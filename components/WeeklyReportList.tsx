@@ -49,14 +49,31 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
 
     const fieldsTableHtml = fields.map(field => {
       const f = report.fields[field.id as keyof typeof report.fields];
-      return `
-        <tr>
-          <td style="font-weight:bold; background:#f9fafb; text-align:center;">${field.label}</td>
-          <td style="text-align:left;">${(f.thisWeek || '').replace(/\n/g, '<br/>')}</td>
-          <td style="text-align:center;">${(f.results || '').replace(/\n/g, '<br/>')}</td>
-          <td style="text-align:left;">${(f.nextWeek || '').replace(/\n/g, '<br/>')}</td>
-        </tr>
-      `;
+      
+      const thisWeekLines = (f.thisWeek || '').split('\n').filter(l => l.trim() !== '');
+      const resultLines = (f.results || '').split('\n').map(l => l.trim());
+      const nextWeekLines = (f.nextWeek || '').split('\n').filter(l => l.trim() !== '');
+
+      const rowCount = Math.max(thisWeekLines.length, nextWeekLines.length, 1);
+      
+      let categoryRows = '';
+      for (let i = 0; i < rowCount; i++) {
+        const isFirst = i === 0;
+        const isLast = i === rowCount - 1;
+        // 가로선을 완전히 없애기 위해 현재 행의 하단과 다음 행의 상단을 모두 border:none 처리
+        // padding을 2px로 줄여 행 간격을 좁힘
+        const borderStyle = (isLast ? '' : 'border-bottom:none !important;') + (isFirst ? '' : 'border-top:none !important;');
+        
+        categoryRows += `
+          <tr>
+            ${isFirst ? `<td rowspan="${rowCount}" style="font-weight:bold; background:#f9fafb; text-align:center; vertical-align:middle; width:40px;">${field.label}</td>` : ''}
+            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${thisWeekLines[i] || (isFirst && thisWeekLines.length === 0 ? '특이사항 없음' : '')}</td>
+            <td style="text-align:center; padding:2px 6px; vertical-align:middle; width:90px; ${borderStyle}">${resultLines[i] || ''}</td>
+            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${nextWeekLines[i] || (isFirst && nextWeekLines.length === 0 ? '예정사항 없음' : '')}</td>
+          </tr>
+        `;
+      }
+      return categoryRows;
     }).join('');
 
     const photosHtml = (report.photos || []).filter(p => p.dataUrl).map(photo => `
@@ -75,7 +92,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.3; color: black; margin: 0; padding: 0; background: #f1f5f9; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #f1f5f9; -webkit-print-color-adjust: exact; }
             .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
             @media print { 
               .no-print { display: none !important; } 
@@ -85,7 +102,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
             }
             .print-page { width: 100%; max-width: 210mm; margin: 20px auto; padding: 25mm 12mm 10mm 12mm; box-sizing: border-box; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-height: 297mm; }
             .doc-title { margin: 0 auto 15px auto; text-align: center; font-size: 30pt; font-weight: 900; letter-spacing: 12px; text-decoration: underline; text-underline-offset: 8px; }
-            .info-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt; margin-bottom: 15px; border-bottom: 1.5px solid black; padding-bottom: 5px; }
+            .info-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt; margin-bottom: 15px; border-bottom: 1.5 solid black; padding-bottom: 5px; }
             .section-header { font-size: 13pt; font-weight: bold; margin-top: 10px; margin-bottom: 15px; border-left: 8px solid black; padding-left: 15px; text-align: left; }
             table { width: 100%; border-collapse: collapse; border: 1.5px solid black; margin-bottom: 15px; table-layout: fixed; }
             th, td { border: 1px solid black; padding: 6px; font-size: 9pt; vertical-align: top; word-break: break-all; }

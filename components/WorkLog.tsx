@@ -26,7 +26,8 @@ import {
   fetchElevatorInspectionList,
   saveElevatorInspectionList,
   fetchFireHistoryList,
-  saveFireHistoryList
+  saveFireHistoryList,
+  apiFetchBatch
 } from '../services/dataService';
 import { 
   DailyData, 
@@ -93,8 +94,6 @@ const INITIAL_WORKLOG: WorkLogData = {
   cleaning: { ...EMPTY_LOG_CATEGORY },
   handover: { ...EMPTY_LOG_CATEGORY },
 };
-
-// Removed redundant local TaskItem interface declaration to resolve conflict with imported TaskItem
 
 interface TaskRowProps {
   item: TaskItem;
@@ -257,7 +256,7 @@ interface SearchResultItem {
   type: '금일' | '익일';
   content: string;
   id: string;
-  date?: string; // 검색 시 날짜 정보 추가
+  date?: string; 
 }
 
 const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
@@ -271,12 +270,11 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const [activeTab, setActiveTab] = useState('electrical');
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
-  // Search states
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
-  const [selectedSearchYear, setSelectedSearchYear] = useState(new Date().getFullYear()); // 선택된 검색 연도
-  const [isSearching, setIsSearching] = useState(false); // 검색 처리 중 로딩 상태
+  const [selectedSearchYear, setSelectedSearchYear] = useState(new Date().getFullYear()); 
+  const [isSearching, setIsSearching] = useState(false); 
 
   const [gasLog, setGasLog] = useState<GasLogData>(getInitialGasLog(''));
   const [septicLog, setSepticLog] = useState<SepticLogData>(getInitialSepticLog(''));
@@ -290,24 +288,30 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     setLoading(true);
     isInitialLoad.current = true;
     try {
-      const [serverDataResult, gasData, septicData] = await Promise.all([
-        fetchDailyData(dateKey, force),
-        fetchGasLog(dateKey),
-        fetchSepticLog(dateKey)
+      const searchStart = format(subDays(currentDate, 7), 'yyyy-MM-dd');
+      const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
+
+      // 최적화: 4개의 요청을 하나의 배치 요청으로 묶음 (Batching)
+      const batchResults = await apiFetchBatch([
+        { type: 'get', key: `DAILY_${dateKey}` },
+        { type: 'get', key: `GAS_LOG_${dateKey}` },
+        { type: 'get', key: `SEPTIC_LOG_${dateKey}` },
+        { type: 'range', prefix: "DAILY_", start: searchStart, end: yesterdayStr }
       ]);
 
       if (isCancelled()) return;
 
+      const serverDataResult = batchResults[0]?.data as DailyData;
+      const gasData = batchResults[1]?.data as GasLogData;
+      const septicData = batchResults[2]?.data as SepticLogData;
+      const recentLogs = batchResults[3]?.data || [];
+
       setGasLog(gasData || getInitialGasLog(dateKey));
       setSepticLog(septicData || getInitialSepticLog(dateKey));
 
-      const searchStart = format(subDays(currentDate, 7), 'yyyy-MM-dd');
-      const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
-      const recentLogs = await apiFetchRange("DAILY_", searchStart, yesterdayStr);
-      
       let lastWorkdayLog: DailyData | null = null;
       if (recentLogs && recentLogs.length > 0) {
-        recentLogs.sort((a, b) => b.key.localeCompare(a.key));
+        recentLogs.sort((a: any, b: any) => b.key.localeCompare(a.key));
         lastWorkdayLog = recentLogs[0]?.data;
       }
       
@@ -357,12 +361,14 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         handover: () => []
       };
 
+      const normalizeContent = (text: string) => (text || '').replace(/\s+/g, '').trim();
+
       categories.forEach((key) => {
         let cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
+        
         if (!serverDataResult?.lastUpdated) {
           if (!cat.today || cat.today.length === 0) {
-            const autoTasks = automationMap[key] ? automationMap[key](dateKey) : [];
-            cat.today = autoTasks;
+            cat.today = automationMap[key] ? automationMap[key](dateKey) : [];
           }
           if (!cat.tomorrow || cat.tomorrow.length === 0) {
             const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
@@ -373,13 +379,18 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         if (yesterdayFullLog && (yesterdayFullLog as any)[key]?.tomorrow) {
           const prevTomorrow = (yesterdayFullLog as any)[key].tomorrow as TaskItem[];
           prevTomorrow.forEach(item => {
-            if (item?.content?.trim() && !cat.today.some(t => t.content === item.content)) {
-              cat.today.push({ 
-                id: `from_prev_${item.id}_${Date.now()}`, 
-                content: item.content, 
-                frequency: item.frequency || '일일', 
-                status: '진행중' 
-              });
+            if (item?.content?.trim()) {
+              const normalizedPrev = normalizeContent(item.content);
+              const isDuplicate = cat.today.some(t => normalizeContent(t.content) === normalizedPrev);
+              
+              if (!isDuplicate) {
+                cat.today.push({ 
+                  id: `from_prev_${item.id}_${Date.now()}`, 
+                  content: item.content, 
+                  frequency: item.frequency || '일일', 
+                  status: '진행중' 
+                });
+              }
             }
           });
         }
@@ -391,8 +402,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       setSecurityDuty(draftData?.securityDuty || serverDataResult?.securityDuty || DEFAULT_DUTY);
       setUtility(draftData?.utility || serverDataResult?.utility || DEFAULT_UTILITY);
       
-      const w = await fetchWeatherInfo(dateKey);
-      if (w) setWeather(w);
+      fetchWeatherInfo(dateKey).then(w => { if (w) setWeather(w); });
 
       setTimeout(() => { if (!isCancelled()) isInitialLoad.current = false; }, 500);
     } catch (error) { console.error("WorkLog Load Error:", error); } finally { if (!isCancelled()) setLoading(false); }
@@ -509,13 +519,16 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       }
 
       const fireDraft = getFromStorage(`FIRE_FACILITY_LOG_${dateKey}`, true);
-      if (fireDraft) await saveFireFacilityLog(fireDraft);
       const elevatorDraft = getFromStorage(`ELEVATOR_LOG_${dateKey}`, true);
-      if (elevatorDraft) await saveElevatorLog(elevatorDraft);
       const checklistDraft = getFromStorage(`SUB_CHECK_${dateKey}`, true);
-      if (checklistDraft) await saveSubstationChecklist(checklistDraft);
       const airEnvDraft = getFromStorage(`AIR_ENV_${dateKey}`, true);
-      if (airEnvDraft) await saveAirEnvironmentLog(airEnvDraft);
+      
+      await Promise.all([
+        fireDraft ? saveFireFacilityLog(fireDraft) : Promise.resolve(),
+        elevatorDraft ? saveElevatorLog(elevatorDraft) : Promise.resolve(),
+        checklistDraft ? saveSubstationChecklist(checklistDraft) : Promise.resolve(),
+        airEnvDraft ? saveAirEnvironmentLog(airEnvDraft) : Promise.resolve()
+      ]);
 
       if (success) { 
         setSaveStatus('success'); 
@@ -538,7 +551,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
     setIsSearching(true);
     const results: SearchResultItem[] = [];
-    // 공백을 제거하고 소문자로 변환하는 정규화 함수 (유사어 사전 방식)
     const normalize = (text: string) => text.replace(/\s+/g, '').toLowerCase();
     const normalizedKeyword = normalize(searchKeyword);
 
@@ -547,7 +559,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     ];
 
     try {
-      // 선택된 연도 범위 검색
       const yearStart = `${selectedSearchYear}-01-01`;
       const yearEnd = `${selectedSearchYear}-12-31`;
       const annualLogs = await apiFetchRange("DAILY_", yearStart, yearEnd);
@@ -569,10 +580,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
               }
             });
           }
-          // 익일 예정사항(tomorrow)은 검색 결과에서 제외하도록 수정함
         });
       });
-      // 최신순 정렬
       results.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
       setSearchResults(results);
@@ -589,7 +598,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
     if (!printWindow) return;
 
-    // 점검표, 기계설비 탭은 상단 10, 하단 25 / 나머지는 상단 25, 하단 10
     const isTop10mm = catId === 'checklist' || catId === 'mech_facility';
     const dynamicPadding = isTop10mm ? '10mm 12mm 25mm 12mm' : '25mm 12mm 10mm 12mm';
 
@@ -676,7 +684,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         bodyHtml = `
           <div class="print-page">
             <style>
-              /* 19px 행 높이 설정 적용 */
               th, td { height: 19px !important; padding: 0 4px !important; }
             </style>
             <div class="flex-header"><div class="title-box"><div class="doc-title">기계실 업무일지</div></div>${approvalTableHtml()}</div>
@@ -891,7 +898,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                           <tr key={item.id} className="hover:bg-gray-50">
                             {idx === 0 && <td rowSpan={groupedGas[cat].length} className="border border-gray-200 p-2 text-center font-bold bg-gray-50/50 whitespace-pre-wrap">{cat.replace(' ', '\n')}</td>}
                             <td className="border border-gray-200 p-2 text-left">• {item.content}</td>
-                            {/* Fixed: replaced toggleResult with toggleGasResult */}
                             <td className={`border border-gray-200 p-2 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleGasResult(item.id)}>{item.result || '-'}</td>
                           </tr>
                         ))}
@@ -916,7 +922,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                       {septicLog.items.map(item => (
                         <tr key={item.id} className="hover:bg-gray-50">
                           <td className="border border-gray-200 p-2 text-left">• {item.content}</td>
-                          {/* Fixed: replaced toggleResult with toggleSepticResult */}
                           <td className={`border border-gray-200 p-2 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleSepticResult(item.id)}>{item.result || '-'}</td>
                         </tr>
                       ))}
@@ -991,7 +996,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                </div>
             </div>
 
-            {/* Search Section - Year Selection & Input */}
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
               <div className="flex items-center gap-2 print:hidden">
                 <div className="flex items-center gap-3">
@@ -1027,7 +1031,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                   />
                 </div>
                 <button 
-                  onClick={handleSearch}
+                  onClick={handleSearch} 
                   disabled={isSearching}
                   className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap disabled:bg-gray-400"
                 >
@@ -1048,7 +1052,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             </div>
           </div>
 
-          {/* Search Result Modal */}
           {isSearchModalOpen && (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
               <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-100 animate-scale-up">

@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { HvacLogData, HvacLogItem, BoilerLogData, BoilerLogItem } from '../types';
-import { fetchHvacLog, saveHvacLog, getInitialHvacLog, fetchBoilerLog, saveBoilerLog, getInitialBoilerLog, fetchDateRangeData, saveToCache, getFromStorage, fetchDailyData, saveDailyData, apiFetchRange, clearCache } from '../services/dataService';
+import { fetchHvacLog, saveHvacLog, getInitialHvacLog, fetchBoilerLog, saveBoilerLog, getInitialBoilerLog, fetchDateRangeData, saveToCache, getFromStorage, fetchDailyData, saveDailyData, apiFetchRange, clearCache, apiFetchBatch } from '../services/dataService';
 import { format, startOfMonth, differenceInDays, subDays, parseISO } from 'date-fns';
 import LogSheetLayout from './LogSheetLayout';
 
@@ -18,7 +19,6 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
   const [data, setData] = useState<HvacLogData>(getInitialHvacLog(dateKey));
   const [boilerData, setBoilerData] = useState<BoilerLogData>(getInitialBoilerLog(dateKey));
   
-  // 기준 누계값 (전일자 누계)
   const historySumsRef = useRef({ hvac: 0, boiler: 0 });
   const isInitialLoad = useRef(true);
   const lastLoadedDate = useRef<string>('');
@@ -67,41 +67,46 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
     isInitialLoad.current = true;
 
     if (force) {
-      clearCache(`HVAC_${dateKey}`);
-      clearCache(`BOILER_${dateKey}`);
+      clearCache(`HVAC_LOG_${dateKey}`);
+      clearCache(`BOILER_LOG_${dateKey}`);
     }
 
     try {
-      const cachedHvac = getFromStorage(`HVAC_${dateKey}`);
-      const cachedBoiler = getFromStorage(`BOILER_${dateKey}`);
-      const [hvac, boiler] = await Promise.all([fetchHvacLog(dateKey, force), fetchBoilerLog(dateKey, force)]);
-      
-      let finalHvac = hvac || cachedHvac || getInitialHvacLog(dateKey);
-      let finalBoiler = boiler || cachedBoiler || getInitialBoilerLog(dateKey);
-
       const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
       const searchStart = format(subDays(currentDate, 14), 'yyyy-MM-dd');
+
+      // 최적화: 4개의 요청을 하나의 배치 요청으로 묶음 (Batching)
+      const batchResults = await apiFetchBatch([
+        { type: 'get', key: `HVAC_LOG_${dateKey}` },
+        { type: 'get', key: `BOILER_LOG_${dateKey}` },
+        { type: 'range', prefix: "HVAC_LOG_", start: searchStart, end: yesterdayStr },
+        { type: 'range', prefix: "BOILER_LOG_", start: searchStart, end: yesterdayStr }
+      ]);
+      
+      const hvac = batchResults[0]?.data as HvacLogData;
+      const boiler = batchResults[1]?.data as BoilerLogData;
+      const recentHvacLogs = batchResults[2]?.data || [];
+      const recentBoilerLogs = batchResults[3]?.data || [];
+
+      const cachedHvac = getFromStorage(`HVAC_LOG_${dateKey}`);
+      const cachedBoiler = getFromStorage(`BOILER_LOG_${dateKey}`);
+
+      let finalHvac = hvac || cachedHvac || getInitialHvacLog(dateKey);
+      let finalBoiler = boiler || cachedBoiler || getInitialBoilerLog(dateKey);
 
       let hBase = 0;
       let bBase = 0;
 
-      // --- 냉온수기 데이터 연동 로직 ---
-      const recentHvacLogs = await apiFetchRange("HVAC_LOG_", searchStart, yesterdayStr);
       if (recentHvacLogs.length > 0) {
-        recentHvacLogs.sort((a, b) => b.key.localeCompare(a.key));
+        recentHvacLogs.sort((a: any, b: any) => b.key.localeCompare(a.key));
         const latest = recentHvacLogs[0];
         const latestDate = parseISO(latest.key.replace('HVAC_LOG_', ''));
-        
-        // 가스 전일 지침 및 이전 누계값 기준 설정
         if (latestDate.getMonth() === currentDate.getMonth() && latestDate.getFullYear() === currentDate.getFullYear()) {
           hBase = safeParseFloat(latest.data?.gas?.monthTotal);
         }
-
         if (!finalHvac.gas?.prev || finalHvac.gas.prev === '0' || finalHvac.gas.prev === '') {
           if (latest.data?.gas?.curr && finalHvac.gas) finalHvac.gas.prev = latest.data.gas.curr;
         }
-
-        // 살균제 전일 재고 연동
         if (!finalHvac.sterilizer?.prevStock || finalHvac.sterilizer.prevStock === '0' || finalHvac.sterilizer.prevStock === '') {
           if (latest.data?.sterilizer?.stock && finalHvac.sterilizer) {
             finalHvac.sterilizer.prevStock = latest.data.sterilizer.stock;
@@ -109,23 +114,16 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
         }
       }
 
-      // --- 보일러 데이터 연동 로직 ---
-      const recentBoilerLogs = await apiFetchRange("BOILER_LOG_", searchStart, yesterdayStr);
       if (recentBoilerLogs.length > 0) {
-        recentBoilerLogs.sort((a, b) => b.key.localeCompare(a.key));
+        recentBoilerLogs.sort((a: any, b: any) => b.key.localeCompare(a.key));
         const latest = recentBoilerLogs[0];
         const latestDate = parseISO(latest.key.replace('BOILER_LOG_', ''));
-
-        // 가스 전일 지침 및 이전 누계값 기준 설정
         if (latestDate.getMonth() === currentDate.getMonth() && latestDate.getFullYear() === currentDate.getFullYear()) {
           bBase = safeParseFloat(latest.data?.gas?.monthTotal);
         }
-
         if (!finalBoiler.gas?.prev || finalBoiler.gas.prev === '0' || finalBoiler.gas.prev === '') {
           if (latest.data?.gas?.curr && finalBoiler.gas) finalBoiler.gas.prev = latest.data.gas.curr;
         }
-
-        // 소금 및 청관제 전일 재고 연동
         if (!finalBoiler.salt?.prevStock || finalBoiler.salt.prevStock === '0' || finalBoiler.salt.prevStock === '') {
           if (latest.data?.salt?.stock && finalBoiler.salt) finalBoiler.salt.prevStock = latest.data.salt.stock;
         }
@@ -136,7 +134,6 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
 
       historySumsRef.current = { hvac: hBase, boiler: bBase };
 
-      // 초기 계산 수행 (사용량 정수 처리)
       if (finalHvac.gas) {
         const p = safeParseFloat(finalHvac.gas.prev);
         const c = safeParseFloat(finalHvac.gas.curr);
@@ -162,7 +159,6 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
         }
       }
 
-      // 약품 재고 업데이트
       if (finalHvac.sterilizer) {
           const p = safeParseFloat(finalHvac.sterilizer.prevStock);
           const i = safeParseFloat(finalHvac.sterilizer.inQty);
@@ -193,8 +189,8 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
 
   useEffect(() => {
     if (isInitialLoad.current || loading) return;
-    saveToCache(`HVAC_${dateKey}`, data);
-    saveToCache(`BOILER_${dateKey}`, boilerData);
+    saveToCache(`HVAC_LOG_${dateKey}`, data);
+    saveToCache(`BOILER_LOG_${dateKey}`, boilerData);
   }, [data, boilerData, dateKey, loading]);
 
   const handleManualSave = async () => {

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { WeatherData } from "../types";
+import { WeatherData, Tenant } from "../types";
 import { isWithinInterval, addDays, subDays, parseISO, startOfDay } from "date-fns";
 
 // 캐시 및 상태 관리
@@ -35,14 +35,12 @@ const getSeasonalMockWeather = (dateStr: string): WeatherData => {
 
 /**
  * 날씨 정보를 가져오는 함수
- * @param time 기준 시간 (기본값 09:00)
  */
 export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, time: string = "09:00"): Promise<WeatherData | null> => {
   const now = Date.now();
   const targetDate = startOfDay(parseISO(dateStr));
   const today = startOfDay(new Date());
   
-  // 저장 키를 날짜와 시간별로 관리
   const storageKey = `weather_v5_${dateStr}_${time.replace(':', '')}`;
 
   const isNearToday = isWithinInterval(targetDate, {
@@ -116,4 +114,61 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 
   pendingRequests.set(storageKey, fetchPromise);
   return fetchPromise;
+};
+
+/**
+ * 계량기 사진을 분석하여 입주사 및 지침값을 추출하는 함수
+ */
+export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]): Promise<{
+  tenantName: string;
+  floor: string;
+  type: '일반' | '특수';
+  reading: string;
+} | null> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    // 입주사 명단을 텍스트로 변환하여 프롬프트에 포함 (매칭 정확도 향상)
+    const tenantContext = tenants.map(t => `${t.floor}: ${t.name}`).join(', ');
+
+    const imagePart = {
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64Image.split(',')[1], // Remove data URL prefix
+      },
+    };
+
+    const prompt = `
+      당신은 시설관리 전문가입니다. 제공된 계량기 사진을 분석하여 다음 정보를 추출하세요.
+      
+      1. 입주사 매칭: 사진의 라벨(견출지 등)에 적힌 층과 이름을 확인하세요.
+         - 제공된 입주사 명단: [${tenantContext}]
+         - 줄임말 대응: '이가종합건축사'는 '이가종합'으로 적혀있을 수 있습니다. 명단에서 가장 유사한 업체를 고르세요.
+         - 층 표기 대응: '1층'은 '1F'와 동일합니다.
+      2. 계량기 구분: 사진 속 라벨이나 문구(에어컨, 전열, 특수 등)를 통해 '일반'인지 '특수'인지 판단하세요. 명확하지 않으면 '일반'으로 분류하세요.
+      3. 당월 지침값: 계량기의 숫자(디지털 또는 아날로그 다이얼)를 정확히 읽으세요. 소수점은 무시하고 정수 위주로 읽으세요.
+      
+      반드시 다음 JSON 형식으로 응답하세요:
+      {
+        "tenantName": "명단에 있는 정확한 입주사명",
+        "floor": "명단에 있는 정확한 층",
+        "type": "일반" 또는 "특수",
+        "reading": "숫자로 된 지침값"
+      }
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: { parts: [imagePart, { text: prompt }] },
+      config: {
+        responseMimeType: "application/json",
+      },
+    });
+
+    const result = JSON.parse(response.text || '{}');
+    return result;
+  } catch (error) {
+    console.error("Meter analysis error:", error);
+    return null;
+  }
 };

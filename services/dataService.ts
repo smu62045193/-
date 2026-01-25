@@ -124,6 +124,63 @@ export const apiFetchRange = async (prefix: string, startDate: string, endDate: 
 };
 
 /**
+ * Speed Optimization: 배치 요청 (여러 데이터 한 번에 가져오기)
+ * Fallback: 배치 요청이 실패할 경우 개별 요청으로 전환하여 안정성 보장
+ */
+export const apiFetchBatch = async (requests: { type: 'get' | 'range', key?: string, prefix?: string, start?: string, end?: string }[]) => {
+  try {
+    const batchJson = JSON.stringify(requests);
+    const url = `${GOOGLE_APPS_SCRIPT_URL}?batch=${encodeURIComponent(batchJson)}`;
+    
+    // URL 길이가 너무 길면 (브라우저 제한 대략 2~8KB) 개별 요청으로 즉시 전환
+    if (url.length > 2000) {
+      throw new Error("URL too long for GET batch");
+    }
+
+    const response = await fetch(url);
+    const result = await response.json();
+    
+    if (result.status === 'success' && Array.isArray(result.data)) {
+      return result.data;
+    }
+    throw new Error(result.message || "Batch request unsuccessful");
+
+  } catch (error) {
+    console.warn("apiFetchBatch failed, falling back to individual requests:", error);
+    
+    // 개별 요청 병렬 실행 (Fallback)
+    const fallbackResults = await Promise.all(requests.map(async (req) => {
+      if (req.type === 'get' && req.key) {
+        const data = await fetchFromApi(req.key);
+        return { key: req.key, data };
+      } else if (req.type === 'range' && req.prefix && req.start && req.end) {
+        const data = await apiFetchRange(req.prefix, req.start, req.end);
+        return { key: req.prefix, data };
+      }
+      return null;
+    }));
+    
+    return fallbackResults;
+  }
+};
+
+/**
+ * Speed Optimization Wrapper: 캐시 우선 반환 전략
+ */
+const fetchWithCache = async <T>(key: string, force: boolean = false): Promise<T | null> => {
+  const cacheKey = key;
+  if (!force) {
+    const cached = getFromStorage(cacheKey);
+    if (cached) {
+      return cached as T;
+    }
+  }
+  const server = await fetchFromApi(key);
+  if (server) saveToCache(cacheKey, server);
+  return server as T;
+};
+
+/**
  * Daily Data
  */
 export const getInitialDailyData = (date: string): DailyData => ({
@@ -152,13 +209,7 @@ export const getInitialDailyData = (date: string): DailyData => ({
 });
 
 export const fetchDailyData = async (date: string, force = false): Promise<DailyData | null> => {
-  if (!force) {
-    const cached = getFromStorage(`DAILY_${date}`);
-    if (cached) return cached;
-  }
-  const server = await fetchFromApi(`DAILY_${date}`);
-  if (server) saveToCache(`DAILY_${date}`, server);
-  return server;
+  return await fetchWithCache<DailyData>(`DAILY_${date}`, force);
 };
 
 export const saveDailyData = async (data: DailyData) => {
@@ -176,7 +227,7 @@ export const fetchDateRangeData = async (startDate: string, daysCount: number) =
  * Consumables
  */
 export const fetchConsumables = async (): Promise<ConsumableItem[]> => {
-  const res = await fetchFromApi('CONSUMABLES_DB');
+  const res = await fetchWithCache<any>('CONSUMABLES_DB');
   return res?.consumables || [];
 };
 
@@ -215,7 +266,7 @@ export const getInitialSubstationChecklist = (date: string): SubstationChecklist
 });
 
 export const fetchSubstationChecklist = async (date: string): Promise<SubstationChecklistData | null> => {
-  return await fetchFromApi(`SUB_CHECK_${date}`);
+  return await fetchWithCache<SubstationChecklistData>(`SUB_CHECK_${date}`);
 };
 
 export const saveSubstationChecklist = async (data: SubstationChecklistData) => {
@@ -247,7 +298,7 @@ export const getInitialFireFacilityLog = (date: string): FireFacilityLogData => 
 });
 
 export const fetchFireFacilityLog = async (date: string): Promise<FireFacilityLogData | null> => {
-  return await fetchFromApi(`FIRE_FACILITY_LOG_${date}`);
+  return await fetchWithCache<FireFacilityLogData>(`FIRE_FACILITY_LOG_${date}`);
 };
 
 export const saveFireFacilityLog = async (data: FireFacilityLogData) => {
@@ -273,7 +324,7 @@ export const getInitialElevatorLog = (date: string): ElevatorLogData => ({
 });
 
 export const fetchElevatorLog = async (date: string): Promise<ElevatorLogData | null> => {
-  return await fetchFromApi(`ELEVATOR_LOG_${date}`);
+  return await fetchWithCache<ElevatorLogData>(`ELEVATOR_LOG_${date}`);
 };
 
 export const saveElevatorLog = async (data: ElevatorLogData) => {
@@ -307,7 +358,7 @@ export const getInitialGasLog = (date: string): GasLogData => ({
 });
 
 export const fetchGasLog = async (date: string): Promise<GasLogData | null> => {
-  return await fetchFromApi(`GAS_LOG_${date}`);
+  return await fetchWithCache<GasLogData>(`GAS_LOG_${date}`);
 };
 
 export const saveGasLog = async (data: GasLogData) => {
@@ -334,7 +385,7 @@ export const getInitialSepticLog = (date: string): SepticLogData => ({
 });
 
 export const fetchSepticLog = async (date: string): Promise<SepticLogData | null> => {
-  return await fetchFromApi(`SEPTIC_LOG_${date}`);
+  return await fetchWithCache<SepticLogData>(`SEPTIC_LOG_${date}`);
 };
 
 export const saveSepticLog = async (data: SepticLogData) => {
@@ -345,7 +396,7 @@ export const saveSepticLog = async (data: SepticLogData) => {
  * Staff
  */
 export const fetchStaffList = async (): Promise<StaffMember[]> => {
-  const res = await fetchFromApi('STAFF_DB_MASTER');
+  const res = await fetchWithCache<any>('STAFF_DB_MASTER');
   return res?.staff || [];
 };
 
@@ -357,14 +408,13 @@ export const saveStaffList = async (list: StaffMember[]) => {
  * Weekly Report
  */
 export const fetchWeeklyReport = async (date: string): Promise<WeeklyReportData | null> => {
-  return await fetchFromApi(`WEEKLY_REPORT_${date}`);
+  return await fetchWithCache<WeeklyReportData>(`WEEKLY_REPORT_${date}`);
 };
 
 export const saveWeeklyReport = async (data: WeeklyReportData) => {
   return await saveToApi(`WEEKLY_REPORT_${data.startDate}`, data);
 };
 
-// Add missing fetchWeeklyReportList function to fix error in WeeklyReportList component
 export const fetchWeeklyReportList = async (): Promise<{key: string, data: WeeklyReportData}[]> => {
   return await apiFetchRange("WEEKLY_REPORT_", "2024-01-01", "2034-12-31");
 };
@@ -373,7 +423,7 @@ export const fetchWeeklyReportList = async (): Promise<{key: string, data: Weekl
  * Consumable Requests
  */
 export const fetchConsumableRequests = async (): Promise<ConsumableRequest[]> => {
-  const res = await fetchFromApi('CONSUMABLE_REQ_DB');
+  const res = await fetchWithCache<any>('CONSUMABLE_REQ_DB');
   return res?.consumableReq || [];
 };
 
@@ -385,7 +435,7 @@ export const saveConsumableRequests = async (list: ConsumableRequest[]) => {
  * Parking
  */
 export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => {
-  const res = await fetchFromApi('PARKING_CHANGE_DB');
+  const res = await fetchWithCache<any>('PARKING_CHANGE_DB');
   return res?.parkingChange || [];
 };
 
@@ -394,7 +444,7 @@ export const saveParkingChangeList = async (list: ParkingChangeItem[]) => {
 };
 
 export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => {
-  const res = await fetchFromApi('PARKING_STATUS_DB');
+  const res = await fetchWithCache<any>('PARKING_STATUS_DB');
   return res?.parkingStatus || [];
 };
 
@@ -406,7 +456,7 @@ export const saveParkingStatusList = async (list: ParkingStatusItem[]) => {
  * Parking Layout
  */
 export const fetchParkingLayout = async (): Promise<any> => {
-  const res = await fetchFromApi('PARKING_LAYOUT_DB');
+  const res = await fetchWithCache<any>('PARKING_LAYOUT_DB');
   return res?.layout || null;
 };
 
@@ -418,7 +468,7 @@ export const saveParkingLayout = async (layout: any) => {
  * Contractors
  */
 export const fetchContractors = async (): Promise<Contractor[]> => {
-  const res = await fetchFromApi('CONTRACTOR_DB');
+  const res = await fetchWithCache<any>('CONTRACTOR_DB');
   return res?.contractors || [];
 };
 
@@ -478,7 +528,7 @@ export const getInitialGeneratorCheck = (month: string): GeneratorCheckData => (
 });
 
 export const fetchGeneratorCheck = async (month: string): Promise<GeneratorCheckData | null> => {
-  return await fetchFromApi(`GEN_CHECK_${month}`);
+  return await fetchWithCache<GeneratorCheckData>(`GEN_CHECK_${month}`);
 };
 
 export const saveGeneratorCheck = async (data: GeneratorCheckData) => {
@@ -515,6 +565,7 @@ export const getInitialSubstationLog = (date: string): SubstationLogData => ({
       acb1: { v: '', a: '', kw: '' }, 
       acb2: { v: '', a: '', kw: '' }, 
       acb3: { v: '', a: '', kw: '' }, 
+      // Fixed Type Error: Property name '처리' should be 'tr2' as per AcbReadings interface.
       trTemp: { tr1: '', tr2: '', tr3: '' } 
     }
   },
@@ -527,13 +578,7 @@ export const getInitialSubstationLog = (date: string): SubstationLogData => ({
 });
 
 export const fetchSubstationLog = async (date: string, force = false): Promise<SubstationLogData | null> => {
-  if (!force) {
-    const cached = getFromStorage(`SUB_LOG_${date}`);
-    if (cached) return cached;
-  }
-  const server = await fetchFromApi(`SUB_LOG_${date}`);
-  if (server) saveToCache(`SUB_LOG_${date}`, server);
-  return server;
+  return await fetchWithCache<SubstationLogData>(`SUB_LOG_${date}`, force);
 };
 
 export const saveSubstationLog = async (data: SubstationLogData) => {
@@ -550,7 +595,7 @@ export const getInitialMeterReading = (month: string): MeterReadingData => ({
 });
 
 export const fetchMeterReading = async (month: string): Promise<MeterReadingData | null> => {
-  return await fetchFromApi(`METER_${month}`);
+  return await fetchWithCache<MeterReadingData>(`METER_${month}`);
 };
 
 export const saveMeterReading = async (data: MeterReadingData) => {
@@ -561,7 +606,7 @@ export const saveMeterReading = async (data: MeterReadingData) => {
  * Meter Photos
  */
 export const fetchMeterPhotos = async (month: string): Promise<MeterPhotoData | null> => {
-  return await fetchFromApi(`METER_PHOTO_${month}`);
+  return await fetchWithCache<MeterPhotoData>(`METER_PHOTO_${month}`);
 };
 
 export const saveMeterPhotos = async (data: MeterPhotoData) => {
@@ -599,7 +644,7 @@ export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
 });
 
 export const fetchBatteryCheck = async (month: string): Promise<BatteryCheckData | null> => {
-  return await fetchFromApi(`BATTERY_${month}`);
+  return await fetchWithCache<BatteryCheckData>(`BATTERY_${month}`);
 };
 
 export const saveBatteryCheck = async (data: BatteryCheckData) => {
@@ -619,7 +664,7 @@ export const getInitialLoadCurrent = (month: string): LoadCurrentData => {
 };
 
 export const fetchLoadCurrent = async (month: string): Promise<LoadCurrentData | null> => {
-  return await fetchFromApi(`LOAD_${month}`);
+  return await fetchWithCache<LoadCurrentData>(`LOAD_${month}`);
 };
 
 export const saveLoadCurrent = async (data: LoadCurrentData) => {
@@ -644,7 +689,7 @@ export const getInitialSafetyCheck = (date: string, type: 'general' | 'ev'): Saf
 });
 
 export const fetchSafetyCheck = async (month: string, type: 'general' | 'ev'): Promise<SafetyCheckData | null> => {
-  return await fetchFromApi(`SAFETY_${type}_${month}`);
+  return await fetchWithCache<SafetyCheckData>(`SAFETY_${type}_${month}`);
 };
 
 export const saveSafetyCheck = async (data: SafetyCheckData) => {
@@ -677,17 +722,11 @@ export const getInitialHvacLog = (date: string): HvacLogData => ({
 });
 
 export const fetchHvacLog = async (date: string, force = false): Promise<HvacLogData | null> => {
-  if (!force) {
-    const cached = getFromStorage(`HVAC_${date}`);
-    if (cached) return cached;
-  }
-  const server = await fetchFromApi(`HVAC_LOG_${date}`);
-  if (server) saveToCache(`HVAC_${date}`, server);
-  return server;
+  return await fetchWithCache<HvacLogData>(`HVAC_LOG_${date}`, force);
 };
 
 export const saveHvacLog = async (data: HvacLogData) => {
-  saveToCache(`HVAC_${data.date}`, data);
+  saveToCache(`HVAC_LOG_${data.date}`, data);
   return await saveToApi(`HVAC_LOG_${data.date}`, data);
 };
 
@@ -708,17 +747,11 @@ export const getInitialBoilerLog = (date: string): BoilerLogData => ({
 });
 
 export const fetchBoilerLog = async (date: string, force = false): Promise<BoilerLogData | null> => {
-  if (!force) {
-    const cached = getFromStorage(`BOILER_${date}`);
-    if (cached) return cached;
-  }
-  const server = await fetchFromApi(`BOILER_LOG_${date}`);
-  if (server) saveToCache(`BOILER_${date}`, server);
-  return server;
+  return await fetchWithCache<BoilerLogData>(`BOILER_LOG_${date}`, force);
 };
 
 export const saveBoilerLog = async (data: BoilerLogData) => {
-  saveToCache(`BOILER_${data.date}`, data);
+  saveToCache(`BOILER_LOG_${data.date}`, data);
   return await saveToApi(`BOILER_LOG_${data.date}`, data);
 };
 
@@ -740,7 +773,7 @@ export const getInitialAirEnvironmentLog = (date: string): AirEnvironmentLogData
 });
 
 export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironmentLogData | null> => {
-  return await fetchFromApi(`AIR_ENV_${date}`);
+  return await fetchWithCache<AirEnvironmentLogData>(`AIR_ENV_${date}`);
 };
 
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData) => {
@@ -761,7 +794,7 @@ export const getInitialWaterTankLog = (date: string): WaterTankLogData => ({
     { id: 'wt-2', category: '저수조 본체의 상태', criteria: ['균열 또는 누수되는 부분이 없을 것', '출입구나 접합부의 틈으로 빗물 등이 들어가지 아니할 것', '유출관·배수관등의 접합부분은 고정되고 방수·밀폐되어 있을 것'], results: ['O', 'O', 'O'] },
     { id: 'wt-3', category: '저수조 윗부분의 상태', criteria: ['저수조의 윗부분에는 물을 오염시킬 우려가 있는 설비나기기 등이 놓여 있지 아니할 것', '저수조의 상부는 물이 고이지 아니하여야 하고 먼지 등 위생에 해로운 것이 쌓이지 아니할 것'], results: ['O', 'O'] },
     { id: 'wt-4', category: '저수조 안의 상태', criteria: ['오물, 붉은 녹 등의 침식물, 저수조 내벽 및 내부구조물의 오염 또는 도장의 떨어짐 등이 없을 것', '수중 및 수면에 부유물질(浮遊物質)이 없을 것', '외벽도장이 벗겨져 빛이 투과하는 상태로 되어 있지 아니할 것'], results: ['O', 'O', 'O'] },
-    { id: 'wt-5', category: '맨홀의 상태', criteria: ['뚜껑을 통하여 먼지나 그 밖에 위생에 해로운 부유물질이 들어 갈 수 없는 구조일 것', '점검을 하는 자 외의 자가 쉽게 열고 닫을 수 없도록 잠금장치가 안전할 것'], results: ['O', 'O'] },
+    { id: 'wt-5', category: '맨홀의 상태', criteria: ['뚜껑을 통하여 먼지나 그 밖에 위생에 해로운 부유물질이 들어 갈 수 없는 구조일 것', '점검을 하는 자 외의 자가 쉽게 열고 닫을 수 없도록 장금장치가 안전할 것'], results: ['O', 'O'] },
     { id: 'wt-6', category: '월류관·통기관의 상태', criteria: ['관의 끝부분으로부터 먼지나 그 밖에 위생에 해로운 물질이 들어갈 수 없을 것', '관 끝부분의 방충망은 훼손되지 아니하고 망눈의 크기는 작은 동물 등의 침입을 막을 수 있을 것'], results: ['O', 'O'] },
     { id: 'wt-7', category: '냄새', criteria: ['물에 불쾌한 냄새가 나지 아니할 것'], results: ['O'] },
     { id: 'wt-8', category: '맛', criteria: ['물이 이상한 맛이 나지 아니할 것'], results: ['O'] },
@@ -771,7 +804,7 @@ export const getInitialWaterTankLog = (date: string): WaterTankLogData => ({
 });
 
 export const fetchWaterTankLog = async (month: string): Promise<WaterTankLogData | null> => {
-  return await fetchFromApi(`WATER_TANK_${month}`);
+  return await fetchWithCache<WaterTankLogData>(`WATER_TANK_${month}`);
 };
 
 export const saveWaterTankLog = async (data: WaterTankLogData) => {
@@ -788,7 +821,7 @@ export const getInitialChemicalLog = (date: string): ChemicalLogData => ({
 });
 
 export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | null> => {
-  return await fetchFromApi(`CHEMICAL_${date}`);
+  return await fetchWithCache<ChemicalLogData>(`CHEMICAL_${date}`);
 };
 
 export const saveChemicalLog = async (data: ChemicalLogData) => {
@@ -799,7 +832,7 @@ export const saveChemicalLog = async (data: ChemicalLogData) => {
  * Fire Extinguishers
  */
 export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[]> => {
-  const res = await fetchFromApi('FIRE_EXT_DB');
+  const res = await fetchWithCache<any>('FIRE_EXT_DB');
   return res?.fireExtList || [];
 };
 
@@ -811,7 +844,7 @@ export const saveFireExtinguisherList = async (list: FireExtinguisherItem[]) => 
  * Tenants
  */
 export const fetchTenants = async (): Promise<Tenant[]> => {
-  const res = await fetchFromApi('TENANT_DB');
+  const res = await fetchWithCache<any>('TENANT_DB');
   return res?.tenants || [];
 };
 
@@ -823,7 +856,7 @@ export const saveTenants = async (list: Tenant[]) => {
  * Elevator Inspection History
  */
 export const fetchElevatorInspectionList = async (): Promise<ElevatorInspectionItem[]> => {
-  const res = await fetchFromApi('ELEVATOR_INSPECTION_DB');
+  const res = await fetchWithCache<any>('ELEVATOR_INSPECTION_DB');
   return res?.inspectionList || [];
 };
 
@@ -835,7 +868,7 @@ export const saveElevatorInspectionList = async (list: ElevatorInspectionItem[])
  * Construction Logs
  */
 export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> => {
-  const res = await fetchFromApi('EXTERNAL_WORK_DB');
+  const res = await fetchWithCache<any>('EXTERNAL_WORK_DB');
   return res?.workList || [];
 };
 
@@ -844,7 +877,7 @@ export const saveExternalWorkList = async (list: ConstructionWorkItem[]) => {
 };
 
 export const fetchInternalWorkList = async (): Promise<ConstructionWorkItem[]> => {
-  const res = await fetchFromApi('INTERNAL_WORK_DB');
+  const res = await fetchWithCache<any>('INTERNAL_WORK_DB');
   return res?.workList || [];
 };
 
@@ -856,7 +889,7 @@ export const saveInternalWorkList = async (list: ConstructionWorkItem[]) => {
  * Appointments
  */
 export const fetchAppointmentList = async (): Promise<AppointmentItem[]> => {
-  const res = await fetchFromApi('APPOINTMENT_DB');
+  const res = await fetchWithCache<any>('APPOINTMENT_DB');
   return res?.appointmentList || [];
 };
 
@@ -874,7 +907,7 @@ export const getInitialFireInspectionLog = (date: string): FireInspectionLogData
 });
 
 export const fetchFireInspectionLog = async (date: string): Promise<FireInspectionLogData | null> => {
-  return await fetchFromApi(`FIRE_INSP_LOG_${date}`);
+  return await fetchWithCache<FireInspectionLogData>(`FIRE_INSP_LOG_${date}`);
 };
 
 export const saveFireInspectionLog = async (data: FireInspectionLogData) => {
@@ -885,7 +918,7 @@ export const saveFireInspectionLog = async (data: FireInspectionLogData) => {
  * Fire History
  */
 export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
-  const res = await fetchFromApi('FIRE_INSPECTION_HISTORY_DB');
+  const res = await fetchWithCache<any>('FIRE_INSPECTION_HISTORY_DB');
   return res?.fireHistoryList || [];
 };
 

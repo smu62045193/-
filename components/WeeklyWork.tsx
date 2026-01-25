@@ -357,16 +357,32 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
 
     const fieldsHtml = FIELDS.map(field => {
       const f = report.fields[field.id as keyof typeof report.fields];
-      // 분야 칸의 '특이사항' 문구를 '특이' 한 줄, '사항' 한 줄로 강제 줄바꿈
       const displayLabel = field.id === 'handover' ? '특이<br/>사항' : field.label;
-      return `
-        <tr>
-          <td style="font-weight:bold; background:#f9fafb; text-align:center;">${displayLabel}</td>
-          <td class="text-left">${(f.thisWeek || '').replace(/\n/g, '<br/>')}</td>
-          <td class="text-center">${(f.results || '').replace(/\n/g, '<br/>')}</td>
-          <td class="text-left">${(f.nextWeek || '').replace(/\n/g, '<br/>')}</td>
-        </tr>
-      `;
+      
+      const thisWeekLines = (f.thisWeek || '').split('\n').filter(l => l.trim() !== '');
+      const resultLines = (f.results || '').split('\n').map(l => l.trim());
+      const nextWeekLines = (f.nextWeek || '').split('\n').filter(l => l.trim() !== '');
+      
+      const rowCount = Math.max(thisWeekLines.length, nextWeekLines.length, 1);
+      
+      let categoryRows = '';
+      for (let i = 0; i < rowCount; i++) {
+        const isFirst = i === 0;
+        const isLast = i === rowCount - 1;
+        // 항목 사이의 가로선을 제거하되 카테고리 간의 경계는 유지
+        // padding을 2px로 줄여 행 간격을 좁힘
+        const borderStyle = (isLast ? '' : 'border-bottom:none !important;') + (isFirst ? '' : 'border-top:none !important;');
+        
+        categoryRows += `
+          <tr>
+            ${isFirst ? `<td rowspan="${rowCount}" style="font-weight:bold; background:#f9fafb; text-align:center; vertical-align:middle; width:40px;">${displayLabel}</td>` : ''}
+            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${thisWeekLines[i] || (isFirst && thisWeekLines.length === 0 ? '특이사항 없음' : '')}</td>
+            <td style="text-align:center; padding:2px 6px; vertical-align:middle; width:90px; ${borderStyle}">${resultLines[i] || ''}</td>
+            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${nextWeekLines[i] || (isFirst && nextWeekLines.length === 0 ? '예정사항 없음' : '')}</td>
+          </tr>
+        `;
+      }
+      return categoryRows;
     }).join('');
 
     const photosHtml = (report.photos || []).filter(p => p.dataUrl).map(photo => `
@@ -383,7 +399,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.3; color: black; margin: 0; padding: 0; background: #f1f5f9; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #f1f5f9; -webkit-print-color-adjust: exact; }
             .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
             @media print { 
               .no-print { display: none !important; } 
@@ -534,7 +550,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           </div>
         </div>
         <div className="mt-8 border border-gray-300 rounded-xl p-4 bg-white shadow-sm">
-          <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-100"><h3 className="font-bold text-gray-800 flex items-center"><ImageIcon size={18} className="mr-2 text-blue-500" />작업 사진</h3><button onClick={handleOpenPhotoImportModal} className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold border border-blue-100 hover:bg-blue-100 transition-all print:hidden">사진 불러오기</button></div>
+          <div className="flex justify-between items-center mb-4 pb-2 border-b border-100"><h3 className="font-bold text-gray-800 flex items-center"><ImageIcon size={18} className="mr-2 text-blue-500" />작업 사진</h3><button onClick={handleOpenPhotoImportModal} className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold border border-blue-100 hover:bg-blue-100 transition-all print:hidden">사진 불러오기</button></div>
           <div className="grid grid-cols-3 gap-4">{(report.photos || []).map((p, i) => (<div key={p.id} className="border border-gray-200 p-1.5 rounded-xl relative group bg-gray-50"><div className="aspect-[4/3] bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 shadow-inner">{p.dataUrl ? <img src={p.dataUrl} className="w-full h-full object-cover" /> : <div className="text-center p-4"><label className="cursor-pointer text-blue-600 text-xs font-bold bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5"><Upload size={14}/> 사진 업로드<input type="file" accept="image/*" className="hidden" onChange={async e => { const f=e.target.files?.[0]; if(f){const u=await resizeImage(f); const n=[...(report.photos || [])]; n[i]={...n[i],dataUrl:u}; setReport({...report,photos:n});} }} /></label></div>}</div><input type="text" value={p.title} onChange={e => {const n=[...(report.photos || [])]; n[i]={...n[i],title:e.target.value}; setReport({...report,photos:n});}} placeholder="사진 제목 (예: 1층 전등 교체)" className="w-full mt-2 border-b border-gray-200 outline-none px-1 text-[11px] font-normal text-center bg-transparent focus:border-blue-400" /></div>))}</div>
         </div></>
       )}
@@ -572,7 +588,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               ))}
             </div>
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-              <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-100 active:scale-95 transition-all">취소</button>
+              <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-100 transition-all">취소</button>
               <button onClick={handleApplySelection} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all">보고서에 반영하기</button>
             </div>
           </div>

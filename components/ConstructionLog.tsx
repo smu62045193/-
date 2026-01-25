@@ -55,6 +55,9 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     id: generateId(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
   });
 
+  // 모드별 사진 제한 개수 설정
+  const PHOTO_LIMIT = mode === 'external' ? 20 : 10;
+
   useEffect(() => { loadData(); handleReset(false); }, [mode]);
 
   const loadData = async () => {
@@ -165,8 +168,8 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files; if (!files) return;
-    const fileList = Array.from(files) as File[]; const remaining = 10 - currentItem.photos.length;
-    if (fileList.length > remaining) { alert(`최대 10장까지만 가능합니다.`); return; }
+    const fileList = Array.from(files) as File[]; const remaining = PHOTO_LIMIT - currentItem.photos.length;
+    if (fileList.length > remaining) { alert(`최대 ${PHOTO_LIMIT}장까지만 가능합니다.`); return; }
     
     setLoading(true);
     const newPhotos: WorkPhoto[] = [];
@@ -244,9 +247,9 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-bold text-gray-600 mb-2">사진 첨부 ({currentItem.photos.length}/10) <span className="text-[10px] text-blue-500 ml-2">* 저장 시 파일명은 작업내용_순번 형식으로 자동 부여됩니다.</span></label>
+          <label className="block text-sm font-bold text-gray-600 mb-2">사진 첨부 ({currentItem.photos.length}/{PHOTO_LIMIT}) <span className="text-[10px] text-blue-500 ml-2">* 저장 시 파일명은 작업내용 기반으로 자동 부여됩니다.</span></label>
           <div className="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-10 gap-2">
-            {currentItem.photos.length < 10 && (
+            {currentItem.photos.length < PHOTO_LIMIT && (
               <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-white hover:border-blue-400 transition-colors">
                 <Upload size={20} className="text-gray-400" />
                 <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload}/>
@@ -354,7 +357,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
             <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100">
                 <AlertTriangle className="text-red-600" size={36} />
               </div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">작업 내역 삭제 확인</h3>

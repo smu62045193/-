@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { MeterPhotoData, MeterPhotoItem, Tenant } from '../types';
 import { fetchMeterPhotos, saveMeterPhotos, fetchTenants, fetchMeterReading, saveMeterReading } from '../services/dataService';
+import { analyzeMeterPhoto } from '../services/geminiService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
-import { Camera, Plus, Trash2, Save, RefreshCw, X, Image as ImageIcon, Search, ChevronLeft, ChevronRight, Upload, Zap, ZapOff, Edit2, FileText, Calendar, RotateCcw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Camera, Plus, Trash2, Save, RefreshCw, X, Image as ImageIcon, Search, ChevronLeft, ChevronRight, Upload, Zap, ZapOff, Edit2, FileText, Calendar, RotateCcw, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
 
 interface MeterReadingPhotosProps {
   currentDate: Date;
@@ -35,6 +37,7 @@ const resizeImage = (file: File): Promise<string> => {
 
 const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [currentMonth, setCurrentMonth] = useState(format(currentDate, 'yyyy-MM'));
   const [data, setData] = useState<MeterPhotoData>({ month: currentMonth, items: [] });
@@ -110,7 +113,26 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
     const file = e.target.files?.[0];
     if (file) {
       const resized = await resizeImage(file);
-      setNewItem({ ...newItem, photo: resized });
+      setNewItem(prev => ({ ...prev, photo: resized }));
+      
+      // AI 분석 시작
+      setAnalyzing(true);
+      try {
+        const result = await analyzeMeterPhoto(resized, tenants);
+        if (result) {
+          setNewItem(prev => ({
+            ...prev,
+            tenant: result.tenantName,
+            floor: result.floor,
+            type: result.type,
+            reading: result.reading
+          }));
+        }
+      } catch (err) {
+        console.error("AI Analysis failed", err);
+      } finally {
+        setAnalyzing(false);
+      }
     }
   };
 
@@ -253,6 +275,13 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                 <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
                 {newItem.photo && <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold">사진 변경</div>}
               </label>
+              
+              {analyzing && (
+                <div className="mt-3 flex items-center justify-center gap-2 text-amber-600 font-black animate-pulse">
+                  <Sparkles size={16} />
+                  <span className="text-sm">AI가 사진을 분석 중입니다...</span>
+                </div>
+              )}
             </div>
 
             {/* Right Side: Inputs */}
@@ -260,8 +289,9 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
               <div className="md:col-span-2">
                 <label className="block text-xs font-black text-gray-400 mb-1.5 uppercase tracking-wider">입주사 선택 *</label>
                 <select 
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition-all bg-white"
+                  className={`w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 transition-all bg-white ${analyzing ? 'opacity-50' : 'focus:border-amber-500 focus:ring-2 focus:ring-amber-100'}`}
                   value={`${newItem.tenant}|${newItem.floor}`}
+                  disabled={analyzing}
                   onChange={e => {
                     const [name, floor] = e.target.value.split('|');
                     setNewItem({ ...newItem, tenant: name, floor });
@@ -276,14 +306,16 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                 <label className="block text-xs font-black text-gray-400 mb-1.5 uppercase tracking-wider">검침 구분</label>
                 <div className="flex bg-gray-100 p-1.5 rounded-2xl border border-gray-200 shadow-inner">
                   <button 
+                    disabled={analyzing}
                     onClick={() => setNewItem({ ...newItem, type: '일반' })}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-black transition-all ${newItem.type === '일반' ? 'bg-white text-blue-600 shadow-sm border border-gray-200' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-black transition-all ${newItem.type === '일반' ? 'bg-white text-blue-600 shadow-sm border border-gray-200' : 'text-gray-400 hover:text-gray-600'} ${analyzing ? 'cursor-wait' : ''}`}
                   >
                     <Zap size={16} /> 일반 계량기
                   </button>
                   <button 
+                    disabled={analyzing}
                     onClick={() => setNewItem({ ...newItem, type: '특수' })}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-black transition-all ${newItem.type === '특수' ? 'bg-white text-orange-600 shadow-sm border border-gray-200' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-black transition-all ${newItem.type === '특수' ? 'bg-white text-orange-600 shadow-sm border border-gray-200' : 'text-gray-400 hover:text-gray-600'} ${analyzing ? 'cursor-wait' : ''}`}
                   >
                     <ZapOff size={16} /> 특수 계량기
                   </button>
@@ -294,7 +326,8 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                 <label className="block text-xs font-black text-gray-400 mb-1.5 uppercase tracking-wider">당월 지침값</label>
                 <input 
                   type="text" 
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-black text-blue-600 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 text-xl transition-all bg-white"
+                  disabled={analyzing}
+                  className={`w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-black text-blue-600 text-xl transition-all bg-white ${analyzing ? 'opacity-50' : 'focus:border-amber-500 focus:ring-2 focus:ring-amber-100'}`}
                   placeholder="0"
                   value={newItem.reading}
                   onChange={e => setNewItem({ ...newItem, reading: e.target.value })}
@@ -305,19 +338,21 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                 <label className="block text-xs font-black text-gray-400 mb-1.5 uppercase tracking-wider">촬영 일자</label>
                 <input 
                   type="date" 
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 focus:border-amber-500 focus:ring-2 focus:ring-amber-100 transition-all bg-white h-[52px]"
+                  disabled={analyzing}
+                  className={`w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 transition-all bg-white h-[52px] ${analyzing ? 'opacity-50' : 'focus:border-amber-500 focus:ring-2 focus:ring-amber-100'}`}
                   value={newItem.date}
                   onChange={e => setNewItem({ ...newItem, date: e.target.value })}
                 />
               </div>
 
               <div className="md:col-span-2 flex gap-3 mt-2">
-                <button onClick={handleCancel} className="flex-1 py-3.5 bg-white border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-all shadow-sm active:scale-95">취소</button>
+                <button disabled={analyzing} onClick={handleCancel} className="flex-1 py-3.5 bg-white border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-all shadow-sm active:scale-95 disabled:opacity-50">취소</button>
                 <button 
+                  disabled={analyzing}
                   onClick={handleSubmit} 
-                  className={`flex-[2] py-3.5 text-white rounded-xl font-black text-lg shadow-lg active:scale-95 transition-all ${editingId ? 'bg-orange-600 shadow-orange-200 hover:bg-orange-700' : 'bg-amber-600 shadow-amber-200 hover:bg-amber-700'}`}
+                  className={`flex-[2] py-3.5 text-white rounded-xl font-black text-lg shadow-lg active:scale-95 transition-all ${analyzing ? 'bg-gray-400 cursor-wait' : (editingId ? 'bg-orange-600 shadow-orange-200 hover:bg-orange-700' : 'bg-amber-600 shadow-amber-200 hover:bg-amber-700')}`}
                 >
-                  {editingId ? '정보 수정 완료' : '사진첩에 등록하기'}
+                  {analyzing ? '분석 중...' : (editingId ? '정보 수정 완료' : '사진첩에 등록하기')}
                 </button>
               </div>
             </div>

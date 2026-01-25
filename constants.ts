@@ -4,7 +4,7 @@ import { MenuId, MenuItem, Holiday } from './types';
 // =================================================================================================
 // [중요] 구글 앱스 스크립트 배포 후 발급받은 '웹 앱 URL'을 아래에 붙여넣으세요.
 // =================================================================================================
-export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwdtO7PhBExdYOqunn6QjyDkVkleGl8-8uXjr_9p1nEimAUJFQOL9ydA4Ywac03B6pl/exec"; 
+export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8o8TQNWcfUWl_pJ6DOkB9euA5t0qP9jOhyS_6iyipn3Jus32_8Fqv6WhBIt5nlyl5/exec"; 
 
 export const MENU_ITEMS: MenuItem[] = [
   { id: MenuId.WORK_LOG, label: '업무일지' },

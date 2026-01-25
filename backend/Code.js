@@ -1,7 +1,43 @@
+
 function doGet(e) {
   var params = e.parameter;
+  var sheet = getOrCreateSheet('DB_STORE');
   
-  // 1. 파라미터가 없는 경우 (웹사이트 직접 접속 시) index.html 화면을 출력
+  // 1. 배치 요청 처리 (여러 데이터를 한 번의 HTTP 요청으로 반환)
+  if (params.batch) {
+    try {
+      var batchRequests = JSON.parse(params.batch);
+      var lastRow = sheet.getLastRow();
+      
+      // 데이터가 없는 초기 상태 대응
+      if (lastRow < 2) {
+        var emptyResults = batchRequests.map(function() { return { data: null }; });
+        return response({ status: 'success', data: emptyResults });
+      }
+      
+      var allValues = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      var results = batchRequests.map(function(req) {
+        try {
+          if (req.type === 'get') {
+            var rawData = findDataInValues(allValues, req.key);
+            var processedData = handleSpecialListKeys(req.key, rawData);
+            return { key: req.key, data: processOutputPhotos(processedData) };
+          } else if (req.type === 'range') {
+            var rangeData = findRangeInValues(allValues, req.start, req.end, req.prefix);
+            return { key: req.prefix, data: processOutputPhotos(rangeData) };
+          }
+        } catch (itemErr) {
+          return { key: (req.key || req.prefix), data: null, error: itemErr.toString() };
+        }
+        return null;
+      });
+      return response({ status: 'success', data: results });
+    } catch (err) {
+      return response({ status: 'error', message: "Batch processing failed: " + err.toString() });
+    }
+  }
+
+  // 2. 기본 인덱스 페이지 반환
   if (!params.date && !params.startDate && !params.prefix) {
     return HtmlService.createHtmlOutputFromFile('index')
       .setTitle('새마을운동중앙회 대치동사옥 시설관리')
@@ -9,25 +45,49 @@ function doGet(e) {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 
-  // 2. 파라미터가 있는 경우 (앱 내에서 데이터 요청 시) 기존 API 로직 수행
+  // 3. 단일 범위 조회 처리
   var dateKey = params.date;
   var startDate = params.startDate;
   var endDate = params.endDate;
   var prefix = params.prefix || "";
-  
-  var sheet = getOrCreateSheet('DB_STORE');
 
   if (startDate && endDate) {
     var rangeData = getRangeData(sheet, startDate, endDate, prefix);
     return response({ status: 'success', data: rangeData });
   }
 
-  if (!dateKey) {
-    return response({ status: 'error', message: 'Parameter is missing' });
-  }
-
+  // 4. 단일 키 조회 처리
+  if (!dateKey) return response({ status: 'error', message: 'Parameter is missing' });
   var data = getRowData(sheet, dateKey);
-  
+  var result = handleSpecialListKeys(dateKey, data);
+  return response({ status: 'success', data: processOutputPhotos(result) });
+}
+
+// 배치 요청을 위한 내부 도우미 함수들
+function findDataInValues(values, targetKey) {
+  for (var i = 0; i < values.length; i++) {
+    if (normalizeKey(values[i][0]) === targetKey) return parseJson(values[i][1]);
+  }
+  return null;
+}
+
+function findRangeInValues(values, start, end, prefix) {
+  var results = [];
+  for (var i = 0; i < values.length; i++) {
+    var fullKey = normalizeKey(values[i][0]);
+    var datePart = fullKey;
+    if (prefix) {
+      if (fullKey.indexOf(prefix) === 0) datePart = fullKey.substring(prefix.length);
+      else continue;
+    }
+    if (datePart >= start && datePart <= end) {
+      results.push({ key: fullKey, data: parseJson(values[i][1]) });
+    }
+  }
+  return results;
+}
+
+function handleSpecialListKeys(key, data) {
   var listKeys = [
     'STAFF_DB_MASTER', 'CONSUMABLES_DB', 'CONSUMABLE_REQ_DB', 
     'PARKING_CHANGE_DB', 'PARKING_STATUS_DB', 'CONTRACTOR_DB', 
@@ -35,34 +95,23 @@ function doGet(e) {
     'EXTERNAL_WORK_DB', 'INTERNAL_WORK_DB', 'APPOINTMENT_DB',
     'FIRE_INSPECTION_HISTORY_DB'
   ];
+  if (listKeys.indexOf(key) === -1) return data;
 
-  if (listKeys.indexOf(dateKey) !== -1) {
-    var result = {};
-    var fieldMap = {
-      'STAFF_DB_MASTER': 'staff',
-      'CONSUMABLES_DB': 'consumables',
-      'CONSUMABLE_REQ_DB': 'consumableReq',
-      'PARKING_CHANGE_DB': 'parkingChange',
-      'PARKING_STATUS_DB': 'parkingStatus',
-      'CONTRACTOR_DB': 'contractors',
-      'FIRE_EXT_DB': 'fireExtList',
-      'TENANT_DB': 'tenants',
-      'ELEVATOR_INSPECTION_DB': 'inspectionList',
-      'EXTERNAL_WORK_DB': 'workList',
-      'INTERNAL_WORK_DB': 'workList',
-      'APPOINTMENT_DB': 'appointmentList',
-      'FIRE_INSPECTION_HISTORY_DB': 'fireHistoryList'
-    };
-    
-    if (data && typeof data === 'object' && !Array.isArray(data) && data[fieldMap[dateKey]]) {
-      result[fieldMap[dateKey]] = processOutputPhotos(data[fieldMap[dateKey]]);
-    } else {
-      result[fieldMap[dateKey]] = processOutputPhotos(data || []);
-    }
-    return response({ status: 'success', data: result });
+  var fieldMap = {
+    'STAFF_DB_MASTER': 'staff', 'CONSUMABLES_DB': 'consumables', 'CONSUMABLE_REQ_DB': 'consumableReq',
+    'PARKING_CHANGE_DB': 'parkingChange', 'PARKING_STATUS_DB': 'parkingStatus', 'CONTRACTOR_DB': 'contractors',
+    'FIRE_EXT_DB': 'fireExtList', 'TENANT_DB': 'tenants', 'ELEVATOR_INSPECTION_DB': 'inspectionList',
+    'EXTERNAL_WORK_DB': 'workList', 'INTERNAL_WORK_DB': 'workList', 'APPOINTMENT_DB': 'appointmentList',
+    'FIRE_INSPECTION_HISTORY_DB': 'fireHistoryList'
+  };
+  var result = {};
+  var field = fieldMap[key];
+  if (data && typeof data === 'object' && !Array.isArray(data) && data[field]) {
+    result[field] = data[field];
+  } else {
+    result[field] = data || [];
   }
-
-  return response({ status: 'success', data: processOutputPhotos(data) });
+  return result;
 }
 
 function doPost(e) {
@@ -70,40 +119,24 @@ function doPost(e) {
     var content = e.postData.contents;
     var payload = JSON.parse(content);
     var dateKey = payload.targetKey || payload.date;
-    
     if (!dateKey) return response({ status: 'error', message: 'Missing date key' });
-
     var sheet = getOrCreateSheet('DB_STORE');
-    
     payload = processInputPhotos(payload, dateKey);
-
     var listKeyMap = {
-      'STAFF_DB_MASTER': 'staff',
-      'CONSUMABLES_DB': 'consumables',
-      'CONSUMABLE_REQ_DB': 'consumableReq',
-      'PARKING_CHANGE_DB': 'parkingChange',
-      'PARKING_STATUS_DB': 'parkingStatus',
-      'CONTRACTOR_DB': 'contractors',
-      'FIRE_EXT_DB': 'fireExtList',
-      'TENANT_DB': 'tenants',
-      'ELEVATOR_INSPECTION_DB': 'inspectionList',
-      'EXTERNAL_WORK_DB': 'workList',
-      'INTERNAL_WORK_DB': 'workList',
-      'APPOINTMENT_DB': 'appointmentList',
+      'STAFF_DB_MASTER': 'staff', 'CONSUMABLES_DB': 'consumables', 'CONSUMABLE_REQ_DB': 'consumableReq',
+      'PARKING_CHANGE_DB': 'parkingChange', 'PARKING_STATUS_DB': 'parkingStatus', 'CONTRACTOR_DB': 'contractors',
+      'FIRE_EXT_DB': 'fireExtList', 'TENANT_DB': 'tenants', 'ELEVATOR_INSPECTION_DB': 'inspectionList',
+      'EXTERNAL_WORK_DB': 'workList', 'INTERNAL_WORK_DB': 'workList', 'APPOINTMENT_DB': 'appointmentList',
       'FIRE_INSPECTION_HISTORY_DB': 'fireHistoryList'
     };
-
     var finalData;
     if (listKeyMap[dateKey]) {
       finalData = payload[listKeyMap[dateKey]] || [];
     } else {
       var existingData = getRowData(sheet, dateKey);
       finalData = (existingData && typeof existingData === 'object' && !Array.isArray(existingData)) ? existingData : {};
-      for (var key in payload) {
-        if (key !== 'targetKey') finalData[key] = payload[key];
-      }
+      for (var key in payload) { if (key !== 'targetKey') finalData[key] = payload[key]; }
     }
-
     updateRowData(sheet, dateKey, finalData);
     return response({ status: 'success', message: 'Data saved successfully' });
   } catch (error) {
@@ -114,27 +147,18 @@ function doPost(e) {
 function getPhotoFolder() {
   var folderName = "Saemaul_Facility_Photos";
   var folders = DriveApp.getFoldersByName(folderName);
-  if (folders.hasNext()) {
-    return folders.next();
-  } else {
-    var folder = DriveApp.createFolder(folderName);
-    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return folder;
-  }
+  if (folders.hasNext()) return folders.next();
+  var folder = DriveApp.createFolder(folderName);
+  folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  return folder;
 }
 
 function saveBase64Image(base64Data, fileName) {
-  if (!base64Data || typeof base64Data !== 'string' || !base64Data.startsWith('data:image')) {
-    return base64Data; 
-  }
-  
+  if (!base64Data || typeof base64Data !== 'string' || !base64Data.startsWith('data:image')) return base64Data; 
   try {
     var folder = getPhotoFolder();
     var existingFiles = folder.getFilesByName(fileName);
-    while (existingFiles.hasNext()) {
-      var file = existingFiles.next();
-      file.setTrashed(true);
-    }
+    while (existingFiles.hasNext()) existingFiles.next().setTrashed(true);
     var contentType = base64Data.substring(5, base64Data.indexOf(';'));
     var bytes = Utilities.base64Decode(base64Data.substring(base64Data.indexOf(',') + 1));
     var blob = Utilities.newBlob(bytes, contentType, fileName);
@@ -168,9 +192,8 @@ function processInputPhotos(data, contextKey, entityId) {
 
 function processOutputPhotos(data) {
   if (!data) return data;
-  if (Array.isArray(data)) {
-    return data.map(processOutputPhotos);
-  } else if (typeof data === 'object' && data !== null) {
+  if (Array.isArray(data)) return data.map(processOutputPhotos);
+  if (typeof data === 'object' && data !== null) {
     for (var key in data) {
       if (typeof data[key] === 'string' && data[key].startsWith('DRIVE_ID:')) {
         var id = data[key].replace('DRIVE_ID:', '');
@@ -208,47 +231,22 @@ function getRowData(sheet, key) {
   var targetKey = normalizeKey(key);
   var dataRange = sheet.getRange(2, 1, lastRow - 1, 2);
   var values = dataRange.getValues();
-  for (var i = 0; i < values.length; i++) {
-    if (normalizeKey(values[i][0]) === targetKey) {
-      return parseJson(values[i][1]);
-    }
-  }
-  return null;
+  return findDataInValues(values, targetKey);
 }
 
 function getRangeData(sheet, start, end, prefix) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  var results = [];
   var dataRange = sheet.getRange(2, 1, lastRow - 1, 2);
   var values = dataRange.getValues();
-  for (var i = 0; i < values.length; i++) {
-    var fullKey = normalizeKey(values[i][0]);
-    var datePart = fullKey;
-    if (prefix) {
-      if (fullKey.indexOf(prefix) === 0) {
-        datePart = fullKey.substring(prefix.length);
-      } else {
-        continue;
-      }
-    }
-    if (datePart >= start && datePart <= end) {
-      results.push({
-        key: fullKey,
-        data: parseJson(values[i][1])
-      });
-    }
-  }
-  return results;
+  return findRangeInValues(values, start, end, prefix);
 }
 
 function parseJson(jsonStr) {
   try {
     if (!jsonStr || jsonStr === "") return null;
     return typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
-  } catch (e) {
-    return null;
-  }
+  } catch (e) { return null; }
 }
 
 function updateRowData(sheet, key, jsonData) {
