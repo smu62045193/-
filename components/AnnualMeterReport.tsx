@@ -1,8 +1,28 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetchRange } from '../services/dataService';
 import { MeterReadingData, MeterReadingItem } from '../types';
 import { format, parseISO } from 'date-fns';
 import { Search, Printer, RefreshCw, FileText, ChevronDown, User, Calendar } from 'lucide-react';
+
+// 층별 정렬 순서 계산 함수
+const getFloorWeight = (floor: string) => {
+  const f = floor.trim().toUpperCase();
+  if (!f) return 9999;
+  
+  // 지하층 처리 (B1, B2... 또는 지하1층...)
+  if (f.startsWith('B') || f.includes('지하')) {
+    const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+    return 1000 + num; // B1 = 1001, B2 = 1002...
+  }
+  
+  // 옥상 처리
+  if (f === 'RF' || f === '옥상' || f.includes('옥탑')) return 999;
+  
+  // 지상층 처리 (1F, 2F... 또는 1층, 2층...)
+  const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+  return num; // 1층 = 1, 2층 = 2...
+};
 
 const AnnualMeterReport: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -26,8 +46,15 @@ const AnnualMeterReport: React.FC = () => {
 
   const tenantList = useMemo(() => {
     const tenantsMap = new Map<string, {name: string, floor: string}>();
-    allYearData.forEach(monthData => monthData.items.forEach(item => { if (item.tenant) tenantsMap.set(`${item.tenant}|${item.floor || ''}`, { name: item.tenant, floor: item.floor || '' }); }));
-    return Array.from(tenantsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    allYearData.forEach(monthData => monthData.items.forEach(item => { 
+      if (item.tenant) tenantsMap.set(`${item.tenant}|${item.floor || ''}`, { name: item.tenant, floor: item.floor || '' }); 
+    }));
+    return Array.from(tenantsMap.values()).sort((a, b) => {
+      const weightA = getFloorWeight(a.floor);
+      const weightB = getFloorWeight(b.floor);
+      if (weightA !== weightB) return weightA - weightB;
+      return a.name.localeCompare(b.name);
+    });
   }, [allYearData]);
 
   const monthlyStats = useMemo(() => {
@@ -103,8 +130,8 @@ const AnnualMeterReport: React.FC = () => {
       <html><head><title>연간검침보고서</title><style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         @page { size: A4 portrait; margin: 0; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
-        .no-print { display: flex; justify-content: center; padding: 20px; }
+        body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; background: white !important; -webkit-print-color-adjust: exact; }
+        .no-print { display: flex; justify-content: center; padding: 20px; background: #f1f5f9; border-bottom: 1px solid #ddd; }
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
         .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
         h1 { text-align: center; font-size: 26pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin-bottom: 35px; margin-top: 0; }

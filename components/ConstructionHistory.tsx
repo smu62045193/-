@@ -59,9 +59,9 @@ const ConstructionHistory: React.FC = () => {
       </div>
     `;
 
-    // 2페이지부터의 HTML 생성
+    // 2페이지부터의 HTML 생성 - 페이지당 6장으로 수정
     const extraPagesHtml: string[] = [];
-    const photosPerPage = 4;
+    const photosPerPage = 6;
     for (let i = 0; i < extraPhotos.length; i += photosPerPage) {
       const chunk = extraPhotos.slice(i, i + photosPerPage);
       extraPagesHtml.push(`

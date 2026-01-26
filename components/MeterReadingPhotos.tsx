@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MeterPhotoData, MeterPhotoItem, Tenant } from '../types';
 import { fetchMeterPhotos, saveMeterPhotos, fetchTenants, fetchMeterReading, saveMeterReading } from '../services/dataService';
 import { analyzeMeterPhoto } from '../services/geminiService';
@@ -11,6 +11,25 @@ interface MeterReadingPhotosProps {
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// 층별 정렬 순서 계산 함수 (입주사 현황과 동일한 로직)
+const getFloorWeight = (floor: string) => {
+  const f = floor.trim().toUpperCase();
+  if (!f) return 9999;
+  
+  // 지하층 처리 (B1, B2... 또는 지하1층...)
+  if (f.startsWith('B') || f.includes('지하')) {
+    const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+    return 1000 + num; // B1 = 1001, B2 = 1002...
+  }
+  
+  // 옥상 처리
+  if (f === 'RF' || f === '옥상' || f.includes('옥탑')) return 999;
+  
+  // 지상층 처리 (1F, 2F... 또는 1층, 2층...)
+  const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+  return num; // 1층 = 1, 2층 = 2...
+};
 
 const resizeImage = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -203,9 +222,19 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
     setDeleteTargetId(null);
   };
 
-  const filteredItems = data.items.filter(item => 
-    item.tenant.includes(searchTerm) || item.floor.includes(searchTerm)
-  );
+  const filteredItems = useMemo(() => {
+    return data.items
+      .filter(item => 
+        item.tenant.includes(searchTerm) || item.floor.includes(searchTerm)
+      )
+      .sort((a, b) => {
+        const floorDiff = getFloorWeight(a.floor) - getFloorWeight(b.floor);
+        if (floorDiff !== 0) return floorDiff;
+        // 같은 층 내에서는 '일반' 계량기가 '특수' 계량기보다 먼저 나오도록 설정
+        if (a.type === b.type) return 0;
+        return a.type === '일반' ? -1 : 1;
+      });
+  }, [data.items, searchTerm]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -448,7 +477,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
             <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
                 <AlertTriangle className="text-red-600" size={36} />
               </div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">검침 사진 삭제</h3>
@@ -462,7 +491,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                   <X size={20} className="mr-2" />
                   취소
                 </button>
-                <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center active:scale-95">
+                <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95">
                   <Trash2 size={20} className="mr-2" />
                   삭제 실행
                 </button>

@@ -1,15 +1,14 @@
 
 function doGet(e) {
-  var params = e.parameter;
-  var sheet = getOrCreateSheet('DB_STORE');
-  
-  // 1. 배치 요청 처리 (여러 데이터를 한 번의 HTTP 요청으로 반환)
-  if (params.batch) {
-    try {
+  try {
+    var params = e.parameter;
+    var sheet = getOrCreateSheet('DB_STORE');
+    
+    // 1. 배치 요청 처리
+    if (params.batch) {
       var batchRequests = JSON.parse(params.batch);
       var lastRow = sheet.getLastRow();
       
-      // 데이터가 없는 초기 상태 대응
       if (lastRow < 2) {
         var emptyResults = batchRequests.map(function() { return { data: null }; });
         return response({ status: 'success', data: emptyResults });
@@ -32,41 +31,77 @@ function doGet(e) {
         return null;
       });
       return response({ status: 'success', data: results });
-    } catch (err) {
-      return response({ status: 'error', message: "Batch processing failed: " + err.toString() });
     }
+
+    // 2. 기본 인덱스 페이지 반환
+    if (!params.date && !params.startDate && !params.prefix) {
+      return HtmlService.createHtmlOutputFromFile('index')
+        .setTitle('새마을운동중앙회 대치동사옥 시설관리')
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+
+    // 3. 단일 범위 조회 처리
+    var startDate = params.startDate;
+    var endDate = params.endDate;
+    var prefix = params.prefix || "";
+
+    if (startDate && endDate) {
+      var rangeData = getRangeData(sheet, startDate, endDate, prefix);
+      return response({ status: 'success', data: rangeData });
+    }
+
+    // 4. 단일 키 조회 처리
+    var dateKey = params.date;
+    if (!dateKey) return response({ status: 'error', message: 'Parameter is missing' });
+    var data = getRowData(sheet, dateKey);
+    var result = handleSpecialListKeys(dateKey, data);
+    return response({ status: 'success', data: processOutputPhotos(result) });
+
+  } catch (err) {
+    return response({ status: 'error', message: 'Server Side Error: ' + err.toString() });
   }
+}
 
-  // 2. 기본 인덱스 페이지 반환
-  if (!params.date && !params.startDate && !params.prefix) {
-    return HtmlService.createHtmlOutputFromFile('index')
-      .setTitle('새마을운동중앙회 대치동사옥 시설관리')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+function doPost(e) {
+  try {
+    var content = e.postData.contents;
+    var payload = JSON.parse(content);
+    var dateKey = payload.targetKey || payload.date;
+    if (!dateKey) return response({ status: 'error', message: 'Missing date key' });
+    
+    var sheet = getOrCreateSheet('DB_STORE');
+    payload = processInputPhotos(payload, dateKey);
+    
+    var listKeyMap = {
+      'STAFF_DB_MASTER': 'staff', 'CONSUMABLES_DB': 'consumables', 'CONSUMABLE_REQ_DB': 'consumableReq',
+      'PARKING_CHANGE_DB': 'parkingChange', 'PARKING_STATUS_DB': 'parkingStatus', 'CONTRACTOR_DB': 'contractors',
+      'FIRE_EXT_DB': 'fireExtList', 'TENANT_DB': 'tenants', 'ELEVATOR_INSPECTION_DB': 'inspectionList',
+      'EXTERNAL_WORK_DB': 'workList', 'INTERNAL_WORK_DB': 'workList', 'APPOINTMENT_DB': 'appointmentList',
+      'FIRE_INSPECTION_HISTORY_DB': 'fireHistoryList'
+    };
+    
+    var finalData;
+    if (listKeyMap[dateKey]) {
+      finalData = payload[listKeyMap[dateKey]] || [];
+    } else {
+      var existingData = getRowData(sheet, dateKey);
+      finalData = (existingData && typeof existingData === 'object' && !Array.isArray(existingData)) ? existingData : {};
+      for (var key in payload) { if (key !== 'targetKey') finalData[key] = payload[key]; }
+    }
+    
+    updateRowData(sheet, dateKey, finalData);
+    return response({ status: 'success', message: 'Data saved successfully' });
+  } catch (error) {
+    return response({ status: 'error', message: 'Post Error: ' + error.toString() });
   }
-
-  // 3. 단일 범위 조회 처리
-  var dateKey = params.date;
-  var startDate = params.startDate;
-  var endDate = params.endDate;
-  var prefix = params.prefix || "";
-
-  if (startDate && endDate) {
-    var rangeData = getRangeData(sheet, startDate, endDate, prefix);
-    return response({ status: 'success', data: rangeData });
-  }
-
-  // 4. 단일 키 조회 처리
-  if (!dateKey) return response({ status: 'error', message: 'Parameter is missing' });
-  var data = getRowData(sheet, dateKey);
-  var result = handleSpecialListKeys(dateKey, data);
-  return response({ status: 'success', data: processOutputPhotos(result) });
 }
 
 // 배치 요청을 위한 내부 도우미 함수들
 function findDataInValues(values, targetKey) {
+  var normTarget = normalizeKey(targetKey);
   for (var i = 0; i < values.length; i++) {
-    if (normalizeKey(values[i][0]) === targetKey) return parseJson(values[i][1]);
+    if (normalizeKey(values[i][0]) === normTarget) return parseJson(values[i][1]);
   }
   return null;
 }
@@ -112,36 +147,6 @@ function handleSpecialListKeys(key, data) {
     result[field] = data || [];
   }
   return result;
-}
-
-function doPost(e) {
-  try {
-    var content = e.postData.contents;
-    var payload = JSON.parse(content);
-    var dateKey = payload.targetKey || payload.date;
-    if (!dateKey) return response({ status: 'error', message: 'Missing date key' });
-    var sheet = getOrCreateSheet('DB_STORE');
-    payload = processInputPhotos(payload, dateKey);
-    var listKeyMap = {
-      'STAFF_DB_MASTER': 'staff', 'CONSUMABLES_DB': 'consumables', 'CONSUMABLE_REQ_DB': 'consumableReq',
-      'PARKING_CHANGE_DB': 'parkingChange', 'PARKING_STATUS_DB': 'parkingStatus', 'CONTRACTOR_DB': 'contractors',
-      'FIRE_EXT_DB': 'fireExtList', 'TENANT_DB': 'tenants', 'ELEVATOR_INSPECTION_DB': 'inspectionList',
-      'EXTERNAL_WORK_DB': 'workList', 'INTERNAL_WORK_DB': 'workList', 'APPOINTMENT_DB': 'appointmentList',
-      'FIRE_INSPECTION_HISTORY_DB': 'fireHistoryList'
-    };
-    var finalData;
-    if (listKeyMap[dateKey]) {
-      finalData = payload[listKeyMap[dateKey]] || [];
-    } else {
-      var existingData = getRowData(sheet, dateKey);
-      finalData = (existingData && typeof existingData === 'object' && !Array.isArray(existingData)) ? existingData : {};
-      for (var key in payload) { if (key !== 'targetKey') finalData[key] = payload[key]; }
-    }
-    updateRowData(sheet, dateKey, finalData);
-    return response({ status: 'success', message: 'Data saved successfully' });
-  } catch (error) {
-    return response({ status: 'error', message: error.toString() });
-  }
 }
 
 function getPhotoFolder() {

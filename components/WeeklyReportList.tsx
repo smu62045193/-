@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { WeeklyReportData } from '../types';
 import { fetchWeeklyReportList } from '../services/dataService';
@@ -67,9 +68,9 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
         categoryRows += `
           <tr>
             ${isFirst ? `<td rowspan="${rowCount}" style="font-weight:bold; background:#f9fafb; text-align:center; vertical-align:middle; width:40px;">${field.label}</td>` : ''}
-            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${thisWeekLines[i] || (isFirst && thisWeekLines.length === 0 ? '특이사항 없음' : '')}</td>
+            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${thisWeekLines[i] || ''}</td>
             <td style="text-align:center; padding:2px 6px; vertical-align:middle; width:90px; ${borderStyle}">${resultLines[i] || ''}</td>
-            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${nextWeekLines[i] || (isFirst && nextWeekLines.length === 0 ? '예정사항 없음' : '')}</td>
+            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${nextWeekLines[i] || ''}</td>
           </tr>
         `;
       }

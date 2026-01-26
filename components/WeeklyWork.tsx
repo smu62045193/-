@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { startOfWeek, addDays, format, subDays, parseISO, isWithinInterval } from 'date-fns';
 import { HOLIDAYS } from '../constants';
@@ -321,9 +322,9 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       });
 
       newFields[field.id as keyof typeof newFields] = { 
-        thisWeek: formatGroup(selThis, true) || '특이사항 없음', 
+        thisWeek: formatGroup(selThis, true) || '', 
         results: resultsList.join('\n') || (selThis.length > 0 ? '완료 / 이상없음' : ''), 
-        nextWeek: formatGroup(selNext, false) || '예정사항 없음' 
+        nextWeek: formatGroup(selNext, false) || '' 
       };
     });
 
@@ -376,9 +377,9 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
         categoryRows += `
           <tr>
             ${isFirst ? `<td rowspan="${rowCount}" style="font-weight:bold; background:#f9fafb; text-align:center; vertical-align:middle; width:40px;">${displayLabel}</td>` : ''}
-            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${thisWeekLines[i] || (isFirst && thisWeekLines.length === 0 ? '특이사항 없음' : '')}</td>
+            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${thisWeekLines[i] || ''}</td>
             <td style="text-align:center; padding:2px 6px; vertical-align:middle; width:90px; ${borderStyle}">${resultLines[i] || ''}</td>
-            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${nextWeekLines[i] || (isFirst && nextWeekLines.length === 0 ? '예정사항 없음' : '')}</td>
+            <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${nextWeekLines[i] || ''}</td>
           </tr>
         `;
       }
@@ -484,7 +485,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin mr-1" /> : <Save size={18} className="mr-1" />}
               {saveStatus === 'success' ? '저장완료' : '서버저장'}
             </button>
-            <button onClick={handlePrint} className="bg-gray-700 text-white px-3 py-1.5 rounded font-bold text-xs hover:bg-gray-800 transition-colors shadow-sm flex items-center">
+            <button onClick={handlePrint} className="bg-gray-700 text-white px-3 py-1.5 rounded font-bold text-xs hover:bg-emerald-800 transition-colors shadow-sm flex items-center">
               <Printer size={18} className="mr-1" />미리보기
             </button>
           </div>

@@ -1,10 +1,30 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../types';
 import { fetchTenants, saveTenants } from '../services/dataService';
-import { Save, Plus, Trash2, Search, Printer, RefreshCw, Cloud, X, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Save, Plus, Trash2, Search, Printer, RefreshCw, Cloud, X, CheckCircle2, AlertTriangle, Edit2, Check } from 'lucide-react';
 import { format } from 'date-fns';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
+
+// 층별 정렬 순서 계산 함수
+const getFloorWeight = (floor: string) => {
+  const f = floor.trim().toUpperCase();
+  if (!f) return 9999;
+  
+  // 지하층 처리 (B1, B2... 또는 지하1층...)
+  if (f.startsWith('B') || f.includes('지하')) {
+    const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+    return 1000 + num; // B1 = 1001, B2 = 1002...
+  }
+  
+  // 옥상 처리
+  if (f === 'RF' || f === '옥상' || f.includes('옥탑')) return 999;
+  
+  // 지상층 처리 (1F, 2F... 또는 1층, 2층...)
+  const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+  return num; // 1층 = 1, 2층 = 2...
+};
 
 const TenantStatus: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -13,6 +33,9 @@ const TenantStatus: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  
+  // 수정 중인 행 ID 관리
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -23,6 +46,7 @@ const TenantStatus: React.FC = () => {
     const data = await fetchTenants();
     setTenants(data || []);
     setLoading(false);
+    setEditingId(null);
   };
 
   const handleSaveClick = () => {
@@ -33,8 +57,11 @@ const TenantStatus: React.FC = () => {
     setShowSaveConfirm(false);
     setSaveStatus('loading');
     try {
-      const success = await saveTenants(tenants);
+      // 저장 전 최종 정렬
+      const sortedTenants = [...tenants].sort((a, b) => getFloorWeight(a.floor) - getFloorWeight(b.floor));
+      const success = await saveTenants(sortedTenants);
       if (success) {
+        setTenants(sortedTenants);
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
@@ -48,8 +75,9 @@ const TenantStatus: React.FC = () => {
   };
 
   const handleAdd = () => {
+    const newId = generateId();
     const newItem: Tenant = {
-      id: generateId(),
+      id: newId,
       floor: '',
       name: '',
       area: '',
@@ -57,7 +85,8 @@ const TenantStatus: React.FC = () => {
       contact: '',
       note: '일반'
     };
-    setTenants([...tenants, newItem]);
+    setTenants([newItem, ...tenants]);
+    setEditingId(newId); // 추가 즉시 수정 모드
   };
 
   const handleDeleteRequest = (id: string) => {
@@ -73,6 +102,7 @@ const TenantStatus: React.FC = () => {
     
     setTenants(newTenants);
     setDeleteTargetId(null);
+    if (editingId === idStr) setEditingId(null);
     
     try {
       const success = await saveTenants(newTenants);
@@ -93,10 +123,24 @@ const TenantStatus: React.FC = () => {
     ));
   };
 
-  const filteredList = tenants.filter(t => 
-    (t.name || '').includes(searchTerm) || 
-    (t.floor || '').includes(searchTerm)
-  );
+  const handleToggleEdit = (id: string) => {
+    if (editingId === id) {
+      setEditingId(null);
+      // 수정 완료 시 리스트 재정렬
+      setTenants(prev => [...prev].sort((a, b) => getFloorWeight(a.floor) - getFloorWeight(b.floor)));
+    } else {
+      setEditingId(id);
+    }
+  };
+
+  const filteredList = useMemo(() => {
+    return tenants
+      .filter(t => 
+        (t.name || '').includes(searchTerm) || 
+        (t.floor || '').includes(searchTerm)
+      )
+      .sort((a, b) => getFloorWeight(a.floor) - getFloorWeight(b.floor));
+  }, [tenants, searchTerm]);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
@@ -153,9 +197,9 @@ const TenantStatus: React.FC = () => {
     printWindow.document.close();
   };
 
-  const inputClass = "w-full h-full text-center outline-none bg-transparent text-black text-[13px] p-1 font-medium";
+  const inputClass = (isEditing: boolean) => `w-full h-full text-center outline-none bg-transparent text-black text-[13px] p-1 font-medium ${isEditing ? 'bg-orange-50 focus:ring-1 focus:ring-blue-400' : 'cursor-default'}`;
   const headerClass = "border border-gray-300 bg-gray-50 text-center font-bold text-[13px] p-2 text-gray-700";
-  const cellClass = "border border-gray-300 p-0 h-11 align-middle relative group hover:bg-gray-50/50 transition-colors";
+  const cellClass = (isEditing: boolean) => `border border-gray-300 p-0 h-11 align-middle relative transition-colors ${isEditing ? 'bg-orange-50/50' : 'bg-white group-hover:bg-gray-50/30'}`;
 
   return (
     <div className="p-4 sm:p-6 max-w-full mx-auto space-y-6 animate-fade-in relative pb-32">
@@ -197,7 +241,7 @@ const TenantStatus: React.FC = () => {
               <th className={`${headerClass} w-32`}>전용면적</th>
               <th className={`${headerClass} w-32`}>기준전력(월)</th>
               <th className={headerClass}>비 고</th>
-              <th className={`${headerClass} w-16 print:hidden`}>관리</th>
+              <th className={`${headerClass} w-28 print:hidden`}>관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
@@ -206,34 +250,77 @@ const TenantStatus: React.FC = () => {
                 <td colSpan={7} className="py-20 text-gray-400 italic font-medium">등록된 입주사 정보가 없습니다.</td>
               </tr>
             ) : (
-              filteredList.map((item, idx) => (
-                <tr key={item.id} className="group">
-                  <td className="border border-gray-300 bg-gray-50/30 text-[11px] text-gray-400 font-mono">{idx + 1}</td>
-                  <td className={cellClass}>
-                    <input type="text" className={`${inputClass} font-black text-blue-800`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} />
-                  </td>
-                  <td className={cellClass}>
-                    <input type="text" className={inputClass} value={item.floor} onChange={(e) => updateItem(item.id, 'floor', e.target.value)} />
-                  </td>
-                  <td className={cellClass}>
-                    <input type="text" className={inputClass} value={item.area} onChange={(e) => updateItem(item.id, 'area', e.target.value)} />
-                  </td>
-                  <td className={cellClass}>
-                    <input type="text" className={`${inputClass} font-bold text-emerald-600`} value={item.refPower} onChange={(e) => updateItem(item.id, 'refPower', e.target.value)} />
-                  </td>
-                  <td className={cellClass}>
-                    <input type="text" className={`${inputClass} !text-left px-3 text-gray-500`} value={item.note} onChange={(e) => updateItem(item.id, 'note', e.target.value)} />
-                  </td>
-                  <td className="border border-gray-300 p-0 print:hidden text-center bg-white relative">
-                    <button 
-                      onClick={() => handleDeleteRequest(item.id)} 
-                      className="text-gray-400 hover:text-red-500 transition-all p-2"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))
+              filteredList.map((item, idx) => {
+                const isEditing = editingId === item.id;
+                return (
+                  <tr key={item.id} className={`group ${isEditing ? 'bg-orange-50' : ''}`}>
+                    <td className="border border-gray-300 bg-gray-50/30 text-[11px] text-gray-400 font-mono">{idx + 1}</td>
+                    <td className={cellClass(isEditing)}>
+                      <input 
+                        type="text" 
+                        readOnly={!isEditing}
+                        className={`${inputClass(isEditing)} font-black text-blue-800`} 
+                        value={item.name} 
+                        onChange={(e) => updateItem(item.id, 'name', e.target.value)} 
+                      />
+                    </td>
+                    <td className={cellClass(isEditing)}>
+                      <input 
+                        type="text" 
+                        readOnly={!isEditing}
+                        className={inputClass(isEditing)} 
+                        value={item.floor} 
+                        onChange={(e) => updateItem(item.id, 'floor', e.target.value)} 
+                      />
+                    </td>
+                    <td className={cellClass(isEditing)}>
+                      <input 
+                        type="text" 
+                        readOnly={!isEditing}
+                        className={inputClass(isEditing)} 
+                        value={item.area} 
+                        onChange={(e) => updateItem(item.id, 'area', e.target.value)} 
+                      />
+                    </td>
+                    <td className={cellClass(isEditing)}>
+                      <input 
+                        type="text" 
+                        readOnly={!isEditing}
+                        className={`${inputClass(isEditing)} font-bold text-emerald-600`} 
+                        value={item.refPower} 
+                        onChange={(e) => updateItem(item.id, 'refPower', e.target.value)} 
+                      />
+                    </td>
+                    <td className={cellClass(isEditing)}>
+                      <input 
+                        type="text" 
+                        readOnly={!isEditing}
+                        className={`${inputClass(isEditing)} !text-left px-3 text-gray-500`} 
+                        value={item.note} 
+                        onChange={(e) => updateItem(item.id, 'note', e.target.value)} 
+                      />
+                    </td>
+                    <td className="border border-gray-300 p-0 print:hidden text-center bg-white relative">
+                      <div className="flex items-center justify-center gap-1 p-1">
+                        <button 
+                          onClick={() => handleToggleEdit(item.id)}
+                          className={`p-2 rounded-lg transition-all ${isEditing ? 'bg-blue-600 text-white shadow-md' : 'text-blue-500 hover:bg-blue-50'}`}
+                          title={isEditing ? "수정 완료" : "수정하기"}
+                        >
+                          {isEditing ? <Check size={16} /> : <Edit2 size={16} />}
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteRequest(item.id)} 
+                          className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 transition-all rounded-lg"
+                          title="삭제하기"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -248,7 +335,6 @@ const TenantStatus: React.FC = () => {
         </div>
       </div>
 
-      {/* 업무일지와 동일한 하단 고정 저장 버튼 */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40 print:hidden">
         <button 
           onClick={handleSaveClick} 
@@ -270,10 +356,9 @@ const TenantStatus: React.FC = () => {
         </button>
       </div>
 
-      {/* 업무일지와 동일한 통합 저장 확인 모달 */}
       {showSaveConfirm && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
             <div className="p-6 text-center">
               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
                 <Cloud className="text-blue-600" size={32} />
@@ -281,7 +366,7 @@ const TenantStatus: React.FC = () => {
               <h3 className="text-xl font-bold text-gray-900 mb-2">입주사 정보 통합 저장</h3>
               <p className="text-gray-500 mb-8 leading-relaxed font-medium">
                 작성하신 <span className="text-blue-600 font-bold">모든 입주사 명단과 정보</span>를<br/>
-                서버에 안전하게 기록하시겠습니까?
+                층별 순서로 자동 정렬하여 서버에 안전하게 기록하시겠습니까?
               </p>
               
               <div className="flex gap-3">
@@ -305,7 +390,6 @@ const TenantStatus: React.FC = () => {
         </div>
       )}
 
-      {/* 데이터 삭제 확인 모달 */}
       {deleteTargetId && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">

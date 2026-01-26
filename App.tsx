@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -18,8 +19,8 @@ import { MenuId } from './types';
 import { Menu as MenuIcon, X } from 'lucide-react';
 
 const App: React.FC = () => {
-  // 초기 활성화 메뉴를 업무일지(WORK_LOG)로 변경
-  const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.WORK_LOG);
+  // 초기 활성화 메뉴를 대시보드(DASHBOARD)로 설정
+  const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -58,8 +59,7 @@ const App: React.FC = () => {
       case MenuId.CONTRACTORS:
         return <ContractorManager />;
       default:
-        // 기본값도 업무일지로 변경
-        return <WorkLog currentDate={currentDate} />;
+        return <Dashboard currentDate={currentDate} />;
     }
   };
 

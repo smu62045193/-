@@ -7,6 +7,7 @@ import { MenuId, MenuItem, Holiday } from './types';
 export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8o8TQNWcfUWl_pJ6DOkB9euA5t0qP9jOhyS_6iyipn3Jus32_8Fqv6WhBIt5nlyl5/exec"; 
 
 export const MENU_ITEMS: MenuItem[] = [
+  { id: MenuId.DASHBOARD, label: '대시보드' },
   { id: MenuId.WORK_LOG, label: '업무일지' },
   { id: MenuId.WEEKLY_WORK, label: '주간업무' },
   { id: MenuId.ELEC_CHECK, label: '전기점검' },
@@ -30,8 +31,8 @@ export const WORK_LOG_TABS = [
   { id: 'air_env', label: '대기환경' },
   { id: 'fire', label: '소방' },
   { id: 'elevator', label: '승강기' },
-  { id: 'handover', label: '특이사항' },
   { id: 'park_sec_clean', label: '주차/경비/미화' },
+  { id: 'handover', label: '특이사항' },
 ];
 
 // Variable Holidays (Lunar New Year, Chuseok, Buddha's Birthday and Substitutes) 2024-2033

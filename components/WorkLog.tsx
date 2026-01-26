@@ -251,14 +251,6 @@ interface WorkLogProps {
   currentDate: Date;
 }
 
-interface SearchResultItem {
-  category: string;
-  type: '금일' | '익일';
-  content: string;
-  id: string;
-  date?: string; 
-}
-
 const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -269,12 +261,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const [logData, setLogData] = useState<WorkLogData>(INITIAL_WORKLOG);
   const [activeTab, setActiveTab] = useState('electrical');
   const [weather, setWeather] = useState<WeatherData | null>(null);
-
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
-  const [selectedSearchYear, setSelectedSearchYear] = useState(new Date().getFullYear()); 
-  const [isSearching, setIsSearching] = useState(false); 
 
   const [gasLog, setGasLog] = useState<GasLogData>(getInitialGasLog(''));
   const [septicLog, setSepticLog] = useState<SepticLogData>(getInitialSepticLog(''));
@@ -291,7 +277,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const searchStart = format(subDays(currentDate, 7), 'yyyy-MM-dd');
       const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
 
-      // 최적화: 4개의 요청을 하나의 배치 요청으로 묶음 (Batching)
       const batchResults = await apiFetchBatch([
         { type: 'get', key: `DAILY_${dateKey}` },
         { type: 'get', key: `GAS_LOG_${dateKey}` },
@@ -434,90 +419,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         ]);
       }
 
-      if (dateKey >= '2026-01-01') {
-        const evTodayTasks = logData.elevator?.today || [];
-        const keywords = ['오티스', '한국승강기안전공단', 'OTIS'];
-        const tasksToAutoRegister = evTodayTasks.filter(t => 
-          t.content && keywords.some(k => t.content.toUpperCase().includes(k.toUpperCase()))
-        );
-
-        if (tasksToAutoRegister.length > 0) {
-          try {
-            const currentInspections = await fetchElevatorInspectionList();
-            const updatedInspections = [...(currentInspections || [])];
-            let hasNew = false;
-
-            tasksToAutoRegister.forEach(task => {
-              const isExisting = updatedInspections.some(item => 
-                item.date === dateKey && item.content === task.content
-              );
-              if (!isExisting) {
-                const upperContent = (task.content || '').toUpperCase();
-                const company = (upperContent.includes('오티스') || upperContent.includes('OTIS')) 
-                  ? '오티스 엘리베이터' 
-                  : '한국승강기안전공단';
-                
-                updatedInspections.push({
-                  id: `auto_ev_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                  date: dateKey,
-                  company: company,
-                  content: task.content,
-                  note: '업무일지 자동연동'
-                });
-                hasNew = true;
-              }
-            });
-
-            if (hasNew) {
-              updatedInspections.sort((a, b) => b.date.localeCompare(a.date));
-              await saveElevatorInspectionList(updatedInspections);
-            }
-          } catch (err) {
-            console.error("Auto registration for elevator history failed", err);
-          }
-        }
-      }
-
-      const fireTodayTasks = logData.fire?.today || [];
-      const fireKeywords = ['무한개발', '금성방재', 'GPS', '강남소방서'];
-      const fireTasksToAutoRegister = fireTodayTasks.filter(t => 
-        t.content && fireKeywords.some(k => t.content.includes(k))
-      );
-
-      if (fireTasksToAutoRegister.length > 0) {
-        try {
-          const currentFireHistory = await fetchFireHistoryList();
-          const updatedFireHistory = [...(currentFireHistory || [])];
-          let hasNewFireEntry = false;
-
-          fireTasksToAutoRegister.forEach(task => {
-            const isExisting = updatedFireHistory.some(item => 
-              item.date === dateKey && item.content === task.content
-            );
-            
-            if (!isExisting) {
-              const company = fireKeywords.find(k => task.content.includes(k)) || '기타업체';
-              
-              updatedFireHistory.push({
-                id: `auto_fire_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-                date: dateKey,
-                company: company,
-                content: task.content,
-                note: '업무일지 자동연동'
-              });
-              hasNewFireEntry = true;
-            }
-          });
-
-          if (hasNewFireEntry) {
-            updatedFireHistory.sort((a, b) => b.date.localeCompare(a.date));
-            await saveFireHistoryList(updatedFireHistory);
-          }
-        } catch (err) {
-          console.error("Auto registration for fire history failed", err);
-        }
-      }
-
       const fireDraft = getFromStorage(`FIRE_FACILITY_LOG_${dateKey}`, true);
       const elevatorDraft = getFromStorage(`ELEVATOR_LOG_${dateKey}`, true);
       const checklistDraft = getFromStorage(`SUB_CHECK_${dateKey}`, true);
@@ -540,57 +441,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     } catch (err) { 
       setSaveStatus('error'); 
       alert('저장 중 오류가 발생했습니다.'); 
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!searchKeyword.trim()) {
-      alert('검색어를 입력해주세요.');
-      return;
-    }
-
-    setIsSearching(true);
-    const results: SearchResultItem[] = [];
-    const normalize = (text: string) => text.replace(/\s+/g, '').toLowerCase();
-    const normalizedKeyword = normalize(searchKeyword);
-
-    const categoriesToSearch: (keyof WorkLogData)[] = [
-      'electrical', 'mechanical', 'fire', 'elevator', 'handover', 'parking', 'security', 'cleaning'
-    ];
-
-    try {
-      const yearStart = `${selectedSearchYear}-01-01`;
-      const yearEnd = `${selectedSearchYear}-12-31`;
-      const annualLogs = await apiFetchRange("DAILY_", yearStart, yearEnd);
-
-      annualLogs.forEach(entry => {
-        const entryDateKey = entry.key.replace("DAILY_", "");
-        const entryWorkLog = entry.data?.workLog;
-        if (!entryWorkLog) return;
-
-        categoriesToSearch.forEach((catKey) => {
-          const catData = entryWorkLog[catKey] as LogCategory;
-          if (!catData) return;
-          const catLabel = WORK_LOG_TABS.find(t => t.id === catKey)?.label || catKey;
-
-          if (catData.today) {
-            catData.today.forEach(task => {
-              if (task.content && normalize(task.content).includes(normalizedKeyword)) {
-                results.push({ category: catLabel, type: '금일', content: task.content, id: task.id, date: entryDateKey });
-              }
-            });
-          }
-        });
-      });
-      results.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-
-      setSearchResults(results);
-      setIsSearchModalOpen(true);
-    } catch (e) {
-      console.error("Search Error:", e);
-      alert("검색 중 오류가 발생했습니다.");
-    } finally {
-      setIsSearching(false);
     }
   };
 
@@ -854,9 +704,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     );
     if (activeTab === 'park_sec_clean') return (
       <div className="space-y-8">
-        <DetailedLogSection title="주차 관리" icon={<Car className="text-blue-500" size={20} />} data={logData?.parking} onUpdate={d => setLogData({...logData, parking: d})} />
-        <DetailedLogSection title="경비 보안" icon={<Shield className="text-green-500" size={20} />} data={logData?.security} onUpdate={d => setLogData({...logData, security: d})} />
-        <DetailedLogSection title="미화 위생" icon={<Droplets className="text-cyan-500" size={20} />} data={logData?.cleaning} onUpdate={d => setLogData({...logData, cleaning: d})} />
+        <DetailedLogSection title="주차 관리" icon={<Car className="text-blue-500" size={20} />} data={logData?.parking} onUpdate={d => setLogData({...logData, parking: d})} onRefresh={() => loadData(() => false, true)} />
+        <DetailedLogSection title="경비 보안" icon={<Shield className="text-green-500" size={20} />} data={logData?.security} onUpdate={d => setLogData({...logData, security: d})} onRefresh={() => loadData(() => false, true)} />
+        <DetailedLogSection title="미화 위생" icon={<Droplets className="text-cyan-500" size={20} />} data={logData?.cleaning} onUpdate={d => setLogData({...logData, cleaning: d})} onRefresh={() => loadData(() => false, true)} />
       </div>
     );
 
@@ -969,6 +819,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           data={(logData as any)?.[activeTab]} 
           onUpdate={d => setLogData({...logData, [activeTab]: d})} 
           onPrint={canPrintThisTab ? () => handlePrintCategory(activeTab) : undefined}
+          onRefresh={() => loadData(() => false, true)}
         />
         {activeTab === 'electrical' && <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mt-4"><SubstationChecklistLog currentDate={currentDate} isEmbedded={true} /></div>}
       </div>
@@ -977,70 +828,16 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 pb-32">
+      <div className="mb-6 print:hidden">
+        <h2 className="text-2xl font-bold text-gray-800">업무 일지</h2>
+        <p className="text-gray-500 mt-1">시설 관리 업무 기록 및 일일 점검 내역을 관리합니다.</p>
+      </div>
+
       {loading ? (
         <div className="flex flex-col items-center justify-center py-32 bg-white rounded-2xl border border-gray-200 shadow-sm"><RefreshCw size={48} className="animate-spin text-blue-500 mb-4" /><p className="text-gray-500 font-bold text-lg">데이터 동기화 중...</p></div>
       ) : (
         <>
           <div className="animate-fade-in space-y-6">
-            <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-               <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold flex items-center text-gray-800"><LayoutList className="mr-2 text-blue-600" size={24} />업무일지 기본 정보</h3></div>
-               <div className="space-y-6">
-                  {[ {k:'facility', c:'blue', l:'시설근무현황', fields:[{k:'deputy',l:'대리'},{k:'chief',l:'주임'},{k:'day',l:'주간'},{k:'night',l:'당직'},{k:'off',l:'비번'},{k:'vacation',l:'휴가'}]} ].map(sec => (
-                    <div key={sec.k} className="bg-gray-50 p-5 rounded-xl border border-gray-100">
-                      <div className={`font-bold text-${sec.c}-700 border-b border-${sec.c}-100 pb-3 mb-4 flex items-center tracking-wider text-sm`}><span className={`w-2 h-4 bg-${sec.c}-600 rounded-full mr-2`}></span>{sec.l}</div>
-                      <div className={`grid grid-cols-2 md:grid-cols-${sec.fields.length} gap-4`}>{sec.fields.map(f => (
-                        <div key={f.k} className="flex flex-col"><label className="text-[11px] text-gray-500 font-black mb-1.5 text-center">{f.l}</label><input type="text" value={(sec.k === 'facility' ? facilityDuty : securityDuty as any)?.[f.k] || ''} onChange={e => (sec.k === 'facility' ? setFacilityDuty({...facilityDuty, [f.k]: e.target.value}) : setSecurityDuty({...securityDuty, [f.k]: e.target.value}))} className="w-full bg-white border border-gray-200 rounded-lg px-2 py-2 text-sm text-center font-bold outline-none" /></div>
-                      ))}</div>
-                    </div>
-                  ))}
-               </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 print:hidden">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 text-sm font-bold text-gray-700 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200">
-                    <Calendar size={16} className="text-blue-500" />
-                    검색 연도
-                  </div>
-                  <select 
-                    value={selectedSearchYear} 
-                    onChange={e => setSelectedSearchYear(parseInt(e.target.value))} 
-                    className="px-4 py-2 border border-gray-300 rounded-xl font-bold bg-white text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  >
-                    {Array.from({length: 11}, (_, i) => (new Date().getFullYear() - 5) + i).map(y => (
-                      <option key={y} value={y}>{y}년도</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="text-[11px] text-gray-400 font-medium ml-2">
-                  * 공백 무시 검색 (예: '비상발전기' = '비상 발전기')
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-2.5 text-gray-400" size={20} />
-                  <input 
-                    type="text" 
-                    placeholder={`${selectedSearchYear}년 전체 기록 검색...`}
-                    className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all font-medium"
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                  />
-                </div>
-                <button 
-                  onClick={handleSearch} 
-                  disabled={isSearching}
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap disabled:bg-gray-400"
-                >
-                  {isSearching ? <RefreshCw size={18} className="animate-spin" /> : <Search size={18} />}
-                  {isSearching ? "검색 중..." : "검색하기"}
-                </button>
-              </div>
-            </div>
-
             <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-2 border-b border-gray-100 items-center scrollbar-hide px-1">
               {WORK_LOG_TABS.map(tab => (
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-full text-[13px] font-bold transition-all border ${activeTab === tab.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>{tab.label}</button>
@@ -1052,79 +849,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             </div>
           </div>
 
-          {isSearchModalOpen && (
-            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-gray-100 animate-scale-up">
-                <div className="p-6 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-600 text-white rounded-xl shadow-lg">
-                      <Search size={24} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-black text-gray-900 leading-tight">작업 내용 검색 결과</h3>
-                      <p className="text-sm text-gray-500 font-medium mt-0.5">
-                        <span className="text-blue-600 font-bold">"{searchKeyword}"</span> {selectedSearchYear}년 기록에서 <span className="text-gray-900 font-bold">{searchResults.length}건</span>이 발견되었습니다.
-                      </p>
-                    </div>
-                  </div>
-                  <button onClick={() => setIsSearchModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500">
-                    <X size={28} />
-                  </button>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-                  {searchResults.length === 0 ? (
-                    <div className="py-20 text-center">
-                      <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
-                        <Search size={32} className="text-gray-300" />
-                      </div>
-                      <p className="text-gray-400 font-bold text-lg">검색 결과가 없습니다.</p>
-                      <p className="text-gray-300 text-sm mt-1">다른 검색어 또는 다른 연도를 시도해 보세요.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {searchResults.map((res, idx) => (
-                        <div key={res.id + idx} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-blue-200 hover:shadow-md transition-all group">
-                          <div className="flex items-start gap-4">
-                            <div className="flex flex-col items-center gap-1 shrink-0 pt-1">
-                              <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${res.type === '금일' ? 'bg-blue-100 text-blue-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                {res.type}
-                              </span>
-                              <span className="text-[11px] font-bold text-gray-400 whitespace-nowrap">
-                                {res.category}
-                              </span>
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-gray-800 font-bold text-[15px] leading-relaxed group-hover:text-blue-700 transition-colors">
-                                {res.content}
-                              </p>
-                              <div className="mt-2 flex items-center gap-2 text-[10px] text-gray-400 font-medium">
-                                <Calendar size={12} />
-                                <span>{res.date || dateKey} 업무기록</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
-                  <button 
-                    onClick={() => setIsSearchModalOpen(false)}
-                    className="px-8 py-3 bg-gray-800 text-white font-black rounded-2xl hover:bg-gray-900 transition-all active:scale-95 shadow-lg shadow-gray-200"
-                  >
-                    확인 및 닫기
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {showSaveConfirm && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100"><div className="p-6 text-center"><div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100"><Cloud className="text-blue-600" size={32} /></div><h3 className="text-xl font-bold text-gray-900 mb-2">업무일지 통합 저장</h3><p className="text-gray-500 mb-8 leading-relaxed">입력하신 <span className="text-blue-600 font-bold">모든 탭의 내용과 근무 현황</span>을<br/>
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100"><div className="p-6 text-center"><div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100"><Cloud className="text-blue-600" size={32} /></div><h3 className="text-xl font-bold text-gray-900 mb-2">업무일지 통합 저장</h3><p className="text-gray-500 mb-8 leading-relaxed">입력하신 <span className="text-blue-600 font-bold">모든 탭의 내용과 근무 현황</span>을<br/>
                 서버에 안전하게 기록하시겠습니까?</p><div className="flex gap-3"><button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center"><X size={18} className="mr-2" />취소</button><button onClick={handleSaveAll} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle2 size={18} className="mr-2" />확인</button></div></div></div></div>
           )}
         </>

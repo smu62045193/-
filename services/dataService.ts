@@ -82,16 +82,43 @@ export const clearCache = (key: string) => {
 };
 
 /**
+ * Robust Fetch with Retry
+ */
+const fetchWithRetry = async (url: string, options: any = {}, retries: number = 2): Promise<Response> => {
+  try {
+    const response = await fetch(url, {
+      ...options,
+      cache: 'no-store' // 브라우저 캐시 방지
+    });
+    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+    return response;
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 1000));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw err;
+  }
+};
+
+/**
  * API: Core fetch and save
  */
 const fetchFromApi = async (key: string) => {
   try {
-    const url = `${GOOGLE_APPS_SCRIPT_URL}?date=${encodeURIComponent(key)}`;
-    const response = await fetch(url);
+    const baseUrl = GOOGLE_APPS_SCRIPT_URL;
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const url = `${baseUrl}${separator}date=${encodeURIComponent(key)}`;
+    
+    const response = await fetchWithRetry(url);
     const result = await response.json();
     return result.status === 'success' ? result.data : null;
   } catch (error) {
     console.error(`Fetch API error for ${key}:`, error);
+    // Failed to fetch인 경우 네트워크 상태나 GAS 배포 설정을 확인하도록 알림 유도
+    if (error.toString().includes('Failed to fetch')) {
+       console.warn("네트워크 연결을 확인하거나 GAS 앱이 'Anyone' 권한으로 배포되었는지 확인하십시오.");
+    }
     return null;
   }
 };
@@ -99,7 +126,7 @@ const fetchFromApi = async (key: string) => {
 const saveToApi = async (key: string, data: any) => {
   try {
     const payload = { targetKey: key, ...data };
-    const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+    const response = await fetchWithRetry(GOOGLE_APPS_SCRIPT_URL, {
       method: 'POST',
       body: JSON.stringify(payload)
     });
@@ -113,8 +140,11 @@ const saveToApi = async (key: string, data: any) => {
 
 export const apiFetchRange = async (prefix: string, startDate: string, endDate: string) => {
   try {
-    const url = `${GOOGLE_APPS_SCRIPT_URL}?prefix=${encodeURIComponent(prefix)}&startDate=${startDate}&endDate=${endDate}`;
-    const response = await fetch(url);
+    const baseUrl = GOOGLE_APPS_SCRIPT_URL;
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const url = `${baseUrl}${separator}prefix=${encodeURIComponent(prefix)}&startDate=${startDate}&endDate=${endDate}`;
+    
+    const response = await fetchWithRetry(url);
     const result = await response.json();
     return result.status === 'success' ? (result.data || []) : [];
   } catch (error) {
@@ -124,20 +154,20 @@ export const apiFetchRange = async (prefix: string, startDate: string, endDate: 
 };
 
 /**
- * Speed Optimization: 배치 요청 (여러 데이터 한 번에 가져오기)
- * Fallback: 배치 요청이 실패할 경우 개별 요청으로 전환하여 안정성 보장
+ * Speed Optimization: 배치 요청
  */
 export const apiFetchBatch = async (requests: { type: 'get' | 'range', key?: string, prefix?: string, start?: string, end?: string }[]) => {
   try {
     const batchJson = JSON.stringify(requests);
-    const url = `${GOOGLE_APPS_SCRIPT_URL}?batch=${encodeURIComponent(batchJson)}`;
+    const baseUrl = GOOGLE_APPS_SCRIPT_URL;
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const url = `${baseUrl}${separator}batch=${encodeURIComponent(batchJson)}`;
     
-    // URL 길이가 너무 길면 (브라우저 제한 대략 2~8KB) 개별 요청으로 즉시 전환
     if (url.length > 2000) {
       throw new Error("URL too long for GET batch");
     }
 
-    const response = await fetch(url);
+    const response = await fetchWithRetry(url);
     const result = await response.json();
     
     if (result.status === 'success' && Array.isArray(result.data)) {
@@ -148,7 +178,6 @@ export const apiFetchBatch = async (requests: { type: 'get' | 'range', key?: str
   } catch (error) {
     console.warn("apiFetchBatch failed, falling back to individual requests:", error);
     
-    // 개별 요청 병렬 실행 (Fallback)
     const fallbackResults = await Promise.all(requests.map(async (req) => {
       if (req.type === 'get' && req.key) {
         const data = await fetchFromApi(req.key);
@@ -171,9 +200,7 @@ const fetchWithCache = async <T>(key: string, force: boolean = false): Promise<T
   const cacheKey = key;
   if (!force) {
     const cached = getFromStorage(cacheKey);
-    if (cached) {
-      return cached as T;
-    }
+    if (cached) return cached as T;
   }
   const server = await fetchFromApi(key);
   if (server) saveToCache(cacheKey, server);
@@ -392,6 +419,59 @@ export const saveSepticLog = async (data: SepticLogData) => {
   return await saveToApi(`SEPTIC_LOG_${data.date}`, data);
 };
 
+// Fixed missing exports for ChemicalLog, FireExtinguisherList, and FireInspectionLog
+/**
+ * Chemical Log
+ */
+export const getInitialChemicalLog = (date: string): ChemicalLogData => ({
+  date,
+  items: [
+    { id: 'chem-1', name: '종균제', unit: 'l', prevStock: '', received: '', used: '', currentStock: '', remark: '' },
+    { id: 'chem-2', name: '소독제', unit: 'kg', prevStock: '', received: '', used: '', currentStock: '', remark: '' }
+  ]
+});
+
+export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | null> => {
+  return await fetchWithCache<ChemicalLogData>(`CHEMICAL_LOG_${date}`);
+};
+
+export const saveChemicalLog = async (data: ChemicalLogData) => {
+  return await saveToApi(`CHEMICAL_LOG_${data.date}`, data);
+};
+
+/**
+ * Fire Extinguisher List
+ */
+export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[]> => {
+  const res = await fetchWithCache<any>('FIRE_EXT_DB');
+  return res?.fireExtList || [];
+};
+
+export const saveFireExtinguisherList = async (list: FireExtinguisherItem[]) => {
+  return await saveToApi('FIRE_EXT_DB', { fireExtList: list });
+};
+
+/**
+ * Fire Inspection Log (Separate from Fire Facility Log)
+ */
+export const getInitialFireInspectionLog = (date: string): FireInspectionLogData => ({
+  date,
+  items: [
+    { id: 'fi-1', category: '소화설비', content: '소화전/스프링클러 작동상태', result: '양호', remarks: '' },
+    { id: 'fi-2', category: '경보설비', content: '자동화재탐지설비 수신반', result: '양호', remarks: '' },
+    { id: 'fi-3', category: '피난설비', content: '유도등 및 비상조명등', result: '양호', remarks: '' }
+  ],
+  inspector: ''
+});
+
+export const fetchFireInspectionLog = async (date: string): Promise<FireInspectionLogData | null> => {
+  return await fetchWithCache<FireInspectionLogData>(`FIRE_INSP_LOG_${date}`);
+};
+
+export const saveFireInspectionLog = async (data: FireInspectionLogData) => {
+  return await saveToApi(`FIRE_INSP_LOG_${data.date}`, data);
+};
+
 /**
  * Staff
  */
@@ -565,7 +645,6 @@ export const getInitialSubstationLog = (date: string): SubstationLogData => ({
       acb1: { v: '', a: '', kw: '' }, 
       acb2: { v: '', a: '', kw: '' }, 
       acb3: { v: '', a: '', kw: '' }, 
-      // Fixed Type Error: Property name '처리' should be 'tr2' as per AcbReadings interface.
       trTemp: { tr1: '', tr2: '', tr3: '' } 
     }
   },
@@ -620,11 +699,8 @@ export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
   month,
   checkDate: `${month}-01`,
   items: [
-    // 1. 정류기반
     { id: 'bat-rec-acv', section: 'rectifier', label: 'AC V', manufacturer: '현대중공업', manufDate: '', spec: '배선용차단기 50A HBS-53(3상3선식)', voltage: '', remarks: '' },
     { id: 'bat-rec-dcv', section: 'rectifier', label: 'DC V', manufacturer: '현대중공업', manufDate: '', spec: '배선용차단기 100A HBS-102(단상)', voltage: '', remarks: '' },
-    
-    // 2. 정류기반 밧데리 개별전류 (1~9)
     ...Array.from({ length: 9 }).map((_, i) => ({ 
       id: `bat-ind-${i + 1}`, 
       section: 'battery' as const, 
@@ -635,8 +711,6 @@ export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
       voltage: '', 
       remarks: '' 
     })),
-    
-    // 3. 비상용 발전기 (10, 11)
     { id: 'bat-gen-10', section: 'generator', label: '10', manufacturer: '세방전지ROCKET', manufDate: '22/8/30', spec: 'RP200-12(12V/200AH/20HR)', voltage: '', remarks: '' },
     { id: 'bat-gen-11', section: 'generator', label: '11', manufacturer: '세방전지ROCKET', manufDate: '22/8/30', spec: 'RP200-12(12V/200AH/20HR)', voltage: '', remarks: '' }
   ],
@@ -813,31 +887,27 @@ export const saveWaterTankLog = async (data: WaterTankLogData) => {
 };
 
 /**
- * Chemical Log
+ * Fire History
  */
-export const getInitialChemicalLog = (date: string): ChemicalLogData => ({
-  date,
-  items: []
-});
-
-export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | null> => {
-  return await fetchWithCache<ChemicalLogData>(`CHEMICAL_${date}`);
+export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
+  const res = await fetchWithCache<any>('FIRE_INSPECTION_HISTORY_DB');
+  return res?.fireHistoryList || [];
 };
 
-export const saveChemicalLog = async (data: ChemicalLogData) => {
-  return await saveToApi(`CHEMICAL_${data.date}`, data);
+export const saveFireHistoryList = async (list: FireHistoryItem[]) => {
+  return await saveToApi('FIRE_INSPECTION_HISTORY_DB', { fireHistoryList: list });
 };
 
 /**
- * Fire Extinguishers
+ * Appointments
  */
-export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[]> => {
-  const res = await fetchWithCache<any>('FIRE_EXT_DB');
-  return res?.fireExtList || [];
+export const fetchAppointmentList = async (): Promise<AppointmentItem[]> => {
+  const res = await fetchWithCache<any>('APPOINTMENT_DB');
+  return res?.appointmentList || [];
 };
 
-export const saveFireExtinguisherList = async (list: FireExtinguisherItem[]) => {
-  return await saveToApi('FIRE_EXT_DB', { fireExtList: list });
+export const saveAppointmentList = async (list: AppointmentItem[]) => {
+  return await saveToApi('APPOINTMENT_DB', { appointmentList: list });
 };
 
 /**
@@ -883,45 +953,4 @@ export const fetchInternalWorkList = async (): Promise<ConstructionWorkItem[]> =
 
 export const saveInternalWorkList = async (list: ConstructionWorkItem[]) => {
   return await saveToApi('INTERNAL_WORK_DB', { workList: list });
-};
-
-/**
- * Appointments
- */
-export const fetchAppointmentList = async (): Promise<AppointmentItem[]> => {
-  const res = await fetchWithCache<any>('APPOINTMENT_DB');
-  return res?.appointmentList || [];
-};
-
-export const saveAppointmentList = async (list: AppointmentItem[]) => {
-  return await saveToApi('APPOINTMENT_DB', { appointmentList: list });
-};
-
-/**
- * Fire Inspection Log (Alternative)
- */
-export const getInitialFireInspectionLog = (date: string): FireInspectionLogData => ({
-  date,
-  items: [],
-  inspector: ''
-});
-
-export const fetchFireInspectionLog = async (date: string): Promise<FireInspectionLogData | null> => {
-  return await fetchWithCache<FireInspectionLogData>(`FIRE_INSP_LOG_${date}`);
-};
-
-export const saveFireInspectionLog = async (data: FireInspectionLogData) => {
-  return await saveToApi(`FIRE_INSP_LOG_${data.date}`, data);
-};
-
-/**
- * Fire History
- */
-export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
-  const res = await fetchWithCache<any>('FIRE_INSPECTION_HISTORY_DB');
-  return res?.fireHistoryList || [];
-};
-
-export const saveFireHistoryList = async (list: FireHistoryItem[]) => {
-  return await saveToApi('FIRE_INSPECTION_HISTORY_DB', { fireHistoryList: list });
 };
