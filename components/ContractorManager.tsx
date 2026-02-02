@@ -1,10 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
 import { fetchContractors, saveContractors } from '../services/dataService';
 import { Save, Plus, Trash2, Search, Briefcase, Printer, Edit2, RotateCcw, RefreshCw, AlertTriangle, X, Cloud, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
+
+const TYPE_ORDER: Record<string, number> = {
+  '전기': 1,
+  '기계': 2,
+  '소방': 3,
+  '승강기': 4,
+  '주차': 5,
+  'CCTV': 6,
+  '기타': 7
+};
 
 const ContractorManager: React.FC = () => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -125,11 +135,20 @@ const ContractorManager: React.FC = () => {
     setDeleteTargetId(String(id));
   };
 
-  const filteredList = contractors.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.type.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredList = useMemo(() => {
+    return contractors
+      .filter(c => 
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        c.type.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        c.contactPerson.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      .sort((a, b) => {
+        const orderA = TYPE_ORDER[a.type] || 99;
+        const orderB = TYPE_ORDER[b.type] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return a.name.localeCompare(b.name);
+      });
+  }, [contractors, searchTerm]);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
@@ -138,8 +157,8 @@ const ContractorManager: React.FC = () => {
     const tableRows = filteredList.map((item, index) => `
       <tr>
         <td>${index + 1}</td>
-        <td>${item.name}</td>
         <td>${item.type}</td>
+        <td>${item.name}</td>
         <td>${item.contactPerson}</td>
         <td>${item.phoneMain || ''}</td>
         <td>${item.phoneMobile || ''}</td>
@@ -183,8 +202,8 @@ const ContractorManager: React.FC = () => {
             <thead>
               <tr>
                 <th style="width: 30px;">No</th>
-                <th style="width: 110px;">업체명</th>
                 <th style="width: 40px;">업종</th>
+                <th style="width: 110px;">업체명</th>
                 <th style="width: 50px;">담당자</th>
                 <th style="width: 90px;">대표번호</th>
                 <th style="width: 90px;">핸드폰</th>
@@ -262,7 +281,7 @@ const ContractorManager: React.FC = () => {
             <button 
               onClick={() => setShowSaveConfirm(true)} 
               disabled={loading}
-              className={`flex items-center justify-center space-x-2 text-white px-8 py-2 rounded-lg shadow-md text-sm font-bold h-[42px] transition-colors ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} disabled:bg-gray-400`}
+              className={`flex items-center justify-center space-x-2 text-white px-8 py-2 rounded-lg shadow-md text-sm font-bold h-[42px] transition-colors ${editId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} disabled:bg-gray-400`}
             >
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               <span>{editId ? '수정 완료' : '업체 등록'}</span>
@@ -289,8 +308,8 @@ const ContractorManager: React.FC = () => {
           <thead>
             <tr>
               <th className={thClass} style={{ width: '50px' }}>No</th>
-              <th className={thClass} style={{ width: '180px' }}>업체명</th>
               <th className={thClass} style={{ width: '100px' }}>업종</th>
+              <th className={thClass} style={{ width: '180px' }}>업체명</th>
               <th className={thClass} style={{ width: '100px' }}>담당자</th>
               <th className={thClass} style={{ width: '130px' }}>대표번호</th>
               <th className={thClass} style={{ width: '130px' }}>휴대폰</th>
@@ -306,8 +325,8 @@ const ContractorManager: React.FC = () => {
               filteredList.map((item, index) => (
                 <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
                   <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>{index + 1}</td>
+                  <td className={`${tdClass} font-bold text-blue-600`}>{item.type}</td>
                   <td className={`${tdClass} font-bold text-gray-800`}>{item.name}</td>
-                  <td className={tdClass}>{item.type}</td>
                   <td className={tdClass}>{item.contactPerson}</td>
                   <td className={tdClass}>{item.phoneMain}</td>
                   <td className={tdClass}>{item.phoneMobile}</td>
@@ -353,7 +372,7 @@ const ContractorManager: React.FC = () => {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
             <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
                 <AlertTriangle className="text-red-600" size={36} />
               </div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">업체 정보 삭제 확인</h3>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { FireFacilityLogData, FireFacilityCheckItem } from '../types';
 import { fetchFireFacilityLog, saveFireFacilityLog, getInitialFireFacilityLog, saveToCache, getFromStorage } from '../services/dataService';
@@ -14,7 +15,6 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   const [data, setData] = useState<FireFacilityLogData>(getInitialFireFacilityLog(dateKey));
   
-  // 초기 로딩 여부를 추적하여 빈 데이터가 캐시를 덮어쓰는 것을 방지
   const isInitialLoad = useRef(true);
 
   useEffect(() => { 
@@ -23,7 +23,6 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
   }, [dateKey]);
 
   useEffect(() => {
-    // 로딩 중이 아니고, 초기 로딩이 완료된 시점부터만 캐시에 저장
     if (!loading && !isInitialLoad.current && data) {
       saveToCache(`FIRE_FACILITY_LOG_${dateKey}`, data, true);
     }
@@ -35,11 +34,9 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
       const fetched = await fetchFireFacilityLog(dateKey);
       const draft = getFromStorage(`FIRE_FACILITY_LOG_${dateKey}`, true);
       
-      // 드래프트가 있으면 우선하고, 없으면 서버 데이터, 둘 다 없으면 초기값 사용
       const finalData = draft || fetched || getInitialFireFacilityLog(dateKey);
       setData(finalData);
       
-      // 데이터 세팅 후 약간의 지연을 두어 isInitialLoad를 해제 (상태 업데이트 반영 시간 확보)
       setTimeout(() => {
         isInitialLoad.current = false;
       }, 100);
@@ -83,8 +80,7 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
     setData(prev => ({ ...prev, remarks: val }));
   };
 
-  // 이미지와 동일한 카테고리 구성
-  const categories = ['소 방 시 설', '피 난 방 화 시 설', '화 재 예 방 조 치', '화 기 취 급 감 독', '기 타'];
+  const categories = ['소방시설', '피난방화시설', '화재예방조치', '화기취급감독', '기타'];
   
   const groupedItems: Record<string, FireFacilityCheckItem[]> = {};
   
@@ -97,14 +93,14 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
     });
   }
 
-  const thClass = "border border-gray-300 p-1.5 bg-gray-100 font-bold text-center text-sm text-gray-700 h-10";
-  const tdClass = "border border-gray-300 p-0 h-9 relative bg-white";
-  const labelClass = "border border-gray-300 p-1.5 font-bold text-center bg-white text-gray-700 align-middle w-40 text-[13px] tracking-tighter";
-  const resultCellClass = (res: string) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-bold text-sm transition-colors ${res === '양호' ? 'text-blue-600 bg-blue-50/10' : res === '불량' ? 'text-red-600 bg-red-50' : 'text-gray-300'}`;
+  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-sm text-slate-700 h-11";
+  const tdClass = "border border-slate-300 p-0 h-11 relative bg-white";
+  const labelClass = "border border-slate-300 p-2 font-bold text-center bg-white text-slate-700 align-middle w-32 text-[13px]";
+  const resultCellClass = (res: string) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-black text-[15px] transition-colors ${res === '양호' ? 'text-blue-600' : res === '불량' ? 'text-red-600 bg-red-50' : 'text-slate-300'}`;
 
   return (
     <LogSheetLayout
-      title="소방 시설 점검 일지"
+      title={<div className="flex items-center gap-2"><h2 className="text-2xl font-black text-slate-800">소방 시설 점검 일지</h2></div>}
       loading={loading}
       saveStatus={saveStatus}
       onRefresh={loadData}
@@ -114,21 +110,21 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
       hideSave={true}
       isEmbedded={true}
     >
-      <div id="fire-facility-log-print-area" className="bg-white max-w-5xl mx-auto shadow-sm p-4">
-        <div className="bg-white border border-gray-300 overflow-hidden">
+      <div id="fire-facility-log-print-area" className="bg-white max-w-5xl mx-auto shadow-sm p-1">
+        <div className="bg-white border border-slate-300 overflow-hidden">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-100">
+              <tr className="bg-slate-100">
                 <th className={`${thClass} w-32`}>구 분</th>
                 <th className={thClass}>점 검 내 용</th>
-                <th className={`${thClass} w-24`}>결 과</th>
+                <th className={`${thClass} w-28`}>결 과</th>
               </tr>
             </thead>
             <tbody>
               {categories.map((category) => (
                 <React.Fragment key={category}>
                   {(groupedItems[category] || []).map((item, idx) => (
-                    <tr key={item.id} className="h-9 hover:bg-gray-50/30 transition-colors">
+                    <tr key={item.id} className="h-11 hover:bg-slate-50/50 transition-colors">
                       {idx === 0 && (
                         <td 
                           rowSpan={groupedItems[category].length} 
@@ -137,7 +133,7 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
                           {category}
                         </td>
                       )}
-                      <td className="border border-gray-300 p-2 text-left text-[13px] font-medium text-gray-600 pl-4">
+                      <td className="border border-slate-300 p-2 text-left text-[14px] font-medium text-slate-700 pl-4">
                         • {item.content}
                       </td>
                       <td 
@@ -152,16 +148,16 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
                   ))}
                 </React.Fragment>
               ))}
-              <tr className="h-24">
+              <tr className="h-28">
                 <td className={`${labelClass} font-black text-sm`}>
-                  특 &nbsp; 이 &nbsp; 사 &nbsp; 항
+                  특 이 사 항
                 </td>
-                <td colSpan={2} className="border border-gray-300 p-0 h-24">
+                <td colSpan={2} className="border border-slate-300 p-0 h-28">
                   <textarea 
                     value={data.remarks || ''} 
                     onChange={(e) => handleRemarksChange(e.target.value)}
                     placeholder="특이사항 입력"
-                    className="w-full h-full p-3 resize-none outline-none text-gray-700 text-[13px] leading-relaxed font-medium bg-transparent !text-left"
+                    className="w-full h-full p-4 resize-none outline-none text-slate-700 text-[14px] leading-relaxed font-medium bg-transparent !text-left scrollbar-hide"
                   />
                 </td>
               </tr>
@@ -170,8 +166,8 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
         </div>
 
         <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-800 flex items-start gap-3 print:hidden shadow-sm">
-          <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
-            <span className="font-bold text-[10px] uppercase tracking-tighter">Guide</span>
+          <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600 font-black text-[10px] uppercase tracking-tighter">
+            GUIDE
           </div>
           <div className="leading-relaxed">
             <p className="font-bold text-sm mb-0.5">소방 시설 점검 안내</p>

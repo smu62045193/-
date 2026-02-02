@@ -136,7 +136,7 @@ const BoilerLog: React.FC<BoilerLogProps> = ({ currentDate, isEmbedded = false }
         <table className="w-full border-collapse text-center text-sm">
           <thead>
             <tr>
-              <th rowSpan={2} className={`${thClass} w-40`}>가 동 시 간 (H)</th>
+              <th rowSpan={2} className={`${thClass} w-40`}>운전시간(H)</th>
               <th colSpan={2} className={thClass}>가스압력(kg/cm²)</th>
               <th rowSpan={2} className={thClass}>증기압<br/>(kg/cm²)</th>
               <th rowSpan={2} className={thClass}>배기온도<br/>(℃)</th>
@@ -154,9 +154,7 @@ const BoilerLog: React.FC<BoilerLogProps> = ({ currentDate, isEmbedded = false }
               <tr key={log.id}>
                 <td className={tdClass}>
                    <div className="flex items-center justify-center h-full px-1">
-                      <input type="text" className="w-1/2 h-full text-center outline-none bg-white text-black text-sm" value={(log.runTime || '').split('~')[0] || ''} onChange={(e) => handleRowRunTimeChange(log.id, 'start', e.target.value)} onKeyDown={handleKeyDown} placeholder="시작" />
-                      <span className="mx-1 font-bold text-gray-400">~</span>
-                      <input type="text" className="w-1/2 h-full text-center outline-none bg-white text-black text-sm" value={(log.runTime || '').split('~')[1] || ''} onChange={(e) => handleRowRunTimeChange(log.id, 'end', e.target.value)} onKeyDown={handleKeyDown} placeholder="종료" />
+                      <input type="text" className="w-full h-full text-center outline-none bg-white text-black text-sm" value={log.runTime} onChange={(e) => updateLogItem(log.id, 'runTime', e.target.value)} onKeyDown={handleKeyDown} placeholder="~" />
                    </div>
                 </td>
                 <td className={tdClass}><input type="text" className={inputClass} value={log.gasPressure1} onChange={(e) => updateLogItem(log.id, 'gasPressure1', e.target.value)} onKeyDown={handleKeyDown} /></td>

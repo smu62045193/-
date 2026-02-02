@@ -5,7 +5,8 @@ import {
   fetchExternalWorkList, 
   saveExternalWorkList, 
   fetchInternalWorkList, 
-  saveInternalWorkList 
+  saveInternalWorkList,
+  uploadFile
 } from '../services/dataService';
 import { Save, Plus, Trash2, Upload, Download, Image as ImageIcon, RotateCcw, RefreshCw, Search, Edit2, Cloud, X, CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -32,7 +33,7 @@ const resizeImage = (file: File): Promise<string> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_SIZE = 800;
+        const MAX_SIZE = 1000; // 작업 사진은 1000px 정도가 적당
         if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
@@ -55,7 +56,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     id: generateId(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
   });
 
-  // 모드별 사진 제한 개수 설정
   const PHOTO_LIMIT = mode === 'external' ? 20 : 10;
 
   useEffect(() => { loadData(); handleReset(false); }, [mode]);
@@ -127,23 +127,37 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     setLoading(true); 
     setShowSaveConfirm(false);
     try {
+      // 1. 모든 사진을 Storage에 업로드 (새로 추가된 사진만)
+      const uploadedPhotos: WorkPhoto[] = [];
+      for (let i = 0; i < currentItem.photos.length; i++) {
+        const photo = currentItem.photos[i];
+        // Base64 데이터인 경우에만 업로드 진행
+        if (photo.dataUrl.startsWith('data:image')) {
+          // 파일명에 타임스탬프를 빼고 고유 photo.id를 사용해 덮어쓰기 유도
+          const fileName = `work_${currentItem.id}_${photo.id}.jpg`;
+          const publicUrl = await uploadFile('facility', 'construction', fileName, photo.dataUrl);
+          uploadedPhotos.push({
+            ...photo,
+            dataUrl: publicUrl || photo.dataUrl,
+            fileName: `${currentItem.content.trim()}_${i + 1}`
+          });
+        } else {
+          // 이미 URL인 사진은 그대로 유지 (중복 업로드 방지)
+          uploadedPhotos.push(photo);
+        }
+      }
+
       const isExternal = currentItem.source === 'external';
       const saveFn = isExternal ? saveExternalWorkList : saveInternalWorkList;
       const currentList = items.filter(i => i.source === currentItem.source).map(({ source, ...rest }) => rest as ConstructionWorkItem);
       
-      // 파일명 자동 변환 로직 적용: 작업내용_순번
-      const renamedPhotos = currentItem.photos.map((photo, index) => ({
-        ...photo,
-        fileName: `${currentItem.content.trim()}_${index + 1}`
-      }));
-
       const itemToSave: ConstructionWorkItem = { 
         id: currentItem.id, 
         date: currentItem.date, 
         category: currentItem.category, 
         company: currentItem.company, 
         content: currentItem.content, 
-        photos: renamedPhotos 
+        photos: uploadedPhotos 
       };
 
       let newList = [...currentList];
@@ -153,7 +167,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
       
       const success = await saveFn(newList);
       if (success) { 
-        alert('저장되었습니다.');
+        alert('성공적으로 저장되었습니다.');
         await loadData(); 
         handleReset(true); 
       } else {
@@ -243,11 +257,11 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
           <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">날짜</label><input type="date" value={currentItem.date} onChange={e => setCurrentItem({...currentItem, date: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black focus:ring-1 focus:ring-blue-400 outline-none"/></div>
           <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">구분</label><select value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black focus:ring-1 focus:ring-blue-400 outline-none"><option value="전기">전기</option><option value="기계">기계</option><option value="소방">소방</option><option value="승강기">승강기</option><option value="영선">영선</option><option value="미화">미화</option></select></div>
           {mode === 'external' && <div className="md:col-span-3"><label className="block text-xs font-bold text-gray-500 mb-1">업체명</label><input type="text" value={currentItem.company || ''} onChange={e => setCurrentItem({...currentItem, company: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black placeholder:text-gray-300 focus:ring-1 focus:ring-blue-400 outline-none" placeholder="업체명"/></div>}
-          <div className={mode === 'external' ? "md:col-span-5" : "md:col-span-8"}><label className="block text-xs font-bold text-gray-500 mb-1">내용</label><textarea value={currentItem.content} onChange={e => setCurrentItem({...currentItem, content: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black resize-none min-h-[42px] focus:ring-1 focus:ring-blue-400 outline-none"/></div>
+          <div className={mode === 'external' ? "md:col-span-5" : "md:col-span-8"}><label className="block text-xs font-bold text-gray-500 mb-1">내용</label><textarea value={currentItem.content} onChange={e => setCurrentItem({...currentItem, content: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black resize-none min-h-[42px] focus:ring-1 focus:ring-blue-400 outline-none" placeholder="작업 내용을 상세히 입력하세요."/></div>
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-bold text-gray-600 mb-2">사진 첨부 ({currentItem.photos.length}/{PHOTO_LIMIT}) <span className="text-[10px] text-blue-500 ml-2">* 저장 시 파일명은 작업내용 기반으로 자동 부여됩니다.</span></label>
+          <label className="block text-sm font-bold text-gray-600 mb-2">사진 첨부 ({currentItem.photos.length}/{PHOTO_LIMIT}) <span className="text-[10px] text-blue-500 ml-2">* 저장 시 사진은 압축되어 서버에 최적화 저장됩니다.</span></label>
           <div className="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-10 gap-2">
             {currentItem.photos.length < PHOTO_LIMIT && (
               <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-white hover:border-blue-400 transition-colors">
@@ -339,9 +353,8 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
               </div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
               <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                {isUpdateMode ? '수정된 작업 내역을' : '작성하신 신규 작업 내역을'}<br/>
-                서버에 안전하게 기록하시겠습니까?<br/>
-                <span className="text-blue-600 text-xs font-bold mt-2 block">* 사진 파일명이 작업내용 기반으로 재정리됩니다.</span>
+                작성하신 작업 내역과 사진들을<br/>
+                서버에 안전하게 기록하시겠습니까?
               </p>
               
               <div className="flex gap-3">
@@ -357,7 +370,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
             <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
                 <AlertTriangle className="text-red-600" size={36} />
               </div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">작업 내역 삭제 확인</h3>

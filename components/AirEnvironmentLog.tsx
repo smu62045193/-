@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { AirEnvironmentLogData, AirEmissionItem, AirPreventionItem, WeatherData } from '../types';
 import { fetchAirEnvironmentLog, saveAirEnvironmentLog, getInitialAirEnvironmentLog, fetchHvacLog, fetchBoilerLog, saveToCache } from '../services/dataService';
@@ -35,8 +36,13 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
 
       // --- 냉온수기 (1호기 & 2호기) 처리 개선 ---
       const hvacRun = hvacData?.hvacLogs?.[0]?.runTime || '';
-      const rawHvacGas = hvacData?.gas?.usage || '0';
-      const hvacGas = roundValue(rawHvacGas);
+      
+      // 사용량 계산 보완: (금일지침 - 전일지침)
+      const hCurr = parseFloat(String(hvacData?.gas?.curr || '0').replace(/,/g, '')) || 0;
+      const hPrev = parseFloat(String(hvacData?.gas?.prev || '0').replace(/,/g, '')) || 0;
+      const hvacGasUsage = Math.max(0, hCurr - hPrev).toString();
+      const hvacGas = roundValue(hvacGasUsage);
+      
       const unit = hvacData?.unitNo || '';
       const isActuallyRunning = hvacRun && hvacRun.trim() !== '' && hvacRun.trim() !== '~';
 
@@ -74,7 +80,13 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
         
         newData.emissions[2].runTime = boilerRunTimes || '';
         newData.emissions[2].remarks = isBoilerRunning ? '정상' : '운휴';
-        newData.preventions[2].gasUsage = roundValue(boilerData.gas?.usage || '0');
+        
+        // 보일러 사용량 계산 보완: (금일지침 - 전일지침)
+        const bCurr = parseFloat(String(boilerData.gas?.curr || '0').replace(/,/g, '')) || 0;
+        const bPrev = parseFloat(String(boilerData.gas?.prev || '0').replace(/,/g, '')) || 0;
+        const boilerGasUsage = Math.max(0, bCurr - bPrev).toString();
+        newData.preventions[2].gasUsage = roundValue(boilerGasUsage);
+        
         hasAnyChange = true;
       }
 
@@ -273,7 +285,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             <div class="remarks-note">* 비고란은 정상 여부 기재합니다.</div>
             <div class="section-title">2. 방지시설 운영사항</div>
             <table class="main-table">
-              <thead><tr><th style="width:25%">방 지 시 설 명</th><th style="width:25%">설 치 위 위치</th><th style="width:25%">가스사용량</th><th style="width:25%">처리오염물질</th></tr></thead>
+              <thead><tr><th style="width:25%">방 지 시 설 명</th><th style="width:25%">설치 위치</th><th style="width:25%">가스사용량</th><th style="width:25%">처리오염물질</th></tr></thead>
               <tbody>
                 ${data.preventions.map(item => `
                   <tr>
@@ -317,7 +329,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       className={`flex-1 sm:flex-none items-center justify-center px-4 py-2.5 rounded-xl font-bold shadow-sm transition-all active:scale-95 flex text-sm ${syncing ? 'bg-gray-100 text-gray-400' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
     >
       <RefreshCw className={`mr-2 ${syncing ? 'animate-spin' : ''}`} size={18} />
-      <span>데이터 다시 불러오기</span>
+      <span>새로고침</span>
     </button>
   );
 
@@ -355,7 +367,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
           <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">2. 방지시설 운영사항</h3>
           <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
             <table className="w-full border-collapse text-center">
-              <thead><tr className="bg-gray-50"><th className={`${thClass} w-[25%]`}>방 지 시 설 명</th><th className={`${thClass} w-[25%]`}>설 치 위 위치</th><th className={`${thClass} w-[25%]`}>가스사용량</th><th className={`${thClass} w-[25%]`}>처리오염물질</th></tr></thead>
+              <thead><tr className="bg-gray-50"><th className={`${thClass} w-[25%]`}>방 지 시 설 명</th><th className={`${thClass} w-[25%]`}>설치 위치</th><th className={`${thClass} w-[25%]`}>가스사용량</th><th className={`${thClass} w-[25%]`}>처리오염물질</th></tr></thead>
               <tbody>
                 {data?.preventions?.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">

@@ -1,22 +1,26 @@
-
 import { MenuId, MenuItem, Holiday } from './types';
 
 // =================================================================================================
 // [중요] 구글 앱스 스크립트 배포 후 발급받은 '웹 앱 URL'을 아래에 붙여넣으세요.
 // =================================================================================================
-export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby8o8TQNWcfUWl_pJ6DOkB9euA5t0qP9jOhyS_6iyipn3Jus32_8Fqv6WhBIt5nlyl5/exec"; 
+export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzG87NevLfuqw1wgJZGp3x0eMREtXjb1y95xodqfbxTrFqLCd1hKpIYggIwydJJyWC9/exec"; 
 
 export const MENU_ITEMS: MenuItem[] = [
+  // 1. 운영 관리 섹션
   { id: MenuId.DASHBOARD, label: '대시보드' },
   { id: MenuId.WORK_LOG, label: '업무일지' },
   { id: MenuId.WEEKLY_WORK, label: '주간업무' },
-  { id: MenuId.ELEC_CHECK, label: '전기점검' },
-  { id: MenuId.MECH_CHECK, label: '기계점검' },
-  { id: MenuId.FIRE_CHECK, label: '소방점검' },
-  { id: MenuId.ELEVATOR_CHECK, label: '승강기점검' },
-  { id: MenuId.PARKING_CHECK, label: '주차점검' },
-  { id: MenuId.CONSUMABLES, label: '소모품관리' },
-  { id: MenuId.CONSTRUCTION, label: '공사/작업' },
+  { id: MenuId.CONSTRUCTION, label: '공사/작업', subItems: ['외부업체', '시설직'] },
+  
+  // 2. 시설 점검 섹션
+  { id: MenuId.ELEC_CHECK, label: '전기점검', subItems: ['계량기검침', '비상발전기', '밧데리', '부하전류', '전기설비점검', '전기자동차'] },
+  { id: MenuId.MECH_CHECK, label: '기계점검', subItems: ['저수조위생점검'] },
+  { id: MenuId.FIRE_CHECK, label: '소방점검', subItems: ['소방점검이력', '소화기 관리'] },
+  { id: MenuId.ELEVATOR_CHECK, label: '승강기점검', subItems: ['승강기점검이력'] },
+  { id: MenuId.PARKING_CHECK, label: '주차점검', subItems: ['지정주차차량현황', '주차점검이력', '지정주차차량위치'] },
+  
+  // 3. 자재 및 인사 섹션
+  { id: MenuId.CONSUMABLES, label: '소모품관리', subItems: ['관리대장', '자재신청서'] },
   { id: MenuId.APPOINTMENTS, label: '선임현황' },
   { id: MenuId.STAFF, label: '직원관리' },
   { id: MenuId.CONTRACTORS, label: '협력업체' },
@@ -65,7 +69,6 @@ export const HOLIDAYS: Holiday[] = [
   { date: '2026-02-16', name: '설날 연휴' },
   { date: '2026-02-17', name: '설날' },
   { date: '2026-02-18', name: '설날 연휴' },
-  { date: '2026-02-19', name: '대체공휴일' },
   { date: '2026-05-24', name: '부처님오신날' },
   { date: '2026-05-25', name: '대체공휴일' },
   { date: '2026-09-24', name: '추석 연휴' },

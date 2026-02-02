@@ -1,5 +1,5 @@
 {
-  "name": "01.26-갓허브-업로드-저장",
+  "name": "02.01-업무일지-업로드-저장",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -13,7 +13,8 @@
     "@google/genai": "^1.31.0",
     "react": "^19.2.1",
     "date-fns": "^4.1.0",
-    "lucide-react": "^0.556.0"
+    "lucide-react": "^0.556.0",
+    "@supabase/supabase-js": "^2.48.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

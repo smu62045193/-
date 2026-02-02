@@ -1,3 +1,4 @@
+
 import { format, startOfMonth, subDays } from 'date-fns';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetchRange, clearCache, deepMerge, fetchDailyData, fetchSubstationLog, getFromStorage, getInitialSubstationLog, saveDailyData, saveSubstationLog, saveToCache } from '../services/dataService';
@@ -196,10 +197,12 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       const success = await saveSubstationLog(data);
       if (success) {
         const currentDaily = await fetchDailyData(dateKey);
-        await saveDailyData({
-          ...currentDaily,
-          utility: { ...currentDaily.utility, electricity: data.dailyStats.activePower }
-        });
+        if (currentDaily) {
+          await saveDailyData({
+            ...currentDaily,
+            utility: { ...currentDaily.utility, electricity: data.dailyStats.activePower }
+          });
+        }
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
@@ -430,7 +433,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   const tdClass = "border border-black p-0 h-10 align-middle relative bg-transparent";
 
   return (
-    <LogSheetLayout title="수변전반 일지" loading={loading} saveStatus={saveStatus} onUsageChange={onUsageChange} onRefresh={() => loadData(true)} onSave={handleSave} onPrint={handlePrint} isEmbedded={isEmbedded} hideSave={false}>
+    <LogSheetLayout title="수변전반 일지" loading={loading} saveStatus={saveStatus} onRefresh={() => loadData(true)} onSave={handleSave} onPrint={handlePrint} isEmbedded={isEmbedded} hideSave={true}>
       <div id="substation-log-print-area" className="bg-white text-black">
         <section className="mb-6">
           <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">1. VCB (특고압수전반)</h3>

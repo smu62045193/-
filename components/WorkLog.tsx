@@ -27,7 +27,10 @@ import {
   saveElevatorInspectionList,
   fetchFireHistoryList,
   saveFireHistoryList,
-  apiFetchBatch
+  apiFetchBatch,
+  saveSubstationLog,
+  saveHvacBoilerCombined,
+  supabase
 } from '../services/dataService';
 import { 
   DailyData, 
@@ -49,7 +52,7 @@ import {
   SepticCheckItem
 } from '../types';
 import { WORK_LOG_TABS } from '../constants';
-import { format, addDays, subDays, parseISO, startOfYear, endOfYear } from 'date-fns';
+import { format, addDays, subDays, parseISO } from 'date-fns';
 import { Plus, Trash2, LayoutList, RefreshCw, ArrowRightCircle, CheckCircle2, Save, Cloud, X, Printer, Car, Shield, Droplets, ClipboardCheck, Flame, Zap, Search, Calendar, History } from 'lucide-react';
 import SubstationLog from './SubstationLog';
 import HvacLog from './HvacLog';
@@ -311,19 +314,30 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         finalWorkLog = deepMerge(finalWorkLog, draftData.workLog);
       }
 
+      // [수정] 어제의 재고를 자동으로 가져옵니다. (현재 입력된 전일 재고값이 없는 경우)
       if (yesterdayFullLog?.mechanicalChemicals) {
-        if (finalWorkLog.mechanicalChemicals) {
-          if (yesterdayFullLog.mechanicalChemicals.seed?.stock) {
-            finalWorkLog.mechanicalChemicals.seed.prev = yesterdayFullLog.mechanicalChemicals.seed.stock;
-          }
-          if (yesterdayFullLog.mechanicalChemicals.sterilizer?.stock) {
-            finalWorkLog.mechanicalChemicals.sterilizer.prev = yesterdayFullLog.mechanicalChemicals.sterilizer.stock;
-          }
+        if (!finalWorkLog.mechanicalChemicals) {
+          finalWorkLog.mechanicalChemicals = { ...INITIAL_CHEMICALS };
+        }
+        
+        // 하위 객체 존재 여부 보장
+        if (!finalWorkLog.mechanicalChemicals.seed) finalWorkLog.mechanicalChemicals.seed = { prev: '', incoming: '', used: '', stock: '' };
+        if (!finalWorkLog.mechanicalChemicals.sterilizer) finalWorkLog.mechanicalChemicals.sterilizer = { prev: '', incoming: '', used: '', stock: '' };
+
+        // 오늘 전일재고(prev)가 입력되지 않은 경우에만 어제의 최종재고(stock)를 가져옵니다.
+        if (!finalWorkLog.mechanicalChemicals.seed.prev && yesterdayFullLog.mechanicalChemicals.seed?.stock) {
+          finalWorkLog.mechanicalChemicals.seed.prev = yesterdayFullLog.mechanicalChemicals.seed.stock;
+        }
+        if (!finalWorkLog.mechanicalChemicals.sterilizer.prev && yesterdayFullLog.mechanicalChemicals.sterilizer?.stock) {
+          finalWorkLog.mechanicalChemicals.sterilizer.prev = yesterdayFullLog.mechanicalChemicals.sterilizer.stock;
         }
       }
 
       if (finalWorkLog.mechanicalChemicals) {
         ['seed', 'sterilizer'].forEach((key) => {
+          if (!finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer']) {
+            finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer'] = { prev: '', incoming: '', used: '', stock: '' };
+          }
           const chem = finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer'];
           const p = parseFloat(chem.prev || '0');
           const i = parseFloat(chem.incoming || '0');
@@ -351,14 +365,13 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       categories.forEach((key) => {
         let cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
         
-        if (!serverDataResult?.lastUpdated) {
-          if (!cat.today || cat.today.length === 0) {
-            cat.today = automationMap[key] ? automationMap[key](dateKey) : [];
-          }
-          if (!cat.tomorrow || cat.tomorrow.length === 0) {
-            const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
-            cat.tomorrow = autoTasksTomorrow.map(t => ({ ...t, status: undefined }));
-          }
+        // [수정 사항] 서버 저장 여부와 상관없이, 해당 리스트가 비어있다면 자동화 항목을 다시 채워주도록 변경
+        if (!cat.today || cat.today.length === 0) {
+          cat.today = automationMap[key] ? automationMap[key](dateKey) : [];
+        }
+        if (!cat.tomorrow || cat.tomorrow.length === 0) {
+          const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
+          cat.tomorrow = autoTasksTomorrow.map(t => ({ ...t, status: undefined }));
         }
 
         if (yesterdayFullLog && (yesterdayFullLog as any)[key]?.tomorrow) {
@@ -423,12 +436,30 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const elevatorDraft = getFromStorage(`ELEVATOR_LOG_${dateKey}`, true);
       const checklistDraft = getFromStorage(`SUB_CHECK_${dateKey}`, true);
       const airEnvDraft = getFromStorage(`AIR_ENV_${dateKey}`, true);
+      const hvacDraft = getFromStorage(`HVAC_LOG_${dateKey}`, true);
+      const boilerDraft = getFromStorage(`BOILER_LOG_${dateKey}`, true);
+      const substationLogDraft = getFromStorage(`SUB_LOG_${dateKey}`, true);
       
+      // 기계설비 통합 저장 처리
+      let hvacToSave = hvacDraft;
+      let boilerToSave = boilerDraft;
+      
+      // 만약 하나가 비어있으면 서버에서 가져와서 보완 (동시 저장 로직 준수)
+      if (hvacToSave || boilerToSave) {
+        if (!hvacToSave || !boilerToSave) {
+          const { data: existing } = await supabase.from('hvac_boiler_logs').select('*').eq('id', `HVAC_BOILER_${dateKey}`).maybeSingle();
+          if (!hvacToSave) hvacToSave = existing?.hvac_data;
+          if (!boilerToSave) boilerToSave = existing?.boiler_data;
+        }
+      }
+
       await Promise.all([
         fireDraft ? saveFireFacilityLog(fireDraft) : Promise.resolve(),
         elevatorDraft ? saveElevatorLog(elevatorDraft) : Promise.resolve(),
         checklistDraft ? saveSubstationChecklist(checklistDraft) : Promise.resolve(),
-        airEnvDraft ? saveAirEnvironmentLog(airEnvDraft) : Promise.resolve()
+        airEnvDraft ? saveAirEnvironmentLog(airEnvDraft) : Promise.resolve(),
+        (hvacToSave || boilerToSave) ? saveHvacBoilerCombined(hvacToSave, boilerToSave) : Promise.resolve(),
+        substationLogDraft ? saveSubstationLog(substationLogDraft) : Promise.resolve()
       ]);
 
       if (success) { 
@@ -442,6 +473,10 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       setSaveStatus('error'); 
       alert('저장 중 오류가 발생했습니다.'); 
     }
+  };
+
+  const updateDutyField = (field: keyof DutyStatus, value: string) => {
+    setFacilityDuty(prev => ({ ...prev, [field]: value }));
   };
 
   const handlePrintCategory = async (catId: string) => {
@@ -458,7 +493,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         body { font-family: "Noto Sans KR", sans-serif; background: #f1f5f9; margin: 0; padding: 0; color: black; line-height: 1.1; -webkit-print-color-adjust: exact; }
         .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
-        .print-page { width: 210mm; min-height: 297mm; padding: ${dynamicPadding}; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; display: flex; flex-direction: column; }
+        .print-page { width: 210mm; min-height: 297mm; padding: ${dynamicPadding}; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; box-sizing: border-box; display: flex; flex-direction: column; }
         table { width: 100%; border-collapse: collapse; border: 1.2px solid black; table-layout: fixed; margin-bottom: 8px; }
         th, td { border: 1px solid black; padding: 0; text-align: center; font-size: 8.5pt; height: 22px; color: black; line-height: 22px; }
         th { background-color: #f2f2f2 !important; font-weight: bold; }
@@ -483,7 +518,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     const formattedDay = format(currentDate, 'dd');
     const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
     const dayName = days[currentDate.getDay()];
-    const dutyInfo = `${facilityDuty.day ? `주간: ${facilityDuty.day}` : ''} ${facilityDuty.day && facilityDuty.night ? ' / ' : ''} ${facilityDuty.night ? `당직: ${facilityDuty.night}` : ''}`;
+    
+    // 요청하신대로 레이블을 항상 포함하는 형식으로 수정
+    const dutyInfo = `주간 : ${facilityDuty.day || ''} / 당직 : ${facilityDuty.night || ''}`;
 
     let bodyHtml = '';
 
@@ -575,7 +612,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         const consumableRows = []; for (let i = 0; i < 2; i++) consumableRows.push({ left: usedConsumables[i] || null, right: usedConsumables[i + 2] || null });
         const safeCheckItems = subCheckData?.items || getInitialSubstationChecklist(dateKey).items;
         const trItems = safeCheckItems.filter(i => i.category === '변압기');
-        const vcbItems = safeCheckItems.filter(i => i.category === 'VCB AB');
+        const vcbItems = safeCheckItems.filter(i => i.category === 'VCB A B');
         const atsItems = safeCheckItems.filter(i => i.category === 'ATS');
 
         bodyHtml = `
@@ -607,7 +644,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
               <table style="width: 50%;" class="h-22">
                 <thead><tr><th style="width:60px;">구분</th><th>점검내용</th><th style="width:70px;">결과</th></tr></thead>
                 <tbody>
-                  ${atsItems.map((item, idx) => `<tr>${idx === 0 ? `<td rowSpan="${atsItems.length}" style="font-weight:bold; background:#f9f9f9;">ATS</td>` : ''}<td class="text-left">&nbsp; • ${item.label}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || ''}</td></tr>`).join('')}
+                  ${atsItems.map((item, idx) => `<tr>${idx === 0 ? `<td rowSpan="${atsItems.length + 1}" style="font-weight:bold; background:#f9f9f9;">ATS</td>` : ''}<td class="text-left">&nbsp; • ${item.label}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || ''}</td></tr>`).join('')}
+                  <tr><td class="text-left">&nbsp;</td><td></td></tr>
                 </tbody>
               </table>
             </div>
@@ -697,7 +735,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           </div>
           <div className="p-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <FireFacilityCheck currentDate={currentDate} />
-            <ElevatorLog currentDate={currentDate} />
+            < ElevatorLog currentDate={currentDate} />
           </div>
         </div>
       </div>
@@ -826,6 +864,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     );
   };
 
+  const isMeasurementTab = activeTab === 'substation' || activeTab === 'mech_facility';
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 pb-32">
       <div className="mb-6 print:hidden">
@@ -845,14 +885,32 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             </div>
             <div className="min-h-[400px]">{renderTabContent()}</div>
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40">
-              <button onClick={() => setShowSaveConfirm(true)} disabled={saveStatus === 'loading'} className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? (<><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>) : saveStatus === 'success' ? (<><CheckCircle2 size={24} /><span>저장 완료</span></>) : (<><Save size={24} /><span>업무일지 전체 저장</span></>)}</button>
+              <button onClick={() => setShowSaveConfirm(true)} disabled={saveStatus === 'loading'} className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                {saveStatus === 'loading' ? (<><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>) : saveStatus === 'success' ? (<><CheckCircle2 size={24} /><span>저장 완료</span></>) : (<><Save size={24} /><span>{isMeasurementTab ? '서버 저장' : '업무일지 전체 저장'}</span></>)}
+              </button>
             </div>
           </div>
 
           {showSaveConfirm && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100"><div className="p-6 text-center"><div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100"><Cloud className="text-blue-600" size={32} /></div><h3 className="text-xl font-bold text-gray-900 mb-2">업무일지 통합 저장</h3><p className="text-gray-500 mb-8 leading-relaxed">입력하신 <span className="text-blue-600 font-bold">모든 탭의 내용과 근무 현황</span>을<br/>
-                서버에 안전하게 기록하시겠습니까?</p><div className="flex gap-3"><button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center"><X size={18} className="mr-2" />취소</button><button onClick={handleSaveAll} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle2 size={18} className="mr-2" />확인</button></div></div></div></div>
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
+                <div className="p-6 text-center">
+                  <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
+                    <Cloud className="text-blue-600" size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{isMeasurementTab ? '데이터 서버 저장' : '업무일지 통합 저장'}</h3>
+                  <p className="text-gray-500 mb-8 leading-relaxed font-medium">
+                    {isMeasurementTab 
+                      ? '입력하신 계측 데이터를 서버에 안전하게 기록하시겠습니까?' 
+                      : <>입력하신 <span className="text-blue-600 font-bold">모든 탭의 내용과 근무 현황</span>을<br/>서버에 안전하게 기록하시겠습니까?</>}
+                  </p>
+                  <div className="flex gap-3">
+                    <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center active:scale-95"><X size={18} className="mr-2" />취소</button>
+                    <button onClick={handleSaveAll} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle2 size={18} className="mr-2" />확인</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}

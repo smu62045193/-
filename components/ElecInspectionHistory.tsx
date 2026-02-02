@@ -76,11 +76,10 @@ const ElecInspectionHistory: React.FC<ElecInspectionHistoryProps> = ({ onSelect 
     if (!printWindow || !item.data) return;
 
     let contentHtml = '';
-    let styles = '';
     const d = item.data;
     const [y, m, dayPart] = item.date.split('-');
     
-    // Fix: Define title variable at a scope where it is accessible by all branches and the final document write call.
+    // Fixed: Declared title as a let variable at the top scope to avoid shadowing and access issues across branches.
     let title = `${item.category} - ${item.date}`;
     
     const commonStyles = `
@@ -94,6 +93,7 @@ const ElecInspectionHistory: React.FC<ElecInspectionHistoryProps> = ({ onSelect 
         table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
         th, td { border: 1px solid black !important; padding: 0; text-align: center; font-size: 11px; height: 35px !important; background: white; }
         .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; min-height: 100px; }
+        .title-area { flex: 1; text-align: center; }
         .doc-title { font-size: 26pt; font-weight: 900; }
         .approval-table { width: 85mm !important; border: 1.5px solid black !important; margin-left: auto; }
         .approval-table th { height: 24px !important; font-size: 9pt !important; background: #f3f4f6 !important; font-weight: bold; }
@@ -110,7 +110,7 @@ const ElecInspectionHistory: React.FC<ElecInspectionHistoryProps> = ({ onSelect 
       const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
       const dayName = dayNames[getDay(parseISO(checkDateStr.length === 7 ? `${checkDateStr}-01` : checkDateStr))];
 
-      // Fix: Assign specific title for generator
+      // Fixed: Updated higher-scoped title instead of redeclaring local const.
       title = `${monthNum}월 비상발전기 운전일지`;
 
       contentHtml = `
@@ -156,7 +156,7 @@ const ElecInspectionHistory: React.FC<ElecInspectionHistoryProps> = ({ onSelect 
         <div style="border:1.5px solid black; padding:15px; min-height:100px; font-size:11px;">${d.note || '이상 없음'}</div>
       `;
     } else if (item.tabId === 'meter') {
-      // Fix: Update higher-scoped title instead of redeclaring local const.
+      // Fixed: Updated higher-scoped title instead of redeclaring local const.
       title = `${y}년 ${parseInt(m)}월 층별 계량기 검침내역`;
       const totalArea = d.items.reduce((sum: number, it: any) => sum + (parseFloat(String(it.area).replace(/,/g,'')) || 0), 0);
       const totalUsage = d.items.reduce((sum: number, it: any) => {
@@ -185,7 +185,7 @@ const ElecInspectionHistory: React.FC<ElecInspectionHistoryProps> = ({ onSelect 
         </table>
       `;
     } else if (item.tabId === 'battery') {
-      // Fix: Update title for battery branch
+      // Fixed: Updated higher-scoped title instead of redeclaring local const.
       title = `${parseInt(m)}월 정류기반/비상발전기 밧데리 점검`;
       contentHtml = `
         <div class="header-flex">
@@ -206,7 +206,7 @@ const ElecInspectionHistory: React.FC<ElecInspectionHistoryProps> = ({ onSelect 
         }).join('')}
       `;
     } else if (item.tabId === 'load') {
-      // Fix: Update title for load branch
+      // Fixed: Updated higher-scoped title instead of redeclaring local const.
       title = `${parseInt(m)}월 부하 전류 점검 기록부`;
       contentHtml = `
         <div class="header-flex">
@@ -222,7 +222,7 @@ const ElecInspectionHistory: React.FC<ElecInspectionHistoryProps> = ({ onSelect 
       `;
     } else if (item.tabId.startsWith('safety')) {
       const isEv = item.tabId === 'safety_ev';
-      // Fix: Update title for safety branch
+      // Fixed: Updated higher-scoped title instead of redeclaring local const.
       title = isEv ? '전기자동차 충전시설 점검 기록표' : '전기설비점검결과기록표';
       contentHtml = `
         <div class="header-flex">

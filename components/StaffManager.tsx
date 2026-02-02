@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import StaffStatus from './StaffStatus';
 import { LayoutList, User, Camera, Printer, RefreshCw, CalendarDays, UserPlus } from 'lucide-react';
@@ -403,14 +402,6 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
           <h2 className="text-2xl font-bold text-gray-800">직원 관리</h2>
           <p className="text-gray-500 mt-1 text-base">조직 구성 및 직원 현황을 관리합니다.</p>
         </div>
-        <button 
-          onClick={loadData} 
-          disabled={loading}
-          className="p-2 hover:bg-gray-200 rounded-full transition-colors text-gray-500"
-          title="데이터 새로고침"
-        >
-          <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-        </button>
       </div>
 
       <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-4 scrollbar-hide border-b border-gray-200 items-center print:hidden">
@@ -435,11 +426,18 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
       {loading && staffList.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-100 shadow-sm">
           <RefreshCw className="animate-spin text-blue-500 mb-4" size={32} />
-          <p className="text-gray-500 font-bold">직원 정보를 불러오는 중입니다...</p>
+          <p className="text-gray-500 font-bold">직원 정보를 불러오는 중...</p>
         </div>
       ) : activeTab === 'chart' ? (
         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 overflow-hidden print:p-0 print:border-none">
-          <div className="flex justify-end mb-6 print:hidden">
+          <div className="flex justify-end mb-6 print:hidden gap-2">
+            <button 
+              onClick={loadData}
+              disabled={loading}
+              className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-lg hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+            >
+              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침
+            </button>
             <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 font-bold text-sm transition-colors">
               <Printer size={16} className="mr-2" /> 미리보기
             </button>

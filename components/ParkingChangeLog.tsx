@@ -4,12 +4,11 @@ import {
   fetchParkingChangeList, 
   saveParkingChangeList, 
   fetchParkingStatusList, 
-  saveParkingStatusList 
+  saveParkingStatusList,
+  generateUUID
 } from '../services/dataService';
 import { Save, Trash2, Edit, RotateCcw, Calendar, Cloud, X, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
-
-const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const ParkingChangeLog: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -101,7 +100,7 @@ const ParkingChangeLog: React.FC = () => {
           };
         } else {
            updatedStatusList.push({
-            id: generateId(),
+            id: generateUUID(),
             date: newItem.date,
             type: newItem.type,
             location: newItem.location,
@@ -134,7 +133,7 @@ const ParkingChangeLog: React.FC = () => {
     setLoading(true);
     setShowSaveConfirm(false);
     const originalItems = [...items];
-    const itemToAdd = { ...newItem, id: generateId() };
+    const itemToAdd = { ...newItem, id: generateUUID() };
     const newItems = [itemToAdd, ...originalItems];
     
     setItems(newItems);
@@ -165,7 +164,7 @@ const ParkingChangeLog: React.FC = () => {
           };
         } else {
           updatedStatusList.push({
-            id: generateId(),
+            id: generateUUID(),
             date: newItem.date,
             type: newItem.type, 
             location: newItem.location,

@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ParkingStatusItem } from '../types';
-import { fetchParkingStatusList, saveParkingStatusList } from '../services/dataService';
+import { fetchParkingStatusList, saveParkingStatusList, generateUUID } from '../services/dataService';
 import { Trash2, Printer, Plus, Edit2, RotateCcw, AlertTriangle, X, Cloud, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
-
-const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const ParkingStatusList: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -92,7 +90,7 @@ const ParkingStatusList: React.FC = () => {
 
         const itemToSave = { 
           ...newItem, 
-          id: existingIndex >= 0 ? updatedList[existingIndex].id : generateId() 
+          id: existingIndex >= 0 ? updatedList[existingIndex].id : generateUUID() 
         };
 
         if (existingIndex >= 0) {
@@ -185,7 +183,7 @@ const ParkingStatusList: React.FC = () => {
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
           @page { size: A4 portrait; margin: 0; }
-          body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
+          body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; background: white !important; -webkit-print-color-adjust: exact; }
           .no-print { display: flex; justify-content: center; padding: 20px; }
           @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
           .print-page { 
@@ -236,10 +234,8 @@ const ParkingStatusList: React.FC = () => {
     printWindow.document.close();
   };
 
-  // 수변전반 점검표 스타일의 클래스 정의
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center text-[12px] text-gray-700 h-10 align-middle";
   const tdClass = "border border-gray-300 p-0 h-10 align-middle relative bg-white";
-  const tableInputClass = "w-full h-full text-center outline-none bg-transparent text-black p-1 focus:bg-blue-50/30 text-sm font-bold";
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in relative">
@@ -248,20 +244,21 @@ const ParkingStatusList: React.FC = () => {
           <div className="flex items-center gap-2"><div className={`w-2 h-6 rounded-full ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}></div><h3 className="text-lg font-bold text-gray-800">{editId ? '차량 정보 수정' : '신규 차량 등록'}</h3></div>
           {editId && <button onClick={handleCancelEdit} className="flex items-center space-x-1 text-sm text-orange-600 hover:text-orange-800 font-bold bg-white px-3 py-1 rounded-full border border-orange-200 shadow-sm"><RotateCcw size={14} /><span>수정 취소</span></button>}
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-7 gap-3 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
           <div><label className="block text-xs font-bold text-gray-500 mb-1">날짜</label><input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
           <div><label className="block text-xs font-bold text-gray-500 mb-1">구분</label><select value={newItem.type || '변경'} onChange={e => setNewItem({...newItem, type: e.target.value})} className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]"><option value="변경">변경</option><option value="추가">추가</option></select></div>
           <div><label className="block text-xs font-bold text-gray-500 mb-1">업체</label><input type="text" value={newItem.company} onChange={e => setNewItem({...newItem, company: e.target.value})} placeholder="업체명" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
           <div><label className="block text-xs font-bold text-gray-500 mb-1">위치 *</label><input type="text" value={newItem.location} onChange={e => setNewItem({...newItem, location: e.target.value})} placeholder="예: B2-1" className="w-full border border-blue-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px] font-bold" /></div>
           <div><label className="block text-xs font-bold text-gray-500 mb-1">변경전차량번호</label><input type="text" value={newItem.prevPlate || ''} onChange={e => setNewItem({...newItem, prevPlate: e.target.value})} placeholder="변경 시 입력" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
           <div><label className="block text-xs font-bold text-gray-500 mb-1">변경후차량번호 *</label><input type="text" value={newItem.plateNum} onChange={e => setNewItem({...newItem, plateNum: e.target.value})} placeholder="현재 차량번호" className="w-full border border-blue-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px] font-bold" /></div>
+          <div><label className="block text-xs font-bold text-gray-500 mb-1">비고</label><input type="text" value={newItem.note || ''} onChange={e => setNewItem({...newItem, note: e.target.value})} placeholder="비고" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
           <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex items-center justify-center space-x-2 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-bold h-[38px] transition-colors ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} disabled:bg-gray-400`}>{editId ? <Edit2 size={18} /> : <Plus size={18} />}<span>서버저장</span></button>
         </div>
       </div>
 
       <div className="flex justify-between items-center mb-4"><div className="flex items-center gap-2"><h2 className="text-xl font-bold text-gray-800">지정주차 차량 현황</h2><span className="text-sm text-gray-400 font-normal">총 {items.length}대</span></div><button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md text-sm"><Printer size={18} className="mr-2" />미리보기</button></div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
         <table className="w-full min-w-[1000px] border-collapse">
           <thead>
             <tr>
@@ -279,7 +276,7 @@ const ParkingStatusList: React.FC = () => {
           <tbody className="divide-y divide-gray-300">
             {items.length === 0 ? (<tr><td colSpan={9} className="text-center py-10 text-gray-400 italic">등록된 차량이 없습니다.</td></tr>) : (
                items.map((item, index) => (
-                 <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors divide-x divide-gray-300 ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
+                 <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors divide-x divide-gray-100 ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
                    <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>{items.length - index}</td>
                    <td className={tdClass}><div className="flex items-center justify-center w-full h-full text-xs text-gray-700">{item.date || '-'}</div></td>
                    <td className={tdClass}><div className="flex items-center justify-center w-full h-full"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{item.type || '-'}</span></div></td>
@@ -303,7 +300,7 @@ const ParkingStatusList: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-gray-100">
             <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100">
+              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
                 <AlertTriangle className="text-red-500" size={32} />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">차량 정보 삭제 확인</h3>

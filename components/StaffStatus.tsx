@@ -1,6 +1,7 @@
+
 import React, { useState, useRef } from 'react';
 import { StaffMember } from '../types';
-import { saveStaffList } from '../services/dataService';
+import { saveStaffList, uploadFile } from '../services/dataService';
 import { Save, Plus, Trash2, Search, ArrowLeft, Printer, Edit2, RotateCcw, UserPlus, Check, RefreshCw, Camera, User, Cloud, X, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface StaffStatusProps {
@@ -29,10 +30,15 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement('canvas'); const MAX_WIDTH = 300; const scaleSize = MAX_WIDTH / img.width;
-          canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
-          const ctx = canvas.getContext('2d'); ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          setFormItem(prev => ({ ...prev, photo: canvas.toDataURL('image/jpeg', 0.85) }));
+          const canvas = document.createElement('canvas'); 
+          const MAX_WIDTH = 300; // 직원 사진은 300px면 충분
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH; 
+          canvas.height = img.height * scaleSize;
+          const ctx = canvas.getContext('2d'); 
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // JPEG 품질 0.6으로 설정하여 용량 최소화
+          setFormItem(prev => ({ ...prev, photo: canvas.toDataURL('image/jpeg', 0.6) }));
         };
         img.src = event.target?.result as string;
       };
@@ -45,11 +51,40 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     setLoading(true);
     setShowSaveConfirm(false);
     try {
+      // 1. ID를 먼저 결정 (기존 수정이면 유지, 신규면 생성)
+      const targetId = editId || generateId();
+      let finalPhotoUrl = formItem.photo;
+      
+      // 2. 사진이 새로 업로드된 경우 (Base64 상태) Storage로 전송
+      if (finalPhotoUrl && finalPhotoUrl.startsWith('data:image')) {
+        // 파일명을 ID로 고정하여 중복 방지 (기존 사진 덮어쓰기)
+        const fileName = `staff_${targetId}.jpg`;
+        const uploadedUrl = await uploadFile('facility', 'staff', fileName, finalPhotoUrl);
+        if (uploadedUrl) finalPhotoUrl = uploadedUrl;
+      }
+
       let newList = [...staffList];
-      if (editId) { const idx = newList.findIndex(m => String(m.id) === String(editId)); if (idx >= 0) newList[idx] = { ...formItem }; }
-      else { newList = [{ ...formItem, id: generateId() }, ...newList]; }
-      if (await saveStaffList(newList)) { setStaffList(newList); setEditId(null); setFormItem(initialFormState); alert('저장되었습니다.'); }
-    } catch (e) { alert('오류 발생'); } finally { setLoading(false); }
+      const memberToSave = { ...formItem, id: targetId, photo: finalPhotoUrl };
+
+      if (editId) { 
+        const idx = newList.findIndex(m => String(m.id) === String(editId)); 
+        if (idx >= 0) newList[idx] = memberToSave; 
+      }
+      else { 
+        newList = [memberToSave, ...newList]; 
+      }
+
+      if (await saveStaffList(newList)) { 
+        setStaffList(newList); 
+        setEditId(null); 
+        setFormItem(initialFormState); 
+        alert('성공적으로 저장되었습니다.'); 
+      }
+    } catch (e) { 
+      alert('오류 발생'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const confirmDelete = async () => {
@@ -103,7 +138,6 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
     if (!printWindow) return;
 
-    // 퇴사일이 있는 직원을 제외
     const activeStaffForPrint = filteredAndSortedList.filter(m => !m.resignDate || m.resignDate.trim() === '');
 
     const tableRows = activeStaffForPrint.map((m, i) => `
@@ -130,7 +164,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         th, td { border: 1px solid black; padding: 0 3px; text-align: center; word-break: break-all; height: 35px; line-height: 35px; }
         th { background: #f3f4f6; font-weight: bold; }
       </style></head><body>
-        <div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">인쇄하기</button></div>
+        <div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button></div>
         <div class="print-page">
           <h1>직원 현황 리스트</h1>
           <table>

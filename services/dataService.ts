@@ -1,4 +1,5 @@
 
+import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
   WorkLogData, 
@@ -11,6 +12,7 @@ import {
   StaffMember, 
   WeeklyReportData, 
   ConsumableRequest, 
+  ConsumableRequestItem, 
   ParkingChangeItem, 
   ParkingStatusItem, 
   Contractor, 
@@ -32,188 +34,349 @@ import {
   ElevatorInspectionItem, 
   ConstructionWorkItem, 
   AppointmentItem, 
-  Tenant 
+  Tenant,
+  ShiftSettings,
+  BatteryItem,
+  TaskItem,
+  VcbReadings,
+  AcbReadings,
+  PowerUsageReadings,
+  DailyStats
 } from '../types';
-import { GOOGLE_APPS_SCRIPT_URL } from '../constants';
 import { format, addDays, parseISO } from 'date-fns';
 
+// Supabase configuration
+const SUPABASE_URL = 'https://gvymrgekfdxqrkbrgroa.supabase.co'; 
+const SUPABASE_KEY = 'sb_publishable_9BNvty62YwJwcy3xBmcpvQ_bziQ1VDD'; 
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
 /**
- * Utility: Deep Merge objects
+ * UUID 유효성 검사 및 생성 헬퍼
  */
-export const deepMerge = (target: any, source: any) => {
-  const isObject = (item: any) => (item && typeof item === 'object' && !Array.isArray(item));
-  const output = Object.assign({}, target);
-  if (isObject(target) && isObject(source)) {
-    Object.keys(source).forEach(key => {
-      if (isObject(source[key])) {
-        if (!(key in target))
-          Object.assign(output, { [key]: source[key] });
-        else
-          output[key] = deepMerge(target[key], source[key]);
-      } else {
-        Object.assign(output, { [key]: source[key] });
-      }
-    });
+const isValidUUID = (uuid: string) => {
+  const s = "" + uuid;
+  const match = s.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  return !!match;
+};
+
+export const generateUUID = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
   }
-  return output;
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 };
 
 /**
- * Utility: Storage helpers
+ * [Supabase 전용] Prefix와 테이블명 매핑 정의
  */
-export const getFromStorage = (key: string, isJson: boolean = true) => {
+const PREFIX_TABLE_MAP: Record<string, string> = {
+  "DAILY_": "daily_reports",
+  "SUB_LOG_": "substation_logs",
+  "GAS_LOG_": "gas_logs",
+  "SEPTIC_LOG_": "septic_logs",
+  "WEEKLY_": "weekly_reports",
+  "FIRE_FAC_": "fire_facility_logs",
+  "ELEV_LOG_": "elevator_logs",
+  "METER_": "meter_readings",
+  "GEN_CHECK_": "generator_checks",
+  "BATTERY_": "battery_checks",
+  "LOAD_": "load_currents",
+  "SAFETY_general_": "safety_checks",
+  "SAFETY_ev_": "safety_checks",
+  "AIR_ENV_": "air_environment_logs",
+  "HVAC_LOG_": "hvac_boiler_logs",
+  "BOILER_LOG_": "hvac_boiler_logs",
+  "HVAC_BOILER_": "hvac_boiler_logs",
+  "SUB_CHECK_": "substation_checklists"
+};
+
+/**
+ * DB 데이터를 앱 인터페이스로 매핑 (Snake to Camel)
+ */
+const mapFromDB = (prefix: string, item: any): any => {
+  if (!item) return null;
+  
+  switch(prefix) {
+    case "DAILY_":
+      return {
+        date: item.id,
+        facilityDuty: item.facility_duty,
+        securityDuty: item.security_duty,
+        utility: item.utility,
+        workLog: item.work_log,
+        lastUpdated: item.last_updated
+      };
+    case "SUB_LOG_":
+      return {
+        date: item.date,
+        vcb: item.vcb,
+        acb: item.acb,
+        powerUsage: item.power_usage,
+        dailyStats: item.daily_stats
+      };
+    case "WEEKLY_":
+      return {
+        startDate: item.start_date,
+        reportingDate: item.reporting_date,
+        author: item.author,
+        fields: item.fields,
+        photos: item.photos,
+        lastUpdated: item.last_updated
+      };
+    case "HVAC_LOG_":
+      return item.hvac_data;
+    case "BOILER_LOG_":
+      return item.boiler_data;
+    case "HVAC_BOILER_":
+      return item; // 통합 데이터 행 전체 반환
+    default:
+      return item.data || item;
+  }
+};
+
+/**
+ * 데이터 매퍼 (Mapper) - UUID 형식 강제
+ */
+const mapParkingStatusToDB = (item: ParkingStatusItem) => ({
+  id: isValidUUID(item.id) ? item.id : generateUUID(), 
+  date: item.date,
+  type: item.type || null,
+  location: item.location,
+  company: item.company,
+  prev_plate: item.prevPlate || null,
+  plate_num: item.plateNum,
+  note: item.note,
+  last_updated: new Date().toISOString()
+});
+
+const mapParkingChangeToDB = (item: ParkingChangeItem) => ({
+  id: isValidUUID(item.id) ? item.id : generateUUID(),
+  date: item.date,
+  type: item.type,
+  company: item.company,
+  location: item.location,
+  prev_plate: item.prevPlate || null,
+  new_plate: item.newPlate,
+  note: item.note,
+  last_updated: new Date().toISOString()
+});
+
+/**
+ * 승강기 점검 이력 매퍼
+ */
+const mapElevatorInspectionToDB = (item: ElevatorInspectionItem) => ({
+  id: isValidUUID(item.id) ? item.id : generateUUID(),
+  date: item.date,
+  company: item.company,
+  content: item.content,
+  note: item.note
+});
+
+/**
+ * 소방 점검 이력 매퍼
+ */
+const mapFireHistoryToDB = (item: FireHistoryItem) => ({
+  id: isValidUUID(item.id) ? item.id : generateUUID(),
+  date: item.date,
+  company: item.company,
+  content: item.content,
+  note: item.note
+});
+
+/**
+ * 소화기 관리 매퍼
+ */
+const mapFireExtinguisherToDB = (item: FireExtinguisherItem) => ({
+  id: isValidUUID(item.id) ? item.id : generateUUID(),
+  manage_no: item.manageNo,
+  type: item.type,
+  floor: item.floor,
+  company: item.company,
+  serial_no: item.serialNo,
+  phone: item.phone,
+  cert_no: item.certNo,
+  date: item.date,
+  remarks: item.remarks
+});
+
+/**
+ * Base64를 Blob으로 변환
+ */
+const dataURLtoBlob = (dataurl: string) => {
+  const arr = dataurl.split(',');
+  if (arr.length < 2) return null;
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+};
+
+/**
+ * Supabase Storage 업로드
+ */
+export const uploadFile = async (bucket: string, folder: string, fileName: string, base64Data: string): Promise<string | null> => {
+  if (!base64Data || !base64Data.startsWith('data:image')) return base64Data; 
+
   try {
-    const val = localStorage.getItem(key);
-    if (!val) return null;
-    return isJson ? JSON.parse(val) : val;
-  } catch (e) {
-    console.error(`Error parsing storage for ${key}:`, e);
-    return null;
+    const blob = dataURLtoBlob(base64Data);
+    if (!blob) return base64Data;
+    const filePath = `${folder}/${fileName}`;
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, blob, {
+        upsert: true,
+        contentType: blob.type
+      });
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    return publicUrl;
+  } catch (err) {
+    console.error('Storage Upload Error:', err);
+    return base64Data;
   }
 };
 
-export const saveToCache = (key: string, data: any, isJson: boolean = true) => {
-  const val = isJson ? JSON.stringify(data) : data;
-  localStorage.setItem(key, val);
+/**
+ * Storage Helpers
+ */
+export const getFromStorage = (key: string, isJson = true) => {
+  const data = localStorage.getItem(key);
+  if (!data) return null;
+  return isJson ? JSON.parse(data) : data;
+};
+
+export const saveToCache = (key: string, data: any, isJson = true) => {
+  localStorage.setItem(key, isJson ? JSON.stringify(data) : data);
 };
 
 export const clearCache = (key: string) => {
   localStorage.removeItem(key);
 };
 
-/**
- * Robust Fetch with Retry
- */
-const fetchWithRetry = async (url: string, options: any = {}, retries: number = 2): Promise<Response> => {
-  try {
-    const response = await fetch(url, {
-      ...options,
-      cache: 'no-store' // 브라우저 캐시 방지
-    });
-    if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
-    return response;
-  } catch (err) {
-    if (retries > 0) {
-      await new Promise(r => setTimeout(r, 1000));
-      return fetchWithRetry(url, options, retries - 1);
+export const deepMerge = (target: any, source: any): any => {
+  if (!source) return target;
+  if (!target) return source;
+  const output = { ...target };
+  Object.keys(source).forEach(key => {
+    if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+      output[key] = deepMerge(target[key], source[key]);
+    } else {
+      output[key] = source[key];
     }
-    throw err;
-  }
+  });
+  return output;
 };
 
 /**
- * API: Core fetch and save
+ * Supabase 병렬 쿼리
  */
-const fetchFromApi = async (key: string) => {
-  try {
-    const baseUrl = GOOGLE_APPS_SCRIPT_URL;
-    const separator = baseUrl.includes('?') ? '&' : '?';
-    const url = `${baseUrl}${separator}date=${encodeURIComponent(key)}`;
-    
-    const response = await fetchWithRetry(url);
-    const result = await response.json();
-    return result.status === 'success' ? result.data : null;
-  } catch (error) {
-    console.error(`Fetch API error for ${key}:`, error);
-    // Failed to fetch인 경우 네트워크 상태나 GAS 배포 설정을 확인하도록 알림 유도
-    if (error.toString().includes('Failed to fetch')) {
-       console.warn("네트워크 연결을 확인하거나 GAS 앱이 'Anyone' 권한으로 배포되었는지 확인하십시오.");
+export const apiFetchBatch = async (requests: any[]): Promise<any[]> => {
+  const promises = requests.map(async (req) => {
+    try {
+      if (req.type === 'get') {
+        const data = await fetchSingleGeneric(req.key);
+        return { key: req.key, data: data };
+      } else if (req.type === 'range') {
+        const data = await apiFetchRange(req.prefix, req.start, req.end);
+        return { key: req.prefix, data: data };
+      }
+    } catch (e) {
+      console.error(`Batch item error [${req.key || req.prefix}]:`, e);
+      return { key: (req.key || req.prefix), data: null, error: e };
     }
     return null;
-  }
+  });
+  
+  return await Promise.all(promises);
 };
 
-const saveToApi = async (key: string, data: any) => {
-  try {
-    const payload = { targetKey: key, ...data };
-    const response = await fetchWithRetry(GOOGLE_APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-    const result = await response.json();
-    return result.status === 'success';
-  } catch (error) {
-    console.error(`Save API error for ${key}:`, error);
-    return false;
-  }
-};
+/**
+ * Supabase 범위 쿼리
+ */
+export const apiFetchRange = async (prefix: string, start: string, end: string): Promise<any[]> => {
+  const table = PREFIX_TABLE_MAP[prefix];
+  if (!table) return [];
 
-export const apiFetchRange = async (prefix: string, startDate: string, endDate: string) => {
   try {
-    const baseUrl = GOOGLE_APPS_SCRIPT_URL;
-    const separator = baseUrl.includes('?') ? '&' : '?';
-    const url = `${baseUrl}${separator}prefix=${encodeURIComponent(prefix)}&startDate=${startDate}&endDate=${endDate}`;
+    let query = supabase.from(table).select("*");
     
-    const response = await fetchWithRetry(url);
-    const result = await response.json();
-    return result.status === 'success' ? (result.data || []) : [];
-  } catch (error) {
-    console.error("apiFetchRange error", error);
+    const isSpecialPrefix = (prefix === "DAILY_" || prefix === "HVAC_LOG_" || prefix === "BOILER_LOG_" || prefix === "AIR_ENV_");
+    const startKey = isSpecialPrefix ? start : `${prefix}${start}`;
+    const endKey = isSpecialPrefix ? end : `${prefix}${end}`;
+
+    if (prefix === "HVAC_LOG_" || prefix === "BOILER_LOG_") {
+      query = query.gte("id", `HVAC_BOILER_${start}`).lte("id", `HVAC_BOILER_${end}`);
+    } else if (prefix === "DAILY_") {
+      query = query.gte("id", start).lte("id", end);
+    } else if (prefix === "AIR_ENV_") {
+      query = query.gte("id", `AIR_ENV_${start}`).lte("id", `AIR_ENV_${end}`);
+    } else {
+      query = query.gte("id", startKey).lte("id", endKey);
+    }
+
+    const { data, error } = await query.order('id', { ascending: true });
+    
+    if (error) throw error;
+    if (!data) return [];
+
+    return data.map(item => ({
+      key: item.id,
+      data: mapFromDB(prefix, item)
+    }));
+  } catch (err) {
+    console.error(`apiFetchRange failed for ${prefix}:`, err);
     return [];
   }
 };
 
 /**
- * Speed Optimization: 배치 요청
+ * 단일 키 기반 데이터 라우팅 함수 (Batch Get용)
  */
-export const apiFetchBatch = async (requests: { type: 'get' | 'range', key?: string, prefix?: string, start?: string, end?: string }[]) => {
-  try {
-    const batchJson = JSON.stringify(requests);
-    const baseUrl = GOOGLE_APPS_SCRIPT_URL;
-    const separator = baseUrl.includes('?') ? '&' : '?';
-    const url = `${baseUrl}${separator}batch=${encodeURIComponent(batchJson)}`;
-    
-    if (url.length > 2000) {
-      throw new Error("URL too long for GET batch");
-    }
-
-    const response = await fetchWithRetry(url);
-    const result = await response.json();
-    
-    if (result.status === 'success' && Array.isArray(result.data)) {
-      return result.data;
-    }
-    throw new Error(result.message || "Batch request unsuccessful");
-
-  } catch (error) {
-    console.warn("apiFetchBatch failed, falling back to individual requests:", error);
-    
-    const fallbackResults = await Promise.all(requests.map(async (req) => {
-      if (req.type === 'get' && req.key) {
-        const data = await fetchFromApi(req.key);
-        return { key: req.key, data };
-      } else if (req.type === 'range' && req.prefix && req.start && req.end) {
-        const data = await apiFetchRange(req.prefix, req.start, req.end);
-        return { key: req.prefix, data };
-      }
-      return null;
-    }));
-    
-    return fallbackResults;
+const fetchSingleGeneric = async (key: string): Promise<any> => {
+  if (key.startsWith("DAILY_")) return await fetchDailyData(key.replace("DAILY_", ""));
+  if (key.startsWith("GAS_LOG_")) return await fetchGasLog(key.replace("GAS_LOG_", ""));
+  if (key.startsWith("SEPTIC_LOG_")) return await fetchSepticLog(key.replace("SEPTIC_LOG_", ""));
+  if (key.startsWith("SUB_LOG_")) return await fetchSubstationLog(key.replace("SUB_LOG_", ""));
+  if (key.startsWith("SUB_CHECK_")) return await fetchSubstationChecklist(key.replace("SUB_CHECK_", ""));
+  if (key.startsWith("FIRE_FAC_")) return await fetchFireFacilityLog(key.replace("FIRE_FAC_", ""));
+  if (key.startsWith("ELEV_LOG_")) return await fetchElevatorLog(key.replace("ELEV_LOG_", ""));
+  
+  // HVAC_BOILER_ 직접 조회 처리 추가
+  if (key.startsWith("HVAC_BOILER_")) {
+    const { data } = await supabase.from('hvac_boiler_logs').select("*").eq("id", key).maybeSingle();
+    return mapFromDB("HVAC_BOILER_", data);
   }
+
+  for (const prefix of Object.keys(PREFIX_TABLE_MAP)) {
+    if (key.startsWith(prefix)) {
+      const table = PREFIX_TABLE_MAP[prefix];
+      const { data } = await supabase.from(table).select("*").eq("id", key).maybeSingle();
+      return mapFromDB(prefix, data);
+    }
+  }
+  return null;
 };
 
 /**
- * Speed Optimization Wrapper: 캐시 우선 반환 전략
- */
-const fetchWithCache = async <T>(key: string, force: boolean = false): Promise<T | null> => {
-  const cacheKey = key;
-  if (!force) {
-    const cached = getFromStorage(cacheKey);
-    if (cached) return cached as T;
-  }
-  const server = await fetchFromApi(key);
-  if (server) saveToCache(cacheKey, server);
-  return server as T;
-};
-
-/**
- * Daily Data
+ * 초기 데이터 생성기
  */
 export const getInitialDailyData = (date: string): DailyData => ({
   date,
-  facilityDuty: { day: '', night: '', off: '', vacation: '', deputy: '', chief: '', leader: '' },
-  securityDuty: { day: '', night: '', off: '', vacation: '', leader: '' },
+  facilityDuty: { day: '', night: '', off: '', vacation: '', deputy: '', chief: '', shiftMode: 'manual', baseDate: '' },
+  securityDuty: { day: '', night: '', off: '', vacation: '' },
   utility: { electricity: '', hvacGas: '', boilerGas: '' },
   workLog: {
     scheduled: [],
@@ -231,551 +394,170 @@ export const getInitialDailyData = (date: string): DailyData => ({
     parking: { today: [], tomorrow: [] },
     security: { today: [], tomorrow: [] },
     cleaning: { today: [], tomorrow: [] },
-    handover: { today: [], tomorrow: [] },
+    handover: { today: [], tomorrow: [] }
   }
 });
 
-export const fetchDailyData = async (date: string, force = false): Promise<DailyData | null> => {
-  return await fetchWithCache<DailyData>(`DAILY_${date}`, force);
-};
-
-export const saveDailyData = async (data: DailyData) => {
-  saveToCache(`DAILY_${data.date}`, data);
-  return await saveToApi(`DAILY_${data.date}`, data);
-};
-
-export const fetchDateRangeData = async (startDate: string, daysCount: number) => {
-  const start = parseISO(startDate);
-  const end = addDays(start, daysCount - 1);
-  return await apiFetchRange("DAILY_", format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd'));
-};
-
-/**
- * Consumables
- */
-export const fetchConsumables = async (): Promise<ConsumableItem[]> => {
-  const res = await fetchWithCache<any>('CONSUMABLES_DB');
-  return res?.consumables || [];
-};
-
-export const saveConsumables = async (list: ConsumableItem[]) => {
-  return await saveToApi('CONSUMABLES_DB', { consumables: list });
-};
-
-/**
- * Substation Checklist
- */
 export const getInitialSubstationChecklist = (date: string): SubstationChecklistData => ({
   date,
   items: [
-    { id: 'tr-1', category: '변압기', label: '변압기 외관 청결상태', result: '양호' },
-    { id: 'tr-2', category: '변압기', label: '단자부위 과열 및 변색여부', result: '양호' },
-    { id: 'tr-3', category: '변압기', label: '이상음, 진동, 취기 발생유무', result: '양호' },
-    { id: 'tr-4', category: '변압기', label: '접지선 접촉 및 단선유무', result: '양호' },
-    { id: 'tr-5', category: '변압기', label: '온도상태 확인 및 환기팬 작동', result: '양호' },
-    { id: 'tr-6', category: '변압기', label: '애자류 손상 및 오염상태', result: '양호' },
-    { id: 'tr-7', category: '변압기', label: '반내 습기유입 및 부식상태', result: '양호' },
-    { id: 'vcb-1', category: 'VCB AB', label: 'VCB 투입 및 개방상태 확인', result: '양호' },
-    { id: 'vcb-2', category: 'VCB AB', label: '이상 소음 및 냄새 유무', result: '양호' },
-    { id: 'vcb-3', category: 'VCB AB', label: '각종 계기 및 램프 점등상태', result: '양호' },
-    { id: 'ats-1', category: 'ATS', label: 'ATS 절체상태 및 동작유무', result: '양호' },
-    { id: 'ats-2', category: 'ATS', label: '단자부 변색 및 과열유무', result: '양호' },
-    { id: 'ats-3', category: 'ATS', label: '조작배선 탈락 및 단선유무', result: '양호' },
-    { id: 'ats-4', category: 'ATS', label: '반내 청결 및 먼지 퇴적상태', result: '양호' },
-    { id: 'ats-5', category: 'ATS', label: '각종 릴레이 및 퓨즈 이상유무', result: '양호' },
-    { id: 'ats-6', category: 'ATS', label: '비상전원 투입 대기상태', result: '양호' },
-    { id: 'ats-7', category: 'ATS', label: '수동 절체 레버 비치상태', result: '양호' },
-    { id: 'ats-8', category: 'ATS', label: '판넬 잠금 및 시건상태', result: '양호' },
-    { id: 'ats-9', category: 'ATS', label: '주변 정리 정돈 상태', result: '양호' },
+    { id: 'tr_1', category: '변압기', label: '변압기 외관 청결상태', result: '양호' },
+    { id: 'tr_2', category: '변압기', label: '단자부위 과열 및 변색여부', result: '양호' },
+    { id: 'tr_3', category: '변압기', label: '이상음, 진동, 취기 발생유무', result: '양호' },
+    { id: 'tr_4', category: '변압기', label: '접지선 접촉 및 단선유무', result: '양호' },
+    { id: 'tr_5', category: '변압기', label: '온도상태 확인 및 환기팬 작동', result: '양호' },
+    { id: 'tr_6', category: '변압기', label: '애자류 손상 및 오염상태', result: '양호' },
+    { id: 'tr_7', category: '변압기', label: '반내 습기유입 및 부식상태', result: '양호' },
+    { id: 'vcb_1', category: 'VCB A B', label: 'VCB 투입 및 개방상태 확인', result: '양호' },
+    { id: 'vcb_2', category: 'VCB A B', label: '이상 소음 및 냄새 유무', result: '양호' },
+    { id: 'vcb_3', category: 'VCB A B', label: '각종 계기 및 램프 점등상태', result: '양호' },
+    { id: 'ats_1', category: 'ATS', label: 'ATS 절체상태 및 동작유무', result: '양호' },
+    { id: 'ats_2', category: 'ATS', label: '단자부 변색 및 과열유무', result: '양호' },
+    { id: 'ats_3', category: 'ATS', label: '조작배선 탈락 및 단선유무', result: '양호' },
+    { id: 'ats_4', category: 'ATS', label: '반내 청결 및 먼지 퇴적상태', result: '양호' },
+    { id: 'ats_5', category: 'ATS', label: '각종 릴레이 및 퓨즈 이상유무', result: '양호' },
+    { id: 'ats_6', category: 'ATS', label: '비상전원 투입 대기상태', result: '양호' },
+    { id: 'ats_7', category: 'ATS', label: '수동 절체 레버 비치상태', result: '양호' },
+    { id: 'ats_8', category: 'ATS', label: '판넬 잠금 및 시건상태', result: '양호' },
+    { id: 'ats_9', category: 'ATS', label: '주변 정리 정돈 상태', result: '양호' }
   ],
   approvers: { checker: '', manager: '' },
   note: ''
 });
 
-export const fetchSubstationChecklist = async (date: string): Promise<SubstationChecklistData | null> => {
-  return await fetchWithCache<SubstationChecklistData>(`SUB_CHECK_${date}`);
-};
-
-export const saveSubstationChecklist = async (data: SubstationChecklistData) => {
-  return await saveToApi(`SUB_CHECK_${data.date}`, data);
-};
-
-/**
- * Fire Facility Log
- */
 export const getInitialFireFacilityLog = (date: string): FireFacilityLogData => ({
   date,
   items: [
-    { id: 'ff-1', category: '소 방 시 설', content: '소화기는 정상 위치 여부', result: '양호', remarks: '' },
-    { id: 'ff-2', category: '소 방 시 설', content: '수신반제어/밸브류 정상 여부', result: '양호', remarks: '' },
-    { id: 'ff-3', category: '소 방 시 설', content: '유도등 상태가 양호한지 여부', result: '양호', remarks: '' },
-    { id: 'ff-4', category: '피 난 방 화 시 설', content: '소화전 주위 장애물 적치여부', result: '양호', remarks: '' },
-    { id: 'ff-5', category: '피 난 방 화 시 설', content: '계단·전실·복도 장애물 적치 여부', result: '양호', remarks: '' },
-    { id: 'ff-6', category: '피 난 방 화 시 설', content: '방화문 주위 장애물 적치 여부', result: '양호', remarks: '' },
-    { id: 'ff-7', category: '화 재 예 방 조 치', content: '가연물 및 위험물 사용 적정 여부', result: '양호', remarks: '' },
-    { id: 'ff-8', category: '화 재 예 방 조 치', content: '전기시설 사용 적정 여부', result: '양호', remarks: '' },
-    { id: 'ff-9', category: '화 재 예 방 조 치', content: '가스시설 사용 적정 여부', result: '양호', remarks: '' },
-    { id: 'ff-10', category: '화 기 취 급 감 독', content: '유류 관리 상태', result: '양호', remarks: '' },
-    { id: 'ff-11', category: '화 기 취 급 감 독', content: '전열기구 관리 상태', result: '양호', remarks: '' },
-    { id: 'ff-12', category: '화 기 취 급 감 독', content: '공사중 소화기 비치', result: '양호', remarks: '' },
-    { id: 'ff-13', category: '기 타', content: '쥐, 고양이등 침입에 취약점 상태', result: '양호', remarks: '' }
+    { id: 'fire_1', category: '소방시설', content: '소화기는 정상 위치 여부', result: '양호', remarks: '' },
+    { id: 'fire_2', category: '소방시설', content: '수신반제어/밸브류 정상 여부', result: '양호', remarks: '' },
+    { id: 'fire_3', category: '소방시설', content: '유도등 상태가 양호한지 여부', result: '양호', remarks: '' },
+    { id: 'fire_4', category: '피난방화시설', content: '소화전 주위 장애물 적치여부', result: '양호', remarks: '' },
+    { id: 'fire_5', category: '피난방화시설', content: '계단·전실·복도 장애물 적치 여부', result: '양호', remarks: '' },
+    { id: 'fire_6', category: '피난방화시설', content: '방화문 주위 장애물 적치 여부', result: '양호', remarks: '' },
+    { id: 'fire_7', category: '화재예방조치', content: '가연물 및 위험물 사용 적정 여부', result: '양호', remarks: '' },
+    { id: 'fire_8', category: '화재예방조치', content: '전기시설 사용 적정 여부', result: '양호', remarks: '' },
+    { id: 'fire_9', category: '화재예방조치', content: '가스시설 사용 적정 여부', result: '양호', remarks: '' },
+    { id: 'fire_10', category: '화기취급감독', content: '유류 관리 상태', result: '양호', remarks: '' },
+    { id: 'fire_11', category: '화기취급감독', content: '전열기구 관리 상태', result: '양호', remarks: '' },
+    { id: 'fire_12', category: '화기취급감독', content: '공사중 소화기 비치', result: '양호', remarks: '' },
+    { id: 'fire_13', category: '기타', content: '쥐, 고양이등 침입에 취약점 상태', result: '양호', remarks: '' }
   ],
   remarks: '',
   approvers: { inspector: '', manager: '' }
 });
 
-export const fetchFireFacilityLog = async (date: string): Promise<FireFacilityLogData | null> => {
-  return await fetchWithCache<FireFacilityLogData>(`FIRE_FACILITY_LOG_${date}`);
-};
-
-export const saveFireFacilityLog = async (data: FireFacilityLogData) => {
-  return await saveToApi(`FIRE_FACILITY_LOG_${data.date}`, data);
-};
-
-/**
- * Elevator Log
- */
 export const getInitialElevatorLog = (date: string): ElevatorLogData => ({
   date,
   items: [
-    { id: 'evl-1', category: '운행상태', content: '카 내 버 튼 상 태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
-    { id: 'evl-2', category: '운행상태', content: '카 내 조 명 상 태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
-    { id: 'evl-3', category: '운행상태', content: '카 도 어 개 폐 상 태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
-    { id: 'evl-4', category: '운행상태', content: '카 레 벨 상 태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
-    { id: 'evl-5', category: '운행상태', content: '카 운 행 상 태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
-    { id: 'evl-6', category: '이상유무', content: '감 시 반 이 상 유 무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
-    { id: 'evl-7', category: '이상유무', content: '기 계 실 이 상 유 무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' }
+    { id: 'elv_1', category: '운행상태', content: '카내버튼상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
+    { id: 'elv_2', category: '운행상태', content: '카내조명상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
+    { id: 'elv_3', category: '운행상태', content: '카도어개폐상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
+    { id: 'elv_4', category: '운행상태', content: '카레벨상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
+    // Fixed Type Error: Changed incorrect property 'ss' to 'ev3' as per ElevatorLogItem definition in types.ts
+    { id: 'elv_5', category: '운행상태', content: '카운행상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
+    { id: 'elv_6', category: '운행상태', content: '감시반이상유무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
+    { id: 'elv_7', category: '운행상태', content: '기계실이상유무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' }
   ],
   remarks: '',
   inspector: ''
 });
 
-export const fetchElevatorLog = async (date: string): Promise<ElevatorLogData | null> => {
-  return await fetchWithCache<ElevatorLogData>(`ELEVATOR_LOG_${date}`);
-};
-
-export const saveElevatorLog = async (data: ElevatorLogData) => {
-  return await saveToApi(`ELEVATOR_LOG_${data.date}`, data);
-};
-
-/**
- * Gas Log
- */
 export const getInitialGasLog = (date: string): GasLogData => ({
   date,
   items: [
-    { id: 'gas-1', category: '정압실', content: '정압기의 작동상태', result: '양호' },
-    { id: 'gas-2', category: '정압실', content: '각 밸브의 개폐 상태', result: '양호' },
-    { id: 'gas-3', category: '정압실', content: '배관 각이음부위의 누설 유무', result: '양호' },
-    { id: 'gas-4', category: '정압실', content: '보안유지 관리 상태', result: '양호' },
-    { id: 'gas-5', category: '정압실', content: '압력기록기의 작동 상태', result: '양호' },
-    { id: 'gas-6', category: '정압실', content: '청결유지상태', result: '양호' },
-    { id: 'gas-7', category: '배관 계통', content: '가스누설 차단장치의 작동상태', result: '양호' },
-    { id: 'gas-8', category: '배관 계통', content: '배관부식 및 고정장치의 상태', result: '양호' },
-    { id: 'gas-9', category: '배관 계통', content: '누설유무', result: '양호' },
-    { id: 'gas-10', category: '배관 계통', content: '휠타의 청결상태', result: '양호' },
-    { id: 'gas-11', category: '연소 장치', content: '정압기의 작동상태', result: '양호' },
-    { id: 'gas-12', category: '연소 장치', content: '전자변의 작동상태', result: '양호' },
-    { id: 'gas-13', category: '연소 장치', content: '가스량제어와 풍량제어의 연동상태', result: '양호' },
-    { id: 'gas-14', category: '연소 장치', content: '버너의 막힘 손상유무', result: '양호' },
-    { id: 'gas-15', category: '연소 장치', content: '각연결부분 누설유무', result: '양호' },
-    { id: 'gas-16', category: '경보 장치', content: '가스 이상압 통보기의 상태', result: '양호' },
-    { id: 'gas-17', category: '경보 장치', content: '감지기의 상태', result: '양호' }
+    { id: 'gas_1', category: '정압실', content: '정압기의 작동상태', result: '양호' },
+    { id: 'gas_2', category: '정압실', content: '각 밸브의 개폐 상태', result: '양호' },
+    { id: 'gas_3', category: '정압실', content: '배관 각이음부위의 누설 유무', result: '양호' },
+    { id: 'gas_4', category: '정압실', content: '보안유지 관리 상태', result: '양호' },
+    { id: 'gas_5', category: '정압실', content: '압력기록기의 작동 상태', result: '양호' },
+    { id: 'gas_6', category: '정압실', content: '청결유지상태', result: '양호' },
+    { id: 'gas_7', category: '배관 계통', content: '가스누설 차단장치의 작동상태', result: '양호' },
+    { id: 'gas_8', category: '배관 계통', content: '배관부식 및 고정장치의 상태', result: '양호' },
+    { id: 'gas_9', category: '배관 계통', content: '누설유무', result: '양호' },
+    { id: 'gas_10', category: '배관 계통', content: '휠타의 청결상태', result: '양호' },
+    { id: 'gas_11', category: '연소 장치', content: '정압기의 작동상태', result: '양호' },
+    { id: 'gas_12', category: '연소 장치', content: '전자변의 작동상태', result: '양호' },
+    { id: 'gas_13', category: '연소 장치', content: '가스량제어와 풍량제어의 연동상태', result: '양호' },
+    { id: 'gas_14', category: '연소 장치', content: '버너의 막힘 손상유무', result: '양호' },
+    { id: 'gas_15', category: '연소 장치', content: '각연결부분 누설유무', result: '양호' },
+    { id: 'gas_16', category: '경보 장치', content: '가스 이상압 통보기의 상태', result: '양호' },
+    { id: 'gas_17', category: '경보 장치', content: '감지기의 상태', result: '양호' }
   ]
 });
 
-export const fetchGasLog = async (date: string): Promise<GasLogData | null> => {
-  return await fetchWithCache<GasLogData>(`GAS_LOG_${date}`);
-};
-
-export const saveGasLog = async (data: GasLogData) => {
-  return await saveToApi(`GAS_LOG_${data.date}`, data);
-};
-
-/**
- * Septic Log
- */
 export const getInitialSepticLog = (date: string): SepticLogData => ({
   date,
   items: [
-    { id: 'sep-1', content: '조절 수위 및 배수 상태는 양호한가?', result: '양호' },
-    { id: 'sep-2', content: '소독조의 염소 투입 상태는 양호한가?', result: '양호' },
-    { id: 'sep-3', content: 'BLOWER의 상태는 양호한가?', result: '양호' },
-    { id: 'sep-4', content: '악취 및 부유물은 없는가?', result: '양호' },
-    { id: 'sep-5', content: 'PUMP의 소음 및 심한 진동은 없는가?', result: '양호' },
-    { id: 'sep-6', content: '전원 PANEL은 정상인가?', result: '양호' },
-    { id: 'sep-7', content: '정화조 내부의 청결 및 정리정돈은 양호한가?', result: '양호' },
-    { id: 'sep-8', content: '급,배기휀의 작동상태는 양호한가?', result: '양호' },
-    { id: 'sep-9', content: '감속기의 상태는 정상인가?', result: '양호' },
-    { id: 'sep-10', content: '가연물 및 위험물 사용 적정 여부', result: '양호' }
+    { id: 'sep_1', content: '조절 수위 및 배수 상태는 양호한가?', result: '양호' },
+    { id: 'sep_2', content: '소독조의 염소 투입 상태는 양호한가?', result: '양호' },
+    { id: 'sep_3', content: 'BLOWER의 상태는 양호한가?', result: '양호' },
+    { id: 'sep_4', content: '악취 및 부유물은 없는가?', result: '양호' },
+    { id: 'sep_5', content: 'PUMP의 소음 및 심한 진동은 없는가?', result: '양호' },
+    { id: 'sep_6', content: '전원 PANEL은 정상인가?', result: '양호' },
+    { id: 'sep_7', content: '정화조 내부의 청결 및 정리정돈은 양호한가?', result: '양호' },
+    { id: 'sep_8', content: '급,배기휀의 작동상태는 양호한가?', result: '양호' },
+    { id: 'sep_9', content: '감속기의 상태는 정상인가?', result: '양호' },
+    { id: 'sep_10', content: '가연물 및 위험물 사용 적정 여부', result: '양호' }
   ]
 });
 
-export const fetchSepticLog = async (date: string): Promise<SepticLogData | null> => {
-  return await fetchWithCache<SepticLogData>(`SEPTIC_LOG_${date}`);
-};
-
-export const saveSepticLog = async (data: SepticLogData) => {
-  return await saveToApi(`SEPTIC_LOG_${data.date}`, data);
-};
-
-// Fixed missing exports for ChemicalLog, FireExtinguisherList, and FireInspectionLog
-/**
- * Chemical Log
- */
-export const getInitialChemicalLog = (date: string): ChemicalLogData => ({
-  date,
-  items: [
-    { id: 'chem-1', name: '종균제', unit: 'l', prevStock: '', received: '', used: '', currentStock: '', remark: '' },
-    { id: 'chem-2', name: '소독제', unit: 'kg', prevStock: '', received: '', used: '', currentStock: '', remark: '' }
-  ]
-});
-
-export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | null> => {
-  return await fetchWithCache<ChemicalLogData>(`CHEMICAL_LOG_${date}`);
-};
-
-export const saveChemicalLog = async (data: ChemicalLogData) => {
-  return await saveToApi(`CHEMICAL_LOG_${data.date}`, data);
-};
-
-/**
- * Fire Extinguisher List
- */
-export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[]> => {
-  const res = await fetchWithCache<any>('FIRE_EXT_DB');
-  return res?.fireExtList || [];
-};
-
-export const saveFireExtinguisherList = async (list: FireExtinguisherItem[]) => {
-  return await saveToApi('FIRE_EXT_DB', { fireExtList: list });
-};
-
-/**
- * Fire Inspection Log (Separate from Fire Facility Log)
- */
-export const getInitialFireInspectionLog = (date: string): FireInspectionLogData => ({
-  date,
-  items: [
-    { id: 'fi-1', category: '소화설비', content: '소화전/스프링클러 작동상태', result: '양호', remarks: '' },
-    { id: 'fi-2', category: '경보설비', content: '자동화재탐지설비 수신반', result: '양호', remarks: '' },
-    { id: 'fi-3', category: '피난설비', content: '유도등 및 비상조명등', result: '양호', remarks: '' }
-  ],
-  inspector: ''
-});
-
-export const fetchFireInspectionLog = async (date: string): Promise<FireInspectionLogData | null> => {
-  return await fetchWithCache<FireInspectionLogData>(`FIRE_INSP_LOG_${date}`);
-};
-
-export const saveFireInspectionLog = async (data: FireInspectionLogData) => {
-  return await saveToApi(`FIRE_INSP_LOG_${data.date}`, data);
-};
-
-/**
- * Staff
- */
-export const fetchStaffList = async (): Promise<StaffMember[]> => {
-  const res = await fetchWithCache<any>('STAFF_DB_MASTER');
-  return res?.staff || [];
-};
-
-export const saveStaffList = async (list: StaffMember[]) => {
-  return await saveToApi('STAFF_DB_MASTER', { staff: list });
-};
-
-/**
- * Weekly Report
- */
-export const fetchWeeklyReport = async (date: string): Promise<WeeklyReportData | null> => {
-  return await fetchWithCache<WeeklyReportData>(`WEEKLY_REPORT_${date}`);
-};
-
-export const saveWeeklyReport = async (data: WeeklyReportData) => {
-  return await saveToApi(`WEEKLY_REPORT_${data.startDate}`, data);
-};
-
-export const fetchWeeklyReportList = async (): Promise<{key: string, data: WeeklyReportData}[]> => {
-  return await apiFetchRange("WEEKLY_REPORT_", "2024-01-01", "2034-12-31");
-};
-
-/**
- * Consumable Requests
- */
-export const fetchConsumableRequests = async (): Promise<ConsumableRequest[]> => {
-  const res = await fetchWithCache<any>('CONSUMABLE_REQ_DB');
-  return res?.consumableReq || [];
-};
-
-export const saveConsumableRequests = async (list: ConsumableRequest[]) => {
-  return await saveToApi('CONSUMABLE_REQ_DB', { consumableReq: list });
-};
-
-/**
- * Parking
- */
-export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => {
-  const res = await fetchWithCache<any>('PARKING_CHANGE_DB');
-  return res?.parkingChange || [];
-};
-
-export const saveParkingChangeList = async (list: ParkingChangeItem[]) => {
-  return await saveToApi('PARKING_CHANGE_DB', { parkingChange: list });
-};
-
-export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => {
-  const res = await fetchWithCache<any>('PARKING_STATUS_DB');
-  return res?.parkingStatus || [];
-};
-
-export const saveParkingStatusList = async (list: ParkingStatusItem[]) => {
-  return await saveToApi('PARKING_STATUS_DB', { parkingStatus: list });
-};
-
-/**
- * Parking Layout
- */
-export const fetchParkingLayout = async (): Promise<any> => {
-  const res = await fetchWithCache<any>('PARKING_LAYOUT_DB');
-  return res?.layout || null;
-};
-
-export const saveParkingLayout = async (layout: any) => {
-  return await saveToApi('PARKING_LAYOUT_DB', { layout });
-};
-
-/**
- * Contractors
- */
-export const fetchContractors = async (): Promise<Contractor[]> => {
-  const res = await fetchWithCache<any>('CONTRACTOR_DB');
-  return res?.contractors || [];
-};
-
-export const saveContractors = async (list: Contractor[]) => {
-  return await saveToApi('CONTRACTOR_DB', { contractors: list });
-};
-
-/**
- * Generator Check
- */
-export const getInitialGeneratorCheck = (month: string): GeneratorCheckData => ({
-  date: month,
-  specs: { 
-    manufacturer: '한관전기', 
-    year: '2005년 10월', 
-    serialNo: '8610E0657', 
-    type: 'DEGP-6001', 
-    output: '600/500Kw', 
-    voltage: '380/220v 60Hz', 
-    current: '1140/950A', 
-    rpm: '1600rpm', 
-    method: 'B-LESS', 
-    location: 'B6F비상발전기실' 
-  },
-  test: { 
-    checkDate: `${month}-01`, 
-    dayName: '',
-    reason: '비상발전기 무부하시 운전 및 점검', 
-    startTime: '',
-    endTime: '',
-    usedTime: '', 
-    monthlyRunTime: '', 
-    monthlyRunCount: '', 
-    totalRunTime: '', 
-    fuelUsed: '', 
-    fuelTotal: '', 
-    voltsRS: '', voltsRN: '', voltsST: '', voltsSN: '', voltsTR: '', voltsTN: '', 
-    ampR: '', ampS: '', ampT: '', 
-    oilTemp: '', 
-    oilPressure: '', 
-    rpmValue: '', 
-    batteryGravityValue: '' 
-  },
-  status: { 
-    coolingWater: '양호', 
-    startCircuit: '양호', 
-    fuelStatus: '양호', 
-    afterRun: '양호', 
-    panel: '양호', 
-    engine: '양호', 
-    duringRun: '양호', 
-    afterStop: '양호', 
-    battery: '양호',
-    gravity: '양호'
-  },
-  note: ''
-});
-
-export const fetchGeneratorCheck = async (month: string): Promise<GeneratorCheckData | null> => {
-  return await fetchWithCache<GeneratorCheckData>(`GEN_CHECK_${month}`);
-};
-
-export const saveGeneratorCheck = async (data: GeneratorCheckData) => {
-  return await saveToApi(`GEN_CHECK_${data.date}`, data);
-};
-
-/**
- * Substation Log
- */
 export const getInitialSubstationLog = (date: string): SubstationLogData => ({
   date,
   vcb: {
-    time9: { 
-      main: { v: '22.9', a: '', pf: '', hz: '60' }, 
-      tr1: { v: '22.9', a: '', pf: '' }, 
-      tr2: { v: '22.9', a: '', pf: '' }, 
-      tr3: { v: '22.9', a: '', pf: '' } 
-    },
-    time21: { 
-      main: { v: '22.9', a: '', pf: '', hz: '60' }, 
-      tr1: { v: '22.9', a: '', pf: '' }, 
-      tr2: { v: '22.9', a: '', pf: '' }, 
-      tr3: { v: '22.9', a: '', pf: '' } 
-    }
+    time9: { main: { v: '22.9', a: '', pf: '', hz: '60' }, tr1: { v: '22.9', a: '', pf: '' }, tr2: { v: '22.9', a: '', pf: '' }, tr3: { v: '22.9', a: '', pf: '' } },
+    time21: { main: { v: '22.9', a: '', pf: '', hz: '60' }, tr1: { v: '22.9', a: '', pf: '' }, tr2: { v: '22.9', a: '', pf: '' }, tr3: { v: '22.9', a: '', pf: '' } }
   },
   acb: {
-    time9: { 
-      acb1: { v: '', a: '', kw: '' }, 
-      acb2: { v: '', a: '', kw: '' }, 
-      acb3: { v: '', a: '', kw: '' }, 
-      trTemp: { tr1: '', tr2: '', tr3: '' } 
-    },
-    time21: { 
-      acb1: { v: '', a: '', kw: '' }, 
-      acb2: { v: '', a: '', kw: '' }, 
-      acb3: { v: '', a: '', kw: '' }, 
-      trTemp: { tr1: '', tr2: '', tr3: '' } 
-    }
+    time9: { acb1: { v: '', a: '', kw: '' }, acb2: { v: '', a: '', kw: '' }, acb3: { v: '', a: '', kw: '' }, trTemp: { tr1: '', tr2: '', tr3: '' } },
+    time21: { acb1: { v: '', a: '', kw: '' }, acb2: { v: '', a: '', kw: '' }, acb3: { v: '', a: '', kw: '' }, trTemp: { tr1: '', tr2: '', tr3: '' } }
   },
   powerUsage: {
     prev: { activeMid: '', activeMax: '', activeLight: '', reactiveMid: '', reactiveMax: '' },
     curr: { activeMid: '', activeMax: '', activeLight: '', reactiveMid: '', reactiveMax: '' },
     usage: { activeMid: '', activeMax: '', activeLight: '', reactiveMid: '', reactiveMax: '' }
   },
-  dailyStats: { activePower: '0', reactivePower: '0', monthTotal: '0', maxPower: '0', powerFactor: '0', loadFactor: '0', demandFactor: '0' }
+  dailyStats: { activePower: '', reactivePower: '', monthTotal: '', maxPower: '', powerFactor: '', loadFactor: '', demandFactor: '' }
 });
 
-export const fetchSubstationLog = async (date: string, force = false): Promise<SubstationLogData | null> => {
-  return await fetchWithCache<SubstationLogData>(`SUB_LOG_${date}`, force);
-};
+export const getInitialMeterReading = (month: string): MeterReadingData => ({ month, items: [] });
 
-export const saveSubstationLog = async (data: SubstationLogData) => {
-  saveToCache(`SUB_LOG_${data.date}`, data);
-  return await saveToApi(`SUB_LOG_${data.date}`, data);
-};
-
-/**
- * Meter Reading
- */
-export const getInitialMeterReading = (month: string): MeterReadingData => ({
-  month,
-  items: []
+export const getInitialGeneratorCheck = (month: string): GeneratorCheckData => ({
+  date: month,
+  specs: { manufacturer: '', year: '', serialNo: '', type: '', output: '', voltage: '', current: '', rpm: '', method: '', location: '' },
+  test: { checkDate: '', dayName: '', reason: '', startTime: '', endTime: '', usedTime: '', monthlyRunTime: '', monthlyRunCount: '', totalRunTime: '', fuelUsed: '', fuelTotal: '', voltsRS: '', voltsRN: '', voltsST: '', voltsSN: '', voltsTR: '', voltsTN: '', ampR: '', ampS: '', ampT: '', oilTemp: '', oilPressure: '', rpmValue: '', batteryGravityValue: '' },
+  status: { coolingWater: '양호', startCircuit: '양호', fuelStatus: '양호', afterRun: '양호', panel: '양호', engine: '양호', duringRun: '양호', afterStop: '양호', battery: '양호', gravity: '양호' },
+  note: ''
 });
 
-export const fetchMeterReading = async (month: string): Promise<MeterReadingData | null> => {
-  return await fetchWithCache<MeterReadingData>(`METER_${month}`);
-};
-
-export const saveMeterReading = async (data: MeterReadingData) => {
-  return await saveToApi(`METER_${data.month}`, data);
-};
-
-/**
- * Meter Photos
- */
-export const fetchMeterPhotos = async (month: string): Promise<MeterPhotoData | null> => {
-  return await fetchWithCache<MeterPhotoData>(`METER_PHOTO_${month}`);
-};
-
-export const saveMeterPhotos = async (data: MeterPhotoData) => {
-  return await saveToApi(`METER_PHOTO_${data.month}`, data);
-};
-
-/**
- * Battery Check
- */
 export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
-  month,
-  checkDate: `${month}-01`,
+  month, checkDate: '',
   items: [
-    { id: 'bat-rec-acv', section: 'rectifier', label: 'AC V', manufacturer: '현대중공업', manufDate: '', spec: '배선용차단기 50A HBS-53(3상3선식)', voltage: '', remarks: '' },
-    { id: 'bat-rec-dcv', section: 'rectifier', label: 'DC V', manufacturer: '현대중공업', manufDate: '', spec: '배선용차단기 100A HBS-102(단상)', voltage: '', remarks: '' },
-    ...Array.from({ length: 9 }).map((_, i) => ({ 
-      id: `bat-ind-${i + 1}`, 
-      section: 'battery' as const, 
-      label: `${i + 1}`, 
-      manufacturer: '세방전지ROCKET', 
-      manufDate: '21/8/30', 
-      spec: 'RP100-12(12V/100AH/20HR)', 
-      voltage: '', 
-      remarks: '' 
-    })),
-    { id: 'bat-gen-10', section: 'generator', label: '10', manufacturer: '세방전지ROCKET', manufDate: '22/8/30', spec: 'RP200-12(12V/200AH/20HR)', voltage: '', remarks: '' },
-    { id: 'bat-gen-11', section: 'generator', label: '11', manufacturer: '세방전지ROCKET', manufDate: '22/8/30', spec: 'RP200-12(12V/200AH/20HR)', voltage: '', remarks: '' }
+    { id: 'rect1', label: '정류기1', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'rectifier' },
+    { id: 'bat1', label: '축전지1', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'gen1', label: '발전기', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' }
   ],
   approvers: { staff: '', assistant: '', manager: '', director: '' }
 });
 
-export const fetchBatteryCheck = async (month: string): Promise<BatteryCheckData | null> => {
-  return await fetchWithCache<BatteryCheckData>(`BATTERY_${month}`);
-};
+export const getInitialLoadCurrent = (month: string): LoadCurrentData => ({ date: month, period: '', items: [] });
 
-export const saveBatteryCheck = async (data: BatteryCheckData) => {
-  return await saveToApi(`BATTERY_${data.month}`, data);
-};
-
-/**
- * Load Current
- */
-export const getInitialLoadCurrent = (month: string): LoadCurrentData => {
-  const [y, m] = month.split('-');
-  return {
-    date: month,
-    period: `${y}년 ${parseInt(m)}월`,
-    items: []
-  };
-};
-
-export const fetchLoadCurrent = async (month: string): Promise<LoadCurrentData | null> => {
-  return await fetchWithCache<LoadCurrentData>(`LOAD_${month}`);
-};
-
-export const saveLoadCurrent = async (data: LoadCurrentData) => {
-  return await saveToApi(`LOAD_${data.date}`, data);
-};
-
-/**
- * Safety Check
- */
 export const getInitialSafetyCheck = (date: string, type: 'general' | 'ev'): SafetyCheckData => ({
-  date,
-  type,
-  items: [],
+  date, type, items: [], approver: '', opinion: '',
   measurements: type === 'general' ? {
     lv1: { v_r: '', v_s: '', v_t: '', v_n: '', i_r: '', i_s: '', i_t: '', i_n: '', l_r: '', l_s: '', l_t: '', l_n: '' },
     lv3: { v_r: '', v_s: '', v_t: '', v_n: '', i_r: '', i_s: '', i_t: '', i_n: '', l_r: '', l_s: '', l_t: '', l_n: '' },
     lv5: { v_r: '', v_s: '', v_t: '', v_n: '', i_r: '', i_s: '', i_t: '', i_n: '', l_r: '', l_s: '', l_t: '', l_n: '' },
     pf: { day: '', night: '' },
-    power: { active: '', reactive: '', max: '', multiplier: '' }
-  } : undefined,
-  approver: ''
+    power: { active: '', reactive: '', max: '', multiplier: '1200' }
+  } : undefined
 });
 
-export const fetchSafetyCheck = async (month: string, type: 'general' | 'ev'): Promise<SafetyCheckData | null> => {
-  return await fetchWithCache<SafetyCheckData>(`SAFETY_${type}_${month}`);
-};
-
-export const saveSafetyCheck = async (data: SafetyCheckData) => {
-  return await saveToApi(`SAFETY_${data.type}_${data.date.substring(0, 7)}`, data);
-};
-
 /**
- * HVAC Log
+ * Added initializers for missing data types to resolve component errors.
  */
 export const getInitialHvacLog = (date: string): HvacLogData => ({
   date,
-  unitNo: '',
+  unitNo: '1',
   inletTempColdHot: { time10: '', time15: '' },
   outletTempColdHot: { time10: '', time15: '' },
   outletPressColdHot: { time10: '', time15: '' },
@@ -795,18 +577,6 @@ export const getInitialHvacLog = (date: string): HvacLogData => ({
   sterilizer: { prevStock: '', inQty: '', usedQty: '', stock: '' }
 });
 
-export const fetchHvacLog = async (date: string, force = false): Promise<HvacLogData | null> => {
-  return await fetchWithCache<HvacLogData>(`HVAC_LOG_${date}`, force);
-};
-
-export const saveHvacLog = async (data: HvacLogData) => {
-  saveToCache(`HVAC_LOG_${data.date}`, data);
-  return await saveToApi(`HVAC_LOG_${data.date}`, data);
-};
-
-/**
- * Boiler Log
- */
 export const getInitialBoilerLog = (date: string): BoilerLogData => ({
   date,
   logs: [
@@ -820,137 +590,634 @@ export const getInitialBoilerLog = (date: string): BoilerLogData => ({
   cleaner: { prevStock: '', inQty: '', usedQty: '', stock: '' }
 });
 
-export const fetchBoilerLog = async (date: string, force = false): Promise<BoilerLogData | null> => {
-  return await fetchWithCache<BoilerLogData>(`BOILER_LOG_${date}`, force);
-};
-
-export const saveBoilerLog = async (data: BoilerLogData) => {
-  saveToCache(`BOILER_LOG_${data.date}`, data);
-  return await saveToApi(`BOILER_LOG_${data.date}`, data);
-};
-
-/**
- * Air Environment Log
- */
 export const getInitialAirEnvironmentLog = (date: string): AirEnvironmentLogData => ({
   date,
   emissions: [
-    { id: 'em-1', outletNo: '1', facilityName: '냉온수기 1호기', runTime: '', remarks: '운휴' },
-    { id: 'em-2', outletNo: '2', facilityName: '냉온수기 2호기', runTime: '', remarks: '운휴' },
-    { id: 'em-3', outletNo: '3', facilityName: '보 일 러', runTime: '', remarks: '운휴' }
+    { id: '1', outletNo: '1호', facilityName: '흡수식 냉온수기 1호기', runTime: '', remarks: '' },
+    { id: '2', outletNo: '2호', facilityName: '흡수식 냉온수기 2호기', runTime: '', remarks: '' },
+    { id: '3', outletNo: '3호', facilityName: '노통연관식보일러', runTime: '', remarks: '' }
   ],
   preventions: [
-    { id: 'pr-1', facilityName: '냉온수기 1호기', location: 'B6F 기계실', gasUsage: '', pollutants: 'SOX , NOX , 먼지' },
-    { id: 'pr-2', facilityName: '냉온수기 2호기', location: 'B6F 기계실', gasUsage: '', pollutants: 'SOX , NOX , 먼지' },
-    { id: 'pr-3', facilityName: '보일러', location: 'B6F 기계실', gasUsage: '', pollutants: 'SOX , NOX , 먼지' }
+    { id: '1', facilityName: '저녹스버너(냉온수기1)', location: '기계실', gasUsage: '', pollutants: '질소산화물' },
+    { id: '2', facilityName: '저녹스버너(냉온수기2)', location: '기계실', gasUsage: '', pollutants: '질소산화물' },
+    { id: '3', facilityName: '저녹스버너(보일러)', location: '기계실', gasUsage: '', pollutants: '질소산화물' }
   ]
 });
 
-export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironmentLogData | null> => {
-  return await fetchWithCache<AirEnvironmentLogData>(`AIR_ENV_${date}`);
-};
-
-export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData) => {
-  return await saveToApi(`AIR_ENV_${data.date}`, data);
-};
-
-/**
- * Water Tank
- */
 export const getInitialWaterTankLog = (date: string): WaterTankLogData => ({
   date,
-  buildingName: '새마을운동중앙회 대치동 사옥',
-  location: '서울특별시 강남구 영동대로 316(대치동,새마을운동중앙회)',
-  usage: '사무용',
-  inspector: '',
+  buildingName: '새마을운동중앙회 대치동사옥',
+  location: '지하 6층 기계실',
+  usage: '업무시설(빌딩)',
   items: [
-    { id: 'wt-1', category: '저수조 주위의 상태', criteria: ['청결하며 쓰레기·오물 등이 놓여 있지 아니할 것', '저수조 주위에 고인 물, 용수 등이 없을 것'], results: ['O', 'O'] },
-    { id: 'wt-2', category: '저수조 본체의 상태', criteria: ['균열 또는 누수되는 부분이 없을 것', '출입구나 접합부의 틈으로 빗물 등이 들어가지 아니할 것', '유출관·배수관등의 접합부분은 고정되고 방수·밀폐되어 있을 것'], results: ['O', 'O', 'O'] },
-    { id: 'wt-3', category: '저수조 윗부분의 상태', criteria: ['저수조의 윗부분에는 물을 오염시킬 우려가 있는 설비나기기 등이 놓여 있지 아니할 것', '저수조의 상부는 물이 고이지 아니하여야 하고 먼지 등 위생에 해로운 것이 쌓이지 아니할 것'], results: ['O', 'O'] },
-    { id: 'wt-4', category: '저수조 안의 상태', criteria: ['오물, 붉은 녹 등의 침식물, 저수조 내벽 및 내부구조물의 오염 또는 도장의 떨어짐 등이 없을 것', '수중 및 수면에 부유물질(浮遊物質)이 없을 것', '외벽도장이 벗겨져 빛이 투과하는 상태로 되어 있지 아니할 것'], results: ['O', 'O', 'O'] },
-    { id: 'wt-5', category: '맨홀의 상태', criteria: ['뚜껑을 통하여 먼지나 그 밖에 위생에 해로운 부유물질이 들어 갈 수 없는 구조일 것', '점검을 하는 자 외의 자가 쉽게 열고 닫을 수 없도록 장금장치가 안전할 것'], results: ['O', 'O'] },
-    { id: 'wt-6', category: '월류관·통기관의 상태', criteria: ['관의 끝부분으로부터 먼지나 그 밖에 위생에 해로운 물질이 들어갈 수 없을 것', '관 끝부분의 방충망은 훼손되지 아니하고 망눈의 크기는 작은 동물 등의 침입을 막을 수 있을 것'], results: ['O', 'O'] },
-    { id: 'wt-7', category: '냄새', criteria: ['물에 불쾌한 냄새가 나지 아니할 것'], results: ['O'] },
-    { id: 'wt-8', category: '맛', criteria: ['물이 이상한 맛이 나지 아니할 것'], results: ['O'] },
-    { id: 'wt-9', category: '색도', criteria: ['물에 이상한 색이 나타나지 아니할 것'], results: ['O'] },
-    { id: 'wt-10', category: '탁도', criteria: ['물이 이상한 탁함이 나타나지 아니할 것'], results: ['O'] }
+    { id: '1', category: '수조주변 상태', criteria: ['수조 상부에 물건 적치 여부', '수조 주변에 오염원 존재 여부'], results: ['', ''] },
+    { id: '2', category: '수조본체 상태', criteria: ['수조 본체 균열 및 누수 여부', '맨홀 뚜껑의 밀폐 및 잠금 상태'], results: ['', ''] },
+    { id: '3', category: '배관 및 밸브', criteria: ['배관 부식 및 누수 여부', '밸브 작동 상태'], results: ['', ''] },
+    { id: '4', category: '기타 사항', criteria: ['월 1회 위생 점검 실시 여부'], results: [''] }
+  ],
+  inspector: ''
+});
+
+export const getInitialChemicalLog = (date: string): ChemicalLogData => ({
+  date,
+  items: [
+    { id: '1', name: '종균제', unit: 'l', prevStock: '', received: '', used: '', currentStock: '', remark: '' },
+    { id: '2', name: '소독제', unit: 'kg', prevStock: '', received: '', used: '', currentStock: '', remark: '' }
   ]
 });
 
-export const fetchWaterTankLog = async (month: string): Promise<WaterTankLogData | null> => {
-  return await fetchWithCache<WaterTankLogData>(`WATER_TANK_${month}`);
+export const getInitialFireInspectionLog = (date: string): FireInspectionLogData => ({
+  date,
+  items: [
+    { id: '1', category: '소방시설', content: '소화전/송수구 관리 상태', result: '양호', remarks: '' },
+    { id: '2', category: '소방시설', content: '수신반 감시 및 동작 상태', result: '양호', remarks: '' }
+  ],
+  inspector: ''
+});
+
+export const fetchHvacLog = async (date: string, force = false): Promise<HvacLogData | null> => {
+  try {
+    const { data } = await supabase.from('hvac_boiler_logs').select('hvac_data').eq('id', `HVAC_BOILER_${date}`).maybeSingle();
+    if (data?.hvac_data) return data.hvac_data as HvacLogData;
+  } catch (e) {}
+  return null;
 };
 
-export const saveWaterTankLog = async (data: WaterTankLogData) => {
-  const monthKey = data.date.substring(0, 7);
-  return await saveToApi(`WATER_TANK_${monthKey}`, data);
+export const saveHvacLog = async (data: HvacLogData): Promise<boolean> => {
+  const { data: existing } = await supabase.from('hvac_boiler_logs').select('*').eq('id', `HVAC_BOILER_${data.date}`).maybeSingle();
+  const dbData = { id: `HVAC_BOILER_${data.date}`, date: data.date, hvac_data: data, boiler_data: existing?.boiler_data || null, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('hvac_boiler_logs').upsert(dbData);
+  return !error;
+};
+
+export const fetchBoilerLog = async (date: string, force = false): Promise<BoilerLogData | null> => {
+  try {
+    const { data } = await supabase.from('hvac_boiler_logs').select('boiler_data').eq('id', `HVAC_BOILER_${date}`).maybeSingle();
+    if (data?.boiler_data) return data.boiler_data as BoilerLogData;
+  } catch (e) {}
+  return null;
+};
+
+export const saveBoilerLog = async (data: BoilerLogData): Promise<boolean> => {
+  const { data: existing } = await supabase.from('hvac_boiler_logs').select('*').eq('id', `HVAC_BOILER_${data.date}`).maybeSingle();
+  const dbData = { id: `HVAC_BOILER_${data.date}`, date: data.date, boiler_data: data, hvac_data: existing?.hvac_data || null, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('hvac_boiler_logs').upsert(dbData);
+  return !error;
 };
 
 /**
- * Fire History
+ * 냉온수기 및 보일러 통합 저장 (하나의 트랜잭션처럼 처리)
  */
-export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
-  const res = await fetchWithCache<any>('FIRE_INSPECTION_HISTORY_DB');
-  return res?.fireHistoryList || [];
-};
+export const saveHvacBoilerCombined = async (hvacData: HvacLogData | null, boilerData: BoilerLogData | null): Promise<boolean> => {
+  const date = hvacData?.date || boilerData?.date;
+  if (!date) return false;
+  
+  // 만약 한쪽 데이터가 null이면 기존 데이터를 불러와서 병합함 (덮어쓰기 방지)
+  let finalHvac = hvacData;
+  let finalBoiler = boilerData;
+  
+  if (!finalHvac || !finalBoiler) {
+    const { data: existing } = await supabase.from('hvac_boiler_logs').select('*').eq('id', `HVAC_BOILER_${date}`).maybeSingle();
+    if (!finalHvac) finalHvac = existing?.hvac_data || null;
+    if (!finalBoiler) finalBoiler = existing?.boiler_data || null;
+  }
 
-export const saveFireHistoryList = async (list: FireHistoryItem[]) => {
-  return await saveToApi('FIRE_INSPECTION_HISTORY_DB', { fireHistoryList: list });
+  const dbData = { 
+    id: `HVAC_BOILER_${date}`, 
+    date: date, 
+    hvac_data: finalHvac, 
+    boiler_data: finalBoiler, 
+    last_updated: new Date().toISOString() 
+  };
+  const { error } = await supabase.from('hvac_boiler_logs').upsert(dbData);
+  return !error;
 };
 
 /**
- * Appointments
+ * Data Fetch & Save Functions (Supabase Only)
  */
+export const fetchDailyData = async (date: string, force = false): Promise<DailyData | null> => {
+  if (!force) {
+    const cached = getFromStorage(`DAILY_${date}`);
+    if (cached) return cached;
+  }
+  try {
+    const { data } = await supabase.from('daily_reports').select('*').eq('id', date).maybeSingle();
+    if (data) {
+      const mapped = mapFromDB("DAILY_", data);
+      saveToCache(`DAILY_${date}`, mapped);
+      return mapped;
+    }
+  } catch (e) {}
+  return null;
+};
+
+export const saveDailyData = async (data: DailyData): Promise<boolean> => {
+  const { error } = await supabase.from('daily_reports').upsert({ id: data.date, facility_duty: data.facilityDuty, security_duty: data.securityDuty, utility: data.utility, work_log: data.workLog, last_updated: new Date().toISOString() });
+  if (!error) {
+    saveToCache(`DAILY_${data.date}`, data);
+    return true;
+  }
+  return false;
+};
+
+export const fetchStaffList = async (): Promise<StaffMember[]> => {
+  try {
+    const { data } = await supabase.from('staff_members').select('*');
+    if (data && data.length > 0) return data.map(s => ({ 
+      id: s.id, 
+      name: s.name, 
+      category: s.category, 
+      jobTitle: s.job_title || '', // Map DB field to Model property
+      birthDate: s.birth_date || '', 
+      joinDate: s.join_date || '', 
+      resignDate: s.resign_date || '', 
+      phone: s.phone || '', 
+      area: s.area || '', 
+      note: s.note || '', 
+      photo: s.photo_url || s.photo 
+    }));
+  } catch (e) {}
+  return [];
+};
+
+export const saveStaffList = async (list: StaffMember[]): Promise<boolean> => {
+  const dbData = list.map(s => ({ id: s.id, name: s.name, category: s.category, job_title: s.jobTitle, birth_date: s.birthDate, join_date: s.joinDate, resign_date: s.resignDate, phone: s.phone, area: s.area, note: s.note, photo_url: s.photo }));
+  const { error } = await supabase.from('staff_members').upsert(dbData);
+  return !error;
+};
+
+export const fetchShiftSettings = async (): Promise<ShiftSettings | null> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'SHIFT_SETTINGS').maybeSingle();
+    if (data?.data) return data.data as ShiftSettings;
+  } catch (e) {}
+  return null;
+};
+
+export const saveShiftSettings = async (settings: ShiftSettings): Promise<boolean> => {
+  const { error } = await supabase.from('system_settings').upsert({ id: 'SHIFT_SETTINGS', data: settings, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchConsumables = async (): Promise<ConsumableItem[]> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLES_DB').maybeSingle();
+    if (data?.data?.consumables) return data.data.consumables;
+  } catch (e) {}
+  return [];
+};
+
+export const saveConsumables = async (list: ConsumableItem[]): Promise<boolean> => {
+  const { error } = await supabase.from('system_settings').upsert({ id: 'CONSUMABLES_DB', data: { consumables: list }, last_updated: new Date().toISOString() });
+  return !error;
+};
+
 export const fetchAppointmentList = async (): Promise<AppointmentItem[]> => {
-  const res = await fetchWithCache<any>('APPOINTMENT_DB');
-  return res?.appointmentList || [];
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'APPOINTMENT_DB').maybeSingle();
+    if (data?.data?.appointmentList) return data.data.appointmentList;
+  } catch (e) {}
+  return [];
 };
 
-export const saveAppointmentList = async (list: AppointmentItem[]) => {
-  return await saveToApi('APPOINTMENT_DB', { appointmentList: list });
+export const saveAppointmentList = async (list: AppointmentItem[]): Promise<boolean> => {
+  const { error } = await supabase.from('system_settings').upsert({ id: 'APPOINTMENT_DB', data: { appointmentList: list }, last_updated: new Date().toISOString() });
+  return !error;
 };
 
-/**
- * Tenants
- */
-export const fetchTenants = async (): Promise<Tenant[]> => {
-  const res = await fetchWithCache<any>('TENANT_DB');
-  return res?.tenants || [];
+export const fetchSubstationChecklist = async (date: string): Promise<SubstationChecklistData | null> => {
+  try {
+    const { data } = await supabase.from('substation_checklists').select('*').eq('id', `SUB_CHECK_${date}`).maybeSingle();
+    if (data) return { date: data.date, items: data.items, approvers: data.approvers, note: data.note };
+  } catch (e) {}
+  return null;
 };
 
-export const saveTenants = async (list: Tenant[]) => {
-  return await saveToApi('TENANT_DB', { tenants: list });
+export const saveSubstationChecklist = async (data: SubstationChecklistData): Promise<boolean> => {
+  const { error } = await supabase.from('substation_checklists').upsert({ id: `SUB_CHECK_${data.date}`, date: data.date, items: data.items, approvers: data.approvers, note: data.note, last_updated: new Date().toISOString() });
+  return !error;
 };
 
-/**
- * Elevator Inspection History
- */
-export const fetchElevatorInspectionList = async (): Promise<ElevatorInspectionItem[]> => {
-  const res = await fetchWithCache<any>('ELEVATOR_INSPECTION_DB');
-  return res?.inspectionList || [];
+export const fetchFireFacilityLog = async (date: string): Promise<FireFacilityLogData | null> => {
+  try {
+    const { data } = await supabase.from('fire_facility_logs').select('*').eq('id', `FIRE_FAC_${date}`).maybeSingle();
+    if (data) return { date: data.date, items: data.items, remarks: data.remarks, approvers: data.approvers };
+  } catch (e) {}
+  return null;
 };
 
-export const saveElevatorInspectionList = async (list: ElevatorInspectionItem[]) => {
-  return await saveToApi('ELEVATOR_INSPECTION_DB', { inspectionList: list });
+export const saveFireFacilityLog = async (data: FireFacilityLogData): Promise<boolean> => {
+  const { error } = await supabase.from('fire_facility_logs').upsert({ id: `FIRE_FAC_${data.date}`, date: data.date, items: data.items, remarks: data.remarks, approvers: data.approvers, last_updated: new Date().toISOString() });
+  return !error;
 };
 
-/**
- * Construction Logs
- */
+export const fetchElevatorLog = async (date: string): Promise<ElevatorLogData | null> => {
+  try {
+    const { data } = await supabase.from('elevator_logs').select('*').eq('id', `ELEV_LOG_${date}`).maybeSingle();
+    if (data) return { date: data.date, items: data.items, remarks: data.remarks, inspector: data.inspector };
+  } catch (e) {}
+  return null;
+};
+
+export const saveElevatorLog = async (data: ElevatorLogData): Promise<boolean> => {
+  const { error } = await supabase.from('elevator_logs').upsert({ id: `ELEV_LOG_${data.date}`, date: data.date, items: data.items, remarks: data.remarks, inspector: data.inspector, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchGasLog = async (date: string): Promise<GasLogData | null> => {
+  try {
+    const { data } = await supabase.from('gas_logs').select('*').eq('id', `GAS_LOG_${date}`).maybeSingle();
+    if (data) return { date: data.date, items: data.items };
+  } catch (e) {}
+  return null;
+};
+
+export const saveGasLog = async (data: GasLogData): Promise<boolean> => {
+  const { error } = await supabase.from('gas_logs').upsert({ id: `GAS_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchSepticLog = async (date: string): Promise<SepticLogData | null> => {
+  try {
+    const { data } = await supabase.from('septic_logs').select('*').eq('id', `SEPTIC_LOG_${date}`).maybeSingle();
+    if (data) return { date: data.date, items: data.items };
+  } catch (e) {}
+  return null;
+};
+
+export const saveSepticLog = async (data: SepticLogData): Promise<boolean> => {
+  const { error } = await supabase.from('septic_logs').upsert({ id: `SEPTIC_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchWeeklyReport = async (date: string): Promise<WeeklyReportData | null> => {
+  try {
+    const { data } = await supabase.from('weekly_reports').select('*').eq('id', `WEEKLY_${date}`).maybeSingle();
+    if (data) return mapFromDB("WEEKLY_", data);
+  } catch (err) {}
+  return null;
+};
+
+export const saveWeeklyReport = async (data: WeeklyReportData): Promise<boolean> => {
+  const dbData = { id: `WEEKLY_${data.startDate}`, start_date: data.startDate, reporting_date: data.reportingDate, author: data.author, fields: data.fields, photos: data.photos, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('weekly_reports').upsert(dbData);
+  return !error;
+};
+
+export const fetchWeeklyReportList = async (): Promise<any[]> => {
+  try {
+    const { data } = await supabase.from('weekly_reports').select('*').order('start_date', { ascending: false });
+    if (data && data.length > 0) return data.map(r => ({ key: r.id, data: mapFromDB("WEEKLY_", r) }));
+  } catch (err) {}
+  return [];
+};
+
+export const fetchDateRangeData = async (start: string, days: number): Promise<any[]> => {
+  const end = format(addDays(parseISO(start), days), 'yyyy-MM-dd');
+  return await apiFetchRange("DAILY_", start, end);
+};
+
 export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> => {
-  const res = await fetchWithCache<any>('EXTERNAL_WORK_DB');
-  return res?.workList || [];
+  try {
+    const { data } = await supabase.from('construction_logs').select('*').eq('source', 'external').order('date', { ascending: false });
+    if (data && data.length > 0) return data.map(w => ({ id: w.id, date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos || [] }));
+  } catch (e) {}
+  return [];
 };
 
-export const saveExternalWorkList = async (list: ConstructionWorkItem[]) => {
-  return await saveToApi('EXTERNAL_WORK_DB', { workList: list });
+export const saveExternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
+  const dbData = list.map(w => ({ id: isValidUUID(w.id) ? w.id : generateUUID(), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'external' }));
+  const { error } = await supabase.from('construction_logs').upsert(dbData);
+  return !error;
 };
 
 export const fetchInternalWorkList = async (): Promise<ConstructionWorkItem[]> => {
-  const res = await fetchWithCache<any>('INTERNAL_WORK_DB');
-  return res?.workList || [];
+  try {
+    const { data } = await supabase.from('construction_logs').select('*').eq('source', 'internal').order('date', { ascending: false });
+    if (data && data.length > 0) return data.map(w => ({ id: w.id, date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos || [] }));
+  } catch (e) {}
+  return [];
 };
 
-export const saveInternalWorkList = async (list: ConstructionWorkItem[]) => {
-  return await saveToApi('INTERNAL_WORK_DB', { workList: list });
+export const saveInternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
+  const dbData = list.map(w => ({ id: isValidUUID(w.id) ? w.id : generateUUID(), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'internal' }));
+  const { error } = await supabase.from('construction_logs').upsert(dbData);
+  return !error;
+};
+
+export const fetchConsumableRequests = async (): Promise<ConsumableRequest[]> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLE_REQ_DB').maybeSingle();
+    if (data?.data?.consumableReq) return data.data.consumableReq;
+  } catch (e) {}
+  return [];
+};
+
+export const saveConsumableRequests = async (list: ConsumableRequest[]): Promise<boolean> => {
+  const { error } = await supabase.from('system_settings').upsert({ id: 'CONSUMABLE_REQ_DB', data: { consumableReq: list }, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => {
+  try {
+    const { data } = await supabase.from('parking_changes').select('*').order('date', { ascending: false });
+    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, company: p.company, location: p.location, prevPlate: p.prev_plate, newPlate: p.new_plate, note: p.note }));
+  } catch (e) {}
+  return [];
+};
+
+export const saveParkingChangeList = async (list: ParkingChangeItem[]): Promise<boolean> => {
+  const dbData = list.map(mapParkingChangeToDB);
+  const { error } = await supabase.from('parking_changes').upsert(dbData);
+  return !error;
+};
+
+export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => {
+  try {
+    const { data } = await supabase.from('parking_status').select('*').order('location', { ascending: true });
+    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, location: p.location, company: p.company, prevPlate: p.prev_plate, plateNum: p.plate_num, note: p.note }));
+  } catch (e) {}
+  return [];
+};
+
+export const saveParkingStatusList = async (list: ParkingStatusItem[]): Promise<boolean> => {
+  const dbData = list.map(mapParkingStatusToDB);
+  const { error } = await supabase.from('parking_status').upsert(dbData);
+  return !error;
+};
+
+export const fetchParkingLayout = async (): Promise<any> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'PARKING_LAYOUT').maybeSingle();
+    if (data?.data) return data.data;
+  } catch (e) {}
+  return null;
+};
+
+export const saveParkingLayout = async (layout: any): Promise<boolean> => {
+  const { error } = await supabase.from('system_settings').upsert({ id: 'PARKING_LAYOUT', data: layout, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchContractors = async (): Promise<Contractor[]> => {
+  try {
+    const { data } = await supabase.from('contractors').select('*');
+    // Fix: Map database snake_case fields to interface camelCase fields to resolve type incompatibility
+    if (data && data.length > 0) return data.map(c => ({ 
+      id: c.id, 
+      name: c.name, 
+      type: c.type, 
+      contactPerson: c.contact_person, 
+      phoneMain: c.phone_main, 
+      phoneMobile: c.phone_mobile, 
+      fax: c.fax, 
+      note: c.note 
+    }));
+  } catch (e) {}
+  return [];
+};
+
+export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
+  const dbData = list.map(c => ({ id: isValidUUID(c.id) ? c.id : generateUUID(), name: c.name, type: c.type, contact_person: c.contactPerson, phone_main: c.phoneMain, phone_mobile: c.phoneMobile, fax: c.fax, note: c.note }));
+  const { error } = await supabase.from('contractors').upsert(dbData);
+  return !error;
+};
+
+export const fetchMeterReading = async (month: string): Promise<MeterReadingData | null> => {
+  try {
+    const { data } = await supabase.from('meter_readings').select('*').eq('id', `METER_${month}`).maybeSingle();
+    // Fix: Map snake_case database fields to camelCase interface properties to fix TypeScript error.
+    if (data) return { 
+      month: data.month, 
+      unitPrice: data.unit_price, 
+      totalBillInput: data.total_bill_input, 
+      totalUsageInput: data.total_usage_input, 
+      items: data.items, 
+      lastUpdated: data.last_updated 
+    };
+  } catch (err) {}
+  return null;
+};
+
+export const saveMeterReading = async (data: MeterReadingData): Promise<boolean> => {
+  const dbData = { id: `METER_${data.month}`, month: data.month, unit_price: data.unitPrice, total_bill_input: data.totalBillInput, total_usage_input: data.totalUsageInput, items: data.items, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('meter_readings').upsert(dbData);
+  return !error;
+};
+
+export const fetchGeneratorCheck = async (month: string): Promise<GeneratorCheckData | null> => {
+  try {
+    const { data } = await supabase.from('generator_checks').select('*').eq('id', `GEN_CHECK_${month}`).maybeSingle();
+    if (data) return { date: data.date, specs: data.specs, test: data.test, status: data.status, note: data.note };
+  } catch (err) {}
+  return null;
+};
+
+export const saveGeneratorCheck = async (data: GeneratorCheckData): Promise<boolean> => {
+  const dbData = { id: `GEN_CHECK_${data.date}`, date: data.date, specs: data.specs, test: data.test, status: data.status, note: data.note, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('generator_checks').upsert(dbData);
+  return !error;
+};
+
+export const fetchSubstationLog = async (date: string, force = false): Promise<SubstationLogData | null> => {
+  try {
+    const { data } = await supabase.from('substation_logs').select('*').eq('id', `SUB_LOG_${date}`).maybeSingle();
+    if (data) return mapFromDB("SUB_LOG_", data);
+  } catch (e) {}
+  return null;
+};
+
+export const saveSubstationLog = async (data: SubstationLogData): Promise<boolean> => {
+  const { error } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchTenants = async (): Promise<Tenant[]> => {
+  try {
+    const { data } = await supabase.from('tenants').select('*');
+    if (data && data.length > 0) return data.map(t => ({ id: t.id, floor: t.floor, name: t.name, area: t.area?.toString(), contact: t.contact, refPower: t.ref_power?.toString(), note: t.note }));
+  } catch (e) {}
+  return [];
+};
+
+export const saveTenants = async (list: Tenant[]): Promise<boolean> => {
+  const dbData = list.map(t => ({ id: isValidUUID(t.id) ? t.id : generateUUID(), floor: t.floor, name: t.name, area: parseFloat(t.area?.replace(/,/g, '') || '0'), contact: t.contact, ref_power: parseFloat(t.refPower?.replace(/,/g, '') || '0'), note: t.note }));
+  const { error } = await supabase.from('tenants').upsert(dbData);
+  return !error;
+};
+
+export const fetchMeterPhotos = async (month: string): Promise<MeterPhotoData | null> => {
+  try {
+    const { data } = await supabase.from('meter_photo_records').select('*').eq('id', `METER_PHOTOS_${month}`).maybeSingle();
+    if (data) return { month: data.month, items: data.items };
+  } catch (e) {}
+  return null;
+};
+
+export const saveMeterPhotos = async (data: MeterPhotoData): Promise<boolean> => {
+  const { error } = await supabase.from('meter_photo_records').upsert({ id: `METER_PHOTOS_${data.month}`, month: data.month, items: data.items, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchBatteryCheck = async (month: string): Promise<BatteryCheckData | null> => {
+  try {
+    const { data } = await supabase.from('battery_checks').select('*').eq('id', `BATTERY_${month}`).maybeSingle();
+    if (data) return { month: data.month, checkDate: data.check_date, items: data.items, approvers: data.approvers };
+  } catch (err) {}
+  return null;
+};
+
+export const saveBatteryCheck = async (data: BatteryCheckData): Promise<boolean> => {
+  const dbData = { id: `BATTERY_${data.month}`, month: data.month, check_date: data.checkDate, items: data.items, approvers: data.approvers, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('battery_checks').upsert(dbData);
+  return !error;
+};
+
+export const fetchLoadCurrent = async (month: string): Promise<LoadCurrentData | null> => {
+  try {
+    const { data } = await supabase.from('load_currents').select('*').eq('id', `LOAD_${month}`).maybeSingle();
+    if (data) return { date: data.date, period: data.period, items: data.items };
+  } catch (err) {}
+  return null;
+};
+
+export const saveLoadCurrent = async (data: LoadCurrentData): Promise<boolean> => {
+  const dbData = { id: `LOAD_${data.date}`, date: data.date, period: data.period, items: data.items, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('load_currents').upsert(dbData);
+  return !error;
+};
+
+export const fetchSafetyCheck = async (month: string, type: 'general' | 'ev'): Promise<SafetyCheckData | null> => {
+  try {
+    const { data } = await supabase.from('safety_checks').select('*').eq('id', `SAFETY_${type}_${month}`).maybeSingle();
+    if (data) return { date: data.date, type: data.type as 'general' | 'ev', items: data.items, measurements: data.measurements, approver: data.approver, opinion: data.opinion };
+  } catch (err) {}
+  return null;
+};
+
+export const saveSafetyCheck = async (data: SafetyCheckData): Promise<boolean> => {
+  const monthKey = data.date.substring(0, 7);
+  const dbData = { id: `SAFETY_${data.type}_${monthKey}`, date: data.date, type: data.type, items: data.items, measurements: data.measurements, approver: data.approver, opinion: data.opinion, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('safety_checks').upsert(dbData);
+  return !error;
+};
+
+export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironmentLogData | null> => {
+  try {
+    const { data } = await supabase.from('air_environment_logs').select('*').eq('id', `AIR_ENV_${date}`).maybeSingle();
+    if (data) return { date: data.date, emissions: data.emissions, preventions: data.preventions };
+  } catch (e) {}
+  return null;
+};
+
+export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
+  const { error } = await supabase.from('air_environment_logs').upsert({ id: `AIR_ENV_${data.date}`, date: data.date, emissions: data.emissions, preventions: data.preventions, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchWaterTankLog = async (month: string): Promise<WaterTankLogData | null> => {
+  try {
+    const { data } = await supabase.from('water_tank_logs').select('*').eq('id', `WATER_TANK_${month}`).maybeSingle();
+    if (data) return { date: data.date, buildingName: data.building_name, location: data.location, usage: data.usage, items: data.items, inspector: data.inspector, lastUpdated: data.last_updated };
+  } catch (err) {}
+  return null;
+};
+
+export const saveWaterTankLog = async (data: WaterTankLogData): Promise<boolean> => {
+  const dbData = { id: `WATER_TANK_${data.date.substring(0, 7)}`, date: data.date, building_name: data.buildingName, location: data.location, usage: data.usage, items: data.items, inspector: data.inspector, last_updated: new Date().toISOString() };
+  const { error } = await supabase.from('water_tank_logs').upsert(dbData);
+  return !error;
+};
+
+export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | null> => {
+  try {
+    const { data } = await supabase.from('chemical_logs').select('*').eq('id', `CHEM_LOG_${date}`).maybeSingle();
+    if (data) return { date: data.date, items: data.items };
+  } catch (e) {}
+  return null;
+};
+
+export const saveChemicalLog = async (data: ChemicalLogData): Promise<boolean> => {
+  const { error } = await supabase.from('chemical_logs').upsert({ id: `CHEM_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[]> => {
+  try {
+    const { data } = await supabase.from('fire_extinguishers').select('*').order('manage_no', { ascending: true });
+    if (data && data.length > 0) return data.map(item => ({ 
+      id: item.id, 
+      manageNo: item.manage_no, 
+      type: item.type, 
+      floor: item.floor, 
+      company: item.company, 
+      serial_no: item.serial_no, 
+      phone: item.phone, 
+      cert_no: item.cert_no, 
+      date: item.date, 
+      remarks: item.remarks 
+    }));
+  } catch (err) {}
+  return [];
+};
+
+export const saveFireExtinguisherList = async (list: FireExtinguisherItem[]): Promise<boolean> => {
+  const dbData = list.map(mapFireExtinguisherToDB);
+  const { error } = await supabase.from('fire_extinguishers').upsert(dbData);
+  return !error;
+};
+
+export const fetchLinkedKeywords = async (type: string): Promise<string[]> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', `KEYWORDS_${type}`).maybeSingle();
+    if (data?.data) return data.data as string[];
+  } catch (e) {}
+  return [];
+};
+
+export const saveLinkedKeywords = async (type: string, keywords: string[]): Promise<boolean> => {
+  const { error } = await supabase.from('system_settings').upsert({ id: `KEYWORDS_${type}`, data: keywords, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchFireInspectionLog = async (date: string): Promise<FireInspectionLogData | null> => {
+  try {
+    const { data } = await supabase.from('fire_inspection_logs').select('*').eq('id', `FIRE_INSP_${date}`).maybeSingle();
+    if (data) return { date: data.date, items: data.items, inspector: data.inspector };
+  } catch (e) {}
+  return null;
+};
+
+export const saveFireInspectionLog = async (data: FireInspectionLogData): Promise<boolean> => {
+  const { error } = await supabase.from('fire_inspection_logs').upsert({ id: `FIRE_INSP_${data.date}`, date: data.date, items: data.items, inspector: data.inspector, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
+  try {
+    const { data } = await supabase.from('fire_inspection_history').select('*').order('date', { ascending: false });
+    if (data && data.length > 0) return data;
+  } catch (err) {}
+  return [];
+};
+
+export const saveFireHistoryList = async (list: FireHistoryItem[]): Promise<boolean> => {
+  const dbData = list.map(mapFireHistoryToDB);
+  const { error } = await supabase.from('fire_inspection_history').upsert(dbData);
+  return !error;
+};
+
+export const fetchElevatorInspectionList = async (): Promise<ElevatorInspectionItem[]> => {
+  try {
+    const { data } = await supabase.from('elevator_inspections').select('*').order('date', { ascending: false });
+    if (data && data.length > 0) return data;
+  } catch (err) {}
+  return [];
+};
+
+export const saveElevatorInspectionList = async (list: ElevatorInspectionItem[]): Promise<boolean> => {
+  const dbData = list.map(mapElevatorInspectionToDB);
+  const { error } = await supabase.from('elevator_inspections').upsert(dbData);
+  return !error;
 };

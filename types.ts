@@ -43,6 +43,14 @@ export interface DutyStatus {
   deputy?: string; // 대리
   chief?: string;  // 주임
   leader?: string; // 반장
+  shiftMode?: '2-shift' | '3-shift' | 'manual'; // 교대 모드
+  baseDate?: string; // 순환 기준일
+}
+
+export interface ShiftSettings {
+  mode: '2-shift' | '3-shift' | 'manual';
+  baseDate: string;
+  seedOrder: string[]; // 기준일 당시의 이름 순서 (이 순서대로 회전)
 }
 
 export interface UtilityUsage {
