@@ -1,25 +1,34 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { WeeklyReportData } from '../types';
 import { fetchWeeklyReportList } from '../services/dataService';
 import { format, parseISO, addDays } from 'date-fns';
-import { FileText, Search, RefreshCw, Printer, Calendar, User } from 'lucide-react';
+import { FileText, Search, RefreshCw, Printer, Calendar, User, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface WeeklyReportListProps {
   onSelectReport: (startDate: string) => void;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) => {
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState<{key: string, data: WeeklyReportData}[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadData();
   }, []);
 
+  // 검색어가 변경될 때 페이지를 1로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const loadData = async () => {
     setLoading(true);
+    setCurrentPage(1);
     try {
       const data = await fetchWeeklyReportList();
       const sorted = (data || []).sort((a, b) => b.key.localeCompare(a.key));
@@ -61,8 +70,6 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
       for (let i = 0; i < rowCount; i++) {
         const isFirst = i === 0;
         const isLast = i === rowCount - 1;
-        // 가로선을 완전히 없애기 위해 현재 행의 하단과 다음 행의 상단을 모두 border:none 처리
-        // padding을 2px로 줄여 행 간격을 좁힘
         const borderStyle = (isLast ? '' : 'border-bottom:none !important;') + (isFirst ? '' : 'border-top:none !important;');
         
         categoryRows += `
@@ -146,11 +153,26 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
     printWindow.document.close();
   };
 
-  const filteredReports = reports.filter(r => 
-    (r.data.author || '').includes(searchTerm) || 
-    (r.data.startDate || '').includes(searchTerm) ||
-    (r.data.reportingDate || '').includes(searchTerm)
-  );
+  const filteredReports = useMemo(() => {
+    return reports.filter(r => 
+      (r.data.author || '').includes(searchTerm) || 
+      (r.data.startDate || '').includes(searchTerm) ||
+      (r.data.reportingDate || '').includes(searchTerm)
+    );
+  }, [reports, searchTerm]);
+
+  // 페이지네이션 계산
+  const totalItems = filteredReports.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const paginatedReports = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredReports.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredReports, currentPage]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="space-y-4 animate-fade-in pb-10">
@@ -203,14 +225,15 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
               ) : filteredReports.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-gray-400 italic">저장된 보고서 이력이 없습니다.</td></tr>
               ) : (
-                filteredReports.map((report, idx) => {
+                paginatedReports.map((report, idx) => {
+                  const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
                   const start = parseISO(report.data.startDate);
                   const end = addDays(start, 6);
                   const weekRange = `${format(start, 'yyyy.MM.dd')} ~ ${format(end, 'MM.dd')}`;
                   
                   return (
                     <tr key={report.key} className="hover:bg-blue-50/40 transition-colors group">
-                      <td className="px-6 py-5 text-center text-gray-400 font-mono text-xs">{filteredReports.length - idx}</td>
+                      <td className="px-6 py-5 text-center text-gray-400 font-mono text-xs">{globalIdx}</td>
                       <td className="px-6 py-5">
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
@@ -257,6 +280,51 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
             </tbody>
           </table>
         </div>
+
+        {/* 페이지네이션 UI */}
+        {!loading && totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`p-2 rounded-lg border transition-all ${
+                currentPage === 1 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
+              }`}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            
+            <div className="flex items-center gap-1 px-4">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                  className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`p-2 rounded-lg border transition-all ${
+                currentPage === totalPages 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
+              }`}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

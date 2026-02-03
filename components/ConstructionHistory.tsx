@@ -1,20 +1,29 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { fetchExternalWorkList, fetchInternalWorkList } from '../services/dataService';
 import { ConstructionWorkItem, WorkPhoto } from '../types';
-import { RefreshCw, Search, History, ChevronRight, HardHat, ExternalLink, Image as ImageIcon, Printer } from 'lucide-react';
+import { RefreshCw, Search, History, ChevronRight, HardHat, ExternalLink, Image as ImageIcon, Printer, ChevronLeft } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 10;
 
 const ConstructionHistory: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<(ConstructionWorkItem & { type: string })[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadAllHistory();
   }, []);
 
+  // 검색어가 변경될 때 페이지를 1로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const loadAllHistory = async () => {
     setLoading(true);
+    setCurrentPage(1);
     try {
       const [external, internal] = await Promise.all([
         fetchExternalWorkList(),
@@ -190,12 +199,27 @@ const ConstructionHistory: React.FC = () => {
     printWindow.document.close();
   };
 
-  const filteredHistory = history.filter(item => 
-    (item.content || '').includes(searchTerm) || 
-    (item.company || '').includes(searchTerm) || 
-    (item.date || '').includes(searchTerm) ||
-    (item.category || '').includes(searchTerm)
-  );
+  const filteredHistory = useMemo(() => {
+    return history.filter(item => 
+      (item.content || '').includes(searchTerm) || 
+      (item.company || '').includes(searchTerm) || 
+      (item.date || '').includes(searchTerm) ||
+      (item.category || '').includes(searchTerm)
+    );
+  }, [history, searchTerm]);
+
+  // 페이지네이션 계산
+  const totalItems = filteredHistory.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const paginatedHistory = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredHistory.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredHistory, currentPage]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="p-6 space-y-4 animate-fade-in pb-10">
@@ -256,59 +280,108 @@ const ConstructionHistory: React.FC = () => {
                   <td colSpan={6} className="py-24 text-center text-gray-400 italic">저장된 기록이 없습니다.</td>
                 </tr>
               ) : (
-                filteredHistory.map((item, idx) => (
-                  <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group">
-                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{filteredHistory.length - idx}</td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-100 text-xs font-bold">
-                        {item.date}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        item.type === '외부공사' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
-                      }`}>
-                        {item.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-white border border-gray-100 rounded-lg shadow-sm">
-                          <HardHat size={14} className={item.type === '외부공사' ? 'text-orange-500' : 'text-green-500'} />
-                        </div>
-                        <span className="font-bold text-gray-900 text-sm">
-                          {item.company || '시설팀 (자체)'}
+                paginatedHistory.map((item, idx) => {
+                  const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
+                  
+                  return (
+                    <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group">
+                      <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{globalIdx}</td>
+                      <td className="px-4 py-4 text-center">
+                        <span className="px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-100 text-xs font-bold">
+                          {item.date}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600 truncate max-w-[300px]" title={item.content}>
-                          {item.content}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          item.type === '외부공사' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'
+                        }`}>
+                          {item.category}
                         </span>
-                        {item.photos && item.photos.length > 0 && (
-                          <div className="flex items-center gap-0.5 text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                            <ImageIcon size={10} />
-                            {item.photos.length}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1.5 bg-white border border-gray-100 rounded-lg shadow-sm">
+                            <HardHat size={14} className={item.type === '외부공사' ? 'text-orange-500' : 'text-green-500'} />
                           </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <button 
-                        onClick={() => handleOpenDetail(item)}
-                        className="flex items-center gap-1 mx-auto bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
-                      >
-                        상세보기
-                        <Printer size={12} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                          <span className="font-bold text-gray-900 text-sm">
+                            {item.company || '시설팀 (자체)'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600 truncate max-w-[300px]" title={item.content}>
+                            {item.content}
+                          </span>
+                          {item.photos && item.photos.length > 0 && (
+                            <div className="flex items-center gap-0.5 text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                              <ImageIcon size={10} />
+                              {item.photos.length}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <button 
+                          onClick={() => handleOpenDetail(item)}
+                          className="flex items-center gap-1 mx-auto bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
+                        >
+                          상세보기
+                          <Printer size={12} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+
+        {/* 페이지네이션 UI */}
+        {!loading && totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`p-2 rounded-lg border transition-all ${
+                currentPage === 1 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
+              }`}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            
+            <div className="flex items-center gap-1 px-4">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => handlePageChange(pageNum)}
+                  className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`p-2 rounded-lg border transition-all ${
+                currentPage === totalPages 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
+              }`}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
