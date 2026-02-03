@@ -1,3 +1,4 @@
+
 name: Deploy to GitHub Pages
 
 on:
@@ -28,7 +29,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          API_KEY: ${{ secrets.API_KEY }} # 이전에 등록한 Secrets의 API_KEY를 사용합니다.
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -36,7 +37,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist' # 빌드 결과물이 저장되는 폴더 (Vite/Webpack 기준)
+          path: './dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
