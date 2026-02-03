@@ -7,10 +7,12 @@ import {
   fetchDailyData, 
   saveDailyData, 
   apiFetchBatch,
-  saveHvacBoilerCombined
+  saveHvacBoilerCombined,
+  getInitialDailyData
 } from '../services/dataService';
 import { format, subDays, parseISO } from 'date-fns';
 import LogSheetLayout from './LogSheetLayout';
+import { Save, RefreshCw, CheckCircle2, Cloud, X } from 'lucide-react';
 
 interface HvacLogProps {
   currentDate: Date;
@@ -21,6 +23,7 @@ interface HvacLogProps {
 const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUsageChange }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   
   const [data, setData] = useState<HvacLogData>(getInitialHvacLog(dateKey));
@@ -201,18 +204,26 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleManualSave = async () => {
+    setShowSaveConfirm(false);
     if (saveStatus === 'loading') return;
     setSaveStatus('loading');
     try {
+      // 1. 상세 로그 저장 (통합 테이블)
       const success = await saveHvacBoilerCombined(data, boilerData);
       
-      const currentDaily = await fetchDailyData(dateKey);
-      if (currentDaily) {
-        await saveDailyData({
-          ...currentDaily,
-          utility: { ...currentDaily.utility, hvacGas: data.gas?.usage || '', boilerGas: boilerData.gas?.usage || '' }
-        });
-      }
+      // 2. 메인 일지 동기화 (가스 사용량 업데이트)
+      let currentDaily = await fetchDailyData(dateKey, true);
+      if (!currentDaily) currentDaily = getInitialDailyData(dateKey);
+      
+      await saveDailyData({
+        ...currentDaily,
+        utility: { 
+            ...currentDaily.utility, 
+            hvacGas: data.gas?.usage || '', 
+            boilerGas: boilerData.gas?.usage || '' 
+        },
+        lastUpdated: new Date().toISOString()
+      });
       
       if (success) {
         setSaveStatus('success');
@@ -221,7 +232,10 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
         setSaveStatus('error');
         alert('저장에 실패했습니다.');
       }
-    } catch (err) { setSaveStatus('error'); }
+    } catch (err) { 
+        console.error(err);
+        setSaveStatus('error'); 
+    }
   };
 
   const updateHvacNestedField = (parent: 'gas' | 'sterilizer', field: string, value: string) => {
@@ -455,162 +469,213 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
   ];
 
   return (
-    <LogSheetLayout title="기계설비 운전일지" loading={loading} saveStatus={saveStatus} onPrint={handlePrint} isEmbedded={isEmbedded} onSave={handleManualSave} onRefresh={() => loadData(true)} hideSave={true} hideRefresh={false}>
-      <div id="combined-hvac-boiler-area" className="bg-transparent space-y-2 p-1">
-        <section className="max-w-[1050px] mx-auto">
-          <h3 className="text-lg font-bold text-black mb-1 border-l-4 border-black pl-2">1. 냉·온수기 가동 현황</h3>
-          <div className="flex flex-col gap-2">
-            <div className="overflow-x-auto">
-                <table className="w-full border-collapse bg-transparent border border-gray-300">
-                    <thead>
-                        <tr>
-                            <th rowSpan={2} className={`${thClass} w-48`}>점검 항목</th>
-                            <th colSpan={2} className={`${thClass} h-[45px] text-xl font-black text-black unit-header`}>
-                                냉,온수기 (<span className="hidden print:inline-block">{data.unitNo || ''}</span><select value={data.unitNo || ''} onChange={(e) => setData(prev => ({...prev, unitNo: e.target.value}))} className="bg-transparent text-black font-black outline-none cursor-pointer px-1 appearance-none border-none text-xl print:hidden"><option value=""> </option><option value="1">1</option><option value="2">2</option></select>) 호기
-                            </th>
-                        </tr>
-                        <tr><th className={thClass}>10:00</th><th className={thClass}>15:00</th></tr>
-                    </thead>
-                    <tbody>
-                        {hvacMainRows.map((row) => (
-                          <tr key={row.key}>
-                            <td className={`${thClass} text-left pl-3 font-medium`}>{row.label}</td>
-                            <td className={tdClass}>{renderCellWithUnit((data[row.key as keyof HvacLogData] as any)?.time10, (v) => setData(prev => ({...prev, [row.key]: {...(prev[row.key as keyof HvacLogData] as any), time10: v}})), row.unit)}</td>
-                            <td className={tdClass}>{renderCellWithUnit((data[row.key as keyof HvacLogData] as any)?.time15, (v) => setData(prev => ({...prev, [row.key]: {...(prev[row.key as keyof HvacLogData] as any), time15: v}})), row.unit)}</td>
+    <>
+      <LogSheetLayout 
+          title="기계설비 운전일지" 
+          loading={loading} 
+          saveStatus={saveStatus} 
+          onPrint={handlePrint} 
+          isEmbedded={isEmbedded} 
+          onSave={() => setShowSaveConfirm(true)} 
+          onRefresh={() => loadData(true)} 
+          hideSave={true} 
+          hideRefresh={false}
+      >
+        <div id="combined-hvac-boiler-area" className="bg-transparent space-y-2 p-1">
+          <section className="max-w-[1050px] mx-auto">
+            <h3 className="text-lg font-bold text-black mb-1 border-l-4 border-black pl-2">1. 냉·온수기 가동 현황</h3>
+            <div className="flex flex-col gap-2">
+              <div className="overflow-x-auto">
+                  <table className="w-full border-collapse bg-transparent border border-gray-300">
+                      <thead>
+                          <tr>
+                              <th rowSpan={2} className={`${thClass} w-48`}>점검 항목</th>
+                              <th colSpan={2} className={`${thClass} h-[45px] text-xl font-black text-black unit-header`}>
+                                  냉,온수기 (<span className="hidden print:inline-block">{data.unitNo || ''}</span><select value={data.unitNo || ''} onChange={(e) => setData(prev => ({...prev, unitNo: e.target.value}))} className="bg-transparent text-black font-black outline-none cursor-pointer px-1 appearance-none border-none text-xl print:hidden"><option value=""> </option><option value="1">1</option><option value="2">2</option></select>) 호기
+                              </th>
                           </tr>
-                        ))}
-                        <tr>
-                            <td className={`${thClass} text-left pl-3 font-medium`}>운 전 시 간</td>
-                            <td colSpan={2} className={tdClass}>
-                                <div className="flex items-center justify-center h-full px-4">
-                                    <input type="text" className="w-28 text-center outline-none bg-white border border-gray-200 rounded px-2 font-bold text-sm text-blue-700 shadow-sm" value={(data.hvacLogs?.[0]?.runTime || '').split('~')[0] || ''} onChange={e => handleTimeChange('hvac', 0, 'start', e.target.value)} placeholder="00:00" />
-                                    <span className="px-6 font-bold text-gray-800">~</span>
-                                    <input type="text" className="w-28 text-center outline-none bg-white border border-gray-200 rounded px-2 font-bold text-sm text-blue-700 shadow-sm" value={(data.hvacLogs?.[0]?.runTime || '').split('~')[1] || ''} onChange={e => handleTimeChange('hvac', 0, 'end', e.target.value)} placeholder="00:00" />
-                                </div>
-                            </td>
-                        </tr>
-                        <tr><td className={`${thClass} text-left pl-3 font-medium`}>총 가 동 시 간</td><td colSpan={2} className={tdClass}><input type="text" className="w-full h-full text-center outline-none font-extrabold text-blue-700 text-base bg-transparent" value={data.totalRunTime ? `${data.totalRunTime} H` : ''} readOnly /></td></tr>
-                    </tbody>
-                </table>
+                          <tr><th className={thClass}>10:00</th><th className={thClass}>15:00</th></tr>
+                      </thead>
+                      <tbody>
+                          {hvacMainRows.map((row) => (
+                            <tr key={row.key}>
+                              <td className={`${thClass} text-left pl-3 font-medium`}>{row.label}</td>
+                              <td className={tdClass}>{renderCellWithUnit((data[row.key as keyof HvacLogData] as any)?.time10, (v) => setData(prev => ({...prev, [row.key]: {...(prev[row.key as keyof HvacLogData] as any), time10: v}})), row.unit)}</td>
+                              <td className={tdClass}>{renderCellWithUnit((data[row.key as keyof HvacLogData] as any)?.time15, (v) => setData(prev => ({...prev, [row.key]: {...(prev[row.key as keyof HvacLogData] as any), time15: v}})), row.unit)}</td>
+                            </tr>
+                          ))}
+                          <tr>
+                              <td className={`${thClass} text-left pl-3 font-medium`}>운 전 시 간</td>
+                              <td colSpan={2} className={tdClass}>
+                                  <div className="flex items-center justify-center h-full px-4">
+                                      <input type="text" className="w-28 text-center outline-none bg-white border border-gray-200 rounded px-2 font-bold text-sm text-blue-700 shadow-sm" value={(data.hvacLogs?.[0]?.runTime || '').split('~')[0] || ''} onChange={e => handleTimeChange('hvac', 0, 'start', e.target.value)} placeholder="00:00" />
+                                      <span className="px-6 font-bold text-gray-800">~</span>
+                                      <input type="text" className="w-28 text-center outline-none bg-white border border-gray-200 rounded px-2 font-bold text-sm text-blue-700 shadow-sm" value={(data.hvacLogs?.[0]?.runTime || '').split('~')[1] || ''} onChange={e => handleTimeChange('hvac', 0, 'end', e.target.value)} placeholder="00:00" />
+                                  </div>
+                              </td>
+                          </tr>
+                          <tr><td className={`${thClass} text-left pl-3 font-medium`}>총 가 동 시 간</td><td colSpan={2} className={tdClass}><input type="text" className="w-full h-full text-center outline-none font-extrabold text-blue-700 text-base bg-transparent" value={data.totalRunTime ? `${data.totalRunTime} H` : ''} readOnly /></td></tr>
+                      </tbody>
+                  </table>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                  <table className="w-full border-collapse bg-transparent table-fixed border border-gray-300">
+                    <thead><tr><th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th><th className={`${thClass} w-[20%]`}>전일(m³)</th><th className={`${thClass} w-[20%]`}>금일(m³)</th><th className={`${thClass} w-[20%]`}>사용(m³)</th><th className={`${thClass} w-[20%]`}>누계(m³)</th></tr></thead>
+                    <tbody><tr><td className={`${thClass} whitespace-nowrap font-medium`}>냉,온수기 가스 사용량</td><td className={tdClass}>{renderCellWithUnit(data.gas?.prev, (v) => updateHvacNestedField('gas', 'prev', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.curr, (v) => updateHvacNestedField('gas', 'curr', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.usage, () => {}, '', true)}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.monthTotal, () => {}, '', true)}</td></tr></tbody>
+                  </table>
+                  <table className="w-full border-collapse bg-transparent table-fixed border border-gray-300">
+                    <thead><tr><th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th><th className={`${thClass} w-[20%]`}>전일(kg)</th><th className={`${thClass} w-[20%]`}>입고(kg)</th><th className={`${thClass} w-[20%]`}>사용(kg)</th><th className={`${thClass} w-[20%]`}>재고(kg)</th></tr></thead>
+                    <tbody><tr><td className={`${thClass} whitespace-nowrap font-medium`}>냉각탑 살균제</td><td className={tdClass}>{renderCellWithUnit(data.sterilizer?.prevStock, (v) => updateHvacNestedField('sterilizer', 'prevStock', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.sterilizer?.inQty, (v) => updateHvacNestedField('sterilizer', 'inQty', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.sterilizer?.usedQty, (v) => updateHvacNestedField('sterilizer', 'usedQty', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.sterilizer?.stock, () => {}, '', true)}</td></tr></tbody>
+                  </table>
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-                <table className="w-full border-collapse bg-transparent table-fixed border border-gray-300">
-                  <thead><tr><th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th><th className={`${thClass} w-[20%]`}>전일(m³)</th><th className={`${thClass} w-[20%]`}>금일(m³)</th><th className={`${thClass} w-[20%]`}>사용(m³)</th><th className={`${thClass} w-[20%]`}>누계(m³)</th></tr></thead>
-                  <tbody><tr><td className={`${thClass} whitespace-nowrap font-medium`}>냉,온수기 가스 사용량</td><td className={tdClass}>{renderCellWithUnit(data.gas?.prev, (v) => updateHvacNestedField('gas', 'prev', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.curr, (v) => updateHvacNestedField('gas', 'curr', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.usage, () => {}, '', true)}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.monthTotal, () => {}, '', true)}</td></tr></tbody>
-                </table>
-                <table className="w-full border-collapse bg-transparent table-fixed border border-gray-300">
-                  <thead><tr><th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th><th className={`${thClass} w-[20%]`}>전일(kg)</th><th className={`${thClass} w-[20%]`}>입고(kg)</th><th className={`${thClass} w-[20%]`}>사용(kg)</th><th className={`${thClass} w-[20%]`}>재고(kg)</th></tr></thead>
-                  <tbody><tr><td className={`${thClass} whitespace-nowrap font-medium`}>냉각탑 살균제</td><td className={tdClass}>{renderCellWithUnit(data.sterilizer?.prevStock, (v) => updateHvacNestedField('sterilizer', 'prevStock', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.sterilizer?.inQty, (v) => updateHvacNestedField('sterilizer', 'inQty', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.sterilizer?.usedQty, (v) => updateHvacNestedField('sterilizer', 'usedQty', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.sterilizer?.stock, () => {}, '', true)}</td></tr></tbody>
-                </table>
-            </div>
-          </div>
-        </section>
-        
-        <hr className="my-6 border-t-2 border-gray-800 opacity-20" />
+          </section>
+          
+          <hr className="my-6 border-t-2 border-gray-800 opacity-20" />
 
-        <section className="max-w-[1050px] mx-auto">
-          <h3 className="text-lg font-bold text-black mb-1 border-l-4 border-black pl-2">2. 보일러 가동 현황</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse bg-transparent border border-gray-300">
-              <thead>
-                <tr>
-                  <th rowSpan={2} className={`${thClass} w-72 whitespace-nowrap`}>운전시간(H)</th>
-                  <th colSpan={2} className={thClass}>가스압력(kg/cm²)</th>
-                  <th rowSpan={2} className={thClass}>증기압<br/>(kg/cm²)</th>
-                  <th rowSpan={2} className={thClass}>배기온도<br/>(℃)</th>
-                  <th rowSpan={2} className={thClass}>급수온도<br/>(℃)</th>
-                  <th rowSpan={2} className={thClass}>급탕온도<br/>(℃)</th>
-                  <th rowSpan={2} className={thClass}>수위(%)</th>
-                </tr>
-                <tr><th className={thClass}>1차</th><th className={thClass}>2차</th></tr>
-              </thead>
-              <tbody>
-                {boilerData.logs.map((log, lIdx) => (
-                  <tr key={log.id}>
-                    <td className={tdClass}>
-                      <div className="flex items-center justify-center h-full px-2 gap-1">
-                        <input 
-                          type="text" 
-                          className="w-[45%] h-full text-center outline-none bg-white border border-gray-100 rounded px-1 font-bold text-xs text-blue-700 shadow-sm" 
-                          value={(log.runTime || '').split('~')[0] || ''} 
-                          onChange={e => handleTimeChange('boiler', lIdx, 'start', e.target.value)} 
-                          placeholder="00:00"
-                        />
-                        <span className="font-bold text-gray-400 text-[10px]">~</span>
-                        <input 
-                          type="text" 
-                          className="w-[45%] h-full text-center outline-none bg-white border border-gray-100 rounded px-1 font-bold text-xs text-blue-700 shadow-sm" 
-                          value={(log.runTime || '').split('~')[1] || ''} 
-                          onChange={e => handleTimeChange('boiler', lIdx, 'end', e.target.value)} 
-                          placeholder="00:00"
-                        />
+          <section className="max-w-[1050px] mx-auto">
+            <h3 className="text-lg font-bold text-black mb-1 border-l-4 border-black pl-2">2. 보일러 가동 현황</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse bg-transparent border border-gray-300">
+                <thead>
+                  <tr>
+                    <th rowSpan={2} className={`${thClass} w-72 whitespace-nowrap`}>운전시간(H)</th>
+                    <th colSpan={2} className={thClass}>가스압력(kg/cm²)</th>
+                    <th rowSpan={2} className={thClass}>증기압<br/>(kg/cm²)</th>
+                    <th rowSpan={2} className={thClass}>배기온도<br/>(℃)</th>
+                    <th rowSpan={2} className={thClass}>급수온도<br/>(℃)</th>
+                    <th rowSpan={2} className={thClass}>급탕온도<br/>(℃)</th>
+                    <th rowSpan={2} className={thClass}>수위(%)</th>
+                  </tr>
+                  <tr><th className={thClass}>1차</th><th className={thClass}>2차</th></tr>
+                </thead>
+                <tbody>
+                  {boilerData.logs.map((log, lIdx) => (
+                    <tr key={log.id}>
+                      <td className={tdClass}>
+                        <div className="flex items-center justify-center h-full px-2 gap-1">
+                          <input 
+                            type="text" 
+                            className="w-[45%] h-full text-center outline-none bg-white border border-gray-100 rounded px-1 font-bold text-xs text-blue-700 shadow-sm" 
+                            value={(log.runTime || '').split('~')[0] || ''} 
+                            onChange={e => handleTimeChange('boiler', lIdx, 'start', e.target.value)} 
+                            placeholder="00:00"
+                          />
+                          <span className="font-bold text-gray-400 text-[10px]">~</span>
+                          <input 
+                            type="text" 
+                            className="w-[45%] h-full text-center outline-none bg-white border border-gray-100 rounded px-1 font-bold text-xs text-blue-700 shadow-sm" 
+                            value={(log.runTime || '').split('~')[1] || ''} 
+                            onChange={e => handleTimeChange('boiler', lIdx, 'end', e.target.value)} 
+                            placeholder="00:00"
+                          />
+                        </div>
+                      </td>
+                      <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.gasPressure1} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, gasPressure1:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
+                      <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.gasPressure2} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, gasPressure2:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
+                      <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.steamPressure} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, steamPressure:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
+                      <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.exhaustTemp} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, exhaustTemp:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
+                      <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.supplyTemp} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, supplyTemp:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
+                      <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.hotWaterTemp} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, hotWaterTemp:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
+                      <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.waterLevel} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, waterLevel:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <td className={`${thClass} whitespace-nowrap`}>총 가 동 시 간</td>
+                    <td colSpan={7} className={tdClass}>
+                      <div className="flex items-center justify-center h-full">
+                        <input type="text" className="w-full h-full text-center outline-none font-extrabold text-blue-700 text-base bg-transparent" value={boilerData.totalRunTime ? `${boilerData.totalRunTime} H` : ''} readOnly />
                       </div>
                     </td>
-                    <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.gasPressure1} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, gasPressure1:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
-                    <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.gasPressure2} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, gasPressure2:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
-                    <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.steamPressure} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, steamPressure:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
-                    <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.exhaustTemp} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, exhaustTemp:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
-                    <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.supplyTemp} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, supplyTemp:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
-                    <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.hotWaterTemp} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, hotWaterTemp:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
-                    <td className={tdClass}><input type="text" className="w-full h-full text-center outline-none bg-transparent font-bold text-sm" value={log.waterLevel} onChange={e => { const nl=[...boilerData.logs]; nl[lIdx]={...log, waterLevel:e.target.value}; setBoilerData({...boilerData, logs:nl}); }} /></td>
                   </tr>
-                ))}
-                <tr>
-                  <td className={`${thClass} whitespace-nowrap`}>총 가 동 시 간</td>
-                  <td colSpan={7} className={tdClass}>
-                    <div className="flex items-center justify-center h-full">
-                      <input type="text" className="w-full h-full text-center outline-none font-extrabold text-blue-700 text-base bg-transparent" value={boilerData.totalRunTime ? `${boilerData.totalRunTime} H` : ''} readOnly />
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
+            <div className="flex flex-col gap-1.5 mt-2">
+              <table className="w-full border-collapse bg-transparent table-fixed border border-gray-300">
+                <thead><tr><th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th><th className={`${thClass} w-[20%]`}>전일(m³)</th><th className={`${thClass} w-[20%]`}>금일(m³)</th><th className={`${thClass} w-[20%]`}>사용(m³)</th><th className={`${thClass} w-[20%]`}>누계(m³)</th></tr></thead>
+                <tbody><tr><td className={`${thClass} font-medium`}>보일러 가스 사용량</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.prev, (v) => updateBoilerNestedField('gas', 'prev', v), '')}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.curr, (v) => updateBoilerNestedField('gas', 'curr', v), '')}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.usage, () => {}, '', true)}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.monthTotal, () => {}, '', true)}</td></tr></tbody>
+              </table>
+              
+              <table className="w-full border-collapse bg-transparent table-fixed border border-gray-300 mt-1.5">
+                <thead>
+                  <tr>
+                    <th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th>
+                    <th className={`${thClass} w-[20%]`}>전일(kg)</th>
+                    <th className={`${thClass} w-[20%]`}>입고(kg)</th>
+                    <th className={`${thClass} w-[20%]`}>사용(kg)</th>
+                    <th className={`${thClass} w-[20%]`}>재고(kg)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className={`${thClass} font-medium`}>소금</td>
+                    <td className={tdClass}>{renderCellWithUnit(boilerData.salt?.prevStock, (v) => updateBoilerNestedField('salt', 'prevStock', v), '')}</td>
+                    <td className={tdClass}>{renderCellWithUnit(boilerData.salt?.inQty, (v) => updateBoilerNestedField('salt', 'inQty', v), '')}</td>
+                    <td className={tdClass}>{renderCellWithUnit(boilerData.salt?.usedQty, (v) => updateBoilerNestedField('salt', 'usedQty', v), '')}</td>
+                    <td className={tdClass}>
+                      <div className="w-full h-full flex items-center justify-center font-bold text-blue-600 bg-gray-50/30">
+                        {boilerData.salt?.stock || '0'}
+                      </div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className={`${thClass} font-medium`}>청관제</td>
+                    <td className={tdClass}>{renderCellWithUnit(boilerData.cleaner?.prevStock, (v) => updateBoilerNestedField('cleaner', 'prevStock', v), '')}</td>
+                    <td className={tdClass}>{renderCellWithUnit(boilerData.cleaner?.inQty, (v) => updateBoilerNestedField('cleaner', 'inQty', v), '')}</td>
+                    <td className={tdClass}>{renderCellWithUnit(boilerData.cleaner?.usedQty, (v) => updateBoilerNestedField('cleaner', 'usedQty', v), '')}</td>
+                    <td className={tdClass}>
+                      <div className="w-full h-full flex items-center justify-center font-bold text-blue-600 bg-gray-50/30">
+                        {boilerData.cleaner?.stock || '0'}
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        {/* 전기 탭과 동일한 하단 저장 버튼 위치 */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40 print:hidden">
+          <button 
+            onClick={() => setShowSaveConfirm(true)} 
+            disabled={saveStatus === 'loading'} 
+            className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+          >
+            {saveStatus === 'loading' ? (
+              <><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>
+            ) : saveStatus === 'success' ? (
+              <><CheckCircle2 size={24} /><span>저장 완료</span></>
+            ) : (
+              <><Save size={24} /><span>기계설비 데이터 서버 저장</span></>
+            )}
+          </button>
+        </div>
+      </LogSheetLayout>
+
+      {/* 저장 확인 모달 */}
+      {showSaveConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
+                <Cloud className="text-blue-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">기계설비 데이터 서버 저장</h3>
+              <p className="text-gray-500 mb-8 leading-relaxed font-medium">
+                입력하신 <span className="text-blue-600 font-bold">냉온수기 및 보일러 계측 기록</span>을<br/>
+                서버에 안전하게 기록하시겠습니까?
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center active:scale-95"><X size={18} className="mr-2" />취소</button>
+                <button onClick={handleManualSave} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle2 size={18} className="mr-2" />확인</button>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5 mt-2">
-            <table className="w-full border-collapse bg-transparent table-fixed border border-gray-300">
-              <thead><tr><th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th><th className={`${thClass} w-[20%]`}>전일(m³)</th><th className={`${thClass} w-[20%]`}>금일(m³)</th><th className={`${thClass} w-[20%]`}>사용(m³)</th><th className={`${thClass} w-[20%]`}>누계(m³)</th></tr></thead>
-              <tbody><tr><td className={`${thClass} font-medium`}>보일러 가스 사용량</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.prev, (v) => updateBoilerNestedField('gas', 'prev', v), '')}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.curr, (v) => updateBoilerNestedField('gas', 'curr', v), '')}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.usage, () => {}, '', true)}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.monthTotal, () => {}, '', true)}</td></tr></tbody>
-            </table>
-            
-            <table className="w-full border-collapse bg-transparent table-fixed border border-gray-300 mt-1.5">
-              <thead>
-                <tr>
-                  <th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th>
-                  <th className={`${thClass} w-[20%]`}>전일(kg)</th>
-                  <th className={`${thClass} w-[20%]`}>입고(kg)</th>
-                  <th className={`${thClass} w-[20%]`}>사용(kg)</th>
-                  <th className={`${thClass} w-[20%]`}>재고(kg)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td className={`${thClass} font-medium`}>소금</td>
-                  <td className={tdClass}>{renderCellWithUnit(boilerData.salt?.prevStock, (v) => updateBoilerNestedField('salt', 'prevStock', v), '')}</td>
-                  <td className={tdClass}>{renderCellWithUnit(boilerData.salt?.inQty, (v) => updateBoilerNestedField('salt', 'inQty', v), '')}</td>
-                  <td className={tdClass}>{renderCellWithUnit(boilerData.salt?.usedQty, (v) => updateBoilerNestedField('salt', 'usedQty', v), '')}</td>
-                  <td className={tdClass}>
-                    <div className="w-full h-full flex items-center justify-center font-bold text-blue-600 bg-gray-50/30">
-                      {boilerData.salt?.stock || '0'}
-                    </div>
-                  </td>
-                </tr>
-                <tr>
-                  <td className={`${thClass} font-medium`}>청관제</td>
-                  <td className={tdClass}>{renderCellWithUnit(boilerData.cleaner?.prevStock, (v) => updateBoilerNestedField('cleaner', 'prevStock', v), '')}</td>
-                  <td className={tdClass}>{renderCellWithUnit(boilerData.cleaner?.inQty, (v) => updateBoilerNestedField('cleaner', 'inQty', v), '')}</td>
-                  <td className={tdClass}>{renderCellWithUnit(boilerData.cleaner?.usedQty, (v) => updateBoilerNestedField('cleaner', 'usedQty', v), '')}</td>
-                  <td className={tdClass}>
-                    <div className="w-full h-full flex items-center justify-center font-bold text-blue-600 bg-gray-50/30">
-                      {boilerData.cleaner?.stock || '0'}
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </div>
-    </LogSheetLayout>
+        </div>
+      )}
+    </>
   );
 };
 

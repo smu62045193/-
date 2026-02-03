@@ -187,7 +187,18 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
+    // 미리보기 클릭 시 실시간 당일 날씨 강제 재조회
+    setSyncing(true);
+    try {
+      const latestWeather = await fetchWeatherInfo(dateKey, true);
+      if (latestWeather) setWeather(latestWeather);
+    } catch (err) {
+      console.error("Weather refresh failed for print", err);
+    } finally {
+      setSyncing(false);
+    }
+
     const printContent = document.getElementById('air-env-log-content');
     if (!printContent) return;
 

@@ -1,9 +1,10 @@
 
 import { format, startOfMonth, subDays } from 'date-fns';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { apiFetchRange, fetchDailyData, fetchSubstationLog, getInitialSubstationLog, saveDailyData, saveSubstationLog } from '../services/dataService';
-import { AcbReadings, PowerUsageReadings, SubstationLogData, VcbReadings } from '../types';
+import { apiFetchRange, fetchDailyData, fetchSubstationLog, getInitialSubstationLog, saveDailyData, saveSubstationLog, getInitialDailyData } from '../services/dataService';
+import { AcbReadings, PowerUsageReadings, SubstationLogData, VcbReadings, DailyData } from '../types';
 import LogSheetLayout from './LogSheetLayout';
+import { Save, RefreshCw, CheckCircle2, Cloud, X } from 'lucide-react';
 
 interface SubstationLogProps {
   currentDate: Date;
@@ -14,6 +15,7 @@ interface SubstationLogProps {
 const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded = false, onUsageChange }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   
   const [data, setData] = useState<SubstationLogData>(getInitialSubstationLog(dateKey));
@@ -67,12 +69,10 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     const activeMid = safeParseFloat(powerUsage.usage.activeMid);
     const activeMax = safeParseFloat(powerUsage.usage.activeMax);
     const activeLight = safeParseFloat(powerUsage.usage.activeLight);
-    // Added const declaration to fix 'Cannot find name totalActive' error
     const totalActive = activeMid + activeMax + activeLight;
 
     const reactiveMid = safeParseFloat(powerUsage.usage.reactiveMid);
     const reactiveMax = safeParseFloat(powerUsage.usage.reactiveMax);
-    // Added const declaration to fix 'Cannot find name totalReactive' error
     const totalReactive = reactiveMid + reactiveMax;
 
     dailyStats.activePower = totalActive.toString();
@@ -177,25 +177,36 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   useEffect(() => { loadData(false); }, [dateKey]);
 
   const handleSave = async () => {
+    setShowSaveConfirm(false);
     if (saveStatus === 'loading') return;
     setSaveStatus('loading');
     try {
+      // 1. 상세 로그 저장
       const success = await saveSubstationLog(data);
       if (success) {
-        const currentDaily = await fetchDailyData(dateKey);
-        if (currentDaily) {
-          await saveDailyData({
-            ...currentDaily,
-            utility: { ...currentDaily.utility, electricity: data.dailyStats.activePower }
-          });
-        }
+        // 2. 메인 일지 동기화 (전기 사용량 업데이트)
+        let currentDaily = await fetchDailyData(dateKey, true);
+        if (!currentDaily) currentDaily = getInitialDailyData(dateKey);
+        
+        await saveDailyData({
+          ...currentDaily,
+          utility: { 
+            ...currentDaily.utility, 
+            electricity: data.dailyStats.activePower 
+          },
+          lastUpdated: new Date().toISOString()
+        });
+        
         setSaveStatus('success');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
         alert('저장에 실패했습니다.');
       }
-    } catch (e) { setSaveStatus('error'); }
+    } catch (e) { 
+      console.error(e);
+      setSaveStatus('error'); 
+    }
   };
 
   const updateVcb = (time: 'time9' | 'time21', section: keyof VcbReadings, field: string, value: string) => {
@@ -419,159 +430,209 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   const tdClass = "border border-black p-0 h-10 align-middle relative bg-transparent";
 
   return (
-    <LogSheetLayout title="수변전반 일지" loading={loading} saveStatus={saveStatus} onRefresh={() => loadData(true)} onSave={handleSave} onPrint={handlePrint} isEmbedded={isEmbedded} hideSave={true}>
-      <div id="substation-log-print-area" className="bg-white text-black">
-        <section className="mb-6">
-          <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">1. VCB (특고압수전반)</h3>
-          <div className="overflow-x-auto print:overflow-visible">
-            <table className="w-full border-collapse text-center table-fixed bg-white print:min-w-0 border-black">
-              <thead>
-                <tr>
-                  <th rowSpan={2} style={{ width: '40px' }} className={thClass}>구분</th>
-                  <th colSpan={4} className={thClass}>특고압수전반 (MAIN VCB)</th>
-                  <th colSpan={3} className={thClass}>VCB1 (TR1)</th>
-                  <th colSpan={3} className={thClass}>VCB2 (TR2)</th>
-                  <th colSpan={3} className={thClass}>VCB3 (TR3)</th>
-                </tr>
-                <tr>
-                  <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th><th className={thClass}>Hz</th>
-                  <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
-                  <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
-                  <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {['time9', 'time21'].map((time) => (
-                  <tr key={time}>
-                    <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{time === 'time9' ? '09:00' : '21:00'}</td>
-                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.v || ''} readOnly /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.a || ''} onChange={e => updateVcb(time as any, 'main', 'a', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.pf || ''} onChange={e => updateVcb(time as any, 'main', 'pf', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.hz || ''} onChange={e => updateVcb(time as any, 'main', 'hz', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr1?.v || ''} readOnly /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr1?.a || ''} onChange={e => updateVcb(time as any, 'tr1', 'a', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr1?.pf || ''} onChange={e => updateVcb(time as any, 'tr1', 'pf', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr2?.v || ''} readOnly /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr2?.a || ''} onChange={e => updateVcb(time as any, 'tr2', 'a', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr2?.pf || ''} onChange={e => updateVcb(time as any, 'tr2', 'pf', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr3?.v || ''} readOnly /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr3?.a || ''} onChange={e => updateVcb(time as any, 'tr3', 'a', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr3?.pf || ''} onChange={e => updateVcb(time as any, 'tr3', 'pf', e.target.value)} /></td>
+    <>
+      <LogSheetLayout 
+        title="수변전반 일지" 
+        loading={loading} 
+        saveStatus={saveStatus} 
+        onRefresh={() => loadData(true)} 
+        onSave={() => setShowSaveConfirm(true)} 
+        onPrint={handlePrint} 
+        isEmbedded={isEmbedded} 
+        hideSave={true}
+      >
+        <div id="substation-log-print-area" className="bg-white text-black">
+          <section className="mb-6">
+            <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">1. VCB (특고압수전반)</h3>
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full border-collapse text-center table-fixed bg-white print:min-w-0 border-black">
+                <thead>
+                  <tr>
+                    <th rowSpan={2} style={{ width: '40px' }} className={thClass}>구분</th>
+                    <th colSpan={4} className={thClass}>특고압수전반 (MAIN VCB)</th>
+                    <th colSpan={3} className={thClass}>VCB1 (TR1)</th>
+                    <th colSpan={3} className={thClass}>VCB2 (TR2)</th>
+                    <th colSpan={3} className={thClass}>VCB3 (TR3)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="mb-6">
-          <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">2. ACB / 변압기 온도</h3>
-          <div className="overflow-x-auto print:overflow-visible">
-            <table className="w-full border-collapse text-center table-fixed bg-white print:min-w-0 border-black">
-              <thead>
-                <tr>
-                  <th rowSpan={2} style={{ width: '40px' }} className={thClass}>구분</th>
-                  <th colSpan={3} className={thClass}>LV1 PANEL (ACB1)</th>
-                  <th colSpan={3} className={thClass}>LV3 PANEL (ACB2)</th>
-                  <th colSpan={3} className={thClass}>LV5 PANEL (ACB3)</th>
-                  <th colSpan={3} className={thClass}>변압기 온도</th>
-                </tr>
-                <tr>
-                  <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
-                  <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
-                  <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
-                  <th className={thClass}>TR1(℃)</th><th className={thClass}>TR2(℃)</th><th className={thClass}>TR3(℃)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {['time9', 'time21'].map((time) => (
-                  <tr key={time}>
-                    <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{time === 'time9' ? '09:00' : '21:00'}</td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.v || ''} onChange={e => updateAcb(time as any, 'acb1', 'v', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.a || ''} onChange={e => updateAcb(time as any, 'acb1', 'a', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.kw || ''} onChange={e => updateAcb(time as any, 'acb1', 'kw', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb2?.v || ''} onChange={e => updateAcb(time as any, 'acb2', 'v', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb2?.a || ''} onChange={e => updateAcb(time as any, 'acb2', 'a', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb2?.kw || ''} onChange={e => updateAcb(time as any, 'acb2', 'kw', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb3?.v || ''} onChange={e => updateAcb(time as any, 'acb3', 'v', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb3?.a || ''} onChange={e => updateAcb(time as any, 'acb3', 'a', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb3?.kw || ''} onChange={e => updateAcb(time as any, 'acb3', 'kw', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.trTemp?.tr1 || ''} onChange={e => updateAcb(time as any, 'trTemp', 'tr1', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.trTemp?.tr2 || ''} onChange={e => updateAcb(time as any, 'trTemp', 'tr2', e.target.value)} /></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.trTemp?.tr3 || ''} onChange={e => updateAcb(time as any, 'trTemp', 'tr3', e.target.value)} /></td>
+                  <tr>
+                    <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th><th className={thClass}>Hz</th>
+                    <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
+                    <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
+                    <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="mb-6">
-          <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">3. 전력량 사용 현황</h3>
-          <div className="overflow-x-auto print:overflow-visible">
-            <table className="w-full border-collapse text-center table-fixed bg-white border-black">
-              <thead>
-                <tr>
-                  <th className={thClass} style={{ width: '100px' }}>구분</th>
-                  <th className={thClass}>유효전력 중간(kWh)</th>
-                  <th className={thClass}>유효전력 최대(kWh)</th>
-                  <th className={thClass}>유효전력 경부하(kWh)</th>
-                  <th className={thClass}>무효전력 중간(kVarh)</th>
-                  <th className={thClass}>무효전력 최대(kVarh)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {['prev', 'curr', 'usage'].map((row) => {
-                  const isReadOnlyRow = row === 'usage' || row === 'prev';
-                  return (
-                    <tr key={row}>
-                      <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{row === 'prev' ? '전일지침' : row === 'curr' ? '금일지침' : '사용량'}</td>
-                      <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeMid || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeMid', e.target.value)} readOnly={isReadOnlyRow} /></td>
-                      <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeMax || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeMax', e.target.value)} readOnly={isReadOnlyRow} /></td>
-                      <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeLight || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeLight', e.target.value)} readOnly={isReadOnlyRow} /></td>
-                      <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.reactiveMid || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'reactiveMid', e.target.value)} readOnly={isReadOnlyRow} /></td>
-                      <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.reactiveMax || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'reactiveMax', e.target.value)} readOnly={isReadOnlyRow} /></td>
+                </thead>
+                <tbody>
+                  {['time9', 'time21'].map((time) => (
+                    <tr key={time}>
+                      <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{time === 'time9' ? '09:00' : '21:00'}</td>
+                      <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.v || ''} readOnly /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.a || ''} onChange={e => updateVcb(time as any, 'main', 'a', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.pf || ''} onChange={e => updateVcb(time as any, 'main', 'pf', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.hz || ''} onChange={e => updateVcb(time as any, 'main', 'hz', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr1?.v || ''} readOnly /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr1?.a || ''} onChange={e => updateVcb(time as any, 'tr1', 'a', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr1?.pf || ''} onChange={e => updateVcb(time as any, 'tr1', 'pf', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr2?.v || ''} readOnly /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr2?.a || ''} onChange={e => updateVcb(time as any, 'tr2', 'a', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr2?.pf || ''} onChange={e => updateVcb(time as any, 'tr2', 'pf', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr3?.v || ''} readOnly /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr3?.a || ''} onChange={e => updateVcb(time as any, 'tr3', 'a', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.tr3?.pf || ''} onChange={e => updateVcb(time as any, 'tr3', 'pf', e.target.value)} /></td>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-        <section>
-          <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">4. 일 사용량 분석</h3>
-          <div className="overflow-x-auto print:overflow-visible">
-            <table className="w-full border-collapse table-fixed bg-white border-black">
-              <thead>
-                <tr>
-                  <th className={thClass} style={{ width: '100px' }}>구분</th>
-                  <th className={thClass}>유효(kWh)</th>
-                  <th className={thClass}>무효(kVarh)</th>
-                  <th className={thClass}>금월누계(kWh)</th>
-                  <th className={thClass}>최대(kW)</th>
-                  <th className={thClass}>역율(%)</th>
-                  <th className={thClass}>부하율(%)</th>
-                  <th className={thClass}>수용율(%)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="h-10">
-                  <td className="border border-black font-bold text-sm bg-gray-50 text-gray-700 text-center">금일 사용량</td>
-                  <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.activePower || ''} readOnly /></td>
-                  <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.reactivePower || ''} readOnly /></td>
-                  <td className={tdClass}><input type="text" className={`${readonlyInputClass} font-black text-base`} value={data.dailyStats?.monthTotal || ''} readOnly /></td>
-                  <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.maxPower || ''} readOnly /></td>
-                  <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.powerFactor || ''} readOnly /></td>
-                  <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.loadFactor || ''} readOnly /></td>
-                  <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.demandFactor || ''} readOnly /></td>
-                </tr>
-              </tbody>
-            </table>
+          <section className="mb-6">
+            <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">2. ACB / 변압기 온도</h3>
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full border-collapse text-center table-fixed bg-white print:min-w-0 border-black">
+                <thead>
+                  <tr>
+                    <th rowSpan={2} style={{ width: '40px' }} className={thClass}>구분</th>
+                    <th colSpan={3} className={thClass}>LV1 PANEL (ACB1)</th>
+                    <th colSpan={3} className={thClass}>LV3 PANEL (ACB2)</th>
+                    <th colSpan={3} className={thClass}>LV5 PANEL (ACB3)</th>
+                    <th colSpan={3} className={thClass}>변압기 온도</th>
+                  </tr>
+                  <tr>
+                    <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
+                    <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
+                    <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
+                    <th className={thClass}>TR1(℃)</th><th className={thClass}>TR2(℃)</th><th className={thClass}>TR3(℃)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {['time9', 'time21'].map((time) => (
+                    <tr key={time}>
+                      <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{time === 'time9' ? '09:00' : '21:00'}</td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.v || ''} onChange={e => updateAcb(time as any, 'acb1', 'v', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.a || ''} onChange={e => updateAcb(time as any, 'acb1', 'a', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.kw || ''} onChange={e => updateAcb(time as any, 'acb1', 'kw', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb2?.v || ''} onChange={e => updateAcb(time as any, 'acb2', 'v', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb2?.a || ''} onChange={e => updateAcb(time as any, 'acb2', 'a', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb2?.kw || ''} onChange={e => updateAcb(time as any, 'acb2', 'kw', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb3?.v || ''} onChange={e => updateAcb(time as any, 'acb3', 'v', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb3?.a || ''} onChange={e => updateAcb(time as any, 'acb3', 'a', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb3?.kw || ''} onChange={e => updateAcb(time as any, 'acb3', 'kw', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.trTemp?.tr1 || ''} onChange={e => updateAcb(time as any, 'trTemp', 'tr1', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.trTemp?.tr2 || ''} onChange={e => updateAcb(time as any, 'trTemp', 'tr2', e.target.value)} /></td>
+                      <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.trTemp?.tr3 || ''} onChange={e => updateAcb(time as any, 'trTemp', 'tr3', e.target.value)} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="mb-6">
+            <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">3. 전력량 사용 현황</h3>
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full border-collapse text-center table-fixed bg-white border-black">
+                <thead>
+                  <tr>
+                    <th className={thClass} style={{ width: '100px' }}>구분</th>
+                    <th className={thClass}>유효전력 중간(kWh)</th>
+                    <th className={thClass}>유효전력 최대(kWh)</th>
+                    <th className={thClass}>유효전력 경부하(kWh)</th>
+                    <th className={thClass}>무효전력 중간(kVarh)</th>
+                    <th className={thClass}>무효전력 최대(kVarh)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {['prev', 'curr', 'usage'].map((row) => {
+                    const isReadOnlyRow = row === 'usage' || row === 'prev';
+                    return (
+                      <tr key={row}>
+                        <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{row === 'prev' ? '전일지침' : row === 'curr' ? '금일지침' : '사용량'}</td>
+                        <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeMid || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeMid', e.target.value)} readOnly={isReadOnlyRow} /></td>
+                        <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeMax || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeMax', e.target.value)} readOnly={isReadOnlyRow} /></td>
+                        <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeLight || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeLight', e.target.value)} readOnly={isReadOnlyRow} /></td>
+                        <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.reactiveMid || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'reactiveMid', e.target.value)} readOnly={isReadOnlyRow} /></td>
+                        <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.reactiveMax || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'reactiveMax', e.target.value)} readOnly={isReadOnlyRow} /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">4. 일 사용량 분석</h3>
+            <div className="overflow-x-auto print:overflow-visible">
+              <table className="w-full border-collapse table-fixed bg-white border-black">
+                <thead>
+                  <tr>
+                    <th className={thClass} style={{ width: '100px' }}>구분</th>
+                    <th className={thClass}>유효(kWh)</th>
+                    <th className={thClass}>무효(kVarh)</th>
+                    <th className={thClass}>금월누계(kWh)</th>
+                    <th className={thClass}>최대(kW)</th>
+                    <th className={thClass}>역율(%)</th>
+                    <th className={thClass}>부하율(%)</th>
+                    <th className={thClass}>수용율(%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="h-10">
+                    <td className="border border-black font-bold text-sm bg-gray-50 text-gray-700 text-center">금일 사용량</td>
+                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.activePower || ''} readOnly /></td>
+                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.reactivePower || ''} readOnly /></td>
+                    <td className={tdClass}><input type="text" className={`${readonlyInputClass} font-black text-base`} value={data.dailyStats?.monthTotal || ''} readOnly /></td>
+                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.maxPower || ''} readOnly /></td>
+                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.powerFactor || ''} readOnly /></td>
+                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.loadFactor || ''} readOnly /></td>
+                    <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.demandFactor || ''} readOnly /></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
+        {/* 전기 탭과 동일한 하단 저장 버튼 위치 */}
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40 print:hidden">
+          <button 
+            onClick={() => setShowSaveConfirm(true)} 
+            disabled={saveStatus === 'loading'} 
+            className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+          >
+            {saveStatus === 'loading' ? (
+              <><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>
+            ) : saveStatus === 'success' ? (
+              <><CheckCircle2 size={24} /><span>저장 완료</span></>
+            ) : (
+              <><Save size={24} /><span>수변전반 데이터 서버 저장</span></>
+            )}
+          </button>
+        </div>
+      </LogSheetLayout>
+
+      {/* 저장 확인 모달 */}
+      {showSaveConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
+                <Cloud className="text-blue-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">수변전반 데이터 서버 저장</h3>
+              <p className="text-gray-500 mb-8 leading-relaxed font-medium">
+                입력하신 <span className="text-blue-600 font-bold">상세 계측 기록과 일 사용량</span>을<br/>
+                서버에 안전하게 기록하시겠습니까?
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center active:scale-95"><X size={18} className="mr-2" />취소</button>
+                <button onClick={handleSave} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle2 size={18} className="mr-2" />확인</button>
+              </div>
+            </div>
           </div>
-        </section>
-      </div>
-    </LogSheetLayout>
+        </div>
+      )}
+    </>
   );
 };
 
