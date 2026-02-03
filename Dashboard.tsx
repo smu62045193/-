@@ -333,15 +333,21 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate }) => {
       { key: 'cleaning', label: '미화 위생', icon: <Droplets size={16} /> },
       { key: 'handover', label: '특이사항', icon: <Edit2 size={16} /> }
     ];
+    
     categories.forEach(cat => {
       const log = (workLog as any)[cat.key] as LogCategory;
       if (log?.today) {
+        // ID 필터링 (수동 입력 및 이월 항목만 포함, 자동화 auto- 제외)
         const taskContents = log.today
-          .filter((t: TaskItem) => t.id && (t.id.includes('task_') || t.id.includes('auto-')))
-          .map((t: TaskItem) => t.content)
-          .filter((c: string) => c && c.trim() !== '');
+          .filter((t: TaskItem) => t.id && (t.id.includes('task_') || t.id.includes('from_prev_')))
+          .map((t: TaskItem) => t.content?.trim())
+          .filter((c: string) => c && c !== '');
           
-        if (taskContents.length > 0) sections.push({ label: cat.label, icon: cat.icon, tasks: taskContents });
+        if (taskContents.length > 0) {
+          // 내용(Content) 기준 중복 제거 수행
+          const uniqueContents = Array.from(new Set(taskContents));
+          sections.push({ label: cat.label, icon: cat.icon, tasks: uniqueContents });
+        }
       }
     });
     return sections;

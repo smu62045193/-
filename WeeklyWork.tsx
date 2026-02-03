@@ -195,7 +195,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           const date = addDays(weekStartDate, i);
           const dateKey = format(date, 'yyyy-MM-dd');
           const dayNum = date.getDate();
-          const dayData = logs.find(l => l.key === `DAILY_${dateKey}`);
+          // l.key가 dateKey(2026-01-05)인 경우와 접두어 DAILY_가 붙은 경우 모두 고려
+          const dayData = logs.find(l => l.key === dateKey || l.key === `DAILY_${dateKey}`);
           
           FIELDS.forEach(field => {
             let todayTasks: TaskItem[] = [];
@@ -214,7 +215,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               // 1. 금일 작업 -> 금주 실적 후보
               todayTasks.forEach(task => {
                 if (task?.content?.trim()) {
-                  const baseContent = task.content.split('-')[0].trim();
+                  // 하이픈으로 자르지 않고 전체 내용을 보존 (단, 시작 부분에 하이픈 불릿이 있다면 제거 고려)
+                  const baseContent = task.content.trim();
                   const key = `this_${field.id}_${baseContent}`;
                   if (!groupedItems[key]) {
                     groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'this', days: [] };
@@ -226,7 +228,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               // 2. 익일 예정사항 -> 차주 계획 후보
               tomorrowTasks.forEach(task => {
                 if (task?.content?.trim()) {
-                  const baseContent = task.content.split('-')[0].trim();
+                  const baseContent = task.content.trim();
                   const key = `next_${field.id}_${baseContent}`;
                   if (!groupedItems[key]) {
                     groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', days: [] };
@@ -238,7 +240,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               // 1. 금일 작업 -> 차주 계획 후보
               todayTasks.forEach(task => {
                 if (task?.content?.trim()) {
-                  const baseContent = task.content.split('-')[0].trim();
+                  const baseContent = task.content.trim();
                   const key = `next_${field.id}_${baseContent}`;
                   if (!groupedItems[key]) {
                     groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', days: [] };
