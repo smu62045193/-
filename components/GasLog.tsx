@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GasLogData, GasCheckItem } from '../types';
-import { fetchGasLog, saveGasLog, getInitialGasLog, saveToCache, getFromStorage } from '../services/dataService';
+import { fetchGasLog, saveGasLog, getInitialGasLog } from '../services/dataService';
 import { format } from 'date-fns';
 import LogSheetLayout from './LogSheetLayout';
 
@@ -22,8 +22,7 @@ const GasLog: React.FC<GasLogProps> = ({ currentDate }) => {
     setLoading(true);
     try {
       const fetched = await fetchGasLog(dateKey);
-      const draft = getFromStorage(`GAS_LOG_DRAFT_${dateKey}`, true);
-      setData(draft || fetched || getInitialGasLog(dateKey));
+      setData(fetched || getInitialGasLog(dateKey));
     } catch (e) {
       console.error(e);
       setData(getInitialGasLog(dateKey));
@@ -39,7 +38,6 @@ const GasLog: React.FC<GasLogProps> = ({ currentDate }) => {
     );
     const newData = { ...data, items: newItems };
     setData(newData);
-    saveToCache(`GAS_LOG_DRAFT_${dateKey}`, newData, true);
   };
 
   const toggleResult = (item: GasCheckItem) => {

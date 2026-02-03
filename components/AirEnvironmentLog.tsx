@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { AirEnvironmentLogData, AirEmissionItem, AirPreventionItem, WeatherData } from '../types';
-import { fetchAirEnvironmentLog, saveAirEnvironmentLog, getInitialAirEnvironmentLog, fetchHvacLog, fetchBoilerLog, saveToCache } from '../services/dataService';
+import { fetchAirEnvironmentLog, saveAirEnvironmentLog, getInitialAirEnvironmentLog, fetchHvacLog, fetchBoilerLog } from '../services/dataService';
 import { fetchWeatherInfo } from '../services/geminiService';
 import { format } from 'date-fns';
 import { RefreshCw, Printer } from 'lucide-react';
@@ -32,44 +32,57 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       ]);
 
       const newData = { ...currentData };
-      let hasAnyChange = false;
-
-      // --- 냉온수기 (1호기 & 2호기) 처리 개선 ---
-      const hvacRun = hvacData?.hvacLogs?.[0]?.runTime || '';
       
-      // 사용량 계산 보완: (금일지침 - 전일지침)
+      // 고정 명칭 강제 설정 (항상 같은 폼 유지)
+      newData.emissions[0].facilityName = '냉온수기1호기';
+      newData.emissions[0].outletNo = '1';
+      newData.emissions[1].facilityName = '냉온수기2호기';
+      newData.emissions[1].outletNo = '2';
+      newData.emissions[2].facilityName = '보일러';
+      newData.emissions[2].outletNo = '3';
+
+      newData.preventions[0].facilityName = '냉,온수기1호기';
+      newData.preventions[0].location = '기계실';
+      newData.preventions[0].pollutants = 'SOX, NOX, 먼지';
+      newData.preventions[1].facilityName = '냉,온수기2호기';
+      newData.preventions[1].location = '기계실';
+      newData.preventions[1].pollutants = 'SOX, NOX, 먼지';
+      newData.preventions[2].facilityName = '보일러';
+      newData.preventions[2].location = '기계실';
+      newData.preventions[2].pollutants = 'SOX, NOX, 먼지';
+
+      // 가동시간 및 사용량 데이터 연동
+      const hvacRun = hvacData?.hvacLogs?.[0]?.runTime || '';
       const hCurr = parseFloat(String(hvacData?.gas?.curr || '0').replace(/,/g, '')) || 0;
       const hPrev = parseFloat(String(hvacData?.gas?.prev || '0').replace(/,/g, '')) || 0;
-      const hvacGasUsage = Math.max(0, hCurr - hPrev).toString();
-      const hvacGas = roundValue(hvacGasUsage);
+      const hvacGas = roundValue(Math.max(0, hCurr - hPrev).toString());
       
       const unit = hvacData?.unitNo || '';
       const isActuallyRunning = hvacRun && hvacRun.trim() !== '' && hvacRun.trim() !== '~';
 
-      // 1호기 업데이트 로직
+      // 1호기 업데이트
       if (unit === '1' && isActuallyRunning) {
         newData.emissions[0].runTime = hvacRun;
         newData.emissions[0].remarks = '정상';
         newData.preventions[0].gasUsage = hvacGas;
       } else {
-        newData.emissions[0].runTime = unit === '1' ? hvacRun : '';
+        newData.emissions[0].runTime = '';
         newData.emissions[0].remarks = '운휴';
-        newData.preventions[0].gasUsage = unit === '1' ? hvacGas : '0';
+        newData.preventions[0].gasUsage = '0';
       }
 
-      // 2호기 업데이트 로직
+      // 2호기 업데이트
       if (unit === '2' && isActuallyRunning) {
         newData.emissions[1].runTime = hvacRun;
         newData.emissions[1].remarks = '정상';
         newData.preventions[1].gasUsage = hvacGas;
       } else {
-        newData.emissions[1].runTime = unit === '2' ? hvacRun : '';
+        newData.emissions[1].runTime = '';
         newData.emissions[1].remarks = '운휴';
-        newData.preventions[1].gasUsage = unit === '2' ? hvacGas : '0';
+        newData.preventions[1].gasUsage = '0';
       }
-      hasAnyChange = true;
 
-      // --- 보일러 처리 ---
+      // 보일러 업데이트
       if (boilerData && boilerData.logs) {
         const boilerRunTimes = boilerData.logs
           .map(log => log.runTime)
@@ -77,24 +90,16 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
           .join(', ');
           
         const isBoilerRunning = boilerRunTimes && boilerRunTimes.trim() !== '';
-        
         newData.emissions[2].runTime = boilerRunTimes || '';
         newData.emissions[2].remarks = isBoilerRunning ? '정상' : '운휴';
         
-        // 보일러 사용량 계산 보완: (금일지침 - 전일지침)
         const bCurr = parseFloat(String(boilerData.gas?.curr || '0').replace(/,/g, '')) || 0;
         const bPrev = parseFloat(String(boilerData.gas?.prev || '0').replace(/,/g, '')) || 0;
-        const boilerGasUsage = Math.max(0, bCurr - bPrev).toString();
-        newData.preventions[2].gasUsage = roundValue(boilerGasUsage);
-        
-        hasAnyChange = true;
+        newData.preventions[2].gasUsage = roundValue(Math.max(0, bCurr - bPrev).toString());
       }
 
-      if (hasAnyChange) {
-        setData(newData);
-        return true;
-      }
-      return false;
+      setData(newData);
+      return true;
     } catch (err) {
       console.error("Sync failed", err);
       return false;
@@ -108,7 +113,23 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       const initialData = getInitialAirEnvironmentLog(dateKey);
       
       if (fetched) {
-        setData(fetched);
+        // DB에서 가져온 데이터라도 시설 명칭 등은 강제로 최신 양식 적용
+        const fixedData = {
+          ...fetched,
+          emissions: fetched.emissions.map((item, idx) => ({
+            ...item,
+            outletNo: (idx + 1).toString(),
+            facilityName: idx === 0 ? '냉온수기1호기' : idx === 1 ? '냉온수기2호기' : '보일러',
+            remarks: (item.runTime && item.runTime.trim() !== '' && item.runTime.trim() !== '~') ? '정상' : '운휴'
+          })),
+          preventions: fetched.preventions.map((item, idx) => ({
+            ...item,
+            facilityName: idx === 0 ? '냉,온수기1호기' : idx === 1 ? '냉,온수기2호기' : '보일러',
+            location: '기계실',
+            pollutants: 'SOX, NOX, 먼지'
+          }))
+        };
+        setData(fixedData);
       } else {
         setData(initialData);
         await syncFromMechanical(initialData);
@@ -123,7 +144,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
 
   const loadWeather = async () => {
     try {
-      const w = await fetchWeatherInfo(dateKey, false, "17:00");
+      const w = await fetchWeatherInfo(dateKey, false, "09:00");
       setWeather(w);
     } catch (e) {
       console.error("Failed to load weather", e);
@@ -134,12 +155,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     loadData();
     loadWeather();
   }, [dateKey]);
-
-  useEffect(() => {
-    if (!loading && data) {
-      saveToCache(`AIR_ENV_${dateKey}`, data, true);
-    }
-  }, [data, dateKey, loading]);
 
   const handleSyncData = async () => {
     setSyncing(true);
@@ -304,23 +319,10 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     printWindow.document.close();
   };
 
-  const updateEmissionItem = (id: string, field: keyof AirEmissionItem, value: string) => {
-    const newEmissions = data.emissions.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
-    );
-    setData({ ...data, emissions: newEmissions });
-  };
-
-  const updatePreventionItem = (id: string, field: keyof AirPreventionItem, value: string) => {
-    const newPreventions = data.preventions.map(item => 
-      item.id === id ? { ...item, [field]: value } : item
-    );
-    setData({ ...data, preventions: newPreventions });
-  };
-
+  const labelDivClass = "w-full h-full flex items-center justify-center text-sm font-bold text-slate-800 bg-white";
+  const dataDivClass = "w-full h-full flex items-center justify-center text-sm font-black text-blue-700 bg-white";
   const thClass = "border border-gray-300 bg-gray-50 p-2 font-bold text-center align-middle text-sm h-10 text-gray-700";
-  const tdClass = "border border-gray-300 p-0 h-10 relative bg-white"; 
-  const inputClass = "w-full h-full text-center outline-none bg-white text-black p-1 text-sm font-medium focus:bg-blue-50";
+  const tdClass = "border border-gray-300 p-0 h-10 relative bg-white";
 
   const syncButton = (
     <button 
@@ -352,9 +354,9 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
                 {data?.emissions?.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className={`${tdClass} font-bold text-gray-500 bg-gray-50/20`}>{item.outletNo}</td>
-                    <td className={`${tdClass} font-bold`}><input type="text" className={inputClass} value={item.facilityName} onChange={(e) => updateEmissionItem(item.id, 'facilityName', e.target.value)} /></td>
-                    <td className={tdClass}><div className="flex items-center justify-center h-full px-4"><input type="text" className={`${inputClass} text-center font-bold text-blue-700`} value={item.runTime} onChange={(e) => updateEmissionItem(item.id, 'runTime', e.target.value)} placeholder="~" /></div></td>
-                    <td className={tdClass}><input type="text" className={inputClass} value={item.remarks} onChange={(e) => updateEmissionItem(item.id, 'remarks', e.target.value)} /></td>
+                    <td className={tdClass}><div className={labelDivClass}>{item.facilityName}</div></td>
+                    <td className={tdClass}><div className={dataDivClass}>{item.runTime || '-'}</div></td>
+                    <td className={tdClass}><div className={`${labelDivClass} ${item.remarks === '정상' ? 'text-blue-600' : 'text-slate-400'}`}>{item.remarks || '운휴'}</div></td>
                   </tr>
                 ))}
               </tbody>
@@ -371,10 +373,10 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
               <tbody>
                 {data?.preventions?.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className={`${tdClass} font-medium`}><input type="text" className={inputClass} value={item.facilityName} onChange={(e) => updatePreventionItem(item.id, 'facilityName', e.target.value)} /></td>
-                    <td className={`${tdClass} font-medium`}><input type="text" className={inputClass} value={item.location} onChange={(e) => updatePreventionItem(item.id, 'location', e.target.value)} /></td>
-                    <td className={tdClass}><div className="flex items-center justify-center h-full relative pr-8"><input type="text" className={`${inputClass} text-right font-black pr-1 text-blue-700`} value={roundValue(item.gasUsage)} onChange={(e) => updatePreventionItem(item.id, 'gasUsage', e.target.value)} onBlur={(e) => updatePreventionItem(item.id, 'gasUsage', roundValue(e.target.value))} /><span className="ml-1 text-xs font-bold text-gray-400">㎥</span></div></td>
-                    <td className={`${tdClass} font-medium px-2`}><input type="text" className={inputClass} value={item.pollutants} onChange={(e) => updatePreventionItem(item.id, 'pollutants', e.target.value)} /></td>
+                    <td className={tdClass}><div className={labelDivClass}>{item.facilityName}</div></td>
+                    <td className={tdClass}><div className={labelDivClass}>{item.location}</div></td>
+                    <td className={tdClass}><div className={`${dataDivClass} justify-end pr-8`}>{roundValue(item.gasUsage)} <span className="ml-1 text-xs font-bold text-gray-400">㎥</span></div></td>
+                    <td className={tdClass}><div className={labelDivClass}>{item.pollutants}</div></td>
                   </tr>
                 ))}
               </tbody>

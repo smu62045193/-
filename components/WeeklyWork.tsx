@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { startOfWeek, addDays, format, subDays, parseISO, isWithinInterval } from 'date-fns';
 import { HOLIDAYS } from '../constants';
 import { fetchWeeklyReport, saveWeeklyReport, fetchDateRangeData, fetchExternalWorkList, fetchInternalWorkList } from '../services/dataService';
-import { WeeklyReportData, WeeklyWorkPhoto, TaskItem, ConstructionWorkItem, WorkPhoto } from '../types';
+import { WeeklyReportData, WeeklyWorkPhoto, TaskItem, ConstructionWorkItem, WorkPhoto, LogCategory, WorkLogData } from '../types';
 import { Printer, Save, Upload, X, RefreshCw, Plus, CheckSquare, Square, CheckCircle2, Calendar, Image as ImageIcon, Sparkles, LayoutList, ClipboardEdit, Cloud, CheckCircle } from 'lucide-react';
 import WeeklyReportList from './WeeklyReportList';
 import { 
@@ -184,10 +184,10 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
         elevator: getAutomatedElevatorTasks,
         parking: getAutomatedParkingTasks,
         security: getAutomatedSecurityTasks,
-        cleaning: getAutomatedCleaningTasks
+        cleaning: getAutomatedCleaningTasks,
+        handover: () => []
       };
 
-      // 동일 항목 그룹화를 위한 맵
       const groupedItems: Record<string, { content: string, fieldKey: string, weekType: 'this' | 'next', days: number[] }> = {};
 
       const processWeek = (logs: any[], weekType: 'this' | 'next', weekStartDate: Date) => {
@@ -198,28 +198,54 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           const dayData = logs.find(l => l.key === `DAILY_${dateKey}`);
           
           FIELDS.forEach(field => {
-            let tasks: TaskItem[] = [];
+            let todayTasks: TaskItem[] = [];
+            let tomorrowTasks: TaskItem[] = [];
+
             if (dayData?.data?.workLog) {
-              tasks = (dayData.data.workLog[field.id]?.today || []) as TaskItem[];
+              const logCat = (dayData.data.workLog[field.id as keyof WorkLogData] || { today: [], tomorrow: [] }) as LogCategory;
+              todayTasks = (logCat.today || []) as TaskItem[];
+              tomorrowTasks = (logCat.tomorrow || []) as TaskItem[];
             } else if (automationMap[field.id]) {
-              tasks = automationMap[field.id](dateKey);
+              todayTasks = automationMap[field.id](dateKey);
             }
 
-            tasks.forEach(task => {
-              if (task?.content?.trim()) {
-                const fullContent = task.content.trim();
-                // 핵심: 하이픈(-) 기호를 기준으로 앞부분만 추출하여 그룹화 키로 사용
-                const baseContent = fullContent.split('-')[0].trim();
-                
-                const key = `${weekType}_${field.id}_${baseContent}`;
-                if (!groupedItems[key]) {
-                  groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType, days: [] };
+            // 이번 주 데이터 처리 시:
+            if (weekType === 'this') {
+              // 1. 금일 작업 -> 금주 실적 후보
+              todayTasks.forEach(task => {
+                if (task?.content?.trim()) {
+                  const baseContent = task.content.split('-')[0].trim();
+                  const key = `this_${field.id}_${baseContent}`;
+                  if (!groupedItems[key]) {
+                    groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'this', days: [] };
+                  }
+                  if (!groupedItems[key].days.includes(dayNum)) groupedItems[key].days.push(dayNum);
                 }
-                if (!groupedItems[key].days.includes(dayNum)) {
-                  groupedItems[key].days.push(dayNum);
+              });
+              
+              // 2. 익일 예정사항 -> 차주 계획 후보
+              tomorrowTasks.forEach(task => {
+                if (task?.content?.trim()) {
+                  const baseContent = task.content.split('-')[0].trim();
+                  const key = `next_${field.id}_${baseContent}`;
+                  if (!groupedItems[key]) {
+                    groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', days: [] };
+                  }
                 }
-              }
-            });
+              });
+            } else {
+              // 다음 주 데이터 처리 시:
+              // 1. 금일 작업 -> 차주 계획 후보
+              todayTasks.forEach(task => {
+                if (task?.content?.trim()) {
+                  const baseContent = task.content.split('-')[0].trim();
+                  const key = `next_${field.id}_${baseContent}`;
+                  if (!groupedItems[key]) {
+                    groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', days: [] };
+                  }
+                }
+              });
+            }
           });
         }
       };
@@ -304,7 +330,6 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       
       const formatGroup = (items: SelectableItem[], isThis: boolean) => {
         return items.map(it => {
-          // 사용자 요청: 금주 실적에만 날짜 범위를 붙이고, 차주 계획에는 날짜를 제외
           const dateSuffix = (isThis && it.dayName) ? `(${it.dayName})` : '';
           return `- ${it.content}${dateSuffix}`;
         }).join('\n');
@@ -370,8 +395,6 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       for (let i = 0; i < rowCount; i++) {
         const isFirst = i === 0;
         const isLast = i === rowCount - 1;
-        // 항목 사이의 가로선을 제거하되 카테고리 간의 경계는 유지
-        // padding을 2px로 줄여 행 간격을 좁힘
         const borderStyle = (isLast ? '' : 'border-bottom:none !important;') + (isFirst ? '' : 'border-top:none !important;');
         
         categoryRows += `
@@ -572,7 +595,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                       if(its.length===0) return null; 
                       return (
                         <div key={f.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                          <strong>{f.label}</strong>
+                          <strong className="text-slate-700">{f.label}</strong>
                           <div className="mt-3 space-y-1.5">
                             {its.map(it => (
                               <div key={it.id} onClick={() => toggleSelectItem(it.id)} className="flex gap-2 cursor-pointer text-[13px] group hover:text-blue-600 transition-colors">

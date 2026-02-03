@@ -41,7 +41,7 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
   const targetDate = startOfDay(parseISO(dateStr));
   const today = startOfDay(new Date());
   
-  const storageKey = `weather_v5_${dateStr}_${time.replace(':', '')}`;
+  const storageKey = `weather_v6_${dateStr}_${time.replace(':', '')}`;
 
   const isNearToday = isWithinInterval(targetDate, {
     start: subDays(today, 14),
@@ -73,13 +73,15 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
       if (!apiKey) return getSeasonalMockWeather(dateStr);
 
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `Provide the weather for Seoul, South Korea on ${dateStr} at exactly ${time}. 
-      The "condition" field MUST be in Korean language (text only, no emoji). Return JSON.`;
+      // 구체화된 검색 명령 프롬프트 적용
+      const prompt = `네이버 날씨 정보를 검색해서 그 수치를 알려줘. 서울 ${dateStr} ${time} 기준 날씨 정보를 정확히 제공해줘. 
+      결과 데이터 중 "condition" 필드는 반드시 한글 텍스트(예: 맑음, 흐림)여야 합니다. JSON 형식으로 반환하세요.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
+          tools: [{ googleSearch: {} }], // 검색 그라운딩 도구 사용
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -96,6 +98,17 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
       });
 
       const weatherData = JSON.parse(response.text || '{}') as WeatherData;
+      
+      // 검색 출처 URL 추출 (그라운딩 메타데이터 활용)
+      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      if (groundingChunks && groundingChunks.length > 0) {
+        const source = groundingChunks[0].web;
+        if (source) {
+          weatherData.sourceUrl = source.uri;
+          weatherData.sourceTitle = source.title;
+        }
+      }
+
       if (!weatherData.condition) return getSeasonalMockWeather(dateStr);
 
       weatherCache.set(storageKey, weatherData);

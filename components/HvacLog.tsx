@@ -4,15 +4,12 @@ import { HvacLogData, HvacLogItem, BoilerLogData, BoilerLogItem } from '../types
 import { 
   getInitialHvacLog, 
   getInitialBoilerLog, 
-  saveToCache, 
-  getFromStorage, 
   fetchDailyData, 
   saveDailyData, 
-  clearCache, 
   apiFetchBatch,
   saveHvacBoilerCombined
 } from '../services/dataService';
-import { format, startOfMonth, differenceInDays, subDays, parseISO } from 'date-fns';
+import { format, subDays, parseISO } from 'date-fns';
 import LogSheetLayout from './LogSheetLayout';
 
 interface HvacLogProps {
@@ -76,23 +73,16 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
     setSaveStatus('idle');
     isInitialLoad.current = true;
 
-    if (force) {
-      clearCache(`HVAC_LOG_${dateKey}`);
-      clearCache(`BOILER_LOG_${dateKey}`);
-    }
-
     try {
       const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
       const searchStart = format(subDays(currentDate, 14), 'yyyy-MM-dd');
 
-      // HVAC_BOILER_ 통합 키로 조회하도록 수정 (정확한 매핑 보장)
       const batchResults = await apiFetchBatch([
         { type: 'get', key: `HVAC_BOILER_${dateKey}` },
         { type: 'range', prefix: "HVAC_LOG_", start: searchStart, end: yesterdayStr },
         { type: 'range', prefix: "BOILER_LOG_", start: searchStart, end: yesterdayStr }
       ]);
       
-      // 통합 데이터에서 hvac 및 boiler 데이터 추출
       const combinedRow = batchResults[0]?.data;
       const hvacFromServer = combinedRow?.hvac_data as HvacLogData;
       const boilerFromServer = combinedRow?.boiler_data as BoilerLogData;
@@ -100,12 +90,8 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
       const recentHvacLogs = batchResults[1]?.data || [];
       const recentBoilerLogs = batchResults[2]?.data || [];
 
-      // 서버 데이터가 존재하면 최우선으로 사용, 없을 경우 로컬 캐시 확인
-      const cachedHvac = getFromStorage(`HVAC_LOG_${dateKey}`);
-      const cachedBoiler = getFromStorage(`BOILER_LOG_${dateKey}`);
-
-      let finalHvac = hvacFromServer || cachedHvac || getInitialHvacLog(dateKey);
-      let finalBoiler = boilerFromServer || cachedBoiler || getInitialBoilerLog(dateKey);
+      let finalHvac = hvacFromServer || getInitialHvacLog(dateKey);
+      let finalBoiler = boilerFromServer || getInitialBoilerLog(dateKey);
 
       if (finalBoiler.logs.length < 3) {
         const initial = getInitialBoilerLog(dateKey);
@@ -118,7 +104,6 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
       let hBase = 0;
       let bBase = 0;
 
-      // 냉온수기 전일 누계 합산 (같은 달 안에서만)
       if (recentHvacLogs.length > 0) {
         recentHvacLogs.sort((a: any, b: any) => b.key.localeCompare(a.key));
         const latest = recentHvacLogs[0];
@@ -139,7 +124,6 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
         }
       }
 
-      // 보일러 전일 누계 합산 (같은 달 안에서만)
       if (recentBoilerLogs.length > 0) {
         recentBoilerLogs.sort((a: any, b: any) => b.key.localeCompare(a.key));
         const latest = recentBoilerLogs[0];
@@ -215,12 +199,6 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
   }, [dateKey, currentDate]);
 
   useEffect(() => { loadData(); }, [loadData]);
-
-  useEffect(() => {
-    if (isInitialLoad.current || loading) return;
-    saveToCache(`HVAC_LOG_${dateKey}`, data);
-    saveToCache(`BOILER_LOG_${dateKey}`, boilerData);
-  }, [data, boilerData, dateKey, loading]);
 
   const handleManualSave = async () => {
     if (saveStatus === 'loading') return;

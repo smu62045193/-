@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { SepticLogData, SepticCheckItem } from '../types';
-import { fetchSepticLog, saveSepticLog, getInitialSepticLog, saveToCache, getFromStorage } from '../services/dataService';
+import { fetchSepticLog, saveSepticLog, getInitialSepticLog } from '../services/dataService';
 import { format } from 'date-fns';
 import LogSheetLayout from './LogSheetLayout';
 
@@ -22,8 +22,7 @@ const SepticLog: React.FC<SepticLogProps> = ({ currentDate }) => {
     setLoading(true);
     try {
       const fetched = await fetchSepticLog(dateKey);
-      const draft = getFromStorage(`SEPTIC_LOG_DRAFT_${dateKey}`, true);
-      setData(draft || fetched || getInitialSepticLog(dateKey));
+      setData(fetched || getInitialSepticLog(dateKey));
     } catch (e) {
       console.error(e);
       setData(getInitialSepticLog(dateKey));
@@ -39,7 +38,6 @@ const SepticLog: React.FC<SepticLogProps> = ({ currentDate }) => {
     );
     const newData = { ...data, items: newItems };
     setData(newData);
-    saveToCache(`SEPTIC_LOG_DRAFT_${dateKey}`, newData, true);
   };
 
   const toggleResult = (item: SepticCheckItem) => {

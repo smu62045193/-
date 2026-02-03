@@ -1,7 +1,7 @@
 
 import { format, startOfMonth, subDays } from 'date-fns';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { apiFetchRange, clearCache, deepMerge, fetchDailyData, fetchSubstationLog, getFromStorage, getInitialSubstationLog, saveDailyData, saveSubstationLog, saveToCache } from '../services/dataService';
+import { apiFetchRange, fetchDailyData, fetchSubstationLog, getInitialSubstationLog, saveDailyData, saveSubstationLog } from '../services/dataService';
 import { AcbReadings, PowerUsageReadings, SubstationLogData, VcbReadings } from '../types';
 import LogSheetLayout from './LogSheetLayout';
 
@@ -46,7 +46,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
 
     if (!powerUsage?.usage || !dailyStats) return newData;
 
-    // 장비 교체 여부 확인 (어느 하나라도 사용량이 빈칸이면 교체 상황으로 간주)
     const isEquipmentReplaced = 
       powerUsage.usage.activeMid === '' || 
       powerUsage.usage.activeMax === '' || 
@@ -57,7 +56,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     if (isEquipmentReplaced) {
       dailyStats.activePower = '';
       dailyStats.reactivePower = '';
-      dailyStats.monthTotal = Math.round(hSum).toString(); // 전일 누계치만 표시
+      dailyStats.monthTotal = Math.round(hSum).toString();
       dailyStats.maxPower = '';
       dailyStats.powerFactor = '';
       dailyStats.loadFactor = '';
@@ -68,10 +67,12 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     const activeMid = safeParseFloat(powerUsage.usage.activeMid);
     const activeMax = safeParseFloat(powerUsage.usage.activeMax);
     const activeLight = safeParseFloat(powerUsage.usage.activeLight);
+    // Added const declaration to fix 'Cannot find name totalActive' error
     const totalActive = activeMid + activeMax + activeLight;
 
     const reactiveMid = safeParseFloat(powerUsage.usage.reactiveMid);
     const reactiveMax = safeParseFloat(powerUsage.usage.reactiveMax);
+    // Added const declaration to fix 'Cannot find name totalReactive' error
     const totalReactive = reactiveMid + reactiveMax;
 
     dailyStats.activePower = totalActive.toString();
@@ -111,8 +112,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     isInitialLoad.current = true;
     setSaveStatus('idle');
 
-    if (force) clearCache(`SUB_LOG_${dateKey}`);
-
     try {
       const monthStart = startOfMonth(currentDate);
       const monthStartStr = format(monthStart, 'yyyy-MM-dd');
@@ -130,28 +129,20 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       historySumRef.current = hSum;
 
       const fetched = await fetchSubstationLog(dateKey, force);
-      const cachedDraft = getFromStorage(`SUB_LOG_${dateKey}`, true);
-      
-      let baseData = fetched || getInitialSubstationLog(dateKey);
-      let finalData: SubstationLogData = cachedDraft ? deepMerge(baseData, cachedDraft) : baseData;
+      let finalData: SubstationLogData = fetched || getInitialSubstationLog(dateKey);
 
       const isPrevEmpty = !finalData.powerUsage.prev?.activeMid || finalData.powerUsage.prev.activeMid === '0' || finalData.powerUsage.prev.activeMid === '';
       
       if (isPrevEmpty) {
-          const yesterdaySubDraft = getFromStorage(`SUB_LOG_${yesterdayStr}`, true);
-          if (yesterdaySubDraft?.powerUsage?.curr && yesterdaySubDraft.powerUsage.curr.activeMid !== '') {
-            finalData.powerUsage.prev = { ...yesterdaySubDraft.powerUsage.curr };
-          } else {
-            const searchStart = format(subDays(currentDate, 30), 'yyyy-MM-dd');
-            const recentLogs = await apiFetchRange("SUB_LOG_", searchStart, yesterdayStr);
+          const searchStart = format(subDays(currentDate, 30), 'yyyy-MM-dd');
+          const recentLogs = await apiFetchRange("SUB_LOG_", searchStart, yesterdayStr);
+          
+          if (recentLogs.length > 0) {
+            recentLogs.sort((a, b) => b.key.localeCompare(a.key));
+            const latestLog = recentLogs[0].data;
             
-            if (recentLogs.length > 0) {
-              recentLogs.sort((a, b) => b.key.localeCompare(a.key));
-              const latestLog = recentLogs[0].data;
-              
-              if (latestLog?.powerUsage?.curr && latestLog.powerUsage.curr.activeMid !== '') {
-                finalData.powerUsage.prev = { ...latestLog.powerUsage.curr };
-              }
+            if (latestLog?.powerUsage?.curr && latestLog.powerUsage.curr.activeMid !== '') {
+              finalData.powerUsage.prev = { ...latestLog.powerUsage.curr };
             }
           }
       }
@@ -163,7 +154,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             const c = safeParseFloat(finalData.powerUsage.curr[field]);
             if (c > 0) {
               if (c < p) {
-                finalData.powerUsage.usage[field] = ''; // 장비 교체 시 빈칸 처리
+                finalData.powerUsage.usage[field] = '';
               } else {
                 finalData.powerUsage.usage[field] = Math.round((c - p) * 1200).toString();
               }
@@ -184,11 +175,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   }, [dateKey, currentDate, calculateDailyAnalysis]);
 
   useEffect(() => { loadData(false); }, [dateKey]);
-
-  useEffect(() => {
-    if (isInitialLoad.current || loading) return;
-    saveToCache(`SUB_LOG_${dateKey}`, data, true);
-  }, [data, dateKey, loading]);
 
   const handleSave = async () => {
     if (saveStatus === 'loading') return;
@@ -252,7 +238,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
           const c = safeParseFloat(next.powerUsage.curr[field]);
           if (c > 0) {
             if (c < p) {
-              next.powerUsage.usage[field] = ''; // 장비 교체 시 빈칸 처리
+              next.powerUsage.usage[field] = '';
             } else {
               next.powerUsage.usage[field] = Math.round((c - p) * 1200).toString();
             }

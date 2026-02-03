@@ -346,10 +346,10 @@ export const apiFetchRange = async (prefix: string, start: string, end: string):
  * 단일 키 기반 데이터 라우팅 함수 (Batch Get용)
  */
 const fetchSingleGeneric = async (key: string): Promise<any> => {
-  if (key.startsWith("DAILY_")) return await fetchDailyData(key.replace("DAILY_", ""));
+  if (key.startsWith("DAILY_")) return await fetchDailyData(key.replace("DAILY_", ""), true);
   if (key.startsWith("GAS_LOG_")) return await fetchGasLog(key.replace("GAS_LOG_", ""));
   if (key.startsWith("SEPTIC_LOG_")) return await fetchSepticLog(key.replace("SEPTIC_LOG_", ""));
-  if (key.startsWith("SUB_LOG_")) return await fetchSubstationLog(key.replace("SUB_LOG_", ""));
+  if (key.startsWith("SUB_LOG_")) return await fetchSubstationLog(key.replace("SUB_LOG_", ""), true);
   if (key.startsWith("SUB_CHECK_")) return await fetchSubstationChecklist(key.replace("SUB_CHECK_", ""));
   if (key.startsWith("FIRE_FAC_")) return await fetchFireFacilityLog(key.replace("FIRE_FAC_", ""));
   if (key.startsWith("ELEV_LOG_")) return await fetchElevatorLog(key.replace("ELEV_LOG_", ""));
@@ -453,7 +453,6 @@ export const getInitialElevatorLog = (date: string): ElevatorLogData => ({
     { id: 'elv_2', category: '운행상태', content: '카내조명상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
     { id: 'elv_3', category: '운행상태', content: '카도어개폐상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
     { id: 'elv_4', category: '운행상태', content: '카레벨상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
-    // Fixed Type Error: Changed incorrect property 'ss' to 'ev3' as per ElevatorLogItem definition in types.ts
     { id: 'elv_5', category: '운행상태', content: '카운행상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
     { id: 'elv_6', category: '운행상태', content: '감시반이상유무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
     { id: 'elv_7', category: '운행상태', content: '기계실이상유무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' }
@@ -590,17 +589,20 @@ export const getInitialBoilerLog = (date: string): BoilerLogData => ({
   cleaner: { prevStock: '', inQty: '', usedQty: '', stock: '' }
 });
 
+/**
+ * Fix: Kept this definition and removed the duplicate at the end of the file.
+ */
 export const getInitialAirEnvironmentLog = (date: string): AirEnvironmentLogData => ({
   date,
   emissions: [
-    { id: '1', outletNo: '1호', facilityName: '흡수식 냉온수기 1호기', runTime: '', remarks: '' },
-    { id: '2', outletNo: '2호', facilityName: '흡수식 냉온수기 2호기', runTime: '', remarks: '' },
-    { id: '3', outletNo: '3호', facilityName: '노통연관식보일러', runTime: '', remarks: '' }
+    { id: '1', outletNo: '1', facilityName: '냉온수기1호기', runTime: '', remarks: '' },
+    { id: '2', outletNo: '2', facilityName: '냉온수기2호기', runTime: '', remarks: '' },
+    { id: '3', outletNo: '3', facilityName: '보일러', runTime: '', remarks: '' }
   ],
   preventions: [
-    { id: '1', facilityName: '저녹스버너(냉온수기1)', location: '기계실', gasUsage: '', pollutants: '질소산화물' },
-    { id: '2', facilityName: '저녹스버너(냉온수기2)', location: '기계실', gasUsage: '', pollutants: '질소산화물' },
-    { id: '3', facilityName: '저녹스버너(보일러)', location: '기계실', gasUsage: '', pollutants: '질소산화물' }
+    { id: '1', facilityName: '냉,온수기1호기', location: '기계실', gasUsage: '', pollutants: 'SOX, NOX, 먼지' },
+    { id: '2', facilityName: '냉,온수기2호기', location: '기계실', gasUsage: '', pollutants: 'SOX, NOX, 먼지' },
+    { id: '3', facilityName: '보일러', location: '기계실', gasUsage: '', pollutants: 'SOX, NOX, 먼지' }
   ]
 });
 
@@ -689,7 +691,7 @@ export const saveHvacBoilerCombined = async (hvacData: HvacLogData | null, boile
     boiler_data: finalBoiler, 
     last_updated: new Date().toISOString() 
   };
-  const { error } = await supabase.from('hvac_boiler_logs').upsert(dbData);
+  const { error = null } = await supabase.from('hvac_boiler_logs').upsert(dbData);
   return !error;
 };
 
@@ -697,15 +699,11 @@ export const saveHvacBoilerCombined = async (hvacData: HvacLogData | null, boile
  * Data Fetch & Save Functions (Supabase Only)
  */
 export const fetchDailyData = async (date: string, force = false): Promise<DailyData | null> => {
-  if (!force) {
-    const cached = getFromStorage(`DAILY_${date}`);
-    if (cached) return cached;
-  }
+  // 로컬 캐시(임시 데이터) 무시하고 서버에서 무조건 가져오기 위해 상단 캐시 확인 로직 제거
   try {
     const { data } = await supabase.from('daily_reports').select('*').eq('id', date).maybeSingle();
     if (data) {
       const mapped = mapFromDB("DAILY_", data);
-      saveToCache(`DAILY_${date}`, mapped);
       return mapped;
     }
   } catch (e) {}
@@ -714,11 +712,7 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
 
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   const { error } = await supabase.from('daily_reports').upsert({ id: data.date, facility_duty: data.facilityDuty, security_duty: data.securityDuty, utility: data.utility, work_log: data.workLog, last_updated: new Date().toISOString() });
-  if (!error) {
-    saveToCache(`DAILY_${data.date}`, data);
-    return true;
-  }
-  return false;
+  return !error;
 };
 
 export const fetchStaffList = async (): Promise<StaffMember[]> => {
@@ -729,7 +723,7 @@ export const fetchStaffList = async (): Promise<StaffMember[]> => {
       name: s.name, 
       category: s.category, 
       jobTitle: s.job_title || '', // Map DB field to Model property
-      birthDate: s.birth_date || '', 
+      birthDate: s.birth_date || '', // Map DB field to Model property
       joinDate: s.join_date || '', 
       resignDate: s.resign_date || '', 
       phone: s.phone || '', 
@@ -742,6 +736,7 @@ export const fetchStaffList = async (): Promise<StaffMember[]> => {
 };
 
 export const saveStaffList = async (list: StaffMember[]): Promise<boolean> => {
+  // Line 741 fixed: s.birth_date -> s.birthDate
   const dbData = list.map(s => ({ id: s.id, name: s.name, category: s.category, job_title: s.jobTitle, birth_date: s.birthDate, join_date: s.joinDate, resign_date: s.resignDate, phone: s.phone, area: s.area, note: s.note, photo_url: s.photo }));
   const { error } = await supabase.from('staff_members').upsert(dbData);
   return !error;
@@ -963,7 +958,6 @@ export const saveParkingLayout = async (layout: any): Promise<boolean> => {
 export const fetchContractors = async (): Promise<Contractor[]> => {
   try {
     const { data } = await supabase.from('contractors').select('*');
-    // Fix: Map database snake_case fields to interface camelCase fields to resolve type incompatibility
     if (data && data.length > 0) return data.map(c => ({ 
       id: c.id, 
       name: c.name, 
@@ -987,7 +981,6 @@ export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
 export const fetchMeterReading = async (month: string): Promise<MeterReadingData | null> => {
   try {
     const { data } = await supabase.from('meter_readings').select('*').eq('id', `METER_${month}`).maybeSingle();
-    // Fix: Map snake_case database fields to camelCase interface properties to fix TypeScript error.
     if (data) return { 
       month: data.month, 
       unitPrice: data.unit_price, 
@@ -1152,9 +1145,9 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       type: item.type, 
       floor: item.floor, 
       company: item.company, 
-      serial_no: item.serial_no, 
+      serialNo: item.serial_no, 
       phone: item.phone, 
-      cert_no: item.cert_no, 
+      certNo: item.cert_no, 
       date: item.date, 
       remarks: item.remarks 
     }));

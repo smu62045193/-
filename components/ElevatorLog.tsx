@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ElevatorLogData, ElevatorLogItem, ElevatorResult } from '../types';
-import { fetchElevatorLog, saveElevatorLog, getInitialElevatorLog, saveToCache, getFromStorage } from '../services/dataService';
+import { fetchElevatorLog, saveElevatorLog, getInitialElevatorLog } from '../services/dataService';
 import { format } from 'date-fns';
 import LogSheetLayout from './LogSheetLayout';
 
@@ -15,35 +15,20 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate }) => {
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   const [data, setData] = useState<ElevatorLogData>(getInitialElevatorLog(dateKey));
   
-  const isInitialLoad = useRef(true);
-
   useEffect(() => {
-    isInitialLoad.current = true;
     loadData();
   }, [dateKey]);
-
-  useEffect(() => {
-    if (!loading && !isInitialLoad.current && data) {
-      saveToCache(`ELEVATOR_LOG_${dateKey}`, data, true);
-    }
-  }, [data, dateKey, loading]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const fetched = await fetchElevatorLog(dateKey);
-      const draft = getFromStorage(`ELEVATOR_LOG_${dateKey}`, true);
-      
-      const finalData = draft || fetched || getInitialElevatorLog(dateKey);
+      // 로컬 임시 데이터 무시하고 서버 데이터 우선 적용
+      const finalData = fetched || getInitialElevatorLog(dateKey);
       setData(finalData);
-      
-      setTimeout(() => {
-        isInitialLoad.current = false;
-      }, 100);
     } catch (e) {
       console.error(e);
       setData(getInitialElevatorLog(dateKey));
-      isInitialLoad.current = false;
     } finally {
       setLoading(false);
     }
@@ -72,7 +57,6 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate }) => {
       items: prev.items.map(item => {
         if (item.id === itemId) {
           const current = item.results[elevatorKey];
-          // 이미지 요청: 양호 ↔ 불량 토글
           const next: ElevatorResult = current === '양호' ? '불량' : '양호';
           return { ...item, results: { ...item.results, [elevatorKey]: next } };
         }

@@ -8,14 +8,12 @@ import {
   saveSubstationChecklist, 
   getInitialSubstationChecklist, 
   deepMerge, 
-  getFromStorage, 
   saveFireFacilityLog, 
   saveElevatorLog, 
   fetchFireFacilityLog, 
   fetchElevatorLog, 
   getInitialFireFacilityLog, 
   getInitialElevatorLog, 
-  apiFetchRange, 
   fetchGasLog, 
   fetchSepticLog, 
   getInitialGasLog, 
@@ -23,10 +21,6 @@ import {
   saveAirEnvironmentLog,
   saveGasLog,
   saveSepticLog,
-  fetchElevatorInspectionList,
-  saveElevatorInspectionList,
-  fetchFireHistoryList,
-  saveFireHistoryList,
   apiFetchBatch,
   saveSubstationLog,
   saveHvacBoilerCombined,
@@ -39,7 +33,6 @@ import {
   TaskItem, 
   DutyStatus, 
   UtilityUsage, 
-  ConsumableItem, 
   SubstationChecklistData, 
   FireFacilityLogData, 
   ElevatorLogData, 
@@ -303,28 +296,20 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         lastWorkdayLog = recentLogs[0]?.data;
       }
       
-      const draftData = getFromStorage(`DAILY_${dateKey}`, true);
       const rawWorkLog = serverDataResult?.workLog || INITIAL_WORKLOG;
       const yesterdayFullLog = lastWorkdayLog?.workLog;
       const currentScheduled = Array.isArray(rawWorkLog?.scheduled) ? rawWorkLog.scheduled : [];
       
       let finalWorkLog: WorkLogData = deepMerge(INITIAL_WORKLOG, { ...rawWorkLog, scheduled: currentScheduled });
-      
-      if (draftData && draftData.workLog) {
-        finalWorkLog = deepMerge(finalWorkLog, draftData.workLog);
-      }
 
-      // [수정] 어제의 재고를 자동으로 가져옵니다. (현재 입력된 전일 재고값이 없는 경우)
+      // 어제의 재고 자동 가져오기 로직
       if (yesterdayFullLog?.mechanicalChemicals) {
         if (!finalWorkLog.mechanicalChemicals) {
           finalWorkLog.mechanicalChemicals = { ...INITIAL_CHEMICALS };
         }
-        
-        // 하위 객체 존재 여부 보장
         if (!finalWorkLog.mechanicalChemicals.seed) finalWorkLog.mechanicalChemicals.seed = { prev: '', incoming: '', used: '', stock: '' };
         if (!finalWorkLog.mechanicalChemicals.sterilizer) finalWorkLog.mechanicalChemicals.sterilizer = { prev: '', incoming: '', used: '', stock: '' };
 
-        // 오늘 전일재고(prev)가 입력되지 않은 경우에만 어제의 최종재고(stock)를 가져옵니다.
         if (!finalWorkLog.mechanicalChemicals.seed.prev && yesterdayFullLog.mechanicalChemicals.seed?.stock) {
           finalWorkLog.mechanicalChemicals.seed.prev = yesterdayFullLog.mechanicalChemicals.seed.stock;
         }
@@ -365,7 +350,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       categories.forEach((key) => {
         let cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
         
-        // [수정 사항] 서버 저장 여부와 상관없이, 해당 리스트가 비어있다면 자동화 항목을 다시 채워주도록 변경
         if (!cat.today || cat.today.length === 0) {
           cat.today = automationMap[key] ? automationMap[key](dateKey) : [];
         }
@@ -396,9 +380,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       });
 
       setLogData(finalWorkLog);
-      setFacilityDuty(draftData?.facilityDuty || serverDataResult?.facilityDuty || DEFAULT_DUTY);
-      setSecurityDuty(draftData?.securityDuty || serverDataResult?.securityDuty || DEFAULT_DUTY);
-      setUtility(draftData?.utility || serverDataResult?.utility || DEFAULT_UTILITY);
+      setFacilityDuty(serverDataResult?.facilityDuty || DEFAULT_DUTY);
+      setSecurityDuty(serverDataResult?.securityDuty || DEFAULT_DUTY);
+      setUtility(serverDataResult?.utility || DEFAULT_UTILITY);
       
       fetchWeatherInfo(dateKey).then(w => { if (w) setWeather(w); });
 
@@ -431,36 +415,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           saveSepticLog(septicLog)
         ]);
       }
-
-      const fireDraft = getFromStorage(`FIRE_FACILITY_LOG_${dateKey}`, true);
-      const elevatorDraft = getFromStorage(`ELEVATOR_LOG_${dateKey}`, true);
-      const checklistDraft = getFromStorage(`SUB_CHECK_${dateKey}`, true);
-      const airEnvDraft = getFromStorage(`AIR_ENV_${dateKey}`, true);
-      const hvacDraft = getFromStorage(`HVAC_LOG_${dateKey}`, true);
-      const boilerDraft = getFromStorage(`BOILER_LOG_${dateKey}`, true);
-      const substationLogDraft = getFromStorage(`SUB_LOG_${dateKey}`, true);
-      
-      // 기계설비 통합 저장 처리
-      let hvacToSave = hvacDraft;
-      let boilerToSave = boilerDraft;
-      
-      // 만약 하나가 비어있으면 서버에서 가져와서 보완 (동시 저장 로직 준수)
-      if (hvacToSave || boilerToSave) {
-        if (!hvacToSave || !boilerToSave) {
-          const { data: existing } = await supabase.from('hvac_boiler_logs').select('*').eq('id', `HVAC_BOILER_${dateKey}`).maybeSingle();
-          if (!hvacToSave) hvacToSave = existing?.hvac_data;
-          if (!boilerToSave) boilerToSave = existing?.boiler_data;
-        }
-      }
-
-      await Promise.all([
-        fireDraft ? saveFireFacilityLog(fireDraft) : Promise.resolve(),
-        elevatorDraft ? saveElevatorLog(elevatorDraft) : Promise.resolve(),
-        checklistDraft ? saveSubstationChecklist(checklistDraft) : Promise.resolve(),
-        airEnvDraft ? saveAirEnvironmentLog(airEnvDraft) : Promise.resolve(),
-        (hvacToSave || boilerToSave) ? saveHvacBoilerCombined(hvacToSave, boilerToSave) : Promise.resolve(),
-        substationLogDraft ? saveSubstationLog(substationLogDraft) : Promise.resolve()
-      ]);
 
       if (success) { 
         setSaveStatus('success'); 
@@ -519,7 +473,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
     const dayName = days[currentDate.getDay()];
     
-    // 요청하신대로 레이블을 항상 포함하는 형식으로 수정
     const dutyInfo = `주간 : ${facilityDuty.day || ''} / 당직 : ${facilityDuty.night || ''}`;
 
     let bodyHtml = '';
@@ -880,7 +833,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           <div className="animate-fade-in space-y-6">
             <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-2 border-b border-gray-100 items-center scrollbar-hide px-1">
               {WORK_LOG_TABS.map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-full text-[13px] font-bold transition-all border ${activeTab === tab.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>{tab.label}</button>
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-full text-[13px] font-bold transition-all border ${activeTab === tab.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>{tab.label}</button>
               ))}
             </div>
             <div className="min-h-[400px]">{renderTabContent()}</div>

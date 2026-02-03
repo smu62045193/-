@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FireFacilityLogData, FireFacilityCheckItem } from '../types';
-import { fetchFireFacilityLog, saveFireFacilityLog, getInitialFireFacilityLog, saveToCache, getFromStorage } from '../services/dataService';
+import { fetchFireFacilityLog, saveFireFacilityLog, getInitialFireFacilityLog } from '../services/dataService';
 import { format } from 'date-fns';
 import LogSheetLayout from './LogSheetLayout';
 
@@ -15,34 +15,19 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   const [data, setData] = useState<FireFacilityLogData>(getInitialFireFacilityLog(dateKey));
   
-  const isInitialLoad = useRef(true);
-
   useEffect(() => { 
-    isInitialLoad.current = true;
     loadData(); 
   }, [dateKey]);
-
-  useEffect(() => {
-    if (!loading && !isInitialLoad.current && data) {
-      saveToCache(`FIRE_FACILITY_LOG_${dateKey}`, data, true);
-    }
-  }, [data, dateKey, loading]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const fetched = await fetchFireFacilityLog(dateKey);
-      const draft = getFromStorage(`FIRE_FACILITY_LOG_${dateKey}`, true);
-      
-      const finalData = draft || fetched || getInitialFireFacilityLog(dateKey);
+      // 로컬 임시 데이터 무시하고 서버에서 불러온 데이터 우선 적용
+      const finalData = fetched || getInitialFireFacilityLog(dateKey);
       setData(finalData);
-      
-      setTimeout(() => {
-        isInitialLoad.current = false;
-      }, 100);
     } catch (e) { 
       setData(getInitialFireFacilityLog(dateKey)); 
-      isInitialLoad.current = false;
     } finally { 
       setLoading(false); 
     }
