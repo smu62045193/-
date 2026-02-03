@@ -69,7 +69,7 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 
   const fetchPromise = (async () => {
     try {
-      // Use process.env.API_KEY as per GenAI guidelines
+      // Use process.env.API_KEY as per Google GenAI SDK guidelines
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       // 구체화된 검색 명령 프롬프트 적용
       const prompt = `네이버 날씨 정보를 검색해서 그 수치를 알려줘. 서울 ${dateStr} ${time} 기준 날씨 정보를 정확히 제공해줘. 
@@ -137,7 +137,7 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
   reading: string;
 } | null> => {
   try {
-    // Use process.env.API_KEY as per GenAI guidelines
+    // Use process.env.API_KEY as per Google GenAI SDK guidelines
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     // 입주사 명단을 텍스트로 변환하여 프롬프트에 포함 (매칭 정확도 향상)
