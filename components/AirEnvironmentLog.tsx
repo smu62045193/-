@@ -4,7 +4,7 @@ import { AirEnvironmentLogData, AirEmissionItem, AirPreventionItem, WeatherData 
 import { fetchAirEnvironmentLog, saveAirEnvironmentLog, getInitialAirEnvironmentLog, fetchHvacLog, fetchBoilerLog } from '../services/dataService';
 import { fetchWeatherInfo } from '../services/geminiService';
 import { format } from 'date-fns';
-import { RefreshCw, Printer } from 'lucide-react';
+import { RefreshCw, Printer, Save, CheckCircle2, Cloud, X } from 'lucide-react';
 import LogSheetLayout from './LogSheetLayout';
 
 interface AirEnvironmentLogProps {
@@ -14,6 +14,8 @@ interface AirEnvironmentLogProps {
 const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   const [data, setData] = useState<AirEnvironmentLogData>(getInitialAirEnvironmentLog(dateKey));
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -168,10 +170,21 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
   };
 
   const handleSave = async () => {
-    if (!data) return;
-    const success = await saveAirEnvironmentLog(data);
-    if (success) alert('저장되었습니다.');
-    else alert('저장 실패');
+    setShowSaveConfirm(false);
+    if (!data || saveStatus === 'loading') return;
+    setSaveStatus('loading');
+    try {
+      const success = await saveAirEnvironmentLog(data);
+      if (success) {
+        setSaveStatus('success');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } else {
+        setSaveStatus('error');
+        alert('저장에 실패했습니다.');
+      }
+    } catch (e) {
+      setSaveStatus('error');
+    }
   };
 
   const handlePrint = () => {
@@ -336,55 +349,94 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
   );
 
   return (
-    <LogSheetLayout 
-      title="대기배출시설 및 방지시설 운영기록부" 
-      loading={loading} 
-      onSave={handleSave} 
-      onPrint={handlePrint} 
-      hideRefresh={true}
-      extraActions={syncButton}
-    >
-      <div id="air-env-log-content" className="bg-white p-4 text-black min-w-[850px] max-w-5xl mx-auto shadow-sm border border-gray-100 rounded-lg">
-        <div className="mb-10">
-          <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</h3>
-          <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
-            <table className="w-full border-collapse text-center">
-              <thead><tr className="bg-gray-50"><th className={`${thClass} w-[13%]`}>배 출 구</th><th className={`${thClass} w-[37%]`}>배 출 시 설</th><th className={`${thClass} w-[35%]`}>가 동 시 간</th><th className={`${thClass} w-[15%]`}>비 고</th></tr></thead>
-              <tbody>
-                {data?.emissions?.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className={`${tdClass} font-bold text-gray-500 bg-gray-50/20`}>{item.outletNo}</td>
-                    <td className={tdClass}><div className={labelDivClass}>{item.facilityName}</div></td>
-                    <td className={tdClass}><div className={dataDivClass}>{item.runTime || '-'}</div></td>
-                    <td className={tdClass}><div className={`${labelDivClass} ${item.remarks === '정상' ? 'text-blue-600' : 'text-slate-400'}`}>{item.remarks || '운휴'}</div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <>
+      <LogSheetLayout 
+        title="대기배출시설 및 방지시설 운영기록부" 
+        loading={loading} 
+        onSave={handleSave} 
+        onPrint={handlePrint} 
+        hideRefresh={true}
+        extraActions={syncButton}
+      >
+        <div id="air-env-log-content" className="bg-white p-4 text-black min-w-[850px] max-w-5xl mx-auto shadow-sm border border-gray-100 rounded-lg">
+          <div className="mb-10">
+            <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</h3>
+            <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
+              <table className="w-full border-collapse text-center">
+                <thead><tr className="bg-gray-50"><th className={`${thClass} w-[13%]`}>배 출 구</th><th className={`${thClass} w-[37%]`}>배 출 시 설</th><th className={`${thClass} w-[35%]`}>가 동 시 간</th><th className={`${thClass} w-[15%]`}>비 고</th></tr></thead>
+                <tbody>
+                  {data?.emissions?.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className={`${tdClass} font-bold text-gray-500 bg-gray-50/20`}>{item.outletNo}</td>
+                      <td className={tdClass}><div className={labelDivClass}>{item.facilityName}</div></td>
+                      <td className={tdClass}><div className={dataDivClass}>{item.runTime || '-'}</div></td>
+                      <td className={tdClass}><div className={`${labelDivClass} ${item.remarks === '정상' ? 'text-blue-600' : 'text-slate-400'}`}>{item.remarks || '운휴'}</div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs mt-2 font-medium text-gray-500">* 비고란은 정상 여부 기재합니다.</p>
           </div>
-          <p className="text-xs mt-2 font-medium text-gray-500">* 비고란은 정상 여부 기재합니다.</p>
-        </div>
-        
-        <div className="mt-12">
-          <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">2. 방지시설 운영사항</h3>
-          <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
-            <table className="w-full border-collapse text-center">
-              <thead><tr className="bg-gray-50"><th className={`${thClass} w-[25%]`}>방 지 시 설 명</th><th className={`${thClass} w-[25%]`}>설치 위치</th><th className={`${thClass} w-[25%]`}>가스사용량</th><th className={`${thClass} w-[25%]`}>처리오염물질</th></tr></thead>
-              <tbody>
-                {data?.preventions?.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className={tdClass}><div className={labelDivClass}>{item.facilityName}</div></td>
-                    <td className={tdClass}><div className={labelDivClass}>{item.location}</div></td>
-                    <td className={tdClass}><div className={`${dataDivClass} justify-end pr-8`}>{roundValue(item.gasUsage)} <span className="ml-1 text-xs font-bold text-gray-400">㎥</span></div></td>
-                    <td className={tdClass}><div className={labelDivClass}>{item.pollutants}</div></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          
+          <div className="mt-12">
+            <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">2. 방지시설 운영사항</h3>
+            <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
+              <table className="w-full border-collapse text-center">
+                <thead><tr className="bg-gray-50"><th className={`${thClass} w-[25%]`}>방 지 시 설 명</th><th className={`${thClass} w-[25%]`}>설치 위치</th><th className={`${thClass} w-[25%]`}>가스사용량</th><th className={`${thClass} w-[25%]`}>처리오염물질</th></tr></thead>
+                <tbody>
+                  {data?.preventions?.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className={tdClass}><div className={labelDivClass}>{item.facilityName}</div></td>
+                      <td className={tdClass}><div className={labelDivClass}>{item.location}</div></td>
+                      <td className={tdClass}><div className={`${dataDivClass} justify-end pr-8`}>{roundValue(item.gasUsage)} <span className="ml-1 text-xs font-bold text-gray-400">㎥</span></div></td>
+                      <td className={tdClass}><div className={labelDivClass}>{item.pollutants}</div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
+      </LogSheetLayout>
+
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40">
+        <button 
+          onClick={() => setShowSaveConfirm(true)} 
+          disabled={saveStatus === 'loading'} 
+          className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+        >
+          {saveStatus === 'loading' ? (
+            <><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>
+          ) : saveStatus === 'success' ? (
+            <><CheckCircle2 size={24} /><span>저장 완료</span></>
+          ) : (
+            <><Save size={24} /><span>서버 저장</span></>
+          )}
+        </button>
       </div>
-    </LogSheetLayout>
+
+      {showSaveConfirm && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
+                <Cloud className="text-blue-600" size={32} />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">대기환경 데이터 서버 저장</h3>
+              <p className="text-gray-500 mb-8 leading-relaxed font-medium">
+                입력하신 <span className="text-blue-600 font-bold">대기환경 운영 기록</span>을<br/>
+                서버 전용 테이블에 안전하게 기록하시겠습니까?
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center active:scale-95"><X size={18} className="mr-2" />취소</button>
+                <button onClick={handleSave} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle2 size={18} className="mr-2" />확인</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

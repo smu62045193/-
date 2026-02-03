@@ -837,11 +837,13 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
               ))}
             </div>
             <div className="min-h-[400px]">{renderTabContent()}</div>
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40">
-              <button onClick={() => setShowSaveConfirm(true)} disabled={saveStatus === 'loading'} className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                {saveStatus === 'loading' ? (<><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>) : saveStatus === 'success' ? (<><CheckCircle2 size={24} /><span>저장 완료</span></>) : (<><Save size={24} /><span>{isMeasurementTab ? '서버 저장' : '업무일지 전체 저장'}</span></>)}
-              </button>
-            </div>
+            {activeTab !== 'air_env' && (
+              <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40">
+                <button onClick={() => setShowSaveConfirm(true)} disabled={saveStatus === 'loading'} className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+                  {saveStatus === 'loading' ? (<><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>) : saveStatus === 'success' ? (<><CheckCircle2 size={24} /><span>저장 완료</span></>) : (<><Save size={24} /><span>{isMeasurementTab ? '서버 저장' : '업무일지 전체 저장'}</span></>)}
+                </button>
+              </div>
+            )}
           </div>
 
           {showSaveConfirm && (
