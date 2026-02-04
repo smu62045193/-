@@ -2,9 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AirEnvironmentLogData, AirEmissionItem, AirPreventionItem, WeatherData } from '../types';
 import { fetchAirEnvironmentLog, saveAirEnvironmentLog, getInitialAirEnvironmentLog, fetchHvacLog, fetchBoilerLog } from '../services/dataService';
-import { fetchWeatherInfo } from '../services/geminiService';
 import { format } from 'date-fns';
-import { RefreshCw, Printer, Save, CheckCircle2, Cloud, X, Thermometer, CloudSun, Calendar } from 'lucide-react';
+import { RefreshCw, Printer, Save, CheckCircle2, Cloud, X, Thermometer, CloudSun, Calendar, Edit2, Check } from 'lucide-react';
 import LogSheetLayout from './LogSheetLayout';
 
 interface AirEnvironmentLogProps {
@@ -16,10 +15,9 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
   const [syncing, setSyncing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
-  const [hasSavedData, setHasSavedData] = useState(false);
+  const [isWeatherEditing, setIsWeatherEditing] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   const [data, setData] = useState<AirEnvironmentLogData>(getInitialAirEnvironmentLog(dateKey));
-  const [weather, setWeather] = useState<WeatherData | null>(null);
 
   const roundValue = (val: string) => {
     if (!val) return '0';
@@ -106,12 +104,11 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
 
   const loadData = async () => {
     setLoading(true);
+    setIsWeatherEditing(false);
     try {
       const fetched = await fetchAirEnvironmentLog(dateKey);
       const initialData = getInitialAirEnvironmentLog(dateKey);
       
-      setHasSavedData(!!fetched);
-
       if (fetched) {
         const fixedData = {
           ...fetched,
@@ -141,23 +138,8 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     }
   };
 
-  const loadWeather = async (force = false) => {
-    if (force) setSyncing(true);
-    try {
-      const w = await fetchWeatherInfo(dateKey, force, "09:00");
-      setWeather(w);
-      return w;
-    } catch (e) {
-      console.error("Failed to load weather", e);
-      return null;
-    } finally {
-      if (force) setSyncing(false);
-    }
-  };
-
   useEffect(() => {
     loadData();
-    loadWeather(false);
   }, [dateKey]);
 
   const handleSyncData = async () => {
@@ -179,7 +161,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       const success = await saveAirEnvironmentLog(data);
       if (success) {
         setSaveStatus('success');
-        setHasSavedData(true);
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -191,7 +172,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
   };
 
   const handlePrint = () => {
-    // 즉시 창을 열어 팝업 차단 방지
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
     if (!printWindow) {
       alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
@@ -202,7 +182,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     const formattedDate = format(currentDate, 'yyyy년 MM월 dd일');
     const dayName = days[currentDate.getDay()];
 
-    // 데이터 대기 없이 현재 상태(state)에 있는 weather와 data를 즉시 사용
     printWindow.document.write(`
       <html>
         <head>
@@ -298,7 +277,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             <table class="info-table">
               <tr>
                 <td>${formattedDate} (${dayName})</td>
-                <td class="weather-text">날씨: ${weather?.condition || '흐림'} &nbsp;&nbsp;|&nbsp;&nbsp; 온도: ${weather?.tempMin ?? '-1'}℃ ~ ${weather?.tempMax ?? '7'}℃</td>
+                <td class="weather-text">날씨: ${data.weatherCondition || '흐림'} &nbsp;&nbsp;|&nbsp;&nbsp; 온도: ${data.tempMin ?? '-1'}℃ ~ ${data.tempMax ?? '7'}℃</td>
               </tr>
             </table>
             <div class="section-title">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</div>
@@ -366,25 +345,63 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
         <div id="air-env-log-content" className="bg-white p-4 text-black min-w-[850px] max-w-5xl mx-auto shadow-sm border border-gray-100 rounded-lg">
           
           <div className="flex items-center justify-between mb-8 px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200">
-            <div className="flex items-center gap-2 font-bold text-slate-700 text-base">
-              <CloudSun size={20} className="text-blue-500" />
-              <span>날씨: <span className="text-blue-700">{weather?.condition || '흐림'}</span></span>
-              <span className="mx-2 text-slate-300">|</span>
-              <Thermometer size={20} className="text-orange-500" />
-              <span>온도: <span className="text-orange-700">{weather?.tempMin ?? '-1'}℃ ~ {weather?.tempMax ?? '7'}℃</span></span>
+            <div className="flex items-center gap-4 font-bold text-slate-700 text-base">
+              {isWeatherEditing ? (
+                <div className="flex items-center gap-3 animate-fade-in">
+                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-blue-200">
+                    <CloudSun size={18} className="text-blue-500" />
+                    <input 
+                      type="text" 
+                      value={data.weatherCondition || ''} 
+                      onChange={e => setData({...data, weatherCondition: e.target.value})} 
+                      className="w-20 outline-none font-bold text-blue-700 text-sm"
+                      placeholder="날씨"
+                    />
+                  </div>
+                  <span className="text-slate-300">|</span>
+                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-orange-200">
+                    <Thermometer size={18} className="text-orange-500" />
+                    <div className="flex items-center gap-1">
+                      <input 
+                        type="text" 
+                        value={data.tempMin || ''} 
+                        onChange={e => setData({...data, tempMin: e.target.value})} 
+                        className="w-8 outline-none font-bold text-orange-700 text-sm text-center"
+                        placeholder="최저"
+                      />
+                      <span className="text-slate-400">~</span>
+                      <input 
+                        type="text" 
+                        value={data.tempMax || ''} 
+                        onChange={e => setData({...data, tempMax: e.target.value})} 
+                        className="w-8 outline-none font-bold text-orange-700 text-sm text-center"
+                        placeholder="최고"
+                      />
+                      <span className="text-slate-400 text-xs">℃</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <CloudSun size={20} className="text-blue-500" />
+                  <span>날씨: <span className="text-blue-700">{data.weatherCondition || '흐림'}</span></span>
+                  <span className="mx-2 text-slate-300">|</span>
+                  <Thermometer size={20} className="text-orange-500" />
+                  <span>온도: <span className="text-orange-700">{data.tempMin ?? '-1'}℃ ~ {data.tempMax ?? '7'}℃</span></span>
+                </div>
+              )}
             </div>
             
             <button
-              onClick={() => loadWeather(true)}
-              disabled={hasSavedData || syncing || loading}
+              onClick={() => setIsWeatherEditing(!isWeatherEditing)}
               className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-[13px] transition-all shadow-sm ${
-                hasSavedData 
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300' 
+                isWeatherEditing 
+                  ? 'bg-blue-600 text-white border border-blue-700 active:scale-95' 
                   : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 active:scale-95'
               }`}
             >
-              <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
-              {hasSavedData ? '정보 고정됨' : '불러오기'}
+              {isWeatherEditing ? <Check size={16} /> : <Edit2 size={16} />}
+              {isWeatherEditing ? '확인' : '날씨입력'}
             </button>
           </div>
 

@@ -148,12 +148,17 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
       try {
         const result = await analyzeMeterPhoto(resized, tenants);
         if (result) {
+          // 소수점 제거 로직: parseFloat로 숫자로 변환 후 Math.floor로 정수화
+          const cleanReading = result.reading 
+            ? Math.floor(parseFloat(result.reading.toString().replace(/,/g, ''))).toString() 
+            : '';
+
           setNewItem(prev => ({
             ...prev,
             tenant: result.tenantName,
             floor: result.floor,
             type: result.type,
-            reading: result.reading
+            reading: cleanReading
           }));
         }
       } catch (err) {
@@ -337,7 +342,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                   <button onClick={() => setNewItem({ ...newItem, type: '특수' })} className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-black transition-all ${newItem.type === '특수' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400'}`}><ZapOff size={16} /> 특수 계량기</button>
                 </div>
               </div>
-              <div><label className="block text-xs font-black text-gray-400 mb-1.5 uppercase tracking-wider">당월 지침값</label><input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-black text-blue-600 text-xl transition-all bg-white" placeholder="0" value={newItem.reading} onChange={e => setNewItem({ ...newItem, reading: e.target.value })} /></div>
+              <div><label className="block text-xs font-black text-gray-400 mb-1.5 uppercase tracking-wider">당월 지침값 (정수)</label><input type="text" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-black text-blue-600 text-xl transition-all bg-white" placeholder="0" value={newItem.reading} onChange={e => setNewItem({ ...newItem, reading: e.target.value.replace(/[^0-9]/g, '') })} /></div>
               <div><label className="block text-xs font-black text-gray-400 mb-1.5 uppercase tracking-wider">촬영 일자</label><input type="date" className="w-full border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 transition-all bg-white h-[52px]" value={newItem.date} onChange={e => setNewItem({ ...newItem, date: e.target.value })} /></div>
               <div className="md:col-span-2 flex gap-3 mt-2">
                 <button onClick={handleCancel} className="flex-1 py-3.5 bg-white border border-gray-300 rounded-xl font-bold text-gray-600 hover:bg-gray-100 transition-all shadow-sm active:scale-95">취소</button>
@@ -397,7 +402,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
               <p className="text-slate-500 mb-8 leading-relaxed font-medium">선택하신 검침 사진 정보를 목록에서 <span className="text-red-600 font-bold">영구히 삭제</span>하시겠습니까?</p>
               <div className="flex gap-3">
                 <button onClick={() => setDeleteTargetId(null)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center active:scale-95"><Trash2 size={20} className="mr-2" />삭제 실행</button>
+                <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><Trash2 size={20} className="mr-2" />삭제 실행</button>
               </div>
             </div>
           </div>

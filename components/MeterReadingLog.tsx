@@ -15,8 +15,6 @@ const formatNumber = (val: string | number | undefined) => {
   if (val === undefined || val === null || val === '') return '';
   const str = val.toString().replace(/,/g, '');
   if (str === '.') return '.';
-  if (str === '-') return '-';
-  if (str === '-.') return '-.';
   const parts = str.split('.');
   const integerPart = parts[0];
   const decimalPart = parts[1];
@@ -317,10 +315,68 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
       photosHtml += `</div>`;
     }
 
-    return `<div class="bill-page ${!isLast ? 'page-break' : ''}"><div class="bill-container"><h1 class="header-title">입주사 전기요금 사용내역서(${parseInt(m)}월)</h1><div class="write-date">작성일 : ${todayStr}</div><table><tr class="tenant-title-row"><th colspan="4">${tenantName} ( ${floor} )</th></tr><tr><th class="label-cell">사용기간</th><td colspan="3">${periodStr}</td></tr><tr><th class="label-cell" rowspan="2">계량기검침</th><td colspan="1" style="width:35%; font-weight:bold; background:#f9f9f9;">당월지침</td><td colspan="2" style="font-weight:bold; background:#f9f9f9;">전월지침</td></tr><tr><td colspan="1" class="bold-text">${formatNumber(normalItem?.currentReading) || '-'}</td><td colspan="2" class="bold-text">${formatNumber(normalItem?.prevReading) || '-'}</td></tr><tr><th class="label-cell">전력 사용량</th><td colspan="3"><span class="bold-text" style="font-size:14pt;">${normalCalc.usage.toLocaleString()}</span> - (KWH)</td></tr><tr><th class="label-cell">kWh당 단가</th><td colspan="3">￦ ${parseInt(unitPrice).toLocaleString()} 원</td></tr><tr><th class="label-cell">기준전력(KWH)</th><td colspan="3">${formatNumber(normalItem?.refPower) || '2,380'} - (KWH)</td></tr><tr><th class="label-cell">전기요금</th><td colspan="3" class="formula-cell">(사용량 ${normalCalc.usage.toLocaleString()} - 기준 ${formatNumber(normalItem?.refPower) || '2,380'}) X ${parseInt(unitPrice).toLocaleString()} = <span class="bold-text" style="font-size:14pt;">￦ ${normalCalc.bill.toLocaleString()} 원</span></td></tr><tr class="sub-header"><th colspan="4">특수 전력 사용요금(에어컨, 전열)</th></tr><tr><th class="label-cell" rowspan="2">계량기 검침</th><td colspan="1" style="font-weight:bold; background:#f9f9f9;">당월지침</td><td colspan="2" style="font-weight:bold; background:#f9f9f9;">전월지침</td></tr><tr><td colspan="1" class="bold-text">${formatNumber(specialItem?.currentReading) || '-'}</td><td colspan="2" class="bold-text">${formatNumber(specialItem?.prevReading) || '-'}</td></tr><tr><th class="label-cell">전력 사용량</th><td colspan="3"><span class="bold-text" style="font-size:14pt;">${specialCalc.usage.toLocaleString()}</span> - (KWH)</td></tr><tr><th class="label-cell">kWh당 단가</th><td colspan="3">￦ ${parseInt(unitPrice).toLocaleString()} 원</td></tr><tr><th class="label-cell">전기요금</th><td colspan="3" class="formula-cell">${specialCalc.usage.toLocaleString()} X ${parseInt(unitPrice).toLocaleString()} = <span class="bold-text" style="font-size:14pt;">￦ ${specialCalc.bill.toLocaleString()} 원</span></td></tr><tr class="total-row"><th class="total-label">청구 요금</th><td colspan="3" class="bold-text" style="font-size:24pt;">￦ ${totalBill.toLocaleString()} 원</td></tr></table>${photosHtml}<div class="footer-info">입금계좌안내 : 우리은행 1006-401-220508 (새마을운동중앙회)</div><div class="footer-logo"><div class="logo-text">새마을운동중앙회</div><div class="logo-sub">KOREA SAEMAUL UNDONG CENTER</div></div></div></div>`;
+    // 로고 이미지 URL을 가장 안정적인 위키미디어 공용 이미지로 교체
+    const saemaulLogoUrl = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Saemaul_Undong_logo.svg/1024px-Saemaul_Undong_logo.svg.png";
+
+    return `
+      <div class="bill-page ${!isLast ? 'page-break' : ''}">
+        <div class="bill-container">
+          <h1 class="header-title">입주사 전기요금 사용내역서(${parseInt(m)}월)</h1>
+          <div class="write-date">작성일 : ${todayStr}</div>
+          <table>
+            <tr class="tenant-title-row"><th colspan="4">${tenantName} ( ${floor} )</th></tr>
+            <tr><th class="label-cell">사용기간</th><td colspan="3">${periodStr}</td></tr>
+            <tr><th class="label-cell" rowspan="2">계량기검침</th><td colspan="1" style="width:35%; font-weight:bold; background:#f9f9f9;">당월지침</td><td colspan="2" style="font-weight:bold; background:#f9f9f9;">전월지침</td></tr>
+            <tr><td colspan="1" class="bold-text">${formatNumber(normalItem?.currentReading) || '-'}</td><td colspan="2" class="bold-text">${formatNumber(normalItem?.prevReading) || '-'}</td></tr>
+            <tr><th class="label-cell">전력 사용량</th><td colspan="3"><span class="bold-text" style="font-size:14pt;">${normalCalc.usage.toLocaleString()}</span> - (KWH)</td></tr>
+            <tr><th class="label-cell">kWh당 단가</th><td colspan="3">￦ ${parseInt(unitPrice).toLocaleString()} 원</td></tr>
+            <tr><th class="label-cell">기준전력(KWH)</th><td colspan="3">${formatNumber(normalItem?.refPower) || '2,380'} - (KWH)</td></tr>
+            <tr><th class="label-cell">전기요금</th><td colspan="3" class="formula-cell">(사용량 ${normalCalc.usage.toLocaleString()} - 기준 ${formatNumber(normalItem?.refPower) || '2,380'}) X ${parseInt(unitPrice).toLocaleString()} = <span class="bold-text" style="font-size:14pt;">￦ ${normalCalc.bill.toLocaleString()} 원</span></td></tr>
+            <tr class="sub-header"><th colspan="4">특수 전력 사용요금(에어컨, 전열)</th></tr>
+            <tr><th class="label-cell" rowspan="2">계량기 검침</th><td colspan="1" style="font-weight:bold; background:#f9f9f9;">당월지침</td><td colspan="2" style="font-weight:bold; background:#f9f9f9;">전월지침</td></tr>
+            <tr><td colspan="1" class="bold-text">${formatNumber(specialItem?.currentReading) || '-'}</td><td colspan="2" class="bold-text">${formatNumber(specialItem?.prevReading) || '-'}</td></tr>
+            <tr><th class="label-cell">전력 사용량</th><td colspan="3"><span class="bold-text" style="font-size:14pt;">${specialCalc.usage.toLocaleString()}</span> - (KWH)</td></tr>
+            <tr><th class="label-cell">kWh당 단가</th><td colspan="3">￦ ${parseInt(unitPrice).toLocaleString()} 원</td></tr>
+            <tr><th class="label-cell">전기요금</th><td colspan="3" class="formula-cell">${specialCalc.usage.toLocaleString()} X ${parseInt(unitPrice).toLocaleString()} = <span class="bold-text" style="font-size:14pt;">￦ ${specialCalc.bill.toLocaleString()} 원</span></td></tr>
+            <tr class="total-row"><th class="total-label">청구 요금</th><td colspan="3" class="bold-text" style="font-size:24pt;">￦ ${totalBill.toLocaleString()} 원</td></tr>
+          </table>
+          ${photosHtml}
+          <div class="footer-info">입금계좌안내 : 우리은행 1006-401-220508 (새마을운동중앙회)</div>
+          <div class="footer-logo">
+            <img src="${saemaulLogoUrl}" class="logo-img" />
+          </div>
+        </div>
+      </div>`;
   };
 
-  const billStyles = `<style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');@page { size: A4 portrait; margin: 0; }body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.4; -webkit-print-color-adjust: exact; }.no-print { display: flex; justify-content: center; padding: 20px; background: #f1f5f9; border-bottom: 1px solid #ddd; }@media print { .no-print { display: none !important; } body { background: white !important; } .page-break { page-break-after: always; } }.bill-page { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; padding: 15mm 15mm; }@media print { .bill-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; padding: 10mm 15mm; } }.bill-container { width: 100%; }.header-title { text-align: center; font-size: 32pt; font-weight: 900; margin-bottom: 10px; margin-top: 40px; letter-spacing: -1px; }.write-date { text-align: right; font-weight: bold; font-size: 13pt; margin-bottom: 25px; padding-right: 5px; }table { width: 100%; border-collapse: collapse; border: 1.2px solid black; table-layout: fixed; margin-bottom: 5px; }th, td { border: 1px solid black; padding: 2px 4px; font-size: 12.5pt; text-align: center; height: 30px; }.tenant-title-row { background-color: #dce6c1 !important; font-weight: 900; font-size: 16pt; height: 30px; }.label-cell { background-color: #ffffff; font-weight: bold; width: 30%; }.formula-cell { text-align: center; font-size: 11pt; }.bold-text { font-weight: 900; }.sub-header { background-color: #ffffff; font-weight: 900; font-size: 13pt; height: 30px; border-top: 2px solid black; }.total-row { height: 30px; font-size: 20pt; font-weight: 900; }.total-label { width: 30%; font-size: 18pt; background: #ffffff; }.photo-evidence-container { display: flex; justify-content: center; gap: 10mm; margin-top: 5mm; margin-bottom: 5mm; }.photo-item { text-align: center; width: 85mm; }.photo-item img { width: 100%; height: 40mm; object-fit: contain; border: 1px solid black; background: #fafafa; }.photo-label { font-size: 9pt; font-weight: bold; margin-top: 3px; }.footer-info { margin-top: 20px; font-weight: bold; font-size: 12pt; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }.footer-logo { margin-top: 40px; text-align: center; }.logo-text { font-size: 20pt; font-weight: 900; color: #1e40af; letter-spacing: 2px; }.logo-sub { font-size: 8pt; font-weight: bold; color: #1e40af; letter-spacing: 3px; margin-top: 2px; }</style>`;
+  const billStyles = `<style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+    @page { size: A4 portrait; margin: 0; }
+    body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.4; -webkit-print-color-adjust: exact; }
+    .no-print { display: flex; justify-content: center; padding: 20px; background: #f1f5f9; border-bottom: 1px solid #ddd; }
+    @media print { .no-print { display: none !important; } body { background: white !important; } .page-break { page-break-after: always; } }
+    .bill-page { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; padding: 15mm 15mm; }
+    @media print { .bill-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; padding: 10mm 15mm; } }
+    .bill-container { width: 100%; }
+    .header-title { text-align: center; font-size: 32pt; font-weight: 900; margin-bottom: 10px; margin-top: 40px; letter-spacing: -1px; }
+    .write-date { text-align: right; font-weight: bold; font-size: 13pt; margin-bottom: 25px; padding-right: 5px; }
+    table { width: 100%; border-collapse: collapse; border: 1.2px solid black; table-layout: fixed; margin-bottom: 5px; }
+    th, td { border: 1px solid black; padding: 2px 4px; font-size: 12.5pt; text-align: center; height: 30px; }
+    .tenant-title-row { background-color: #dce6c1 !important; font-weight: 900; font-size: 16pt; height: 30px; }
+    .label-cell { background-color: #ffffff; font-weight: bold; width: 30%; }
+    .formula-cell { text-align: center; font-size: 11pt; }
+    .bold-text { font-weight: 900; }
+    .sub-header { background-color: #ffffff; font-weight: 900; font-size: 13pt; height: 30px; border-top: 2px solid black; }
+    .total-row { height: 30px; font-size: 20pt; font-weight: 900; }
+    .total-label { width: 30%; font-size: 18pt; background: #ffffff; }
+    .photo-evidence-container { display: flex; justify-content: center; gap: 10mm; margin-top: 5mm; margin-bottom: 5mm; }
+    .photo-item { text-align: center; width: 85mm; }
+    .photo-item img { width: 100%; height: 40mm; object-fit: contain; border: 1px solid black; background: #fafafa; }
+    .photo-label { font-size: 9pt; font-weight: bold; margin-top: 3px; }
+    .footer-info { margin-top: 20px; font-weight: bold; font-size: 12pt; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
+    .footer-logo { margin-top: 30px; display: flex; justify-content: center; align-items: center; width: 100%; }
+    .logo-img { height: 65px; width: auto; object-fit: contain; }
+  </style>`;
 
   const handlePrintTenantBill = async (tenantName: string, floor: string) => {
     const photosData = await fetchMeterPhotos(currentMonth);
@@ -363,7 +419,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
             
             <button 
               onClick={() => setIsEditMode(!isEditMode)} 
-              className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
+              className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
             >
               {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
               {isEditMode ? '수정 취소' : '수정'}

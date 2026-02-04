@@ -629,6 +629,9 @@ export interface AirEnvironmentLogData {
   emissions: AirEmissionItem[];
   preventions: AirPreventionItem[];
   lastUpdated?: string;
+  weatherCondition?: string; // 추가된 필드
+  tempMin?: string;          // 추가된 필드
+  tempMax?: string;          // 추가된 필드
 }
 
 // Water Tank Log Types

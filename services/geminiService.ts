@@ -32,15 +32,29 @@ const getSeasonalMockWeather = (dateStr: string): WeatherData => {
 };
 
 /**
- * 날씨 정보를 가져오는 함수 (Google Gemini API - Search Grounding 사용)
+ * 할당량 초과 오류 시 재시도를 지원하는 유틸리티 함수
+ */
+async function withRetry<T>(fn: () => Promise<T>, retries = 1, delay = 2000): Promise<T> {
+  try {
+    return await fn();
+  } catch (error: any) {
+    const isQuotaError = error?.message?.includes("429") || error?.status === "RESOURCE_EXHAUSTED";
+    if (retries > 0 && isQuotaError) {
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+}
+
+/**
+ * 날씨 정보를 가져오는 함수
  */
 export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, time: string = "09:00"): Promise<WeatherData | null> => {
   const targetDate = startOfDay(parseISO(dateStr));
   const today = startOfDay(new Date());
-  
   const storageKey = `weather_gemini_v1_${dateStr}`;
 
-  // 과거 데이터나 너무 먼 미래 데이터는 검색 효율이 떨어지므로 계절별 모의 데이터 반환
   const isNearToday = isWithinInterval(targetDate, {
     start: subDays(today, 1),
     end: addDays(today, 3)
@@ -64,58 +78,24 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 
   const fetchPromise = (async () => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      const prompt = `
-        오늘(${dateStr}) 서울 강남구 대치동의 '네이버 날씨' 정보를 검색해서 알려줘.
-        응답은 반드시 아래 JSON 형식을 지켜야 해:
-        {
-          "condition": "맑음/흐림/비/눈/구름많음 등",
-          "tempCurrent": 현재온도(숫자),
-          "tempMin": 최저온도(숫자),
-          "tempMax": 최고온도(숫자),
-          "icon": "sun" | "cloud" | "cloud-rain" | "cloud-snow" | "cloud-sun" | "wind" 중 하나 선택
-        }
-      `;
+      return await withRetry(async () => {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: `오늘(${dateStr}) 서울 대치동 날씨를 검색해서 JSON으로 알려줘. (condition, tempCurrent, tempMin, tempMax, icon:"sun"|"cloud"...)`,
+          config: {
+            tools: [{ googleSearch: {} }],
+            responseMimeType: "application/json"
+          },
+        });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              condition: { type: Type.STRING },
-              tempCurrent: { type: Type.NUMBER },
-              tempMin: { type: Type.NUMBER },
-              tempMax: { type: Type.NUMBER },
-              icon: { type: Type.STRING }
-            },
-            required: ["condition", "tempCurrent", "tempMin", "tempMax", "icon"]
-          }
-        },
+        const weatherData = JSON.parse(response.text || '{}');
+        weatherCache.set(storageKey, weatherData);
+        try { localStorage.setItem(storageKey, JSON.stringify(weatherData)); } catch (e) {}
+        return weatherData;
       });
-
-      const weatherResult = JSON.parse(response.text || '{}');
-      
-      // 검색 출처 URL 추출 (Search Grounding 필수 규칙)
-      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      const sourceUrl = groundingChunks?.[0]?.web?.uri || "https://weather.naver.com";
-
-      const weatherData: WeatherData = {
-        ...weatherResult,
-        sourceUrl: sourceUrl,
-        sourceTitle: "네이버 날씨 (Gemini 검색)"
-      };
-
-      weatherCache.set(storageKey, weatherData);
-      try { localStorage.setItem(storageKey, JSON.stringify(weatherData)); } catch (e) {}
-      return weatherData;
-
     } catch (error) {
-      console.error("Gemini Weather Error:", error);
+      console.warn("Weather API limit reached, using seasonal defaults.");
       return getSeasonalMockWeather(dateStr);
     } finally {
       pendingRequests.delete(storageKey);
@@ -127,7 +107,7 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 };
 
 /**
- * 계량기 사진을 분석하여 입주사 및 지침값을 추출하는 함수
+ * 계량기 사진 분석 함수
  */
 export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]): Promise<{
   tenantName: string;
@@ -136,42 +116,28 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
   reading: string;
 } | null> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const tenantContext = tenants.map(t => `${t.floor}: ${t.name}`).join(', ');
+    return await withRetry(async () => {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const tenantContext = tenants.map(t => `${t.floor}: ${t.name}`).join(', ');
 
-    const imagePart = {
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: base64Image.split(',')[1],
-      },
-    };
+      const imagePart = {
+        inlineData: { mimeType: 'image/jpeg', data: base64Image.split(',')[1] }
+      };
 
-    const prompt = `
-      제공된 계량기 사진을 분석하세요.
-      1. 입주사 매칭: [${tenantContext}] 명단에서 사진의 층/이름과 가장 유사한 업체를 고르세요.
-      2. 계량기 구분: '일반' 또는 '특수'(에어컨/전열 등)로 분류하세요.
-      3. 지침값: 계량기의 숫자를 정확히 읽으세요.
-      
-      반드시 다음 JSON 형식으로 응답하세요:
-      {
-        "tenantName": "업체명",
-        "floor": "층",
-        "type": "일반" 또는 "특수",
-        "reading": "숫자"
-      }
-    `;
+      const prompt = `사진의 계량기 수치를 읽으세요. 입주사 명단 [${tenantContext}] 중 매칭되는 곳과 지침값(정수)을 JSON으로 반환하세요.`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: { parts: [imagePart, { text: prompt }] },
-      config: {
-        responseMimeType: "application/json",
-      },
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: { parts: [imagePart, { text: prompt }] },
+        config: { responseMimeType: "application/json" }
+      });
+
+      return JSON.parse(response.text || '{}');
     });
-
-    return JSON.parse(response.text || '{}');
-  } catch (error) {
-    console.error("Meter analysis error:", error);
+  } catch (error: any) {
+    if (error?.message?.includes("429")) {
+      alert("현재 AI 분석 서버가 혼잡합니다. 잠시 후 다시 시도하거나 지침값을 직접 입력해 주세요.");
+    }
     return null;
   }
 };

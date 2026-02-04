@@ -603,7 +603,10 @@ export const getInitialAirEnvironmentLog = (date: string): AirEnvironmentLogData
     { id: '1', facilityName: '냉,온수기1호기', location: '기계실', gasUsage: '', pollutants: 'SOX, NOX, 먼지' },
     { id: '2', facilityName: '냉,온수기2호기', location: '기계실', gasUsage: '', pollutants: 'SOX, NOX, 먼지' },
     { id: '3', facilityName: '보일러', location: '기계실', gasUsage: '', pollutants: 'SOX, NOX, 먼지' }
-  ]
+  ],
+  weatherCondition: '흐림',
+  tempMin: '-1',
+  tempMax: '7'
 });
 
 export const getInitialWaterTankLog = (date: string): WaterTankLogData => ({
@@ -1107,13 +1110,29 @@ export const saveSafetyCheck = async (data: SafetyCheckData): Promise<boolean> =
 export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironmentLogData | null> => {
   try {
     const { data } = await supabase.from('air_environment_logs').select('*').eq('id', `AIR_ENV_${date}`).maybeSingle();
-    if (data) return { date: data.date, emissions: data.emissions, preventions: data.preventions };
+    if (data) return { 
+      date: data.date, 
+      emissions: data.emissions, 
+      preventions: data.preventions,
+      weatherCondition: data.weather_condition,
+      tempMin: data.temp_min,
+      tempMax: data.temp_max
+    };
   } catch (e) {}
   return null;
 };
 
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
-  const { error } = await supabase.from('air_environment_logs').upsert({ id: `AIR_ENV_${data.date}`, date: data.date, emissions: data.emissions, preventions: data.preventions, last_updated: new Date().toISOString() });
+  const { error } = await supabase.from('air_environment_logs').upsert({ 
+    id: `AIR_ENV_${data.date}`, 
+    date: data.date, 
+    emissions: data.emissions, 
+    preventions: data.preventions,
+    weather_condition: data.weatherCondition,
+    temp_min: data.tempMin,
+    temp_max: data.tempMax,
+    last_updated: new Date().toISOString() 
+  });
   return !error;
 };
 
