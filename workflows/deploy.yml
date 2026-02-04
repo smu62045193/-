@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main  # 또는 사용 중인 기본 브랜치 이름
+  workflow_dispatch: # 수동 실행 버튼 활성화
 
 permissions:
   contents: read
@@ -29,7 +30,9 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
+          # 코드의 process.env.API_KEY와 연결하기 위해 이름을 API_KEY로 설정합니다.
+          # GitHub Secrets에 저장된 VITE_API_KEY 값을 사용합니다.
+          API_KEY: ${{ secrets.VITE_API_KEY }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
