@@ -71,30 +71,18 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
       const baseDate = dateStr.replace(/-/g, '');
       const baseTime = "0500"; // 05시 발표 데이터 기준
       
-      // API 키 인코딩 처리 (일부 키는 특수문자 포함 시 인코딩 필요할 수 있음)
+      // API 키 인코딩 처리
       const url = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?serviceKey=${encodeURIComponent(KMA_API_KEY)}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=61&ny=125`;
 
       const response = await fetch(url);
       
-      // 응답 상태 확인 (Unauthorized 등의 에러 처리)
       if (!response.ok) {
-        const errorText = await response.text();
-        console.warn(`Weather API Error (${response.status}):`, errorText);
-        return getSeasonalMockWeather(dateStr);
-      }
-
-      // Content-Type 확인
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        console.warn("Weather API returned non-JSON response:", text);
         return getSeasonalMockWeather(dateStr);
       }
 
       const json = await response.json();
 
       if (json.response?.header?.resultCode !== "00") {
-        console.warn("KMA API response error:", json.response?.header?.resultMsg);
         return getSeasonalMockWeather(dateStr);
       }
 
@@ -136,7 +124,6 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
       return weatherData;
 
     } catch (error) {
-      console.error("Weather API fetch failed:", error);
       return getSeasonalMockWeather(dateStr);
     } finally {
       pendingRequests.delete(storageKey);
@@ -148,7 +135,7 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 };
 
 /**
- * 계량기 사진을 분석하여 입주사 및 지침값을 추출하는 함수 (최신 gemini-3-flash-preview 사용)
+ * 계량기 사진을 분석하여 입주사 및 지침값을 추출하는 함수
  */
 export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]): Promise<{
   tenantName: string;
@@ -157,7 +144,7 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
   reading: string;
 } | null> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const tenantContext = tenants.map(t => `${t.floor}: ${t.name}`).join(', ');
 
     const imagePart = {
@@ -190,8 +177,7 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
       },
     });
 
-    const result = JSON.parse(response.text || '{}');
-    return result;
+    return JSON.parse(response.text || '{}');
   } catch (error) {
     console.error("Meter analysis error:", error);
     return null;
