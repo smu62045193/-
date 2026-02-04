@@ -21,13 +21,13 @@ const getSeasonalMockWeather = (dateStr: string): WeatherData => {
   let icon = "sun";
 
   if (month >= 12 || month <= 2) {
-    condition = "흐림(한파)"; tempCurrent = -2 + (day % 5); tempMin = -8; tempMax = 4; icon = "cloud";
+    condition = "흐림"; tempCurrent = -2 + (day % 5); tempMin = -1; tempMax = 7; icon = "cloud";
   } else if (month >= 6 && month <= 8) {
-    condition = "무더움"; tempCurrent = 28 + (day % 4); tempMin = 22; tempMax = 34; icon = "sun";
+    condition = "맑음"; tempCurrent = 28 + (day % 4); tempMin = 22; tempMax = 34; icon = "sun";
   } else if (month >= 3 && month <= 5) {
-    condition = "포근함"; tempCurrent = 14 + (day % 6); tempMin = 6; tempMax = 21; icon = "sun";
+    condition = "맑음"; tempCurrent = 14 + (day % 6); tempMin = 6; tempMax = 21; icon = "sun";
   } else {
-    condition = "선선함"; tempCurrent = 12 + (day % 5); tempMin = 5; tempMax = 18; icon = "sun";
+    condition = "맑음"; tempCurrent = 12 + (day % 5); tempMin = 5; tempMax = 18; icon = "sun";
   }
 
   return { condition, tempCurrent, tempMin, tempMax, icon };
@@ -69,17 +69,17 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 
   const fetchPromise = (async () => {
     try {
-      // Use process.env.API_KEY as per Google GenAI SDK guidelines
-      const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
-      // 구체화된 검색 명령 프롬프트 적용
-      const prompt = `네이버 날씨 정보를 검색해서 그 수치를 알려줘. 서울 ${dateStr} ${time} 기준 날씨 정보를 정확히 제공해줘. 
+      // Fixed: Obtain API key exclusively from process.env.API_KEY as per guidelines (removed import.meta.env)
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      
+      const prompt = `네이버 날씨 정보를 검색해서 서울 지역의 ${dateStr} ${time} 기준 날씨와 최저/최고 온도를 알려줘. 
       결과 데이터 중 "condition" 필드는 반드시 한글 텍스트(예: 맑음, 흐림)여야 합니다. JSON 형식으로 반환하세요.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
-          tools: [{ googleSearch: {} }], // 검색 그라운딩 도구 사용
+          tools: [{ googleSearch: {} }],
           responseMimeType: "application/json",
           responseSchema: {
             type: Type.OBJECT,
@@ -96,17 +96,17 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
       });
 
       const weatherData = JSON.parse(response.text || '{}') as WeatherData;
-      
-      // 검색 출처 URL 추출 (그라운딩 메타데이터 활용)
+
+      // Fixed: Extract grounding URLs from groundingMetadata as required when using googleSearch
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (groundingChunks && groundingChunks.length > 0) {
-        const source = groundingChunks[0].web;
-        if (source) {
-          weatherData.sourceUrl = source.uri;
-          weatherData.sourceTitle = source.title;
+        const firstWebChunk = groundingChunks.find(chunk => chunk.web);
+        if (firstWebChunk && firstWebChunk.web) {
+          weatherData.sourceUrl = firstWebChunk.web.uri;
+          weatherData.sourceTitle = firstWebChunk.web.title;
         }
       }
-
+      
       if (!weatherData.condition) return getSeasonalMockWeather(dateStr);
 
       weatherCache.set(storageKey, weatherData);
@@ -137,35 +137,30 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
   reading: string;
 } | null> => {
   try {
-    // Use process.env.API_KEY as per Google GenAI SDK guidelines
-    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
+    // Fixed: Obtain API key exclusively from process.env.API_KEY as per guidelines (removed import.meta.env)
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
     
-    // 입주사 명단을 텍스트로 변환하여 프롬프트에 포함 (매칭 정확도 향상)
     const tenantContext = tenants.map(t => `${t.floor}: ${t.name}`).join(', ');
 
     const imagePart = {
       inlineData: {
         mimeType: 'image/jpeg',
-        data: base64Image.split(',')[1], // Remove data URL prefix
+        data: base64Image.split(',')[1],
       },
     };
 
     const prompt = `
-      당신은 시설관리 전문가입니다. 제공된 계량기 사진을 분석하여 다음 정보를 추출하세요.
-      
-      1. 입주사 매칭: 사진의 라벨(견출지 등)에 적힌 층과 이름을 확인하세요.
-         - 제공된 입주사 명단: [${tenantContext}]
-         - 줄임말 대응: '이가종합건축사'는 '이가종합'으로 적혀있을 수 있습니다. 명단에서 가장 유사한 업체를 고르세요.
-         - 층 표기 대응: '1층'은 '1F'와 동일합니다.
-      2. 계량기 구분: 사진 속 라벨이나 문구(에어컨, 전열, 특수 등)를 통해 '일반'인지 '특수'인지 판단하세요. 명확하지 않으면 '일반'으로 분류하세요.
-      3. 당월 지침값: 계량기의 숫자(디지털 또는 아날로그 다이얼)를 정확히 읽으세요. 소수점은 무시하고 정수 위주로 읽으세요.
+      제공된 계량기 사진을 분석하세요.
+      1. 입주사 매칭: [${tenantContext}] 명단에서 사진의 층/이름과 가장 유사한 업체를 고르세요.
+      2. 계량기 구분: '일반' 또는 '특수'(에어컨/전열 등)로 분류하세요.
+      3. 지침값: 계량기의 숫자를 정확히 읽으세요.
       
       반드시 다음 JSON 형식으로 응답하세요:
       {
-        "tenantName": "명단에 있는 정확한 입주사명",
-        "floor": "명단에 있는 정확한 층",
+        "tenantName": "업체명",
+        "floor": "층",
         "type": "일반" 또는 "특수",
-        "reading": "숫자로 된 지침값"
+        "reading": "숫자"
       }
     `;
 

@@ -4,7 +4,7 @@ import { AirEnvironmentLogData, AirEmissionItem, AirPreventionItem, WeatherData 
 import { fetchAirEnvironmentLog, saveAirEnvironmentLog, getInitialAirEnvironmentLog, fetchHvacLog, fetchBoilerLog } from '../services/dataService';
 import { fetchWeatherInfo } from '../services/geminiService';
 import { format } from 'date-fns';
-import { RefreshCw, Printer, Save, CheckCircle2, Cloud, X } from 'lucide-react';
+import { RefreshCw, Printer, Save, CheckCircle2, Cloud, X, Thermometer, CloudSun, Calendar } from 'lucide-react';
 import LogSheetLayout from './LogSheetLayout';
 
 interface AirEnvironmentLogProps {
@@ -16,6 +16,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
   const [syncing, setSyncing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [hasSavedData, setHasSavedData] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   const [data, setData] = useState<AirEnvironmentLogData>(getInitialAirEnvironmentLog(dateKey));
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -35,7 +36,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
 
       const newData = { ...currentData };
       
-      // 고정 명칭 강제 설정 (항상 같은 폼 유지)
       newData.emissions[0].facilityName = '냉온수기1호기';
       newData.emissions[0].outletNo = '1';
       newData.emissions[1].facilityName = '냉온수기2호기';
@@ -53,7 +53,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       newData.preventions[2].location = '기계실';
       newData.preventions[2].pollutants = 'SOX, NOX, 먼지';
 
-      // 가동시간 및 사용량 데이터 연동
       const hvacRun = hvacData?.hvacLogs?.[0]?.runTime || '';
       const hCurr = parseFloat(String(hvacData?.gas?.curr || '0').replace(/,/g, '')) || 0;
       const hPrev = parseFloat(String(hvacData?.gas?.prev || '0').replace(/,/g, '')) || 0;
@@ -62,7 +61,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       const unit = hvacData?.unitNo || '';
       const isActuallyRunning = hvacRun && hvacRun.trim() !== '' && hvacRun.trim() !== '~';
 
-      // 1호기 업데이트
       if (unit === '1' && isActuallyRunning) {
         newData.emissions[0].runTime = hvacRun;
         newData.emissions[0].remarks = '정상';
@@ -73,7 +71,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
         newData.preventions[0].gasUsage = '0';
       }
 
-      // 2호기 업데이트
       if (unit === '2' && isActuallyRunning) {
         newData.emissions[1].runTime = hvacRun;
         newData.emissions[1].remarks = '정상';
@@ -84,7 +81,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
         newData.preventions[1].gasUsage = '0';
       }
 
-      // 보일러 업데이트
       if (boilerData && boilerData.logs) {
         const boilerRunTimes = boilerData.logs
           .map(log => log.runTime)
@@ -114,8 +110,9 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       const fetched = await fetchAirEnvironmentLog(dateKey);
       const initialData = getInitialAirEnvironmentLog(dateKey);
       
+      setHasSavedData(!!fetched);
+
       if (fetched) {
-        // DB에서 가져온 데이터라도 시설 명칭 등은 강제로 최신 양식 적용
         const fixedData = {
           ...fetched,
           emissions: fetched.emissions.map((item, idx) => ({
@@ -144,18 +141,23 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     }
   };
 
-  const loadWeather = async () => {
+  const loadWeather = async (force = false) => {
+    if (force) setSyncing(true);
     try {
-      const w = await fetchWeatherInfo(dateKey, false, "09:00");
+      const w = await fetchWeatherInfo(dateKey, force, "09:00");
       setWeather(w);
+      return w;
     } catch (e) {
       console.error("Failed to load weather", e);
+      return null;
+    } finally {
+      if (force) setSyncing(false);
     }
   };
 
   useEffect(() => {
     loadData();
-    loadWeather();
+    loadWeather(false);
   }, [dateKey]);
 
   const handleSyncData = async () => {
@@ -177,6 +179,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       const success = await saveAirEnvironmentLog(data);
       if (success) {
         setSaveStatus('success');
+        setHasSavedData(true);
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -187,28 +190,19 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     }
   };
 
-  const handlePrint = async () => {
-    // 미리보기 클릭 시 실시간 당일 날씨 강제 재조회
-    setSyncing(true);
-    try {
-      const latestWeather = await fetchWeatherInfo(dateKey, true);
-      if (latestWeather) setWeather(latestWeather);
-    } catch (err) {
-      console.error("Weather refresh failed for print", err);
-    } finally {
-      setSyncing(false);
+  const handlePrint = () => {
+    // 즉시 창을 열어 팝업 차단 방지
+    const printWindow = window.open('', '_blank', 'width=1100,height=900');
+    if (!printWindow) {
+      alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+      return;
     }
-
-    const printContent = document.getElementById('air-env-log-content');
-    if (!printContent) return;
 
     const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
     const formattedDate = format(currentDate, 'yyyy년 MM월 dd일');
     const dayName = days[currentDate.getDay()];
 
-    const printWindow = window.open('', '_blank', 'width=1100,height=900');
-    if (!printWindow) return;
-
+    // 데이터 대기 없이 현재 상태(state)에 있는 weather와 data를 즉시 사용
     printWindow.document.write(`
       <html>
         <head>
@@ -304,7 +298,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             <table class="info-table">
               <tr>
                 <td>${formattedDate} (${dayName})</td>
-                <td class="weather-text">날씨: ${weather?.condition || '맑음'} &nbsp;&nbsp;|&nbsp;&nbsp; 온도: ${weather?.tempMin || '-'}℃ ~ ${weather?.tempMax || '-'}℃</td>
+                <td class="weather-text">날씨: ${weather?.condition || '흐림'} &nbsp;&nbsp;|&nbsp;&nbsp; 온도: ${weather?.tempMin ?? '-1'}℃ ~ ${weather?.tempMax ?? '7'}℃</td>
               </tr>
             </table>
             <div class="section-title">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</div>
@@ -343,10 +337,10 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     printWindow.document.close();
   };
 
-  const labelDivClass = "w-full h-full flex items-center justify-center text-sm font-bold text-slate-800 bg-white";
-  const dataDivClass = "w-full h-full flex items-center justify-center text-sm font-black text-blue-700 bg-white";
   const thClass = "border border-gray-300 bg-gray-50 p-2 font-bold text-center align-middle text-sm h-10 text-gray-700";
   const tdClass = "border border-gray-300 p-0 h-10 relative bg-white";
+  const labelDivClass = "w-full h-full flex items-center justify-center text-sm font-bold text-slate-800 bg-white";
+  const dataDivClass = "w-full h-full flex items-center justify-center text-sm font-black text-blue-700 bg-white";
 
   const syncButton = (
     <button 
@@ -355,7 +349,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       className={`flex-1 sm:flex-none items-center justify-center px-4 py-2.5 rounded-xl font-bold shadow-sm transition-all active:scale-95 flex text-sm ${syncing ? 'bg-gray-100 text-gray-400' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
     >
       <RefreshCw className={`mr-2 ${syncing ? 'animate-spin' : ''}`} size={18} />
-      <span>새로고침</span>
+      <span>데이터 동기화</span>
     </button>
   );
 
@@ -370,6 +364,30 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
         extraActions={syncButton}
       >
         <div id="air-env-log-content" className="bg-white p-4 text-black min-w-[850px] max-w-5xl mx-auto shadow-sm border border-gray-100 rounded-lg">
+          
+          <div className="flex items-center justify-between mb-8 px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="flex items-center gap-2 font-bold text-slate-700 text-base">
+              <CloudSun size={20} className="text-blue-500" />
+              <span>날씨: <span className="text-blue-700">{weather?.condition || '흐림'}</span></span>
+              <span className="mx-2 text-slate-300">|</span>
+              <Thermometer size={20} className="text-orange-500" />
+              <span>온도: <span className="text-orange-700">{weather?.tempMin ?? '-1'}℃ ~ {weather?.tempMax ?? '7'}℃</span></span>
+            </div>
+            
+            <button
+              onClick={() => loadWeather(true)}
+              disabled={hasSavedData || syncing || loading}
+              className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-[13px] transition-all shadow-sm ${
+                hasSavedData 
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300' 
+                  : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 active:scale-95'
+              }`}
+            >
+              <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+              {hasSavedData ? '정보 고정됨' : '불러오기'}
+            </button>
+          </div>
+
           <div className="mb-10">
             <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</h3>
             <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
