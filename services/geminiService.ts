@@ -1,14 +1,11 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 import { WeatherData, Tenant } from "../types";
-import { isWithinInterval, addDays, subDays, parseISO, startOfDay } from "date-fns";
+import { isWithinInterval, addDays, subDays, parseISO, startOfDay, format } from "date-fns";
 
 // 캐시 및 상태 관리
 const weatherCache = new Map<string, WeatherData>();
 const pendingRequests = new Map<string, Promise<WeatherData | null>>();
-
-// 기상청 API 키 (사용자 제공)
-const KMA_API_KEY = "ee091b24333b8a98fef62d62d6208aff0713004c9702eeee542de1c4b3618138";
 
 const getSeasonalMockWeather = (dateStr: string): WeatherData => {
   const date = parseISO(dateStr);
@@ -35,17 +32,17 @@ const getSeasonalMockWeather = (dateStr: string): WeatherData => {
 };
 
 /**
- * 날씨 정보를 가져오는 함수 (기상청 API 사용)
+ * 날씨 정보를 가져오는 함수 (Google Gemini API - Search Grounding 사용)
  */
 export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, time: string = "09:00"): Promise<WeatherData | null> => {
   const targetDate = startOfDay(parseISO(dateStr));
   const today = startOfDay(new Date());
   
-  const storageKey = `weather_v9_${dateStr}_${time.replace(':', '')}`;
+  const storageKey = `weather_gemini_v1_${dateStr}`;
 
-  // 기상청 단기예보 특성상 현재 기준 ±3일 이내만 실시간 조회 시도
+  // 과거 데이터나 너무 먼 미래 데이터는 검색 효율이 떨어지므로 계절별 모의 데이터 반환
   const isNearToday = isWithinInterval(targetDate, {
-    start: subDays(today, 3),
+    start: subDays(today, 1),
     end: addDays(today, 3)
   });
 
@@ -67,56 +64,50 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 
   const fetchPromise = (async () => {
     try {
-      // 기상청 단기예보 API 호출 (대치동 좌표: nx=61, ny=125)
-      const baseDate = dateStr.replace(/-/g, '');
-      const baseTime = "0500"; // 05시 발표 데이터 기준
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
-      // API 키 인코딩 처리
-      const url = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?serviceKey=${encodeURIComponent(KMA_API_KEY)}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=61&ny=125`;
+      const prompt = `
+        오늘(${dateStr}) 서울 강남구 대치동의 '네이버 날씨' 정보를 검색해서 알려줘.
+        응답은 반드시 아래 JSON 형식을 지켜야 해:
+        {
+          "condition": "맑음/흐림/비/눈/구름많음 등",
+          "tempCurrent": 현재온도(숫자),
+          "tempMin": 최저온도(숫자),
+          "tempMax": 최고온도(숫자),
+          "icon": "sun" | "cloud" | "cloud-rain" | "cloud-snow" | "cloud-sun" | "wind" 중 하나 선택
+        }
+      `;
 
-      const response = await fetch(url);
-      
-      if (!response.ok) {
-        return getSeasonalMockWeather(dateStr);
-      }
-
-      const json = await response.json();
-
-      if (json.response?.header?.resultCode !== "00") {
-        return getSeasonalMockWeather(dateStr);
-      }
-
-      const items = json.response.body.items.item;
-      let tempMin = 0, tempMax = 0, sky = "1", pty = "0", tempCur = 0;
-      
-      items.forEach((item: any) => {
-        if (item.category === "TMN") tempMin = Math.round(parseFloat(item.fcstValue));
-        if (item.category === "TMX") tempMax = Math.round(parseFloat(item.fcstValue));
-        if (item.category === "SKY") sky = item.fcstValue;
-        if (item.category === "PTY") pty = item.fcstValue;
-        if (item.category === "TMP" && item.fcstTime === "0900") tempCur = Math.round(parseFloat(item.fcstValue));
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              condition: { type: Type.STRING },
+              tempCurrent: { type: Type.NUMBER },
+              tempMin: { type: Type.NUMBER },
+              tempMax: { type: Type.NUMBER },
+              icon: { type: Type.STRING }
+            },
+            required: ["condition", "tempCurrent", "tempMin", "tempMax", "icon"]
+          }
+        },
       });
 
-      let condition = "맑음";
-      let icon = "sun";
-
-      if (pty !== "0") {
-        condition = pty === "1" ? "비" : pty === "2" ? "비/눈" : pty === "3" ? "눈" : "소나기";
-        icon = "cloud-rain";
-      } else {
-        if (sky === "1") { condition = "맑음"; icon = "sun"; }
-        else if (sky === "3") { condition = "구름많음"; icon = "cloud-sun"; }
-        else if (sky === "4") { condition = "흐림"; icon = "cloud"; }
-      }
+      const weatherResult = JSON.parse(response.text || '{}');
+      
+      // 검색 출처 URL 추출 (Search Grounding 필수 규칙)
+      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+      const sourceUrl = groundingChunks?.[0]?.web?.uri || "https://weather.naver.com";
 
       const weatherData: WeatherData = {
-        condition,
-        tempCurrent: tempCur || Math.round((tempMin + tempMax) / 2),
-        tempMin: tempMin || -2,
-        tempMax: tempMax || 7,
-        icon,
-        sourceUrl: "https://www.weather.go.kr",
-        sourceTitle: "기상청 단기예보"
+        ...weatherResult,
+        sourceUrl: sourceUrl,
+        sourceTitle: "네이버 날씨 (Gemini 검색)"
       };
 
       weatherCache.set(storageKey, weatherData);
@@ -124,6 +115,7 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
       return weatherData;
 
     } catch (error) {
+      console.error("Gemini Weather Error:", error);
       return getSeasonalMockWeather(dateStr);
     } finally {
       pendingRequests.delete(storageKey);

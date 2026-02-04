@@ -1,5 +1,5 @@
 {
-  "name": "02.04 작업중",
+  "name": "02.04 날씨 구글AI 저장",
   "description": "A comprehensive facility management dashboard for the Saemaul Undong Junganghoe Daechi-dong Building, featuring digital logs, scheduling, and AI-assisted weather updates.",
   "requestFramePermissions": [
     "camera"
