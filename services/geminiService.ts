@@ -41,7 +41,7 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
   const targetDate = startOfDay(parseISO(dateStr));
   const today = startOfDay(new Date());
   
-  const storageKey = `weather_v6_${dateStr}_${time.replace(':', '')}`;
+  const storageKey = `weather_v7_${dateStr}_${time.replace(':', '')}`;
 
   const isNearToday = isWithinInterval(targetDate, {
     start: subDays(today, 14),
@@ -69,35 +69,42 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 
   const fetchPromise = (async () => {
     try {
-      // Fixed: Obtain API key exclusively from process.env.API_KEY as per guidelines (removed import.meta.env)
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
       
       const prompt = `네이버 날씨 정보를 검색해서 서울 지역의 ${dateStr} ${time} 기준 날씨와 최저/최고 온도를 알려줘. 
-      결과 데이터 중 "condition" 필드는 반드시 한글 텍스트(예: 맑음, 흐림)여야 합니다. JSON 형식으로 반환하세요.`;
+      결과 데이터 중 "condition" 필드는 반드시 한글 텍스트(예: 맑음, 흐림)여야 합니다. 
+      반드시 아래와 같은 순수한 JSON 형식으로만 응답하세요:
+      {
+        "condition": "맑음",
+        "tempCurrent": 15,
+        "tempMin": 10,
+        "tempMax": 20,
+        "icon": "sun"
+      }`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: prompt,
         config: {
           tools: [{ googleSearch: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              condition: { type: Type.STRING },
-              tempCurrent: { type: Type.NUMBER },
-              tempMin: { type: Type.NUMBER },
-              tempMax: { type: Type.NUMBER },
-              icon: { type: Type.STRING }
-            },
-            required: ["condition", "tempCurrent", "tempMin", "tempMax", "icon"]
-          }
+          // Fixed: googleSearch 사용 시 responseMimeType 및 responseSchema는 400에러를 유발하므로 제거함
         }
       });
 
-      const weatherData = JSON.parse(response.text || '{}') as WeatherData;
+      const responseText = response.text || "";
+      // 텍스트 응답 내에서 JSON 블록만 추출하는 로직 추가
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
+      
+      let weatherData: WeatherData;
+      try {
+        weatherData = JSON.parse(jsonStr) as WeatherData;
+      } catch (parseErr) {
+        console.warn("JSON parsing failed, using fallback", parseErr);
+        return getSeasonalMockWeather(dateStr);
+      }
 
-      // Fixed: Extract grounding URLs from groundingMetadata as required when using googleSearch
+      // Grounding 정보 추출 (필수 요구사항)
       const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
       if (groundingChunks && groundingChunks.length > 0) {
         const firstWebChunk = groundingChunks.find(chunk => chunk.web);
@@ -137,9 +144,7 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
   reading: string;
 } | null> => {
   try {
-    // Fixed: Obtain API key exclusively from process.env.API_KEY as per guidelines (removed import.meta.env)
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-    
     const tenantContext = tenants.map(t => `${t.floor}: ${t.name}`).join(', ');
 
     const imagePart = {
