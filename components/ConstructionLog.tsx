@@ -6,7 +6,8 @@ import {
   saveExternalWorkList, 
   fetchInternalWorkList, 
   saveInternalWorkList,
-  uploadFile
+  uploadFile,
+  deleteConstructionWorkItem
 } from '../services/dataService';
 import { Save, Plus, Trash2, Upload, Download, Image as ImageIcon, RotateCcw, RefreshCw, Search, Edit2, Cloud, X, CheckCircle, AlertTriangle } from 'lucide-react';
 
@@ -50,6 +51,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
   const [items, setItems] = useState<WorkItemWithSource[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isUpdateMode, setIsUpdateMode] = useState(false);
+  const [showForm, setShowForm] = useState(false); // 등록창 표시 여부
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [deleteTargetItem, setDeleteTargetItem] = useState<WorkItemWithSource | null>(null);
   const [currentItem, setCurrentItem] = useState<WorkItemWithSource>({
@@ -85,7 +87,12 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     setIsUpdateMode(false);
   };
 
-  const handleEdit = (item: WorkItemWithSource) => { setCurrentItem({ ...item }); setIsUpdateMode(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const handleEdit = (item: WorkItemWithSource) => { 
+    setCurrentItem({ ...item }); 
+    setIsUpdateMode(true); 
+    setShowForm(true); // 수정 시 폼 열기
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+  };
 
   const handleDelete = (e: React.MouseEvent, item: WorkItemWithSource) => {
     e.stopPropagation();
@@ -95,29 +102,27 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
   const confirmDelete = async () => {
     if (!deleteTargetItem) return;
     
-    const item = deleteTargetItem;
-    const idStr = String(item.id);
-    const originalItems = [...items];
-    const newItems = items.filter(i => String(i.id) !== idStr);
-    
-    setItems(newItems);
-    if (String(currentItem.id) === idStr) handleReset(true);
-    setDeleteTargetItem(null);
+    setLoading(true);
+    const idStr = String(deleteTargetItem.id);
 
     try {
-      const isExternal = item.source === 'external';
-      const saveFn = isExternal ? saveExternalWorkList : saveInternalWorkList;
-      const listToSave = newItems.filter(i => i.source === item.source).map(({ source, ...rest }) => rest as ConstructionWorkItem);
+      // 서버에서 직접 삭제 실행
+      const success = await deleteConstructionWorkItem(idStr);
       
-      const success = await saveFn(listToSave);
-      if (!success) {
-        setItems(originalItems);
-        alert('삭제 실패 (서버 저장 오류)');
+      if (success) {
+        // 성공 시 로컬 상태 업데이트
+        setItems(prev => prev.filter(i => String(i.id) !== idStr));
+        if (String(currentItem.id) === idStr) handleReset(true);
+        alert('성공적으로 삭제되었습니다.');
+      } else {
+        alert('서버 데이터 삭제에 실패했습니다.');
       }
     } catch (e) {
       console.error(e);
-      setItems(originalItems);
       alert('삭제 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+      setDeleteTargetItem(null);
     }
   };
 
@@ -170,6 +175,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
         alert('성공적으로 저장되었습니다.');
         await loadData(); 
         handleReset(true); 
+        setShowForm(false); // 저장 후 폼 닫기
       } else {
         alert('저장 실패');
       }
@@ -226,9 +232,16 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     );
   }, [items, searchTerm]);
 
+  const toggleForm = () => {
+    if (showForm && isUpdateMode) {
+      handleReset(true);
+    }
+    setShowForm(!showForm);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-center mb-4 bg-white p-4 rounded-lg border border-gray-200 shadow-sm gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm gap-4">
         <div className="flex items-center gap-4 w-full md:w-auto">
           <h2 className="text-xl font-bold text-gray-800 whitespace-nowrap">{getTitle()} 관리 대장</h2>
           <div className="relative flex-1 md:w-64">
@@ -242,58 +255,85 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
             <Search className="absolute left-3.5 top-2.5 text-gray-400 w-4 h-4" />
           </div>
         </div>
-        <button onClick={loadData} className="p-2 hover:bg-gray-100 rounded-full transition-all text-gray-500 shrink-0">
-           <RefreshCw size={18} className={loading && items.length > 0 ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <button 
+            onClick={toggleForm} 
+            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold shadow-md transition-all text-sm flex-1 md:flex-none ${showForm ? 'bg-gray-500 text-white hover:bg-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+          >
+            {showForm ? <X size={18} /> : <Plus size={18} />}
+            {showForm ? '닫기' : '작업 등록'}
+          </button>
+          <button 
+            onClick={loadData} 
+            disabled={loading}
+            className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
+          >
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            <span>새로고침</span>
+          </button>
+        </div>
       </div>
 
-      <div className={`p-6 rounded-xl border shadow-sm animate-fade-in mb-6 transition-all duration-300 ${isUpdateMode ? 'bg-orange-50 border-orange-200' : 'bg-blue-50/50 border-blue-200'}`}>
-        <h3 className="font-bold text-lg text-gray-800 mb-4 pb-2 border-b border-blue-100 flex items-center">
-          <span className={`w-2 h-6 rounded-full mr-3 ${isUpdateMode ? 'bg-orange-500' : 'bg-blue-600'}`}></span>
-          {isUpdateMode ? '작업 내역 수정' : '신규 작업 등록'}
-        </h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
-          <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">날짜</label><input type="date" value={currentItem.date} onChange={e => setCurrentItem({...currentItem, date: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black focus:ring-1 focus:ring-blue-400 outline-none"/></div>
-          <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">구분</label><select value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black focus:ring-1 focus:ring-blue-400 outline-none"><option value="전기">전기</option><option value="기계">기계</option><option value="소방">소방</option><option value="승강기">승강기</option><option value="영선">영선</option><option value="미화">미화</option></select></div>
-          {mode === 'external' && <div className="md:col-span-3"><label className="block text-xs font-bold text-gray-500 mb-1">업체명</label><input type="text" value={currentItem.company || ''} onChange={e => setCurrentItem({...currentItem, company: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black placeholder:text-gray-300 focus:ring-1 focus:ring-blue-400 outline-none" placeholder="업체명"/></div>}
-          <div className={mode === 'external' ? "md:col-span-5" : "md:col-span-8"}><label className="block text-xs font-bold text-gray-500 mb-1">내용</label><textarea value={currentItem.content} onChange={e => setCurrentItem({...currentItem, content: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black resize-none min-h-[42px] focus:ring-1 focus:ring-blue-400 outline-none" placeholder="작업 내용을 상세히 입력하세요."/></div>
-        </div>
+      {showForm && (
+        <div className={`p-6 rounded-xl border shadow-sm animate-fade-in mb-6 transition-all duration-300 ${isUpdateMode ? 'bg-orange-50 border-orange-200' : 'bg-blue-50/50 border-blue-200'}`}>
+          <h3 className="font-bold text-lg text-gray-800 mb-4 pb-2 border-b border-blue-100 flex items-center">
+            <span className={`w-2 h-6 rounded-full mr-3 ${isUpdateMode ? 'bg-orange-500' : 'bg-blue-600'}`}></span>
+            {isUpdateMode ? '작업 내역 수정' : '신규 작업 등록'}
+          </h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
+            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">날짜</label><input type="date" value={currentItem.date} onChange={e => setCurrentItem({...currentItem, date: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black focus:ring-1 focus:ring-blue-400 outline-none"/></div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-gray-500 mb-1">구분</label>
+              <select value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black focus:ring-1 focus:ring-blue-400 outline-none">
+                <option value="전기">전기</option>
+                <option value="기계">기계</option>
+                <option value="소방">소방</option>
+                <option value="승강기">승강기</option>
+                <option value="영선">영선</option>
+                <option value="미화">미화</option>
+                <option value="주차">주차</option>
+              </select>
+            </div>
+            {mode === 'external' && <div className="md:col-span-3"><label className="block text-xs font-bold text-gray-500 mb-1">업체명</label><input type="text" value={currentItem.company || ''} onChange={e => setCurrentItem({...currentItem, company: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black placeholder:text-gray-300 focus:ring-1 focus:ring-blue-400 outline-none" placeholder="업체명"/></div>}
+            <div className={mode === 'external' ? "md:col-span-5" : "md:col-span-8"}><label className="block text-xs font-bold text-gray-500 mb-1">내용</label><textarea value={currentItem.content} onChange={e => setCurrentItem({...currentItem, content: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black resize-none min-h-[42px] focus:ring-1 focus:ring-blue-400 outline-none" placeholder="작업 내용을 상세히 입력하세요."/></div>
+          </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-bold text-gray-600 mb-2">사진 첨부 ({currentItem.photos.length}/{PHOTO_LIMIT}) <span className="text-[10px] text-blue-500 ml-2">* 저장 시 사진은 압축되어 서버에 최적화 저장됩니다.</span></label>
-          <div className="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-10 gap-2">
-            {currentItem.photos.length < PHOTO_LIMIT && (
-              <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-white hover:border-blue-400 transition-colors">
-                <Upload size={20} className="text-gray-400" />
-                <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload}/>
-              </label>
-            )}
-            {currentItem.photos.map((photo) => (
-              <div key={photo.id} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden group">
-                <img src={formatImageUrl(photo.dataUrl)} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                  <button onClick={() => downloadPhoto(photo)} className="p-1.5 bg-white rounded-full text-blue-600 hover:bg-blue-50" title="다운로드">
-                    <Download size={14} />
-                  </button>
-                  <button onClick={() => removePhoto(photo.id)} className="p-1.5 bg-white rounded-full text-red-600 hover:bg-red-50" title="삭제">
-                    <Trash2 size={14} />
-                  </button>
+          <div className="mb-6">
+            <label className="block text-sm font-bold text-gray-600 mb-2">사진 첨부 ({currentItem.photos.length}/{PHOTO_LIMIT}) <span className="text-[10px] text-blue-500 ml-2">* 저장 시 사진은 압축되어 서버에 최적화 저장됩니다.</span></label>
+            <div className="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-10 gap-2">
+              {currentItem.photos.length < PHOTO_LIMIT && (
+                <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-white hover:border-blue-400 transition-colors">
+                  <Upload size={20} className="text-gray-400" />
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload}/>
+                </label>
+              )}
+              {currentItem.photos.map((photo) => (
+                <div key={photo.id} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden group">
+                  <img src={formatImageUrl(photo.dataUrl)} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button onClick={() => downloadPhoto(photo)} className="p-1.5 bg-white rounded-full text-blue-600 hover:bg-blue-50" title="다운로드">
+                      <Download size={14} />
+                    </button>
+                    <button onClick={() => removePhoto(photo.id)} className="p-1.5 bg-white rounded-full text-red-600 hover:bg-red-50" title="삭제">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-blue-100">
+            <button onClick={() => { handleReset(true); setShowForm(false); }} className="flex items-center px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-50 font-bold border border-gray-200 transition-all text-sm">
+              <RotateCcw size={18} className="mr-2" /> 취소
+            </button>
+            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-md transition-all text-sm disabled:bg-gray-400 active:scale-95">
+              <Save size={18} className="mr-2" /> {isUpdateMode ? '수정 완료' : '서버저장'}
+            </button>
           </div>
         </div>
-
-        <div className="flex justify-end gap-3 pt-4 border-t border-blue-100">
-          <button onClick={() => handleReset(true)} className="flex items-center px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-50 font-bold border border-gray-200 transition-all text-sm">
-            <RotateCcw size={18} className="mr-2" /> 초기화
-          </button>
-          <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-md transition-all text-sm disabled:bg-gray-400 active:scale-95">
-            <Save size={18} className="mr-2" /> {isUpdateMode ? '수정 완료' : '서버저장'}
-          </button>
-        </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all">
         <div className="overflow-x-auto scrollbar-hide">

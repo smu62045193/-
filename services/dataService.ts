@@ -901,6 +901,14 @@ export const saveInternalWorkList = async (list: ConstructionWorkItem[]): Promis
   return !error;
 };
 
+/**
+ * 공사/작업 로그 영구 삭제 (Row 기반)
+ */
+export const deleteConstructionWorkItem = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('construction_logs').delete().eq('id', id);
+  return !error;
+};
+
 export const fetchConsumableRequests = async (): Promise<ConsumableRequest[]> => {
   try {
     const { data } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLE_REQ_DB').maybeSingle();
@@ -964,7 +972,7 @@ export const fetchContractors = async (): Promise<Contractor[]> => {
       type: c.type, 
       contactPerson: c.contact_person, 
       phoneMain: c.phone_main, 
-      phoneMobile: c.phone_mobile, 
+      phone_mobile: c.phone_mobile, 
       fax: c.fax, 
       note: c.note 
     }));
@@ -1145,7 +1153,7 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       type: item.type, 
       floor: item.floor, 
       company: item.company, 
-      serialNo: item.serial_no, 
+      serial_no: item.serial_no, 
       phone: item.phone, 
       certNo: item.cert_no, 
       date: item.date, 
