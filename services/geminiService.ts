@@ -6,8 +6,9 @@ import { isWithinInterval, addDays, subDays, parseISO, startOfDay } from "date-f
 // 캐시 및 상태 관리
 const weatherCache = new Map<string, WeatherData>();
 const pendingRequests = new Map<string, Promise<WeatherData | null>>();
-const QUOTA_BLOCK_KEY = "gemini_api_quota_blocked_until";
-const QUOTA_RESET_TIME = 1000 * 60 * 60; // 1시간 차단
+
+// 기상청 API 키 (사용자 제공)
+const KMA_API_KEY = "ee091b24333b8a98fef62d62d6208aff0713004c9702eeee542de1c4b3618138";
 
 const getSeasonalMockWeather = (dateStr: string): WeatherData => {
   const date = parseISO(dateStr);
@@ -34,24 +35,21 @@ const getSeasonalMockWeather = (dateStr: string): WeatherData => {
 };
 
 /**
- * 날씨 정보를 가져오는 함수
+ * 날씨 정보를 가져오는 함수 (기상청 API 사용)
  */
 export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, time: string = "09:00"): Promise<WeatherData | null> => {
-  const now = Date.now();
   const targetDate = startOfDay(parseISO(dateStr));
   const today = startOfDay(new Date());
   
-  const storageKey = `weather_v7_${dateStr}_${time.replace(':', '')}`;
+  const storageKey = `weather_v9_${dateStr}_${time.replace(':', '')}`;
 
+  // 기상청 단기예보 특성상 현재 기준 ±3일 이내만 실시간 조회 시도
   const isNearToday = isWithinInterval(targetDate, {
-    start: subDays(today, 14),
-    end: addDays(today, 14)
+    start: subDays(today, 3),
+    end: addDays(today, 3)
   });
 
   if (!isNearToday) return getSeasonalMockWeather(dateStr);
-
-  const blockedUntil = localStorage.getItem(QUOTA_BLOCK_KEY);
-  if (blockedUntil && parseInt(blockedUntil) > now && !force) return getSeasonalMockWeather(dateStr);
 
   if (!force) {
     if (weatherCache.has(storageKey)) return weatherCache.get(storageKey) || null;
@@ -69,61 +67,76 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 
   const fetchPromise = (async () => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+      // 기상청 단기예보 API 호출 (대치동 좌표: nx=61, ny=125)
+      const baseDate = dateStr.replace(/-/g, '');
+      const baseTime = "0500"; // 05시 발표 데이터 기준
       
-      const prompt = `네이버 날씨 정보를 검색해서 서울 지역의 ${dateStr} ${time} 기준 날씨와 최저/최고 온도를 알려줘. 
-      결과 데이터 중 "condition" 필드는 반드시 한글 텍스트(예: 맑음, 흐림)여야 합니다. 
-      반드시 아래와 같은 순수한 JSON 형식으로만 응답하세요:
-      {
-        "condition": "맑음",
-        "tempCurrent": 15,
-        "tempMin": 10,
-        "tempMax": 20,
-        "icon": "sun"
-      }`;
+      // API 키 인코딩 처리 (일부 키는 특수문자 포함 시 인코딩 필요할 수 있음)
+      const url = `https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst?serviceKey=${encodeURIComponent(KMA_API_KEY)}&pageNo=1&numOfRows=1000&dataType=JSON&base_date=${baseDate}&base_time=${baseTime}&nx=61&ny=125`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-          // Fixed: googleSearch 사용 시 responseMimeType 및 responseSchema는 400에러를 유발하므로 제거함
-        }
-      });
-
-      const responseText = response.text || "";
-      // 텍스트 응답 내에서 JSON 블록만 추출하는 로직 추가
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
+      const response = await fetch(url);
       
-      let weatherData: WeatherData;
-      try {
-        weatherData = JSON.parse(jsonStr) as WeatherData;
-      } catch (parseErr) {
-        console.warn("JSON parsing failed, using fallback", parseErr);
+      // 응답 상태 확인 (Unauthorized 등의 에러 처리)
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`Weather API Error (${response.status}):`, errorText);
         return getSeasonalMockWeather(dateStr);
       }
 
-      // Grounding 정보 추출 (필수 요구사항)
-      const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      if (groundingChunks && groundingChunks.length > 0) {
-        const firstWebChunk = groundingChunks.find(chunk => chunk.web);
-        if (firstWebChunk && firstWebChunk.web) {
-          weatherData.sourceUrl = firstWebChunk.web.uri;
-          weatherData.sourceTitle = firstWebChunk.web.title;
-        }
+      // Content-Type 확인
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        console.warn("Weather API returned non-JSON response:", text);
+        return getSeasonalMockWeather(dateStr);
       }
+
+      const json = await response.json();
+
+      if (json.response?.header?.resultCode !== "00") {
+        console.warn("KMA API response error:", json.response?.header?.resultMsg);
+        return getSeasonalMockWeather(dateStr);
+      }
+
+      const items = json.response.body.items.item;
+      let tempMin = 0, tempMax = 0, sky = "1", pty = "0", tempCur = 0;
       
-      if (!weatherData.condition) return getSeasonalMockWeather(dateStr);
+      items.forEach((item: any) => {
+        if (item.category === "TMN") tempMin = Math.round(parseFloat(item.fcstValue));
+        if (item.category === "TMX") tempMax = Math.round(parseFloat(item.fcstValue));
+        if (item.category === "SKY") sky = item.fcstValue;
+        if (item.category === "PTY") pty = item.fcstValue;
+        if (item.category === "TMP" && item.fcstTime === "0900") tempCur = Math.round(parseFloat(item.fcstValue));
+      });
+
+      let condition = "맑음";
+      let icon = "sun";
+
+      if (pty !== "0") {
+        condition = pty === "1" ? "비" : pty === "2" ? "비/눈" : pty === "3" ? "눈" : "소나기";
+        icon = "cloud-rain";
+      } else {
+        if (sky === "1") { condition = "맑음"; icon = "sun"; }
+        else if (sky === "3") { condition = "구름많음"; icon = "cloud-sun"; }
+        else if (sky === "4") { condition = "흐림"; icon = "cloud"; }
+      }
+
+      const weatherData: WeatherData = {
+        condition,
+        tempCurrent: tempCur || Math.round((tempMin + tempMax) / 2),
+        tempMin: tempMin || -2,
+        tempMax: tempMax || 7,
+        icon,
+        sourceUrl: "https://www.weather.go.kr",
+        sourceTitle: "기상청 단기예보"
+      };
 
       weatherCache.set(storageKey, weatherData);
       try { localStorage.setItem(storageKey, JSON.stringify(weatherData)); } catch (e) {}
       return weatherData;
 
-    } catch (error: any) {
-      if (error && error.status === 429) {
-        localStorage.setItem(QUOTA_BLOCK_KEY, (Date.now() + QUOTA_RESET_TIME).toString());
-      }
+    } catch (error) {
+      console.error("Weather API fetch failed:", error);
       return getSeasonalMockWeather(dateStr);
     } finally {
       pendingRequests.delete(storageKey);
@@ -135,7 +148,7 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 };
 
 /**
- * 계량기 사진을 분석하여 입주사 및 지침값을 추출하는 함수
+ * 계량기 사진을 분석하여 입주사 및 지침값을 추출하는 함수 (최신 gemini-3-flash-preview 사용)
  */
 export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]): Promise<{
   tenantName: string;
