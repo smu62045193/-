@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
-import { MeterReadingData, MeterReadingItem, Tenant, MeterPhotoItem, StaffMember } from '../types';
+import { MeterReadingData, MeterReadingItem, Tenant, MeterPhotoItem, StaffMember, MeterPhotoData } from '../types';
 import { fetchMeterReading, saveMeterReading, getInitialMeterReading, fetchTenants, fetchMeterPhotos, fetchStaffList, fetchLogoSealSettings } from '../services/dataService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
 import { Save, Printer, Plus, Trash2, RefreshCw, CheckCircle2, X, Cloud, FileText, ChevronLeft, ChevronRight, Calculator, Download, Building2, Edit2, Lock } from 'lucide-react';
@@ -48,18 +47,47 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     setIsSummaryEditMode(false);
     setIsTableEditMode(false);
     try {
-      const fetched = await fetchMeterReading(monthStr);
-      if (fetched && fetched.items && fetched.items.length > 0) {
+      // 1. 기본 검침 기록과 사진첩 데이터를 동시에 가져옴
+      const [fetched, photoData] = await Promise.all([
+        fetchMeterReading(monthStr),
+        fetchMeterPhotos(monthStr)
+      ]);
+
+      const photos = photoData?.items || [];
+
+      if (fetched) {
+        // 이미 서버에 데이터가 있는 경우
+        const updatedItems = (fetched.items || []).map(item => {
+          if (!item.currentReading || item.currentReading === '') {
+            const matchedPhoto = photos.find(p => 
+              p.tenant.trim() === item.tenant.trim() && 
+              p.floor.trim() === item.floor.trim() && 
+              p.type === item.note
+            );
+            if (matchedPhoto && matchedPhoto.reading) {
+              return { ...item, currentReading: matchedPhoto.reading };
+            }
+          }
+          return item;
+        });
+
         setData({
           ...fetched,
+          items: updatedItems,
+          // 중요: 서버 전용 컬럼에서 가져온 작성일(creationDate)을 상태에 세팅
           creationDate: fetched.creationDate || format(new Date(), 'yyyy-MM-dd')
         });
       } else {
+        // 기록이 아예 없는 경우 (신규 생성)
         const prevMonthDate = subMonths(parseISO(`${monthStr}-01`), 1);
         const prevMonthStr = format(prevMonthDate, 'yyyy-MM');
         const prevData = await fetchMeterReading(prevMonthStr);
+        
+        let initialItems: MeterReadingItem[] = [];
+
         if (prevData && prevData.items && prevData.items.length > 0) {
-          const carriedItems: MeterReadingItem[] = prevData.items.map(item => ({
+          // 전월 데이터에서 복사
+          initialItems = prevData.items.map(item => ({
             id: generateId(),
             floor: item.floor,
             tenant: item.tenant,
@@ -70,22 +98,58 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
             prevReading: item.currentReading,
             currentReading: ''
           }));
-          setData({ 
-            month: monthStr, 
-            unitPrice: prevData.unitPrice || '228',
-            totalBillInput: prevData.totalBillInput || '',
-            totalUsageInput: prevData.totalUsageInput || '',
-            creationDate: format(new Date(), 'yyyy-MM-dd'),
-            items: carriedItems 
-          });
         } else {
-          setData({ 
-            ...getInitialMeterReading(monthStr), 
-            unitPrice: '228', 
-            creationDate: format(new Date(), 'yyyy-MM-dd'),
-            items: [] 
-          });
+          // 마스터 DB에서 생성
+          const masterTenants = await fetchTenants();
+          if (masterTenants && masterTenants.length > 0) {
+            initialItems = masterTenants.flatMap(t => [
+              {
+                id: generateId(),
+                floor: t.floor,
+                tenant: t.name,
+                area: t.area || '0',
+                refPower: t.refPower || '2380',
+                multiplier: '1',
+                note: '일반',
+                prevReading: '',
+                currentReading: ''
+              },
+              {
+                id: generateId(),
+                floor: t.floor,
+                tenant: t.name,
+                area: t.area || '0',
+                refPower: '0',
+                multiplier: '1',
+                note: '특수',
+                prevReading: '',
+                currentReading: ''
+              }
+            ]);
+          }
         }
+
+        // 초기 생성된 리스트에 사진첩 데이터가 있다면 즉시 반영
+        const syncedItems = initialItems.map(item => {
+          const matchedPhoto = photos.find(p => 
+            p.tenant.trim() === item.tenant.trim() && 
+            p.floor.trim() === item.floor.trim() && 
+            p.type === item.note
+          );
+          if (matchedPhoto && matchedPhoto.reading) {
+            return { ...item, currentReading: matchedPhoto.reading };
+          }
+          return item;
+        });
+
+        setData({ 
+          month: monthStr, 
+          unitPrice: prevData?.unitPrice || '228',
+          totalBillInput: prevData?.totalBillInput || '',
+          totalUsageInput: prevData?.totalUsageInput || '',
+          creationDate: format(new Date(), 'yyyy-MM-dd'),
+          items: syncedItems 
+        });
       }
     } catch (e) {
       console.error(e);
@@ -117,7 +181,10 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
         setSaveStatus('error');
         alert('저장에 실패했습니다.');
       }
-    } catch (error) { setSaveStatus('error'); }
+    } catch (error) { 
+      setSaveStatus('error'); 
+      alert('저장 중 통신 오류가 발생했습니다.');
+    }
   };
 
   const updateItemField = (id: string, field: keyof MeterReadingItem, value: string) => {
@@ -321,6 +388,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     const pm = format(prevMonthDate, 'MM');
     const periodStr = `${py}년 ${pm}월 17일 ~ ${y}년 ${m}월 16일`;
     
+    // data.creationDate가 있으면 그것을 표시하고, 없으면 오늘 날짜를 표시
     const reportDateObj = data.creationDate ? parseISO(data.creationDate) : new Date();
     const todayStr = format(reportDateObj, 'yyyy년 MM월 dd일');
     
@@ -611,7 +679,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
                     );
                   });
                 })}
-                <tr className="bg-blue-50/50 font-normal border-t-2 border-gray-400"><td colSpan={2} className={`${tdClass} border-r border-gray-300 bg-gray-100`}>합 계</td><td className={`${tdClass} border-r border-gray-300`}>{totalArea.toLocaleString()}</td><td className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} text-right pr-2 border-r border-gray-200 text-blue-700`}>{totalCalculatedBill.toLocaleString()}</td><td colSpan={3} className={`${tdClass} border-r border-gray-200`}></td><td className={`${tdClass} border-r border-gray-200 text-orange-600`}>{totalCalculatedUsage.toLocaleString()}</td><td colSpan={2} className={`${tdClass}`}></td></tr>
+                <tr className="bg-blue-50/50 font-normal border-t-2 border-gray-400"><td colSpan={2} className={`${tdClass} border-r border-gray-300 bg-gray-100`}>합 계</td><td className={`${tdClass} border-r border-gray-300`}>{totalArea.toLocaleString()}</td><td className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} text-right pr-2 border-r border-gray-200 text-blue-700`}>{totalCalculatedBill.toLocaleString()}</td><td colSpan={3} className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} border-r border-gray-200 text-orange-600`}>{totalCalculatedUsage.toLocaleString()}</td><td colSpan={2} className={`${tdClass}`}></td></tr>
               </tbody>
             </table>
           </div>

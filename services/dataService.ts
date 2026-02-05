@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -126,6 +125,17 @@ const mapFromDB = (prefix: string, item: any): any => {
         author: item.author,
         fields: item.fields,
         photos: item.photos,
+        lastUpdated: item.last_updated
+      };
+    case "METER_":
+      // creation_date 컬럼 우선 매핑
+      return {
+        month: item.month,
+        unitPrice: item.unit_price,
+        totalBillInput: item.total_bill_input,
+        totalUsageInput: item.total_usage_input,
+        creationDate: item.creation_date,
+        items: item.items || [],
         lastUpdated: item.last_updated
       };
     case "HVAC_LOG_":
@@ -518,7 +528,11 @@ export const getInitialSubstationLog = (date: string): SubstationLogData => ({
   dailyStats: { activePower: '', reactivePower: '', monthTotal: '', maxPower: '', powerFactor: '', loadFactor: '', demandFactor: '' }
 });
 
-export const getInitialMeterReading = (month: string): MeterReadingData => ({ month, items: [] });
+export const getInitialMeterReading = (month: string): MeterReadingData => ({ 
+  month, 
+  items: [],
+  creationDate: format(new Date(), 'yyyy-MM-dd')
+});
 
 export const getInitialGeneratorCheck = (month: string): GeneratorCheckData => ({
   date: month,
@@ -992,20 +1006,23 @@ export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
 export const fetchMeterReading = async (month: string): Promise<MeterReadingData | null> => {
   try {
     const { data } = await supabase.from('meter_readings').select('*').eq('id', `METER_${month}`).maybeSingle();
-    if (data) return { 
-      month: data.month, 
-      unitPrice: data.unit_price, 
-      totalBillInput: data.total_bill_input, 
-      totalUsageInput: data.total_usage_input, 
-      items: data.items, 
-      lastUpdated: data.last_updated 
-    };
+    if (data) return mapFromDB("METER_", data);
   } catch (err) {}
   return null;
 };
 
 export const saveMeterReading = async (data: MeterReadingData): Promise<boolean> => {
-  const dbData = { id: `METER_${data.month}`, month: data.month, unit_price: data.unitPrice, total_bill_input: data.totalBillInput, total_usage_input: data.totalUsageInput, items: data.items, last_updated: new Date().toISOString() };
+  // creation_date 전용 컬럼에 저장
+  const dbData = { 
+    id: `METER_${data.month}`, 
+    month: data.month, 
+    unit_price: data.unitPrice, 
+    total_bill_input: data.totalBillInput, 
+    total_usage_input: data.totalUsageInput, 
+    creation_date: data.creationDate,
+    items: data.items, 
+    last_updated: new Date().toISOString() 
+  };
   const { error } = await supabase.from('meter_readings').upsert(dbData);
   return !error;
 };

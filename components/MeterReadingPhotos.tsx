@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { MeterPhotoData, MeterPhotoItem, Tenant } from '../types';
+import { MeterPhotoData, MeterPhotoItem, Tenant, MeterReadingData } from '../types';
 import { fetchMeterPhotos, saveMeterPhotos, fetchTenants, fetchMeterReading, saveMeterReading, uploadFile } from '../services/dataService';
 import { analyzeMeterPhoto } from '../services/geminiService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
@@ -50,7 +49,7 @@ const resizeImage = (file: File): Promise<string> => {
 const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [isAiEnabled, setIsAiEnabled] = useState(false); // AI 활성화 상태 기본값을 false로 변경 (AI 분석 OFF가 기본)
+  const [isAiEnabled, setIsAiEnabled] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [currentMonth, setCurrentMonth] = useState(format(currentDate, 'yyyy-MM'));
   const [data, setData] = useState<MeterPhotoData>({ month: currentMonth, items: [] });
@@ -107,13 +106,15 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
     if (photoSaveSuccess) {
       setData(updatedData);
       try {
+        // 월별 검침 기록과의 연동 강화
         const monthlyReadingData = await fetchMeterReading(currentMonth);
         if (monthlyReadingData && monthlyReadingData.items) {
           let updatedCount = 0;
           const updatedMonthlyItems = monthlyReadingData.items.map(mItem => {
+            // 입주사명, 층, 타입(일반/특수) 세 가지 조건으로 매칭
             const matchedPhoto = updatedData.items.find(pItem => 
-              pItem.tenant === mItem.tenant && 
-              pItem.floor === mItem.floor && 
+              pItem.tenant.trim() === mItem.tenant.trim() && 
+              pItem.floor.trim() === mItem.floor.trim() && 
               pItem.type === mItem.note
             );
             if (matchedPhoto && matchedPhoto.reading) {
@@ -122,6 +123,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
             }
             return mItem;
           });
+          
           if (updatedCount > 0) {
             await saveMeterReading({ ...monthlyReadingData, items: updatedMonthlyItems });
           }
@@ -329,12 +331,6 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                 <div className="mt-3 flex items-center justify-center gap-2 text-amber-600 font-black animate-pulse">
                   <Sparkles size={16} />
                   <span className="text-sm">AI가 사진을 분석 중입니다...</span>
-                </div>
-              )}
-              {!isAiEnabled && newItem.photo && (
-                <div className="mt-3 flex items-center justify-center gap-2 text-gray-400 font-bold">
-                  <ZapOff size={14} />
-                  <span className="text-xs">수동 입력 모드 (AI 작동 정지)</span>
                 </div>
               )}
             </div>
