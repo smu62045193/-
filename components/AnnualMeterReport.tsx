@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetchRange } from '../services/dataService';
 import { MeterReadingData, MeterReadingItem } from '../types';
@@ -35,7 +34,8 @@ const AnnualMeterReport: React.FC = () => {
   const loadYearData = async () => {
     setLoading(true);
     try {
-      const results = await apiFetchRange("METER_", `${selectedYear}-01-01`, `${selectedYear}-12-31`);
+      // 2026-01 데이터가 METER_2026-01-01 보다 앞에 정렬되어 누락되는 문제를 방지하기 위해 시작 범위를 YYYY-01로 수정
+      const results = await apiFetchRange("METER_", `${selectedYear}-01`, `${selectedYear}-12-31`);
       const dataList = results.map((r: any) => r.data as MeterReadingData);
       setAllYearData(dataList);
       if (dataList.length > 0 && dataList[0].items.length > 0 && !selectedTenantKey) {
