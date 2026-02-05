@@ -31,7 +31,11 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [showConfirm, setShowConfirm] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
+  
+  // 수정 모드 분리
+  const [isSummaryEditMode, setIsSummaryEditMode] = useState(false);
+  const [isTableEditMode, setIsTableEditMode] = useState(false);
+
   const [currentMonth, setCurrentMonth] = useState(format(currentDate, 'yyyy-MM'));
   const [data, setData] = useState<MeterReadingData>(getInitialMeterReading(format(currentDate, 'yyyy-MM')));
 
@@ -41,7 +45,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
 
   const loadData = async (monthStr: string) => {
     setLoading(true);
-    setIsEditMode(false);
+    setIsSummaryEditMode(false);
+    setIsTableEditMode(false);
     try {
       const fetched = await fetchMeterReading(monthStr);
       if (fetched && fetched.items && fetched.items.length > 0) {
@@ -105,7 +110,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
       const success = await saveMeterReading(data);
       if (success) {
         setSaveStatus('success');
-        setIsEditMode(false);
+        setIsSummaryEditMode(false);
+        setIsTableEditMode(false);
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -338,7 +344,6 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
       photosHtml += `</div>`;
     }
 
-    // DB에서 업로드한 로고가 있으면 사용, 없으면 투명 배경 기본 이미지
     const logoUrl = brandSettings?.logo || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABACAYAAABfv994AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAWElEQVR4nO3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4GMRAAAG34i8zAAAAAElFTkSuQmCC";
 
     const headerBgColor = '#bfdbfe';
@@ -493,12 +498,13 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
           <div className="flex items-center gap-2 pr-2">
             <button onClick={() => loadData(currentMonth)} disabled={loading} className="flex items-center px-4 py-2 bg-gray-50 text-gray-600 rounded-lg border border-gray-200 font-bold hover:bg-gray-100 transition-all text-sm shadow-sm active:scale-95"><RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침</button>
             
+            {/* 상단 수정 버튼 - 요약 전용 */}
             <button 
-              onClick={() => setIsEditMode(!isEditMode)} 
-              className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
+              onClick={() => setIsSummaryEditMode(!isSummaryEditMode)} 
+              className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isSummaryEditMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
             >
-              {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
-              {isEditMode ? '수정 취소' : '수정'}
+              {isSummaryEditMode ? <X size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
+              {isSummaryEditMode ? '요약수정 취소' : '요약 정보 수정'}
             </button>
 
             <button onClick={() => setShowConfirm(true)} disabled={saveStatus === 'loading'} className="flex items-center px-5 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all text-sm shadow-md active:scale-95"><Save size={18} className="mr-2" />서버 저장</button>
@@ -519,15 +525,32 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
             </thead>
             <tbody>
               <tr className="text-center font-black">
-                <td className="py-4 border-r"><input type="text" value={formatNumber(data.totalBillInput || totalCalculatedBill.toString())} onChange={e => handleSummaryChange('totalBillInput', e.target.value)} className="w-full h-full text-center text-xl text-blue-600 font-black outline-none bg-transparent" /></td>
-                <td className="py-4 border-r"><input type="text" value={formatNumber(data.totalUsageInput || totalCalculatedUsage.toString())} onChange={e => handleSummaryChange('totalUsageInput', e.target.value)} className="w-full h-full text-center text-xl text-orange-500 font-black outline-none bg-transparent" /></td>
+                <td className="py-4 border-r">
+                  <input 
+                    type="text" 
+                    readOnly={!isSummaryEditMode}
+                    value={formatNumber(data.totalBillInput || totalCalculatedBill.toString())} 
+                    onChange={e => handleSummaryChange('totalBillInput', e.target.value)} 
+                    className={`w-full h-full text-center text-xl font-black outline-none bg-transparent ${isSummaryEditMode ? 'text-blue-600 bg-orange-50' : 'text-blue-600'}`} 
+                  />
+                </td>
+                <td className="py-4 border-r">
+                  <input 
+                    type="text" 
+                    readOnly={!isSummaryEditMode}
+                    value={formatNumber(data.totalUsageInput || totalCalculatedUsage.toString())} 
+                    onChange={e => handleSummaryChange('totalUsageInput', e.target.value)} 
+                    className={`w-full h-full text-center text-xl font-black outline-none bg-transparent ${isSummaryEditMode ? 'text-orange-500 bg-orange-50' : 'text-orange-500'}`} 
+                  />
+                </td>
                 <td className="py-4 border-r"><input type="text" value={formatNumber(data.unitPrice || '228')} readOnly className="w-full h-full text-center text-xl text-gray-800 font-black outline-none bg-transparent cursor-not-allowed" /></td>
                 <td className="py-4">
                   <input 
                     type="date" 
+                    readOnly={!isSummaryEditMode}
                     value={data.creationDate || format(new Date(), 'yyyy-MM-dd')} 
                     onChange={e => handleSummaryChange('creationDate', e.target.value)} 
-                    className="text-center text-lg text-emerald-600 font-black outline-none bg-transparent cursor-pointer hover:text-emerald-700" 
+                    className={`text-center text-lg font-black outline-none bg-transparent cursor-pointer ${isSummaryEditMode ? 'text-emerald-600 bg-orange-50' : 'text-emerald-600 hover:text-emerald-700'}`} 
                   />
                 </td>
               </tr>
@@ -538,12 +561,13 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
           <div className="flex-1"></div>
           <h2 className="text-3xl font-black text-gray-900 tracking-tighter text-center">{data.month.split('-')[0]}년 {data.month.split('-')[1]}월 층별 계량기 검침내역</h2>
           <div className="flex-1 flex justify-end gap-2">
+            {/* 하단 수정 버튼 - 테이블 지침 전용 */}
             <button 
-              onClick={() => setIsEditMode(!isEditMode)} 
-              className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center shadow-sm transition-all active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
+              onClick={() => setIsTableEditMode(!isTableEditMode)} 
+              className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center shadow-sm transition-all active:scale-95 ${isTableEditMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
             >
-              {isEditMode ? <Lock size={16} className="mr-1.5" /> : <Edit2 size={16} className="mr-1.5" />}
-              {isEditMode ? '수정 취소' : '수정'}
+              {isTableEditMode ? <X size={16} className="mr-1.5" /> : <Edit2 size={16} className="mr-1.5" />}
+              {isTableEditMode ? '지침수정 취소' : '지침수정'}
             </button>
             <button onClick={handlePrintAllTenantBills} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-emerald-700 active:scale-95 transition-all"><Printer size={16} className="mr-1.5" />전체 출력</button>
             <button onClick={handlePrintInvoiceSummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-blue-700 active:scale-95 transition-all"><Calculator size={16} className="mr-1.5" />계산서발행</button>
@@ -567,8 +591,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
                         <td className={`${tdClass} border-r border-gray-200`}>
                           <input 
                             type="text" 
-                            readOnly={!isEditMode} 
-                            className={`${inputClass} text-orange-500 text-[12px] ${isEditMode ? 'bg-orange-50 focus:ring-1 focus:ring-orange-300' : ''}`} 
+                            readOnly={!isTableEditMode} 
+                            className={`${inputClass} text-orange-500 text-[12px] ${isTableEditMode ? 'bg-orange-50 focus:ring-1 focus:ring-orange-300 font-bold' : ''}`} 
                             value={formatNumber(item.currentReading)} 
                             onChange={e => updateItemField(item.id, 'currentReading', e.target.value)}
                           />
@@ -576,8 +600,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
                         <td className={`${tdClass} border-r border-gray-200`}>
                           <input 
                             type="text" 
-                            readOnly={!isEditMode} 
-                            className={`${inputClass} text-[12px] ${isEditMode ? 'bg-orange-50 focus:ring-1 focus:ring-orange-300 font-bold text-blue-600' : ''}`} 
+                            readOnly={!isTableEditMode} 
+                            className={`${inputClass} text-[12px] ${isTableEditMode ? 'bg-orange-50 focus:ring-1 focus:ring-orange-300 font-bold text-blue-600' : ''}`} 
                             value={formatNumber(item.prevReading)} 
                             onChange={e => updateItemField(item.id, 'prevReading', e.target.value)}
                           />
