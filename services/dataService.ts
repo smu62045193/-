@@ -1111,8 +1111,7 @@ export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironme
   try {
     const { data } = await supabase.from('air_environment_logs').select('*').eq('id', `AIR_ENV_${date}`).maybeSingle();
     if (data) {
-      // Compatibility: JSON 데이터가 우선, 없으면 개별 컬럼 로드
-      if (data.data) return data.data as AirEnvironmentLogData;
+      // 수파베이스의 개별 컬럼(weather_condition 등)에서 데이터를 읽어와서 앱 인터페이스에 맞게 매핑
       return { 
         date: data.date, 
         emissions: data.emissions, 
@@ -1127,10 +1126,15 @@ export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironme
 };
 
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
+  // 수파베이스 테이블의 실제 컬럼 이름(snake_case)에 맞춰서 데이터를 전송
   const { error } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 
     date: data.date, 
-    data: data, // 통합 JSON 필드에 저장하여 DB 컬럼 제약 해결
+    emissions: data.emissions, 
+    preventions: data.preventions,
+    weather_condition: data.weatherCondition,
+    temp_min: data.tempMin,
+    temp_max: data.tempMax,
     last_updated: new Date().toISOString() 
   });
   return !error;
