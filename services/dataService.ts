@@ -105,10 +105,10 @@ const mapFromDB = (prefix: string, item: any): any => {
     case "DAILY_":
       return {
         date: item.id,
-        facility_duty: item.facility_duty,
-        security_duty: item.security_duty,
+        facilityDuty: item.facility_duty,
+        securityDuty: item.security_duty,
         utility: item.utility,
-        work_log: item.work_log,
+        workLog: item.work_log,
         lastUpdated: item.last_updated
       };
     case "SUB_LOG_":
