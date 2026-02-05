@@ -4,7 +4,7 @@ import { MeterPhotoData, MeterPhotoItem, Tenant } from '../types';
 import { fetchMeterPhotos, saveMeterPhotos, fetchTenants, fetchMeterReading, saveMeterReading, uploadFile } from '../services/dataService';
 import { analyzeMeterPhoto } from '../services/geminiService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
-import { Camera, Plus, Trash2, Save, RefreshCw, X, Image as ImageIcon, Search, ChevronLeft, ChevronRight, Upload, Zap, ZapOff, Edit2, FileText, Calendar, RotateCcw, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
+import { Camera, Plus, Trash2, Save, RefreshCw, X, Image as ImageIcon, Search, ChevronLeft, ChevronRight, Upload, Zap, ZapOff, Edit2, FileText, Calendar, RotateCcw, AlertTriangle, CheckCircle, Sparkles, Bot } from 'lucide-react';
 
 interface MeterReadingPhotosProps {
   currentDate: Date;
@@ -50,6 +50,7 @@ const resizeImage = (file: File): Promise<string> => {
 const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isAiEnabled, setIsAiEnabled] = useState(false); // AI 활성화 상태 기본값을 false로 변경 (AI 분석 OFF가 기본)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [currentMonth, setCurrentMonth] = useState(format(currentDate, 'yyyy-MM'));
   const [data, setData] = useState<MeterPhotoData>({ month: currentMonth, items: [] });
@@ -88,13 +89,10 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
   const handleSave = async () => {
     setSaveStatus('loading');
     
-    // 1. Base64 사진 데이터들을 Supabase Storage로 업로드
     const uploadedItems = [...data.items];
     for (let i = 0; i < uploadedItems.length; i++) {
       const item = uploadedItems[i];
-      // 사진이 새로 추가/수정된 Base64 형태인 경우에만 업로드
       if (item.photo && item.photo.startsWith('data:image')) {
-        // 파일명을 고정 ID로 지정하여 중복 생성 방지 및 덮어쓰기 유도
         const fileName = `meter_${item.id}.jpg`;
         const publicUrl = await uploadFile('facility', 'meters', fileName, item.photo);
         if (publicUrl) {
@@ -144,11 +142,12 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
       const resized = await resizeImage(file);
       setNewItem(prev => ({ ...prev, photo: resized }));
       
+      if (!isAiEnabled) return;
+
       setAnalyzing(true);
       try {
         const result = await analyzeMeterPhoto(resized, tenants);
         if (result) {
-          // 소수점 제거 로직: parseFloat로 숫자로 변환 후 Math.floor로 정수화
           const cleanReading = result.reading 
             ? Math.floor(parseFloat(result.reading.toString().replace(/,/g, ''))).toString() 
             : '';
@@ -293,11 +292,24 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
               </div>
               <h3 className="text-lg font-bold text-gray-800">{editingId ? '검침 정보 수정' : '신규 검침 사진 등록'}</h3>
             </div>
-            {editingId && (
-              <button onClick={handleCancel} className="flex items-center gap-1 text-xs font-bold text-orange-600 bg-white px-3 py-1.5 rounded-full border border-orange-200 shadow-sm hover:bg-orange-100 transition-colors">
-                <RotateCcw size={14} /> 수정 취소
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsAiEnabled(!isAiEnabled)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-black transition-all border shadow-sm active:scale-95 ${isAiEnabled ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-gray-100 text-gray-400 border-gray-200 opacity-60'}`}
+                title={isAiEnabled ? "AI 자동 분석 사용 중" : "AI 분석 사용 안 함"}
+              >
+                {isAiEnabled ? (
+                  <><Bot size={16} /><Zap size={14} className="animate-pulse" /><span>AI 분석 ON</span></>
+                ) : (
+                  <><Bot size={16} /><ZapOff size={14} /><span>AI 분석 OFF</span></>
+                )}
               </button>
-            )}
+              {editingId && (
+                <button onClick={handleCancel} className="flex items-center gap-1 text-xs font-bold text-orange-600 bg-white px-3 py-1.5 rounded-full border border-orange-200 shadow-sm hover:bg-orange-100 transition-colors">
+                  <RotateCcw size={14} /> 수정 취소
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col lg:flex-row gap-8">
@@ -317,6 +329,12 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                 <div className="mt-3 flex items-center justify-center gap-2 text-amber-600 font-black animate-pulse">
                   <Sparkles size={16} />
                   <span className="text-sm">AI가 사진을 분석 중입니다...</span>
+                </div>
+              )}
+              {!isAiEnabled && newItem.photo && (
+                <div className="mt-3 flex items-center justify-center gap-2 text-gray-400 font-bold">
+                  <ZapOff size={14} />
+                  <span className="text-xs">수동 입력 모드 (AI 작동 정지)</span>
                 </div>
               )}
             </div>

@@ -914,7 +914,7 @@ export const deleteConstructionWorkItem = async (id: string): Promise<boolean> =
 
 export const fetchConsumableRequests = async (): Promise<ConsumableRequest[]> => {
   try {
-    const { data } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLE_REQ_DB').maybeSingle();
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLES_REQ_DB').maybeSingle();
     if (data?.data?.consumableReq) return data.data.consumableReq;
   } catch (e) {}
   return [];
@@ -1244,4 +1244,32 @@ export const saveElevatorInspectionList = async (list: ElevatorInspectionItem[])
   const dbData = list.map(mapElevatorInspectionToDB);
   const { error } = await supabase.from('elevator_inspections').upsert(dbData);
   return !error;
+};
+
+/**
+ * 로고 및 직인 설정 조회
+ */
+export const fetchLogoSealSettings = async (): Promise<{ logo?: string; seal?: string } | null> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'LOGO_SEAL').maybeSingle();
+    return data?.data || null;
+  } catch (e) {
+    return null;
+  }
+};
+
+/**
+ * 로고 및 직인 설정 저장
+ */
+export const saveLogoSealSettings = async (settings: { logo?: string; seal?: string }): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('system_settings').upsert({ 
+      id: 'LOGO_SEAL', 
+      data: settings, 
+      last_updated: new Date().toISOString() 
+    });
+    return !error;
+  } catch (e) {
+    return false;
+  }
 };

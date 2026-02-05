@@ -396,6 +396,7 @@ export interface MeterReadingData {
   unitPrice?: string; // kWh당 단가
   totalBillInput?: string; // 수동 입력 총액
   totalUsageInput?: string; // 수동 입력 총사용량
+  creationDate?: string; // 내역서 작성일 (YYYY-MM-DD)
   items: MeterReadingItem[];
   lastUpdated?: string;
 }

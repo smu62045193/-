@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import StaffStatus from './StaffStatus';
-import { LayoutList, User, Camera, Printer, RefreshCw, CalendarDays, UserPlus } from 'lucide-react';
+import LogoSealManager from './LogoSealManager';
+import { LayoutList, User, Camera, Printer, RefreshCw, CalendarDays, UserPlus, Image as ImageIcon } from 'lucide-react';
 import { fetchStaffList, saveStaffList } from '../services/dataService';
 import { StaffMember } from '../types';
 
@@ -11,6 +13,7 @@ interface StaffManagerProps {
 const TABS = [
   { id: 'chart', label: '직원 조직도' },
   { id: 'status', label: '직원 현황' },
+  { id: 'logoseal', label: '로고/직인' },
 ];
 
 // 팀별 정원(T.O) 설정
@@ -288,11 +291,12 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
   useEffect(() => {
     if (activeSubItem === '직원현황') setActiveTab('status');
     else if (activeSubItem === '직원조직도') setActiveTab('chart');
+    else if (activeSubItem === '로고/직인') setActiveTab('logoseal');
   }, [activeSubItem]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    if (activeTab !== 'logoseal') loadData();
+  }, [activeTab]);
 
   const loadData = async () => {
     setLoading(true);
@@ -457,8 +461,10 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
             </div>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'status' ? (
         <StaffStatus staffList={staffList} setStaffList={setStaffList} />
+      ) : (
+        <LogoSealManager />
       )}
     </div>
   );
