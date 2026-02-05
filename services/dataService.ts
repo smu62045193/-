@@ -105,10 +105,10 @@ const mapFromDB = (prefix: string, item: any): any => {
     case "DAILY_":
       return {
         date: item.id,
-        facilityDuty: item.facility_duty,
-        securityDuty: item.security_duty,
+        facility_duty: item.facility_duty,
+        security_duty: item.security_duty,
         utility: item.utility,
-        workLog: item.work_log,
+        work_log: item.work_log,
         lastUpdated: item.last_updated
       };
     case "SUB_LOG_":
@@ -942,7 +942,7 @@ export const saveParkingChangeList = async (list: ParkingChangeItem[]): Promise<
 export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => {
   try {
     const { data } = await supabase.from('parking_status').select('*').order('location', { ascending: true });
-    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, location: p.location, company: p.company, prevPlate: p.prev_plate, plateNum: p.plate_num, note: p.note }));
+    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, location: p.location, company: p.company, prev_plate: p.prev_plate, plate_num: p.plate_num, note: p.note }));
   } catch (e) {}
   return [];
 };
@@ -1110,14 +1110,18 @@ export const saveSafetyCheck = async (data: SafetyCheckData): Promise<boolean> =
 export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironmentLogData | null> => {
   try {
     const { data } = await supabase.from('air_environment_logs').select('*').eq('id', `AIR_ENV_${date}`).maybeSingle();
-    if (data) return { 
-      date: data.date, 
-      emissions: data.emissions, 
-      preventions: data.preventions,
-      weatherCondition: data.weather_condition,
-      tempMin: data.temp_min,
-      tempMax: data.temp_max
-    };
+    if (data) {
+      // Compatibility: JSON 데이터가 우선, 없으면 개별 컬럼 로드
+      if (data.data) return data.data as AirEnvironmentLogData;
+      return { 
+        date: data.date, 
+        emissions: data.emissions, 
+        preventions: data.preventions,
+        weatherCondition: data.weather_condition,
+        tempMin: data.temp_min,
+        tempMax: data.temp_max
+      };
+    }
   } catch (e) {}
   return null;
 };
@@ -1126,11 +1130,7 @@ export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promis
   const { error } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 
     date: data.date, 
-    emissions: data.emissions, 
-    preventions: data.preventions,
-    weather_condition: data.weatherCondition,
-    temp_min: data.tempMin,
-    temp_max: data.tempMax,
+    data: data, // 통합 JSON 필드에 저장하여 DB 컬럼 제약 해결
     last_updated: new Date().toISOString() 
   });
   return !error;
