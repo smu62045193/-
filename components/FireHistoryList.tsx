@@ -1,9 +1,10 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FireHistoryItem, DailyData, LogCategory } from '../types';
 import { fetchFireHistoryList, saveFireHistoryList, apiFetchRange, fetchLinkedKeywords, saveLinkedKeywords } from '../services/dataService';
-import { RefreshCw, Search, Link, Plus, Trash2, X, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { RefreshCw, Search, Link, Plus, Trash2, X, Save, AlertCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+
+const ITEMS_PER_PAGE = 10;
 
 const FireHistoryList: React.FC = () => {
   const [loading, setLoading] = useState(false);
@@ -13,11 +14,17 @@ const FireHistoryList: React.FC = () => {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadData();
     loadKeywords();
   }, []);
+
+  // 검색어나 데이터가 변경되면 페이지를 1로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, items.length]);
 
   const loadData = async () => {
     setLoading(true);
@@ -59,36 +66,25 @@ const FireHistoryList: React.FC = () => {
           
           if (keywordIdx !== -1) {
             const matchedKeyword = keywords[keywordIdx];
-            
-            // 텍스트 청소 로직: 등록된 업체명을 괄호 포함하여 제거
             let cleanContent = task.content;
-            
-            // 정규표현식 특수문자 이스케이프 (업체명에 특수문자가 있을 경우 대비)
             const escapedK = matchedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            
-            // 제거 패턴 순서: 1. (업체명) -> 2. ( 업체명 ) -> 3. 업체명
             const cleaningPatterns = [
               new RegExp(`\\s?\\(${escapedK}\\)`, 'gi'),
               new RegExp(`\\(${escapedK}\\)`, 'gi'),
               new RegExp(`\\s?${escapedK}`, 'gi')
             ];
-            
             cleaningPatterns.forEach(pattern => {
               cleanContent = cleanContent.replace(pattern, '');
             });
-            
-            // 마지막으로 남은 불필요한 공백 및 양끝 기호 정리
             cleanContent = cleanContent.trim();
-
             const exists = items.some(item => item.date === dateKey && normalize(item.content) === normalize(cleanContent));
-            
             if (!exists) {
               newEntries.push({
                 id: `auto_${dateKey}_${Math.random().toString(36).substr(2, 5)}`,
                 date: dateKey,
                 company: matchedKeyword,
                 content: cleanContent,
-                note: '' // 비고란 비움
+                note: ''
               });
             }
           }
@@ -120,7 +116,6 @@ const FireHistoryList: React.FC = () => {
     const success = await saveLinkedKeywords('fire', keywords);
     if (success) {
       setSaveStatus('saved');
-      // 2초 후 상태 복원 및 모달 닫기
       setTimeout(() => {
         setSaveStatus('idle');
         setIsKeywordModalOpen(false);
@@ -142,15 +137,33 @@ const FireHistoryList: React.FC = () => {
     setKeywords(keywords.filter(item => item !== k));
   };
 
-  const filteredItems = items.filter(item => 
-    (item.company || '').includes(searchTerm) || 
-    (item.content || '').includes(searchTerm) ||
-    (item.date || '').includes(searchTerm)
-  );
+  const filteredItems = useMemo(() => {
+    return items.filter(item => 
+      (item.company || '').includes(searchTerm) || 
+      (item.content || '').includes(searchTerm) ||
+      (item.date || '').includes(searchTerm)
+    );
+  }, [items, searchTerm]);
+
+  // 페이지네이션 로직
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredItems.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredItems, currentPage]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    return pages;
+  }, [currentPage, totalPages]);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-4 animate-fade-in">
-      {/* Toolbar */}
       <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-72">
@@ -184,7 +197,6 @@ const FireHistoryList: React.FC = () => {
         </div>
       </div>
 
-      {/* List Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] border-collapse">
@@ -200,19 +212,17 @@ const FireHistoryList: React.FC = () => {
             <tbody className="divide-y divide-gray-200">
               {loading && items.length === 0 ? (
                 <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">로딩 중...</td></tr>
-              ) : filteredItems.length === 0 ? (
+              ) : paginatedItems.length === 0 ? (
                 <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">데이터가 없습니다. [새로고침]을 눌러 연동하세요.</td></tr>
               ) : (
-                filteredItems.map((item, index) => (
+                paginatedItems.map((item, index) => (
                   <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{filteredItems.length - index}</td>
+                    <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{filteredItems.length - ((currentPage-1)*ITEMS_PER_PAGE + index)}</td>
                     <td className="px-4 py-3 text-center text-sm text-gray-700 font-bold whitespace-nowrap">{item.date}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 font-black">{item.company}</td>
                     <td className="px-4 py-3 text-sm text-gray-700">{item.content}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className="text-[11px] font-bold text-gray-400">
-                        {item.note || '-'}
-                      </span>
+                      <span className="text-[11px] font-bold text-gray-400">{item.note || '-'}</span>
                     </td>
                   </tr>
                 ))
@@ -220,9 +230,43 @@ const FireHistoryList: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination UI */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-400 border border-gray-100 hover:border-blue-200 hover:text-blue-500'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Keyword Modal */}
       {isKeywordModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
@@ -235,13 +279,11 @@ const FireHistoryList: React.FC = () => {
                 <X size={24} />
               </button>
             </div>
-            
             <div className="p-6 space-y-4">
               <p className="text-xs text-slate-500 leading-relaxed font-medium">
                 업무일지에 입력되는 업체명을 등록하세요.<br/>
                 <span className="text-blue-600 font-bold">공백, 괄호 등은 자동으로 무시하고 연동됩니다.</span>
               </p>
-              
               <div className="flex gap-2">
                 <input 
                   type="text" 
@@ -251,14 +293,8 @@ const FireHistoryList: React.FC = () => {
                   placeholder="예: 무한개발, OTIS"
                   className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 />
-                <button 
-                  onClick={addKeyword}
-                  className="px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
-                >
-                  추가
-                </button>
+                <button onClick={addKeyword} className="px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all">추가</button>
               </div>
-
               <div className="max-h-[200px] overflow-y-auto border border-gray-100 rounded-xl p-2 bg-slate-50/50">
                 {keywords.length === 0 ? (
                   <p className="text-center py-8 text-xs text-gray-400 italic">등록된 업체가 없습니다.</p>
@@ -274,7 +310,6 @@ const FireHistoryList: React.FC = () => {
                 )}
               </div>
             </div>
-
             <div className="p-4 bg-gray-50 flex gap-3">
               <button onClick={() => setIsKeywordModalOpen(false)} className="flex-1 px-4 py-3 bg-white border border-gray-300 text-slate-600 rounded-2xl font-bold hover:bg-gray-100 transition-all">취소</button>
               <button 
@@ -286,13 +321,7 @@ const FireHistoryList: React.FC = () => {
                   'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
                 }`}
               >
-                {saveStatus === 'saving' ? (
-                  <><RefreshCw size={18} className="animate-spin" /> 서버저장중...</>
-                ) : saveStatus === 'saved' ? (
-                  <><CheckCircle size={18} /> 서버저장완료</>
-                ) : (
-                  <><Save size={18} /> 서버저장</>
-                )}
+                {saveStatus === 'saving' ? <><RefreshCw size={18} className="animate-spin" /> 서버저장중...</> : saveStatus === 'saved' ? <><CheckCircle size={18} /> 서버저장완료</> : <><Save size={18} /> 서버저장</>}
               </button>
             </div>
           </div>

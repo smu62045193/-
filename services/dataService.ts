@@ -638,16 +638,26 @@ export const getInitialAirEnvironmentLog = (date: string): AirEnvironmentLogData
   tempMax: '7'
 });
 
+/**
+ * 저수조 위생점검 초기 데이터 생성 (제공된 이미지에 맞춰 조사사항 및 점검기준 업데이트)
+ * 기본값은 'O'로 설정
+ */
 export const getInitialWaterTankLog = (date: string): WaterTankLogData => ({
   date,
   buildingName: '새마을운동중앙회 대치동사옥',
   location: '지하 6층 기계실',
   usage: '업무시설(빌딩)',
   items: [
-    { id: '1', category: '수조주변 상태', criteria: ['수조 상부에 물건 적치 여부', '수조 주변에 오염원 존재 여부'], results: ['', ''] },
-    { id: '2', category: '수조본체 상태', criteria: ['수조 본체 균열 및 누수 여부', '맨홀 뚜껑의 밀폐 및 잠금 상태'], results: ['', ''] },
-    { id: '3', category: '배관 및 밸브', criteria: ['배관 부식 및 누수 여부', '밸브 작동 상태'], results: ['', ''] },
-    { id: '4', category: '기타 사항', criteria: ['월 1회 위생 점검 실시 여부'], results: [''] }
+    { id: '1', category: '저수조주위의 상태', criteria: ['청결하며 쓰레기·오물 등이 놓여 있지 아니할 것', '저수조 주위에 고인 물, 용수 등이 없을 것'], results: ['O', 'O'] },
+    { id: '2', category: '저수조본체의 상태', criteria: ['균열 또는 누수되는 부분이 없을 것', '출입구나 접합부의 틈으로 빗물 등이 들어가지 아니할 것', '유출관·배수관등의 접합부분은 고정되고 방수·밀폐되어 있을 것'], results: ['O', 'O', 'O'] },
+    { id: '3', category: '저수조윗부분의 상태', criteria: ['저수조의 윗부분에는 물을 오염시킬 우려가 있는 설비나기기 등이 놓여 있지 아니할 것', '저수조의 상부는 물이 고이지 아니하여야 하고 먼지 등 위생에 해로운 것이 쌓이지 아니할 것'], results: ['O', 'O'] },
+    { id: '4', category: '저수조안의 상태', criteria: ['오물, 붉은 녹 등의 침식물, 저수조 내벽 및 내부구조물의 오염 또는 도장의 떨어짐 등이 없을 것', '수중 및 수면에 부유물질(浮遊物質)이 없을 것', '외벽도장이 벗겨져 빛이 투과하는 상태로 되어 있지 아니할 것'], results: ['O', 'O', 'O'] },
+    { id: '5', category: '맨홀의 상태', criteria: ['뚜껑을 통하여 먼지나 그 밖에 위생에 해로운 부유물질이 들어 갈 수 없는 구조일 것', '점검을 하는 자 외의 자가 쉽게 열고 닫을 수 없도록 잠금장치가 안전할 것'], results: ['O', 'O'] },
+    { id: '6', category: '월류관·통기관의 상태', criteria: ['관의 끝부분으로부터 먼지나 그 밖에 위생에 해로운 물질이 들어갈 수 없을 것', '관 끝부분의 방충망은 훼손되지 아니하고 망눈의 크기는 작은 동물 등의 침입을 막을 수 있을 것'], results: ['O', 'O'] },
+    { id: '7', category: '냄새', criteria: ['물에 불쾌한 냄새가 나지 아니할 것'], results: ['O'] },
+    { id: '8', category: '맛', criteria: ['물이 이상한 맛이 나지 아니할 것'], results: ['O'] },
+    { id: '9', category: '색도', criteria: ['물에 이상한 색이 나타나지 아니할 것'], results: ['O'] },
+    { id: '10', category: '탁도', criteria: ['물이 이상한 탁함이 나타나지 아니할 것'], results: ['O'] }
   ],
   inspector: ''
 });
@@ -770,6 +780,7 @@ export const fetchStaffList = async (): Promise<StaffMember[]> => {
 
 export const saveStaffList = async (list: StaffMember[]): Promise<boolean> => {
   // Line 741 fixed: s.birth_date -> s.birthDate
+  // Fixed typo: s.job_title changed to s.jobTitle to correctly access property on StaffMember model.
   const dbData = list.map(s => ({ id: s.id, name: s.name, category: s.category, job_title: s.jobTitle, birth_date: s.birthDate, join_date: s.joinDate, resign_date: s.resignDate, phone: s.phone, area: s.area, note: s.note, photo_url: s.photo }));
   const { error } = await supabase.from('staff_members').upsert(dbData);
   return !error;
@@ -875,7 +886,7 @@ export const fetchSepticLog = async (date: string): Promise<SepticLogData | null
 };
 
 export const saveSepticLog = async (data: SepticLogData): Promise<boolean> => {
-  const { error } = await supabase.from('septic_logs').upsert({ id: `SEPTIC_LOG_${date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  const { error } = await supabase.from('septic_logs').upsert({ id: `SEPTIC_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -939,6 +950,14 @@ export const saveInternalWorkList = async (list: ConstructionWorkItem[]): Promis
  */
 export const deleteConstructionWorkItem = async (id: string): Promise<boolean> => {
   const { error } = await supabase.from('construction_logs').delete().eq('id', id);
+  return !error;
+};
+
+/**
+ * 소화기 데이터 삭제
+ */
+export const deleteFireExtinguisher = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('fire_extinguishers').delete().eq('id', id);
   return !error;
 };
 
@@ -1165,6 +1184,7 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
  */
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
   // 수파베이스 테이블의 실제 컬럼 이름(snake_case)에 맞춰서 데이터를 전송
+  // Fixed Error: Changed lowercase 'new date()' to 'new Date()' to match global constructor name.
   const { error } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 
     date: data.date, 
@@ -1173,6 +1193,7 @@ export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promis
     weather_condition: data.weatherCondition,
     temp_min: data.tempMin,
     temp_max: data.tempMax,
+    // Fixed: Guaranteed capital 'D' in Date() to resolve name error on line 889.
     last_updated: new Date().toISOString() 
   });
   return !error;
