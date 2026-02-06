@@ -108,7 +108,6 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   const [selectableItems, setSelectableItems] = useState<SelectableItem[]>([]);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [selectablePhotos, setSelectablePhotos] = useState<SelectablePhoto[]>([]);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   
   const startOfCurrentWeek = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -195,7 +194,6 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           const date = addDays(weekStartDate, i);
           const dateKey = format(date, 'yyyy-MM-dd');
           const dayNum = date.getDate();
-          // l.key가 dateKey(2026-01-05)인 경우와 접두어 DAILY_가 붙은 경우 모두 고려
           const dayData = logs.find(l => l.key === dateKey || l.key === `DAILY_${dateKey}`);
           
           FIELDS.forEach(field => {
@@ -210,12 +208,9 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               todayTasks = automationMap[field.id](dateKey);
             }
 
-            // 이번 주 데이터 처리 시:
             if (weekType === 'this') {
-              // 1. 금일 작업 -> 금주 실적 후보
               todayTasks.forEach(task => {
                 if (task?.content?.trim()) {
-                  // 하이픈으로 자르지 않고 전체 내용을 보존 (단, 시작 부분에 하이픈 불릿이 있다면 제거 고려)
                   const baseContent = task.content.trim();
                   const key = `this_${field.id}_${baseContent}`;
                   if (!groupedItems[key]) {
@@ -225,7 +220,6 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                 }
               });
               
-              // 2. 익일 예정사항 -> 차주 계획 후보
               tomorrowTasks.forEach(task => {
                 if (task?.content?.trim()) {
                   const baseContent = task.content.trim();
@@ -236,8 +230,6 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                 }
               });
             } else {
-              // 다음 주 데이터 처리 시:
-              // 1. 금일 작업 -> 차주 계획 후보
               todayTasks.forEach(task => {
                 if (task?.content?.trim()) {
                   const baseContent = task.content.trim();
@@ -360,12 +352,12 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   };
 
   const handleSave = async () => {
-    setShowSaveConfirm(false);
     setSaveStatus('loading');
     try {
       const success = await saveWeeklyReport(report);
       if (success) {
         setSaveStatus('success');
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -506,7 +498,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             <button onClick={handleOpenImportModal} disabled={loading} className="bg-emerald-600 text-white px-3 py-1.5 rounded font-bold text-xs hover:bg-emerald-700 transition-colors shadow-sm flex items-center">
               <RefreshCw size={18} className={`mr-1 ${loading?'animate-spin':''}`} />가져오기
             </button>
-            <button onClick={() => setShowSaveConfirm(true)} disabled={saveStatus === 'loading'} className={`px-3 py-1.5 rounded font-bold text-xs transition-colors shadow-sm flex items-center text-white ${saveStatus === 'success' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
+            <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`px-3 py-1.5 rounded font-bold text-xs transition-colors shadow-sm flex items-center text-white ${saveStatus === 'success' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
               {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin mr-1" /> : <Save size={18} className="mr-1" />}
               {saveStatus === 'success' ? '저장완료' : '서버저장'}
             </button>
@@ -668,29 +660,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             </div>
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
               <button onClick={() => setIsPhotoModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-100 transition-all">취소</button>
-              <button onClick={handleApplyPhotoSelection} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">선택한 사진 추가 ({selectablePhotos.filter(p=>p.selected).length}장)</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                작성하신 주간업무보고 내용을<br/>
-                서버에 안전하게 기록하시겠습니까?
-              </p>
-              
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={handleSave} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-              </div>
+              <button handleApplyPhotoSelection onClick={handleApplyPhotoSelection} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">선택한 사진 추가 ({selectablePhotos.filter(p=>p.selected).length}장)</button>
             </div>
           </div>
         </div>

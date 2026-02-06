@@ -205,6 +205,26 @@ const FireExtinguisherCheck: React.FC = () => {
     return sortedKeys.map(key => ({ floor: key, items: groups[key] }));
   }, [paginatedFlatItems]);
 
+  const filterButtons = useMemo(() => {
+    // Fix: Explicitly using a type guard to ensure uniqueFloors is string[] and resolve 'unknown' errors below.
+    const uniqueFloors = Array.from(new Set(items.map(i => i.floor))).filter((f): f is string => !!f && typeof f === 'string' && f.trim() !== '');
+    const aboveGround = uniqueFloors
+      // Fix: Explicitly typed callback parameter as string to fix 'unknown' assignability error.
+      .filter((f: string) => !isUndergroundFloor(f) && !isRooftopFloor(f))
+      // Fix: Explicitly typed sort parameters to ensure type consistency.
+      .sort((a: string, b: string) => getFloorScore(String(b)) - getFloorScore(String(a)));
+    // Fix: Explicitly typed callback parameter as string to fix 'unknown' assignability error.
+    const hasUnderground = uniqueFloors.some((f: string) => isUndergroundFloor(f));
+    // Fix: Explicitly typed callback parameter as string to fix 'unknown' assignability error.
+    const hasRooftop = uniqueFloors.some((f: string) => isRooftopFloor(f));
+    const btns = ['전체'];
+    if (hasRooftop) btns.push('옥탑');
+    // Fix: uniqueFloors typing fix above ensures aboveGround is string[], making this spread operation safe.
+    btns.push(...aboveGround);
+    if (hasUnderground) btns.push('지하1~6층');
+    return btns;
+  }, [items]);
+
   const visiblePageNumbers = useMemo(() => {
     const halfWindow = 2;
     let startPage = Math.max(1, currentPage - halfWindow);
@@ -214,20 +234,6 @@ const FireExtinguisherCheck: React.FC = () => {
     for (let i = startPage; i <= endPage; i++) pages.push(i);
     return pages;
   }, [currentPage, totalPages]);
-
-  const filterButtons = useMemo(() => {
-    const uniqueFloors = Array.from(new Set(items.map(i => i.floor))).filter((f: string) => f && f.trim() !== '');
-    const aboveGround = uniqueFloors
-      .filter(f => !isUndergroundFloor(f) && !isRooftopFloor(f))
-      .sort((a, b) => getFloorScore(String(b)) - getFloorScore(String(a)));
-    const hasUnderground = uniqueFloors.some(f => isUndergroundFloor(f));
-    const hasRooftop = uniqueFloors.some(f => isRooftopFloor(f));
-    const btns = ['전체'];
-    if (hasRooftop) btns.push('옥탑');
-    btns.push(...aboveGround);
-    if (hasUnderground) btns.push('지하1~6층');
-    return btns;
-  }, [items]);
 
   const handlePrint = () => {
     const flatRows: any[] = [];

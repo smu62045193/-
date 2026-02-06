@@ -76,7 +76,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate }) => {
   const [dutyStatus, setDutyStatus] = useState<DutyStatus>(DEFAULT_DUTY);
   const [globalShift, setGlobalShift] = useState<ShiftSettings | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [showConfirm, setShowConfirm] = useState(false);
   
   const [searchKeyword, setSearchKeyword] = useState('');
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
@@ -258,7 +257,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate }) => {
 
   const handleSave = async (isConfirmShift = false) => {
     if (!dailyData) return;
-    setShowConfirm(false);
     setSaveStatus('loading');
     try {
       const updatedStatus = { ...dutyStatus };
@@ -289,12 +287,15 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate }) => {
         setDailyData(updatedData);
         setIsDutyEditing(false);
         setDutyWasEdited(false);
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
+        alert('저장에 실패했습니다.');
       }
     } catch (err) {
       setSaveStatus('error');
+      alert('오류가 발생했습니다.');
     }
   };
 
@@ -337,14 +338,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate }) => {
     categories.forEach(cat => {
       const log = (workLog as any)[cat.key] as LogCategory;
       if (log?.today) {
-        // ID 필터링 (수동 입력 및 이월 항목만 포함, 자동화 auto- 제외)
         const taskContents = log.today
           .filter((t: TaskItem) => t.id && (t.id.includes('task_') || t.id.includes('from_prev_')))
           .map((t: TaskItem) => t.content?.trim())
           .filter((c: string) => c && c !== '');
           
         if (taskContents.length > 0) {
-          // 내용(Content) 기준 중복 제거 수행
           const uniqueContents = Array.from(new Set(taskContents));
           sections.push({ label: cat.label, icon: cat.icon, tasks: uniqueContents });
         }
@@ -577,7 +576,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate }) => {
       </div>
 
       <div className="flex justify-center pt-8 print:hidden">
-        <button onClick={() => setShowConfirm(true)} disabled={saveStatus === 'loading'} className={`px-12 py-5 rounded-3xl shadow-2xl transition-all duration-500 font-black text-2xl flex items-center justify-center space-x-4 w-full max-w-3xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 scale-105'}`}>
+        <button onClick={() => handleSave(dutyWasEdited)} disabled={saveStatus === 'loading'} className={`px-12 py-5 rounded-3xl shadow-2xl transition-all duration-500 font-black text-2xl flex items-center justify-center space-x-4 w-full max-w-3xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 scale-105'}`}>
           {saveStatus === 'loading' ? (
             <><RefreshCw size={28} className="animate-spin" /><span>Syncing...</span></>
           ) : saveStatus === 'success' ? (
@@ -588,7 +587,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate }) => {
         </button>
       </div>
 
-      {/* Modals remain same but with enhanced CSS */}
       {isSearchModalOpen && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md shadow-2xl">
           <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-100">
@@ -599,24 +597,6 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate }) => {
               )}
             </div>
             <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end"><button onClick={() => setIsSearchModalOpen(false)} className="px-10 py-4 bg-slate-900 text-white font-black rounded-2xl hover:bg-black transition-all shadow-xl active:scale-95">닫기</button></div>
-          </div>
-        </div>
-      )}
-
-      {showConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-scale-up">
-            <div className="p-10 text-center">
-              <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-8 border-4 border-blue-100 shadow-inner">
-                <Cloud className="text-blue-600" size={48} />
-              </div>
-              <h3 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">CLOUD SAVE</h3>
-              <p className="text-slate-500 mb-10 leading-relaxed font-bold">작성하신 근무 현황 및 시설 운영 데이터를<br/>클라우드 서버에 영구적으로 기록할까요?</p>
-              <div className="flex gap-4">
-                <button onClick={() => setShowConfirm(false)} className="flex-1 px-6 py-5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-3xl font-black transition-all active:scale-95 flex items-center justify-center">CANCEL</button>
-                <button onClick={() => handleSave(dutyWasEdited)} className="flex-[2] px-6 py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-3xl font-black transition-all shadow-xl shadow-blue-200 flex items-center justify-center active:scale-95 tracking-widest">SAVE NOW</button>
-              </div>
-            </div>
           </div>
         </div>
       )}

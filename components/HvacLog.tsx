@@ -23,7 +23,6 @@ interface HvacLogProps {
 const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUsageChange }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   
   const [data, setData] = useState<HvacLogData>(getInitialHvacLog(dateKey));
@@ -204,14 +203,11 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleManualSave = async () => {
-    setShowSaveConfirm(false);
     if (saveStatus === 'loading') return;
     setSaveStatus('loading');
     try {
-      // 1. 상세 로그 저장 (통합 테이블)
       const success = await saveHvacBoilerCombined(data, boilerData);
       
-      // 2. 메인 일지 동기화 (가스 사용량 업데이트)
       let currentDaily = await fetchDailyData(dateKey, true);
       if (!currentDaily) currentDaily = getInitialDailyData(dateKey);
       
@@ -227,6 +223,7 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
       
       if (success) {
         setSaveStatus('success');
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -476,9 +473,9 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
           saveStatus={saveStatus} 
           onPrint={handlePrint} 
           isEmbedded={isEmbedded} 
-          onSave={() => setShowSaveConfirm(true)} 
+          onSave={handleManualSave} 
           onRefresh={() => loadData(true)} 
-          hideSave={true} 
+          hideSave={false} 
           hideRefresh={false}
       >
         <div id="combined-hvac-boiler-area" className="bg-transparent space-y-2 p-1">
@@ -636,45 +633,22 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
           </section>
         </div>
 
-        {/* 전기 탭과 동일한 하단 저장 버튼 위치 */}
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40 print:hidden">
           <button 
-            onClick={() => setShowSaveConfirm(true)} 
+            onClick={handleManualSave} 
             disabled={saveStatus === 'loading'} 
             className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
           >
             {saveStatus === 'loading' ? (
               <><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>
             ) : saveStatus === 'success' ? (
-              <><CheckCircle2 size={24} /><span>저장 완료</span></>
+              <><CheckCircle2 size={24} /><span>Update Complete</span></>
             ) : (
               <><Save size={24} /><span>기계설비 데이터 서버 저장</span></>
             )}
           </button>
         </div>
       </LogSheetLayout>
-
-      {/* 저장 확인 모달 */}
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">기계설비 데이터 서버 저장</h3>
-              <p className="text-gray-500 mb-8 leading-relaxed font-medium">
-                입력하신 <span className="text-blue-600 font-bold">냉온수기 및 보일러 계측 기록</span>을<br/>
-                서버에 안전하게 기록하시겠습니까?
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center active:scale-95"><X size={18} className="mr-2" />취소</button>
-                <button onClick={handleManualSave} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle2 size={18} className="mr-2" />확인</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };
