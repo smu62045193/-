@@ -31,7 +31,6 @@ const TenantStatus: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   
   // 수정 중인 행 ID 관리
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -84,24 +83,19 @@ const TenantStatus: React.FC = () => {
     setEditingId(newId); // 추가 즉시 수정 모드
   };
 
-  const handleDeleteRequest = (id: string) => {
-    setDeleteTargetId(id);
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-
-    const idStr = String(deleteTargetId);
+  const handleDeleteRequest = async (id: string) => {
+    const idStr = String(id);
     const originalTenants = [...tenants];
     const newTenants = originalTenants.filter(t => String(t.id) !== idStr);
     
     setTenants(newTenants);
-    setDeleteTargetId(null);
     if (editingId === idStr) setEditingId(null);
     
     try {
       const success = await saveTenants(newTenants);
-      if (!success) {
+      if (success) {
+        alert('삭제가 완료되었습니다.');
+      } else {
         setTenants(originalTenants);
         alert('삭제 실패 (서버 저장 오류)');
       }
@@ -161,7 +155,7 @@ const TenantStatus: React.FC = () => {
             @page { size: A4 portrait; margin: 0; }
             body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
-            @media print { .no-print { display: none !important; } body { background: white !important; } }
+            @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
             .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
             @media print { .print-page { box-shadow: none !important; margin: 0 !important; } }
             table { width: 100%; border-collapse: collapse; border: 1.5px solid black; }
@@ -350,34 +344,6 @@ const TenantStatus: React.FC = () => {
           )}
         </button>
       </div>
-
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100">
-                <AlertTriangle className="text-red-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">데이터 삭제 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                선택하신 입주사 정보를 마스터 DB에서<br/>
-                <span className="text-red-600 font-bold">영구히 삭제</span>하시겠습니까?
-              </p>
-              
-              <div className="flex gap-3">
-                <button onClick={() => setDeleteTargetId(null)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center">
-                  <X size={20} className="mr-2" />
-                  취소
-                </button>
-                <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center active:scale-95">
-                  <Trash2 size={20} className="mr-2" />
-                  삭제 실행
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up {

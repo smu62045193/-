@@ -59,7 +59,6 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   
   const [newItem, setNewItem] = useState<Partial<MeterPhotoItem>>({
     floor: '',
@@ -223,14 +222,9 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
   };
 
   const handleDeleteRequest = (id: string) => {
-    setDeleteTargetId(id);
-  };
-
-  const confirmDelete = () => {
-    if (!deleteTargetId) return;
-    const newItems = data.items.filter(i => i.id !== deleteTargetId);
+    const newItems = data.items.filter(i => i.id !== id);
     setData({ ...data, items: newItems });
-    setDeleteTargetId(null);
+    alert('삭제가 완료되었습니다.');
   };
 
   const filteredItems = useMemo(() => {
@@ -435,25 +429,6 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 삭제 확인 모달 */}
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100">
-                <AlertTriangle className="text-red-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">검침 사진 삭제</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">선택하신 검침 사진 정보를 목록에서 <span className="text-red-600 font-bold">영구히 삭제</span>하시겠습니까?</p>
-              <div className="flex gap-3">
-                <button onClick={() => setDeleteTargetId(null)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center active:scale-95"><Trash2 size={20} className="mr-2" />삭제 실행</button>
               </div>
             </div>
           </div>

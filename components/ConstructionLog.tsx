@@ -52,7 +52,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isUpdateMode, setIsUpdateMode] = useState(false);
   const [showForm, setShowForm] = useState(false); // 등록창 표시 여부
-  const [deleteTargetItem, setDeleteTargetItem] = useState<WorkItemWithSource | null>(null);
   const [currentItem, setCurrentItem] = useState<WorkItemWithSource>({
     id: generateId(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
   });
@@ -93,16 +92,12 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
-  const handleDelete = (e: React.MouseEvent, item: WorkItemWithSource) => {
+  const handleDelete = async (e: React.MouseEvent, item: WorkItemWithSource) => {
     e.stopPropagation();
-    setDeleteTargetItem(item);
-  };
-
-  const confirmDelete = async () => {
-    if (!deleteTargetItem) return;
     
+    // 사용자 요청에 따라 확인 과정 없이 즉시 삭제 로직 실행
     setLoading(true);
-    const idStr = String(deleteTargetItem.id);
+    const idStr = String(item.id);
 
     try {
       // 서버에서 직접 삭제 실행
@@ -112,7 +107,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
         // 성공 시 로컬 상태 업데이트
         setItems(prev => prev.filter(i => String(i.id) !== idStr));
         if (String(currentItem.id) === idStr) handleReset(true);
-        alert('성공적으로 삭제되었습니다.');
+        alert('삭제가 완료되었습니다.'); // 요청된 완료 메시지
       } else {
         alert('서버 데이터 삭제에 실패했습니다.');
       }
@@ -121,7 +116,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
       alert('삭제 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
-      setDeleteTargetItem(null);
     }
   };
 
@@ -381,31 +375,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
           </table>
         </div>
       </div>
-
-      {deleteTargetItem && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100">
-                <AlertTriangle className="text-red-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">작업 내역 삭제 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                선택하신 {deleteTargetItem.category} 작업 내역을<br/>
-                서버에서 <span className="text-red-600 font-bold">영구히 삭제</span>하시겠습니까?
-              </p>
-              
-              <div className="flex gap-3">
-                <button onClick={() => setDeleteTargetItem(null)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center active:scale-95">
-                  <Trash2 size={20} className="mr-2" />
-                  삭제 실행
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up {
