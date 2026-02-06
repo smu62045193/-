@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { GeneratorCheckData, GeneratorSpec, GeneratorTest, GeneratorStatus } from '../types';
 import { fetchMeterReading, fetchGeneratorCheck, saveGeneratorCheck, getInitialGeneratorCheck } from '../services/dataService';
@@ -36,10 +35,8 @@ const GeneratorCheck: React.FC<GeneratorCheckProps> = ({ currentDate }) => {
       setCurrentMonth(newMonth);
       setIsEditMode(false);
     } else {
-      // 서버 데이터가 이미 로드된 상태라면(lastUpdated 혹은 특정 필드 존재) 
-      // 달력 날짜 변경이 폼 데이터의 점검일자를 덮어쓰지 않도록 함
-      // (단, 데이터가 아예 없는 초기 상태인 경우에만 달력 날짜 동의)
-      if (!data.test.startTime && !data.test.endTime && !data.test.usedTime) {
+      // 데이터가 아예 없는 초기 상태인 경우에만 달력 날짜 동기화
+      if (!data.test.startTime && !data.test.endTime && !data.test.usedTime && !data.lastUpdated) {
         const dateStr = format(currentDate, 'yyyy-MM-dd');
         const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
         setData(prev => ({ 
@@ -64,7 +61,7 @@ const GeneratorCheck: React.FC<GeneratorCheckProps> = ({ currentDate }) => {
       const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
 
       if (fetched) {
-        // 서버에서 불러온 날짜가 있을 경우 이를 최우선으로 사용
+        // 1. 이미 데이터가 있는 경우 (기존 로직 유지)
         const dbDate = fetched.test?.checkDate || initial.test.checkDate;
         const dbDayName = fetched.test?.dayName || dayNames[getDay(parseISO(dbDate))];
 
@@ -79,16 +76,27 @@ const GeneratorCheck: React.FC<GeneratorCheckProps> = ({ currentDate }) => {
           } 
         });
       } else { 
-        // 데이터가 없는 경우 (신규 작성) -> 전월 특이사항 복사 시도
+        // 2. 데이터가 없는 경우 (전월 데이터에서 제원 및 점검값 복사)
         const prevMonthDate = subMonths(parseISO(`${monthStr}-01`), 1);
         const prevMonthStr = format(prevMonthDate, 'yyyy-MM');
         const prevFetched = await fetchGeneratorCheck(prevMonthStr);
         
-        if (prevFetched && prevFetched.note) {
-          initial.note = prevFetched.note;
+        if (prevFetched) {
+          // 전월의 제원(specs)과 점검값(test)을 모두 가져오되 날짜만 현재 월로 변경
+          setData({
+            ...initial,
+            specs: { ...prevFetched.specs },
+            test: { 
+              ...prevFetched.test,
+              checkDate: format(currentDate, 'yyyy-MM-dd'),
+              dayName: dayNames[getDay(currentDate)]
+            },
+            status: { ...prevFetched.status },
+            note: prevFetched.note || ''
+          });
+        } else {
+          setData(initial); 
         }
-        
-        setData(initial); 
       }
     } catch (e) { 
       setData(getInitialGeneratorCheck(monthStr)); 

@@ -1,3 +1,4 @@
+
 import { MenuId, MenuItem, Holiday } from './types';
 
 // =================================================================================================
@@ -6,20 +7,15 @@ import { MenuId, MenuItem, Holiday } from './types';
 export const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzG87NevLfuqw1wgJZGp3x0eMREtXjb1y95xodqfbxTrFqLCd1hKpIYggIwydJJyWC9/exec"; 
 
 export const MENU_ITEMS: MenuItem[] = [
-  // 1. 운영 관리 섹션
   { id: MenuId.DASHBOARD, label: '대시보드' },
   { id: MenuId.WORK_LOG, label: '업무일지' },
   { id: MenuId.WEEKLY_WORK, label: '주간업무' },
   { id: MenuId.CONSTRUCTION, label: '공사/작업', subItems: ['외부업체', '시설직'] },
-  
-  // 2. 시설 점검 섹션
   { id: MenuId.ELEC_CHECK, label: '전기점검', subItems: ['계량기검침', '비상발전기', '밧데리', '부하전류', '전기설비점검', '전기자동차'] },
   { id: MenuId.MECH_CHECK, label: '기계점검', subItems: ['저수조위생점검'] },
   { id: MenuId.FIRE_CHECK, label: '소방점검', subItems: ['소방점검이력', '소화기 관리'] },
   { id: MenuId.ELEVATOR_CHECK, label: '승강기점검', subItems: ['승강기점검이력'] },
   { id: MenuId.PARKING_CHECK, label: '주차점검', subItems: ['지정주차차량현황', '주차점검이력', '지정주차차량위치'] },
-  
-  // 3. 자재 및 인사 섹션
   { id: MenuId.CONSUMABLES, label: '소모품관리', subItems: ['관리대장', '자재신청서'] },
   { id: MenuId.APPOINTMENTS, label: '선임현황' },
   { id: MenuId.STAFF, label: '직원관리' },

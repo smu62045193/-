@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { LoadCurrentData, LoadCurrentItem } from '../types';
 import { fetchLoadCurrent, saveLoadCurrent, getInitialLoadCurrent } from '../services/dataService';
@@ -20,9 +19,18 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
   const [data, setData] = useState<LoadCurrentData>(getInitialLoadCurrent(format(currentDate, 'yyyy-MM')));
   const [activeFloor, setActiveFloor] = useState<string>('전체');
 
+  // 페이지네이션 상태 - 15개씩 보기로 수정
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 15;
+
   useEffect(() => {
     loadData(currentMonth);
   }, [currentMonth]);
+
+  // 층별 필터나 월이 변경되면 페이지를 1로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFloor, currentMonth]);
 
   const loadData = async (monthKey: string) => {
     setLoading(true);
@@ -86,7 +94,7 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
-        alert('저장 실패');
+        alert('저장에 실패했습니다.');
       }
     } catch (error) {
       setSaveStatus('error');
@@ -97,7 +105,6 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
   const handlePrint = () => {
     if (!filteredItems.length) return;
 
-    // 데이터 분할 로직: 1페이지 25행, 그 이후 30행씩
     const chunks: LoadCurrentItem[][] = [];
     let start = 0;
     while (start < filteredItems.length) {
@@ -149,8 +156,8 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
                 <th rowspan="2" style="width: 45px;">층</th>
                 <th rowspan="2" style="width: 130px;">점검대상</th>
                 <th rowspan="2" style="width: 45px;">순서</th>
-                <th colspan="3" style="background: #eff6ff !important;">좌측</th>
-                <th colspan="3" style="background: #fff7ed !important;">우측</th>
+                <th colSpan="3" style="background: #eff6ff !important;">좌측</th>
+                <th colSpan="3" style="background: #fff7ed !important;">우측</th>
               </tr>
               <tr>
                 <th style="width: 50px;">용량</th>
@@ -188,96 +195,22 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
           <script src="https://cdn.tailwindcss.com"></script>
           <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
           <style>
-            @page { 
-              size: A4 portrait; 
-              margin: 25mm 12mm 10mm 12mm; 
-            }
-            html, body { 
-              margin: 0 !important; 
-              padding: 0 !important; 
-              background: #f1f5f9; 
-              color: black; 
-              font-family: 'Noto Sans KR', sans-serif;
-              line-height: 1.2;
-              -webkit-print-color-adjust: exact;
-            }
+            @page { size: A4 portrait; margin: 25mm 12mm 10mm 12mm; }
+            html, body { margin: 0 !important; padding: 0 !important; background: #f1f5f9; color: black; font-family: 'Noto Sans KR', sans-serif; line-height: 1.2; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
-            @media print { 
-              .no-print { display: none !important; } 
-              body { background: white !important; } 
-              .page-break { page-break-after: always; }
-            }
-            
-            .print-page { 
-              width: 100%;
-              background: white;
-              box-sizing: border-box;
-            }
-            @media screen {
-              .print-page {
-                width: 210mm;
-                min-height: 297mm;
-                margin: 20px auto;
-                padding: 25mm 12mm 10mm 12mm; 
-                box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-              }
-            }
-
-            table { 
-              border-collapse: collapse !important; 
-              width: 100% !important; 
-              table-layout: fixed !important;
-              border: 1.5px solid black !important; 
-            }
-            th, td { 
-              border: 1px solid black !important; 
-              text-align: center !important; 
-              overflow: hidden; 
-              height: 30px !important; 
-              font-size: 9px !important; 
-              padding: 0 2px !important;
-            }
-            th { 
-              font-weight: bold !important; 
-              background: #f3f4f6 !important; 
-            }
-            
-            .header-flex { 
-              display: flex; 
-              justify-content: space-between; 
-              align-items: center; 
-              margin-bottom: 10px; 
-              min-height: 90px;
-            }
-            .title-area { 
-              flex: 1; 
-              text-align: center; 
-            }
-            .doc-title { 
-              font-size: 26pt; 
-              font-weight: 900; 
-              text-decoration: underline; 
-              text-underline-offset: 8px;
-              margin: 0; 
-              line-height: 1; 
-            }
-            .approval-table { 
-              width: 70mm !important; 
-              border: 1.5px solid black !important; 
-              margin-left: auto; 
-              flex-shrink: 0; 
-              table-layout: fixed !important; 
-            }
-            .approval-table th { 
-              height: 22px !important; 
-              font-size: 9pt !important; 
-              background: #f3f4f6 !important; 
-              font-weight: bold; 
-              border: 1px solid black !important; 
-            }
+            @media print { .no-print { display: none !important; } body { background: white !important; } .page-break { page-break-after: always; } }
+            .print-page { width: 100%; background: white; box-sizing: border-box; }
+            @media screen { .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 25mm 12mm 10mm 12mm; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); } }
+            table { border-collapse: collapse !important; width: 100% !important; table-layout: fixed !important; border: 1.5px solid black !important; }
+            th, td { border: 1px solid black !important; text-align: center !important; overflow: hidden; height: 30px !important; font-size: 9px !important; padding: 0 2px !important; }
+            th { font-weight: bold !important; background: #f3f4f6 !important; }
+            .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; min-height: 90px; }
+            .title-area { flex: 1; text-align: center; }
+            .doc-title { font-size: 26pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin: 0; line-height: 1; }
+            .approval-table { width: 70mm !important; border: 1.5px solid black !important; margin-left: auto; flex-shrink: 0; table-layout: fixed !important; }
+            .approval-table th { height: 22px !important; font-size: 9pt !important; background: #f3f4f6 !important; font-weight: bold; border: 1px solid black !important; }
             .approval-table td { height: 65px !important; border: 1px solid black !important; background: white !important; }
             .approval-table .side-header { width: 28px !important; font-size: 9pt; }
-
             .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; font-size: 11pt; }
           </style>
         </head>
@@ -307,6 +240,11 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
       orderR: '', capacityR: '', valueR: '', noteR: ''
     };
     setData({ ...data, items: [...(data.items || []), newItem] });
+    // 새로 추가된 항목을 보기 위해 마지막 페이지로 이동
+    setTimeout(() => {
+        const newTotalPages = Math.ceil((data.items.length + 1) / ITEMS_PER_PAGE);
+        setCurrentPage(newTotalPages);
+    }, 0);
   };
 
   const deleteItem = async (id: string) => {
@@ -356,6 +294,31 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
     return data.items.filter(item => item.floor === activeFloor);
   }, [data.items, activeFloor]);
 
+  // 페이지네이션 로직 적용
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredItems.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredItems, currentPage]);
+
+  // 하단에 보일 페이지 번호 5개 계산 로직
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    
+    // 만약 마지막 페이지 근처라면 시작 페이지를 앞으로 당김
+    if (endPage === totalPages) {
+      startPage = Math.max(1, endPage - 4);
+    }
+    
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  }, [currentPage, totalPages]);
+
   const [year, month] = currentMonth.split('-');
   
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center text-[12px] text-gray-700 h-10 align-middle";
@@ -381,7 +344,7 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
           </button>
           <button 
             onClick={() => setIsEditMode(!isEditMode)} 
-            className={`flex items-center px-4 py-2 rounded-xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
+            className={`flex items-center px-4 py-2 rounded-xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
           >
             {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
             {isEditMode ? '수정 취소' : '수정'}
@@ -463,10 +426,10 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-300 border-t border-gray-300">
-              {filteredItems.length === 0 ? (
+              {paginatedItems.length === 0 ? (
                 <tr><td colSpan={10} className="py-20 text-gray-400 italic text-center">점검 내역이 없습니다.</td></tr>
               ) : (
-                filteredItems.map((item) => (
+                paginatedItems.map((item) => (
                   <tr key={item.id} className="group hover:bg-gray-50/50 transition-colors divide-x divide-gray-300">
                     <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} font-normal text-blue-600 ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.floor || ''} onChange={e => updateItem(item.id, 'floor', e.target.value)} onKeyDown={handleKeyDown} placeholder="층" readOnly={!isEditMode} /></td>
                     <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.targetL || ''} onChange={e => updateItem(item.id, 'targetL', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
@@ -490,8 +453,46 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
             </tbody>
           </table>
         </div>
+
+        {/* 페이지네이션 UI - 번호 5개만 노출되도록 수정 */}
+        {totalPages > 1 && (
+          <div className="mt-4 flex items-center justify-center gap-2 py-4 no-print border-t border-gray-100">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-400 border border-gray-100 hover:border-blue-200 hover:text-blue-500'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
+
         {isEditMode && (
-          <div className="mt-4 print:hidden">
+          <div className="mt-4 print:hidden px-1">
             <button 
               onClick={addItem}
               className="w-full py-3.5 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 flex items-center justify-center font-black transition-all group shadow-inner"

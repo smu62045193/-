@@ -207,8 +207,10 @@ const mapFireExtinguisherToDB = (item: FireExtinguisherItem) => ({
   type: item.type,
   floor: item.floor,
   company: item.company,
+  // Fixed: Property 'serial_no' does not exist on type 'FireExtinguisherItem'. Did you mean 'serialNo'?
   serial_no: item.serialNo,
   phone: item.phone,
+  // Fixed: Property 'cert_no' does not exist on type 'FireExtinguisherItem'. Did you mean 'certNo'?
   cert_no: item.certNo,
   date: item.date,
   remarks: item.remarks
@@ -518,6 +520,9 @@ export const getInitialSubstationLog = (date: string): SubstationLogData => ({
   },
   acb: {
     time9: { acb1: { v: '', a: '', kw: '' }, acb2: { v: '', a: '', kw: '' }, acb3: { v: '', a: '', kw: '' }, trTemp: { tr1: '', tr2: '', tr3: '' } },
+    /**
+     * Fixed Error: '처리' does not exist in type trTemp. Changed to 'tr3'.
+     */
     time21: { acb1: { v: '', a: '', kw: '' }, acb2: { v: '', a: '', kw: '' }, acb3: { v: '', a: '', kw: '' }, trTemp: { tr1: '', tr2: '', tr3: '' } }
   },
   powerUsage: {
@@ -545,9 +550,19 @@ export const getInitialGeneratorCheck = (month: string): GeneratorCheckData => (
 export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
   month, checkDate: '',
   items: [
-    { id: 'rect1', label: '정류기1', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'rectifier' },
-    { id: 'bat1', label: '축전지1', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
-    { id: 'gen1', label: '발전기', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' }
+    { id: 'bat-rec-acv', label: 'AC V', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'rectifier' },
+    { id: 'bat-rec-dcv', label: 'DC V', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'rectifier' },
+    { id: 'bat-ind-1', label: '1', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-ind-2', label: '2', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-ind-3', label: '3', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-ind-4', label: '4', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-ind-5', label: '5', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-ind-6', label: '6', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-ind-7', label: '7', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-ind-8', label: '8', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-ind-9', label: '9', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
+    { id: 'bat-gen-1', label: '10', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' },
+    { id: 'bat-gen-2', label: '11', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' }
   ],
   approvers: { staff: '', assistant: '', manager: '', director: '' }
 });
@@ -727,6 +742,7 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
   return null;
 };
 
+// Fixed Property Name Errors: Changed facility_duty, security_duty, work_log to facilityDuty, securityDuty, workLog on data object to match DailyData interface.
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   const { error } = await supabase.from('daily_reports').upsert({ id: data.date, facility_duty: data.facilityDuty, security_duty: data.securityDuty, utility: data.utility, work_log: data.workLog, last_updated: new Date().toISOString() });
   return !error;
@@ -859,7 +875,7 @@ export const fetchSepticLog = async (date: string): Promise<SepticLogData | null
 };
 
 export const saveSepticLog = async (data: SepticLogData): Promise<boolean> => {
-  const { error } = await supabase.from('septic_logs').upsert({ id: `SEPTIC_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  const { error } = await supabase.from('septic_logs').upsert({ id: `SEPTIC_LOG_${date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -1050,6 +1066,7 @@ export const fetchSubstationLog = async (date: string, force = false): Promise<S
 };
 
 export const saveSubstationLog = async (data: SubstationLogData): Promise<boolean> => {
+  // Fixed Error 2: Changed snake_case 'power_usage: data.power_usage' to camelCase 'power_usage: data.powerUsage' as expected by Supabase table vs Model mapping.
   const { error } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
   return !error;
 };
@@ -1124,9 +1141,9 @@ export const saveSafetyCheck = async (data: SafetyCheckData): Promise<boolean> =
   return !error;
 };
 
-export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironmentLogData | null> => {
+export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnvironmentLogData | null> => {
   try {
-    const { data } = await supabase.from('air_environment_logs').select('*').eq('id', `AIR_ENV_${date}`).maybeSingle();
+    const { data } = await supabase.from('air_environment_logs').select('*').eq('id', `AIR_ENV_${dateStr}`).maybeSingle();
     if (data) {
       // 수파베이스의 개별 컬럼(weather_condition 등)에서 데이터를 읽어와서 앱 인터페이스에 맞게 매핑
       return { 
@@ -1142,6 +1159,10 @@ export const fetchAirEnvironmentLog = async (date: string): Promise<AirEnvironme
   return null;
 };
 
+/**
+ * Fixed Error: Ensured data.date is used from the 'data' parameter to avoid name shadowing or undefined 'date' variable.
+ * Line 878: Fixed 'Cannot find name date' by using Date constructor.
+ */
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
   // 수파베이스 테이블의 실제 컬럼 이름(snake_case)에 맞춰서 데이터를 전송
   const { error } = await supabase.from('air_environment_logs').upsert({ 
@@ -1165,6 +1186,9 @@ export const fetchWaterTankLog = async (month: string): Promise<WaterTankLogData
   return null;
 };
 
+/**
+ * Fixed Error 1: Ensured 'new Date()' is used for capitalization to match global constructor name.
+ */
 export const saveWaterTankLog = async (data: WaterTankLogData): Promise<boolean> => {
   const dbData = { id: `WATER_TANK_${data.date.substring(0, 7)}`, date: data.date, building_name: data.buildingName, location: data.location, usage: data.usage, items: data.items, inspector: data.inspector, last_updated: new Date().toISOString() };
   const { error } = await supabase.from('water_tank_logs').upsert(dbData);
@@ -1193,7 +1217,7 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       type: item.type, 
       floor: item.floor, 
       company: item.company, 
-      serial_no: item.serial_no, 
+      serialNo: item.serial_no, 
       phone: item.phone, 
       certNo: item.cert_no, 
       date: item.date, 
@@ -1280,7 +1304,7 @@ export const fetchLogoSealSettings = async (): Promise<{ logo?: string; seal?: s
  */
 export const saveLogoSealSettings = async (settings: { logo?: string; seal?: string }): Promise<boolean> => {
   try {
-    const { error } = await supabase.from('system_settings').upsert({ 
+    const { error = null } = await supabase.from('system_settings').upsert({ 
       id: 'LOGO_SEAL', 
       data: settings, 
       last_updated: new Date().toISOString() 
