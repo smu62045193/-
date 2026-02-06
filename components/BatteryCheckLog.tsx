@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { BatteryCheckData, BatteryItem } from '../types';
 import { fetchBatteryCheck, saveBatteryCheck, getInitialBatteryCheck } from '../services/dataService';
@@ -12,7 +13,6 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
   const [currentMonth, setCurrentMonth] = useState(format(currentDate, 'yyyy-MM'));
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [showConfirm, setShowConfirm] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [data, setData] = useState<BatteryCheckData>(getInitialBatteryCheck(format(currentDate, 'yyyy-MM')));
 
@@ -93,7 +93,6 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
 
   const handleSave = async () => {
     if (!data) return;
-    setShowConfirm(false);
     setSaveStatus('loading');
     
     try {
@@ -101,6 +100,7 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
       if (success) {
         setSaveStatus('success');
         setIsEditMode(false);
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -279,8 +279,8 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
         </div>
         <div className="flex gap-2">
           <button onClick={() => loadData(currentMonth)} disabled={loading} className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"><RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침</button>
-          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}>{isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}{isEditMode ? '수정 취소' : '수정'}</button>
-          <button onClick={() => setShowConfirm(true)} disabled={saveStatus === 'loading'} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw size={18} className="mr-2 animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-2" /> : <Save size={18} className="mr-2" />}{saveStatus === 'success' ? '저장완료' : '서버 저장'}</button>
+          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}>{isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}{isEditMode ? '수정 취소' : '수정'}</button>
+          <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw size={18} className="mr-2 animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-2" /> : <Save size={18} className="mr-2" />}{saveStatus === 'success' ? '저장완료' : '서버 저장'}</button>
           <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-sm text-sm transition-all"><Printer size={18} className="mr-2" />미리보기</button>
         </div>
       </div>
@@ -303,19 +303,6 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
         {renderTableSection('정류기반 밧데리 개별전류', batItems, 2)}
         {renderTableSection('비상용 발전기', genItems, 3)}
       </div>
-
-      {showConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-gray-100">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100"><Cloud className="text-blue-600" size={32} /></div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">밧데리 점검 저장</h3>
-              <p className="text-gray-500 mb-8 leading-relaxed">작성하신 {year}년 {month}월 밧데리 점검 내역을<br/>서버에 안전하게 저장하시겠습니까?</p>
-              <div className="flex gap-3"><button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center"><X size={18} className="mr-2" />취소</button><button onClick={handleSave} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center"><CheckCircle size={18} className="mr-2" />저장하기</button></div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }

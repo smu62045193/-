@@ -52,7 +52,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [isUpdateMode, setIsUpdateMode] = useState(false);
   const [showForm, setShowForm] = useState(false); // 등록창 표시 여부
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [deleteTargetItem, setDeleteTargetItem] = useState<WorkItemWithSource | null>(null);
   const [currentItem, setCurrentItem] = useState<WorkItemWithSource>({
     id: generateId(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
@@ -130,7 +129,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     if (!currentItem.content) { alert('내용은 필수입니다.'); return; }
     
     setLoading(true); 
-    setShowSaveConfirm(false);
     try {
       // 1. 모든 사진을 Storage에 업로드 (새로 추가된 사진만)
       const uploadedPhotos: WorkPhoto[] = [];
@@ -172,7 +170,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
       
       const success = await saveFn(newList);
       if (success) { 
-        alert('성공적으로 저장되었습니다.');
+        alert('저장이 완료되었습니다.');
         await loadData(); 
         handleReset(true); 
         setShowForm(false); // 저장 후 폼 닫기
@@ -328,7 +326,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
             <button onClick={() => { handleReset(true); setShowForm(false); }} className="flex items-center px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-50 font-bold border border-gray-200 transition-all text-sm">
               <RotateCcw size={18} className="mr-2" /> 취소
             </button>
-            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-md transition-all text-sm disabled:bg-gray-400 active:scale-95">
+            <button onClick={handleSaveItem} disabled={loading} className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-md transition-all text-sm disabled:bg-gray-400 active:scale-95">
               <Save size={18} className="mr-2" /> {isUpdateMode ? '수정 완료' : '서버저장'}
             </button>
           </div>
@@ -384,33 +382,11 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
         </div>
       </div>
 
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                작성하신 작업 내역과 사진들을<br/>
-                서버에 안전하게 기록하시겠습니까?
-              </p>
-              
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={handleSaveItem} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {deleteTargetItem && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
             <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100">
                 <AlertTriangle className="text-red-600" size={36} />
               </div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">작업 내역 삭제 확인</h3>
@@ -420,10 +396,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
               </p>
               
               <div className="flex gap-3">
-                <button onClick={() => setDeleteTargetItem(null)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center">
-                  <X size={20} className="mr-2" />
-                  취소
-                </button>
+                <button onClick={() => setDeleteTargetItem(null)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
                 <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center active:scale-95">
                   <Trash2 size={20} className="mr-2" />
                   삭제 실행

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MeterPhotoData, MeterPhotoItem, Tenant, MeterReadingData } from '../types';
 import { fetchMeterPhotos, saveMeterPhotos, fetchTenants, fetchMeterReading, saveMeterReading, uploadFile } from '../services/dataService';
@@ -131,9 +132,11 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate }) 
         console.error("연동 중 오류:", syncError);
       }
       setSaveStatus('success');
+      alert('저장이 완료되었습니다.');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } else {
       setSaveStatus('error');
+      alert('저장에 실패했습니다.');
     }
   };
 

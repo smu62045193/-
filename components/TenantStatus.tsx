@@ -31,7 +31,6 @@ const TenantStatus: React.FC = () => {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   
   // 수정 중인 행 ID 관리
@@ -49,12 +48,7 @@ const TenantStatus: React.FC = () => {
     setEditingId(null);
   };
 
-  const handleSaveClick = () => {
-    setShowSaveConfirm(true);
-  };
-
   const handleExecuteSave = async () => {
-    setShowSaveConfirm(false);
     setSaveStatus('loading');
     try {
       // 저장 전 최종 정렬
@@ -63,6 +57,7 @@ const TenantStatus: React.FC = () => {
       if (success) {
         setTenants(sortedTenants);
         setSaveStatus('success');
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -213,7 +208,7 @@ const TenantStatus: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white text-black shadow-inner"
             />
-            <Search className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-3.5 top-2.5 text-gray-400 w-4 h-4" />
           </div>
           <button onClick={loadData} className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-500 border border-gray-200 bg-white shadow-sm transition-all active:scale-95">
             <RefreshCw size={18} className={loading ? 'animate-spin text-blue-600' : ''} />
@@ -337,7 +332,7 @@ const TenantStatus: React.FC = () => {
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40 print:hidden">
         <button 
-          onClick={handleSaveClick} 
+          onClick={handleExecuteSave} 
           disabled={saveStatus === 'loading'} 
           className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-w-2xl active:scale-95 ${
             saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : 
@@ -355,40 +350,6 @@ const TenantStatus: React.FC = () => {
           )}
         </button>
       </div>
-
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">입주사 정보 통합 저장</h3>
-              <p className="text-gray-500 mb-8 leading-relaxed font-medium">
-                작성하신 <span className="text-blue-600 font-bold">모든 입주사 명단과 정보</span>를<br/>
-                층별 순서로 자동 정렬하여 서버에 안전하게 기록하시겠습니까?
-              </p>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowSaveConfirm(false)} 
-                  className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center active:scale-95"
-                >
-                  <X size={18} className="mr-2" />
-                  취소
-                </button>
-                <button 
-                  onClick={handleExecuteSave} 
-                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg flex items-center justify-center active:scale-95"
-                >
-                  <CheckCircle2 size={18} className="mr-2" />
-                  확인
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {deleteTargetId && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">

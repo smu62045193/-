@@ -78,6 +78,7 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
       if (success) {
         setSaveStatus('success');
         setIsEditMode(false);
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -249,6 +250,7 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
       loading={loading} 
       hideHeader={true}
       isEmbedded={false}
+      hideSave={true}
     >
       <div className="space-y-6">
         <div className="flex justify-between items-center mb-2 print:hidden">
@@ -308,7 +310,7 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
         <div className="bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-300">
+              <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 w-[15%] border-r border-gray-300">조사사항</th>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border-r border-gray-300">점검기준</th>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 w-[12%]">적부(O·X)</th>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { MeterReadingData, MeterReadingItem, Tenant, MeterPhotoItem, StaffMember, MeterPhotoData } from '../types';
 import { fetchMeterReading, saveMeterReading, getInitialMeterReading, fetchTenants, fetchMeterPhotos, fetchStaffList, fetchLogoSealSettings } from '../services/dataService';
@@ -29,7 +30,6 @@ const unformatNumber = (val: string) => val.replace(/,/g, '');
 const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [showConfirm, setShowConfirm] = useState(false);
   
   // 수정 모드 분리
   const [isSummaryEditMode, setIsSummaryEditMode] = useState(false);
@@ -168,7 +168,6 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
 
   const handleSave = async () => {
     if (!data) return;
-    setShowConfirm(false);
     setSaveStatus('loading');
     try {
       const success = await saveMeterReading(data);
@@ -176,6 +175,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
         setSaveStatus('success');
         setIsSummaryEditMode(false);
         setIsTableEditMode(false);
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -575,7 +575,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
               {isSummaryEditMode ? '요약수정 취소' : '요약 정보 수정'}
             </button>
 
-            <button onClick={() => setShowConfirm(true)} disabled={saveStatus === 'loading'} className="flex items-center px-5 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all text-sm shadow-md active:scale-95"><Save size={18} className="mr-2" />서버 저장</button>
+            <button onClick={handleSave} disabled={saveStatus === 'loading'} className="flex items-center px-5 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all text-sm shadow-md active:scale-95"><Save size={18} className="mr-2" />서버 저장</button>
             
             <button onClick={handlePrintMain} className="flex items-center px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 transition-all text-sm shadow-md active:scale-95"><Printer size={18} className="mr-2" />미리보기</button>
           </div>
@@ -685,11 +685,6 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
           </div>
         </div>
       </div>
-      {showConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100"><div className="p-6 text-center"><div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100"><Cloud className="text-blue-600" size={32} /></div><h3 className="text-xl font-bold text-gray-900 mb-2">계량기 검침 데이터 저장</h3><p className="text-gray-500 mb-8 leading-relaxed">작성하신 <span className="text-blue-600 font-bold">월별 검침 지침과 요약 정보</span>를<br/>서버에 안전하게 기록하시겠습니까?</p><div className="flex gap-3"><button onClick={() => setShowConfirm(false)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center active:scale-95"><X size={18} className="mr-2" />취소</button><button onClick={handleSave} className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle2 size={18} className="mr-2" />확인</button></div></div></div>
-        </div>
-      )}
       <style>{`@keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }.animate-scale-up { animation: scale-up 0.2s ease-out forwards; }`}</style>
     </div>
   );
