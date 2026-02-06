@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import ParkingStatusList from './ParkingStatusList';
 import ParkingInspectionHistory from './ParkingInspectionHistory';
@@ -61,7 +60,6 @@ const ParkingManager: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [currentFloor, setCurrentFloor] = useState<'B2F' | 'B3F_Yeongdong' | 'B3F_Yusuji'>('B2F');
 
   useEffect(() => {
@@ -96,18 +94,20 @@ const ParkingManager: React.FC = () => {
 
   const handleSaveLayout = async () => {
     setSaveStatus('loading');
-    setShowSaveConfirm(false);
     try {
       const success = await saveParkingLayout(layout);
       if (success) {
         setSaveStatus('success');
         setIsEditMode(false);
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
+        alert('저장에 실패했습니다.');
       }
     } catch (e) {
       setSaveStatus('error');
+      alert('오류가 발생했습니다.');
     }
   };
 
@@ -129,7 +129,7 @@ const ParkingManager: React.FC = () => {
         <head>
           <title>지정주차 배치도 - ${floorLabels[currentFloor]}</title>
           <script src="https://cdn.tailwindcss.com"></script>
-          <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+          <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
           <style>
             body { font-family: 'Noto Sans KR', sans-serif; padding: 0; background: #f1f5f9; margin: 0; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
@@ -236,12 +236,12 @@ const ParkingManager: React.FC = () => {
                 </button>
                 <button 
                   onClick={() => setIsEditMode(!isEditMode)} 
-                  className={`flex items-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white hover:bg-orange-600' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
+                  className={`flex items-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
                 >
                   {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
                   {isEditMode ? '수정취소' : '수정'}
                 </button>
-                <button onClick={() => setShowSaveConfirm(true)} className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 font-bold shadow-lg transition-all active:scale-95 text-sm">
+                <button onClick={handleSaveLayout} disabled={loading} className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 font-bold shadow-lg transition-all active:scale-95 text-sm">
                   <Save size={20} className="mr-2" />
                   서버저장
                 </button>
@@ -325,27 +325,6 @@ const ParkingManager: React.FC = () => {
           </div>
         )}
       </div>
-
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                작성하신 주차 배치 레이아웃 정보를<br/>
-                서버에 안전하게 기록하시겠습니까?
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={handleSaveLayout} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up {

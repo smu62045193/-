@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { ParkingStatusItem } from '../types';
-import { fetchParkingStatusList, saveParkingStatusList, generateUUID } from '../services/dataService';
-import { Trash2, Printer, Plus, Edit2, RotateCcw, AlertTriangle, X, Cloud, CheckCircle } from 'lucide-react';
+import { fetchParkingStatusList, saveParkingStatusList, deleteParkingStatusItem, generateUUID } from '../services/dataService';
+import { Trash2, Printer, Plus, Edit2, RotateCcw, AlertTriangle, X, Cloud, CheckCircle, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 
 const ParkingStatusList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<ParkingStatusItem[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
-  
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   
   const [newItem, setNewItem] = useState<ParkingStatusItem>({
     id: '',
@@ -68,7 +65,6 @@ const ParkingStatusList: React.FC = () => {
     }
 
     setLoading(true);
-    setShowSaveConfirm(false);
     const originalList = [...items];
     try {
       const currentList = await fetchParkingStatusList();
@@ -116,7 +112,7 @@ const ParkingStatusList: React.FC = () => {
       const success = await saveParkingStatusList(updatedList);
       if (success) {
         handleCancelEdit();
-        alert(editId ? '정보가 수정되었습니다.' : '신규 차량이 등록되었습니다.');
+        alert('저장이 완료되었습니다.');
       } else {
         setItems(originalList);
         alert('저장 실패');
@@ -130,33 +126,29 @@ const ParkingStatusList: React.FC = () => {
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-
-    const idStr = String(deleteTargetId);
+  const handleDelete = async (id: string) => {
+    const idStr = String(id);
     const originalList = [...items];
-    const newItems = originalList.filter(i => String(i.id) !== idStr);
     
-    setItems(newItems);
-    if (String(editId) === idStr) handleCancelEdit();
-    setDeleteTargetId(null); 
-
+    setLoading(true);
     try {
-      const success = await saveParkingStatusList(newItems);
-      if (!success) {
-        setItems(originalList);
+      // 서버 DB에서 실제 행 삭제 수행
+      const success = await deleteParkingStatusItem(idStr);
+      
+      if (success) {
+        const newItems = originalList.filter(i => String(i.id) !== idStr);
+        setItems(newItems);
+        if (String(editId) === idStr) handleCancelEdit();
+        alert('삭제가 완료되었습니다.');
+      } else {
         alert('서버 저장 실패로 삭제가 취소되었습니다.');
       }
     } catch (e) {
       console.error(e);
-      setItems(originalList);
       alert('삭제 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setDeleteTargetId(id);
   };
 
   const handlePrint = () => {
@@ -252,11 +244,30 @@ const ParkingStatusList: React.FC = () => {
           <div><label className="block text-xs font-bold text-gray-500 mb-1">변경전차량번호</label><input type="text" value={newItem.prevPlate || ''} onChange={e => setNewItem({...newItem, prevPlate: e.target.value})} placeholder="변경 시 입력" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
           <div><label className="block text-xs font-bold text-gray-500 mb-1">변경후차량번호 *</label><input type="text" value={newItem.plateNum} onChange={e => setNewItem({...newItem, plateNum: e.target.value})} placeholder="현재 차량번호" className="w-full border border-blue-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px] font-bold" /></div>
           <div><label className="block text-xs font-bold text-gray-500 mb-1">비고</label><input type="text" value={newItem.note || ''} onChange={e => setNewItem({...newItem, note: e.target.value})} placeholder="비고" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
-          <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex items-center justify-center space-x-2 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-bold h-[38px] transition-colors ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} disabled:bg-gray-400`}>{editId ? <Edit2 size={18} /> : <Plus size={18} />}<span>서버저장</span></button>
+          <button onClick={handleRegister} disabled={loading} className={`flex items-center justify-center space-x-2 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-bold h-[38px] transition-colors ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} disabled:bg-gray-400`}>{editId ? <Edit2 size={18} /> : <Plus size={18} />}<span>서버저장</span></button>
         </div>
       </div>
 
-      <div className="flex justify-between items-center mb-4"><div className="flex items-center gap-2"><h2 className="text-xl font-bold text-gray-800">지정주차 차량 현황</h2><span className="text-sm text-gray-400 font-normal">총 {items.length}대</span></div><button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md text-sm"><Printer size={18} className="mr-2" />미리보기</button></div>
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-bold text-gray-800">지정주차 차량 현황</h2>
+          <span className="text-sm text-gray-400 font-normal">총 {items.length}대</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={loadData} 
+            disabled={loading}
+            className="flex items-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
+          >
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
+          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md text-sm">
+            <Printer size={18} className="mr-2" />
+            미리보기
+          </button>
+        </div>
+      </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
         <table className="w-full min-w-[1000px] border-collapse">
@@ -288,68 +299,13 @@ const ParkingStatusList: React.FC = () => {
                    <td className={`${tdClass} text-center print:hidden`}>
                      <div className="flex items-center justify-center space-x-1">
                         <button onClick={() => handleLoadToForm(item)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
-                        <button onClick={(e) => handleDeleteClick(e, item.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
+                        <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
                      </div>
                    </td>
                  </tr>)))}
           </tbody>
         </table>
       </div>
-
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-gray-100">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-blue-100">
-                <AlertTriangle className="text-red-500" size={32} />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">차량 정보 삭제 확인</h3>
-              <p className="text-gray-500 mb-8 leading-relaxed">
-                선택하신 지정주차 차량 정보를 정말로 삭제하시겠습니까?<br/>
-                <span className="text-red-500 font-bold text-sm">삭제된 데이터는 복구할 수 없습니다.</span>
-              </p>
-              
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setDeleteTargetId(null)}
-                  className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors flex items-center justify-center"
-                >
-                  <X size={18} className="mr-2" />
-                  취소하기
-                </button>
-                <button 
-                  onClick={confirmDelete}
-                  className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center"
-                >
-                  <Trash2 size={18} className="mr-2" />
-                  삭제 진행
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                작성하신 주차 차량 현황 데이터를<br/>
-                서버에 안전하게 기록하시겠습니까?
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up {

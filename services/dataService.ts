@@ -991,7 +991,16 @@ export const saveParkingChangeList = async (list: ParkingChangeItem[]): Promise<
 export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => {
   try {
     const { data } = await supabase.from('parking_status').select('*').order('location', { ascending: true });
-    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, location: p.location, company: p.company, prev_plate: p.prev_plate, plate_num: p.plate_num, note: p.note }));
+    if (data && data.length > 0) return data.map(p => ({ 
+      id: p.id, 
+      date: p.date, 
+      type: p.type, 
+      location: p.location, 
+      company: p.company, 
+      prevPlate: p.prev_plate, // UI expects prevPlate, DB column is prev_plate
+      plateNum: p.plate_num,   // UI expects plateNum, DB column is plate_num
+      note: p.note 
+    }));
   } catch (e) {}
   return [];
 };
@@ -999,6 +1008,14 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
 export const saveParkingStatusList = async (list: ParkingStatusItem[]): Promise<boolean> => {
   const dbData = list.map(mapParkingStatusToDB);
   const { error } = await supabase.from('parking_status').upsert(dbData);
+  return !error;
+};
+
+/**
+ * 지정주차 차량 정보 개별 삭제 (DB 연동 수정)
+ */
+export const deleteParkingStatusItem = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('parking_status').delete().eq('id', id);
   return !error;
 };
 
