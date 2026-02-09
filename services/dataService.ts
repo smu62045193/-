@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -885,7 +884,7 @@ export const fetchGasLog = async (date: string): Promise<GasLogData | null> => {
 };
 
 export const saveGasLog = async (data: GasLogData): Promise<boolean> => {
-  const { error = null } = await supabase.from('gas_logs').upsert({ id: `GAS_LOG_${date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('gas_logs').upsert({ id: `GAS_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
   return !error;
 };
 
