@@ -85,13 +85,13 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas'); 
-          const MAX_WIDTH = 300; 
+          const MAX_WIDTH = 400; 
           const scaleSize = MAX_WIDTH / img.width;
           canvas.width = MAX_WIDTH; 
           canvas.height = img.height * scaleSize;
           const ctx = canvas.getContext('2d'); 
           ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          setFormItem(prev => ({ ...prev, photo: canvas.toDataURL('image/jpeg', 0.6) }));
+          setFormItem(prev => ({ ...prev, photo: canvas.toDataURL('image/jpeg', 0.8) }));
         };
         img.src = event.target?.result as string;
       };
@@ -106,17 +106,31 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     try {
       const latestStaff = await fetchStaffList();
       const targetId = editId || generateId();
-      let finalPhotoUrl = formItem.photo;
+      let finalPhotoUrl = formItem.photo || '';
       
+      // 1. 사진 업로드 처리 (Base64 데이터인 경우에만)
       if (finalPhotoUrl && finalPhotoUrl.startsWith('data:image')) {
         const fileName = `staff_${targetId}.jpg`;
         const uploadedUrl = await uploadFile('facility', 'staff', fileName, finalPhotoUrl);
         if (uploadedUrl) finalPhotoUrl = uploadedUrl;
       }
 
-      let newList = [...latestStaff];
-      const memberToSave = { ...formItem, id: targetId, photo: finalPhotoUrl };
+      // 2. 날짜 데이터 정제 (빈 문자열 ""을 null로 변환하여 DB 400 에러 방지)
+      const sanitizeDate = (dateStr: string | undefined) => {
+        if (!dateStr || dateStr.trim() === '') return null;
+        return dateStr;
+      };
 
+      const memberToSave = { 
+        ...formItem, 
+        id: targetId, 
+        photo: finalPhotoUrl,
+        birthDate: sanitizeDate(formItem.birthDate) as any,
+        joinDate: sanitizeDate(formItem.joinDate) as any,
+        resignDate: sanitizeDate(formItem.resignDate) as any
+      };
+
+      let newList = [...latestStaff];
       if (editId) { 
         const idx = newList.findIndex(m => String(m.id) === String(editId)); 
         if (idx >= 0) newList[idx] = memberToSave; 
@@ -124,17 +138,26 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         newList = [memberToSave, ...newList]; 
       }
 
-      if (await saveStaffList(newList)) { 
+      // 3. 서버 저장 실행
+      const success = await saveStaffList(newList);
+      if (success) { 
         if (window.opener) {
           window.opener.postMessage({ type: 'STAFF_SAVED' }, '*');
         }
-        setEditId(targetId);
-        setFormItem(memberToSave);
         alert('성공적으로 저장되었습니다.'); 
-        if (isPopupMode) window.close();
+        if (isPopupMode) {
+          window.close();
+        } else {
+          setEditId(null);
+          setFormItem(initialFormState);
+          loadDataForPopup();
+        }
+      } else {
+        alert('서버 저장에 실패했습니다. 날짜 형식을 확인해주세요.');
       }
     } catch (e) { 
-      alert('오류 발생'); 
+      console.error(e);
+      alert('오류가 발생했습니다.'); 
     } finally { 
       setLoading(false); 
     }
@@ -146,6 +169,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     if (await saveStaffList(newList)) {
       setStaffList(newList);
       setDeleteTargetId(null);
+      alert('삭제되었습니다.');
     } else {
       alert('삭제 실패');
     }
@@ -240,7 +264,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
           <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}>
@@ -257,7 +281,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
             <div className="flex flex-col md:flex-row gap-8">
               <div className="flex flex-col items-center">
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">직원 사진</label>
-                <div onClick={() => fileInputRef.current?.click()} className="w-32 h-40 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-slate-50 overflow-hidden group hover:border-blue-400 transition-all">
+                <div onClick={() => fileInputRef.current?.click()} className="w-32 h-40 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer bg-slate-50 overflow-hidden group hover:border-blue-400 transition-all shadow-inner">
                   {formItem.photo ? (
                     <img src={formItem.photo} className="w-full h-full object-cover" alt="Staff" />
                   ) : (
@@ -266,7 +290,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
                       <span className="text-[10px] mt-2 font-bold uppercase">Upload</span>
                     </div>
                   )}
-                  <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
+                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
                 </div>
               </div>
 
@@ -287,15 +311,15 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
                 </div>
                 <div className="col-span-1">
                   <label className="block text-[11px] font-black text-slate-400 mb-1 uppercase tracking-widest">생년월일</label>
-                  <input type="date" value={formItem.birthDate} onChange={e => setFormItem({...formItem, birthDate: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="date" value={formItem.birthDate || ''} onChange={e => setFormItem({...formItem, birthDate: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div className="col-span-1">
                   <label className="block text-[11px] font-black text-slate-400 mb-1 uppercase tracking-widest">입사일</label>
-                  <input type="date" value={formItem.joinDate} onChange={e => setFormItem({...formItem, joinDate: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="date" value={formItem.joinDate || ''} onChange={e => setFormItem({...formItem, joinDate: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div className="col-span-1">
                   <label className="block text-[11px] font-black text-slate-400 mb-1 uppercase tracking-widest">퇴사일</label>
-                  <input type="date" value={formItem.resignDate} onChange={e => setFormItem({...formItem, resignDate: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                  <input type="date" value={formItem.resignDate || ''} onChange={e => setFormItem({...formItem, resignDate: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
               </div>
             </div>
@@ -319,7 +343,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
             <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">취소</button>
-            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
@@ -328,7 +352,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
 
         {showSaveConfirm && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-8 text-center">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-8 text-center animate-scale-up">
               <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100"><Cloud className="text-blue-600" size={36} /></div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
               <p className="text-slate-500 mb-8 leading-relaxed font-medium">직원 정보를 서버에 기록하시겠습니까?</p>

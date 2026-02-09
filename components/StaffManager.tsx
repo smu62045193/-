@@ -56,10 +56,9 @@ const VerticalLine = ({ height = 'h-4' }: { height?: string }) => (
 interface StaffCardProps {
   member: StaffMember & { isPlaceholder?: boolean };
   isManager?: boolean;
-  onPhotoUpdate: (id: string, photo: string) => void;
 }
 
-const StaffCard: React.FC<StaffCardProps> = ({ member, isManager = false, onPhotoUpdate }) => {
+const StaffCard: React.FC<StaffCardProps> = ({ member, isManager = false }) => {
   if (member.isPlaceholder) {
     return (
       <div className={`
@@ -77,29 +76,6 @@ const StaffCard: React.FC<StaffCardProps> = ({ member, isManager = false, onPhot
       </div>
     );
   }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 300; 
-          const scaleSize = MAX_WIDTH / img.width;
-          canvas.width = MAX_WIDTH;
-          canvas.height = img.height * scaleSize;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          onPhotoUpdate(member.id, dataUrl);
-        };
-        img.src = event.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const getSubTitle = () => {
     if (member.category === '미화') {
@@ -120,8 +96,9 @@ const StaffCard: React.FC<StaffCardProps> = ({ member, isManager = false, onPhot
       w-[115px] py-1.5 min-h-[140px] print:w-[120px] print:min-h-[140px]
       ${isManager ? 'bg-blue-50' : 'bg-white'}
     `}>
-      <label className={`
-        relative rounded-md flex items-center justify-center mb-1 overflow-hidden border border-gray-100 cursor-pointer group
+      {/* 조직도에서 직접 수정 불가능하도록 div로 변경 및 업로드 로직 제거 */}
+      <div className={`
+        relative rounded-md flex items-center justify-center mb-1 overflow-hidden border border-gray-100
         w-[88px] h-[88px] print:w-[88px] print:h-[88px]
         ${!member.photo ? (isManager ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500') : 'bg-white'}
       `}>
@@ -130,11 +107,7 @@ const StaffCard: React.FC<StaffCardProps> = ({ member, isManager = false, onPhot
         ) : (
           <User size={isManager ? 30 : 22} />
         )}
-        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center print:hidden">
-          <Camera className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={14} />
-        </div>
-        <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-      </label>
+      </div>
       
       <div className="flex flex-col items-center justify-center w-full px-1 overflow-hidden">
         <div className="flex items-center justify-center w-full whitespace-nowrap mb-0.5">
@@ -169,11 +142,10 @@ interface DepartmentGroupProps {
   title: string;
   members: StaffMember[];
   headerColorClass: string;
-  onPhotoUpdate: (id: string, photo: string) => void;
   position: 'first' | 'middle' | 'last' | 'single'; 
 }
 
-const DepartmentGroup: React.FC<DepartmentGroupProps> = ({ title, members, headerColorClass, onPhotoUpdate, position }) => {
+const DepartmentGroup: React.FC<DepartmentGroupProps> = ({ title, members, headerColorClass, position }) => {
   const facilityPriority = ['서동조', '김성현', '이창준', '이도성', '박평욱'];
   const securityPriority = ['김동창', '하병주', '민영학', '박종두', '이선근'];
   const cleaningPriority = ['조병태'];
@@ -255,18 +227,18 @@ const DepartmentGroup: React.FC<DepartmentGroupProps> = ({ title, members, heade
 
         {leader && (
           <>
-            <StaffCard member={leader} isManager={!leader.isPlaceholder && isManager(leader)} onPhotoUpdate={onPhotoUpdate} />
+            <StaffCard member={leader} isManager={!leader.isPlaceholder && isManager(leader)} />
             {teamMembers.length > 0 && (
               <>
                 <VerticalLine height="h-3 print:h-[10px]" />
                 <div className={`h-2 border-t-2 border-l-2 border-r-2 border-gray-300 print:border-black print:border-t-[3px] print:border-l-[3px] print:border-r-[3px] print:h-2 ${connectorWidthClass}`}></div>
                 <div className="flex gap-[15px] print:gap-[15px]">
                   <div className="flex flex-col items-center gap-[5px] print:gap-[5px]">
-                    {col1.map((m, idx) => <StaffCard key={m.id || idx} member={m} onPhotoUpdate={onPhotoUpdate} />)}
+                    {col1.map((m, idx) => <StaffCard key={m.id || idx} member={m} />)}
                   </div>
                   {numCols >= 2 && (
                     <div className="flex flex-col items-center gap-[5px] print:gap-[5px]">
-                      {col2.map((m, idx) => <StaffCard key={m.id || idx} member={m} onPhotoUpdate={onPhotoUpdate} />)}
+                      {col2.map((m, idx) => <StaffCard key={m.id || idx} member={m} />)}
                     </div>
                   )}
                 </div>
@@ -308,12 +280,6 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handlePhotoUpdate = async (id: string, photo: string) => {
-    const updatedList = staffList.map(m => m.id === id ? { ...m, photo } : m);
-    setStaffList(updatedList);
-    await saveStaffList(updatedList);
   };
 
   const handlePrint = () => {
@@ -451,13 +417,13 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
               새마을운동중앙회 대치동사옥 조직도
             </h1>
             <div className="flex flex-col items-center mt-2 print:mt-1">
-              {manager ? <StaffCard member={manager} isManager onPhotoUpdate={handlePhotoUpdate} /> : <div className="p-10 border-2 border-dashed rounded-lg text-gray-400">현장대리인 공석</div>}
+              {manager ? <StaffCard member={manager} isManager /> : <div className="p-10 border-2 border-dashed rounded-lg text-gray-400">현장대리인 공석</div>}
               <VerticalLine height="h-5 print:h-[10px]" />
             </div>
             <div className="flex justify-center items-start w-full px-4 print:px-0 gap-0">
-              <DepartmentGroup title="경비팀" members={securityTeam} headerColorClass="bg-green-600" onPhotoUpdate={handlePhotoUpdate} position="first" />
-              <DepartmentGroup title="시설팀" members={facilityTeam} headerColorClass="bg-blue-600" onPhotoUpdate={handlePhotoUpdate} position="middle" />
-              <DepartmentGroup title="미화팀" members={cleaningTeam} headerColorClass="bg-orange-600" onPhotoUpdate={handlePhotoUpdate} position="last" />
+              <DepartmentGroup title="경비팀" members={securityTeam} headerColorClass="bg-green-600" position="first" />
+              <DepartmentGroup title="시설팀" members={facilityTeam} headerColorClass="bg-blue-600" position="middle" />
+              <DepartmentGroup title="미화팀" members={cleaningTeam} headerColorClass="bg-orange-600" position="last" />
             </div>
           </div>
         </div>
