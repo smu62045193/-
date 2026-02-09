@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { StaffMember } from '../types';
-import { fetchStaffList, saveStaffList, uploadFile } from '../services/dataService';
+import { fetchStaffList, saveStaffList, uploadFile, deleteStaffMember } from '../services/dataService';
 import { Save, Plus, Trash2, Search, ArrowLeft, Printer, Edit2, RotateCcw, UserPlus, Check, RefreshCw, Camera, User, Cloud, X, CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface StaffStatusProps {
@@ -17,8 +17,6 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const initialFormState: StaffMember = { id: '', category: '시설', jobTitle: '', birthDate: '', joinDate: '', resignDate: '', name: '', phone: '', area: '', note: '', photo: '' };
@@ -102,21 +100,17 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
   const handleRegister = async () => {
     if (!formItem.name.trim()) { alert('성명은 필수입니다.'); return; }
     setLoading(true);
-    setShowSaveConfirm(false);
     try {
       const targetId = editId || generateId();
       let finalPhotoUrl = formItem.photo || '';
       
-      // 1. 사진 업로드 처리 (Base64 데이터인 경우에만)
       if (finalPhotoUrl && finalPhotoUrl.startsWith('data:image')) {
         const fileName = `staff_${targetId}.jpg`;
         const uploadedUrl = await uploadFile('facility', 'staff', fileName, finalPhotoUrl);
         if (uploadedUrl) finalPhotoUrl = uploadedUrl;
       }
 
-      // 2. 전체 목록 기반 데이터 업데이트
       const latestStaff = await fetchStaffList();
-      
       const memberToSave = { 
         ...formItem, 
         id: targetId, 
@@ -131,20 +125,17 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         newList = [memberToSave, ...newList]; 
       }
 
-      // 3. 서버 저장 실행 (dataService에서 날짜 null 처리를 수행함)
       const success = await saveStaffList(newList);
       if (success) { 
         if (window.opener) {
           window.opener.postMessage({ type: 'STAFF_SAVED' }, '*');
         }
         alert('성공적으로 저장되었습니다.'); 
-        if (isPopupMode) {
-          window.close();
-        } else {
-          setEditId(null);
+        
+        if (!editId) {
           setFormItem(initialFormState);
-          loadDataForPopup();
         }
+        loadDataForPopup(); 
       } else {
         alert('서버 저장에 실패했습니다. 날짜 형식을 확인해주세요.');
       }
@@ -156,15 +147,22 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-    const newList = staffList.filter(m => String(m.id) !== String(deleteTargetId));
-    if (await saveStaffList(newList)) {
-      setStaffList(newList);
-      setDeleteTargetId(null);
-      alert('삭제되었습니다.');
-    } else {
-      alert('삭제 실패');
+  const handleDeleteDirect = async (id: string) => {
+    setLoading(true);
+    try {
+      // Upsert 방식이 아닌 직접적인 DELETE 함수 호출
+      const success = await deleteStaffMember(id);
+      if (success) {
+        setStaffList(prev => prev.filter(m => String(m.id) !== String(id)));
+        alert('삭제되었습니다.');
+      } else {
+        alert('삭제 실패');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -334,27 +332,13 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
           </div>
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
-            <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">취소</button>
-            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
+            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
           </div>
         </div>
-
-        {showSaveConfirm && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 p-8 text-center animate-scale-up">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100"><Cloud className="text-blue-600" size={36} /></div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">직원 정보를 서버에 기록하시겠습니까?</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all">취소</button>
-                <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all">확인</button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -414,7 +398,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
                     <td className="px-4 py-4 print:hidden">
                       <div className="flex justify-center gap-1">
                         <button onClick={() => openIndependentWindow(m.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                        <button onClick={() => setDeleteTargetId(m.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                        <button onClick={() => handleDeleteDirect(m.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -424,20 +408,6 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
           </table>
         </div>
       </div>
-
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-red-100 p-8 text-center animate-scale-up">
-            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-red-100"><AlertTriangle className="text-red-600" size={36} /></div>
-            <h3 className="text-2xl font-black text-slate-900 mb-2">직원 정보 삭제 확인</h3>
-            <p className="text-slate-500 mb-8 leading-relaxed font-medium">선택하신 직원 정보를 마스터 DB에서<br/><span className="text-red-600 font-bold">영구히 삭제</span>하시겠습니까?</p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteTargetId(null)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold">취소</button>
-              <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold">삭제 실행</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }

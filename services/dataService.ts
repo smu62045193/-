@@ -782,6 +782,14 @@ export const saveStaffList = async (list: StaffMember[]): Promise<boolean> => {
   return !error;
 };
 
+/**
+ * 직원 정보 영구 삭제
+ */
+export const deleteStaffMember = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('staff_members').delete().eq('id', id);
+  return !error;
+};
+
 export const fetchShiftSettings = async (): Promise<ShiftSettings | null> => {
   try {
     const { data } = await supabase.from('system_settings').select('data').eq('id', 'SHIFT_SETTINGS').maybeSingle();
