@@ -100,11 +100,15 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
       const latestData = await fetchAppointmentList();
       let newList = [...(latestData || [])];
       
+      let targetId = editId;
       if (editId) { 
         const idx = newList.findIndex(i => String(i.id) === String(editId)); 
         if (idx >= 0) newList[idx] = { ...newItem }; 
       } else { 
-        newList = [{ ...newItem, id: generateId() }, ...newList]; 
+        // 신규 등록 시 고유 ID 생성
+        const newId = generateId();
+        targetId = newId;
+        newList = [{ ...newItem, id: newId }, ...newList]; 
       }
       
       if (await saveAppointmentList(newList)) { 
@@ -114,11 +118,17 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
         if (window.opener) {
           window.opener.postMessage({ type: 'APPOINTMENT_SAVED' }, '*');
         }
+
+        // 중요: 신규 등록 완료 후 현재 창의 상태를 '수정 모드'로 즉시 전환 (중복 저장 방지)
+        if (!editId && targetId) {
+          setEditId(targetId);
+          setNewItem(prev => ({ ...prev, id: targetId }));
+        }
         
         alert('저장이 완료되었습니다.');
         setTimeout(() => {
           setSaveStatus('idle');
-          if (isPopupMode) window.close(); // 팝업창인 경우 자신을 닫음
+          // window.close() 로직 제거: 사용자가 직접 닫기 전까지 유지
         }, 500);
       }
     } catch (e) { 
@@ -292,7 +302,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
               취소 후 창 닫기
             </button>
             <button 
-              onClick={handleSave}
+              onClick={handleSave} 
               disabled={saveStatus === 'loading'}
               className="flex-[2] py-3.5 bg-blue-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
             >
