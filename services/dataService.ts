@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -128,7 +129,6 @@ const mapFromDB = (prefix: string, item: any): any => {
         lastUpdated: item.last_updated
       };
     case "METER_":
-      // creation_date 컬럼 우선 매핑
       return {
         month: item.month,
         unitPrice: item.unit_price,
@@ -143,7 +143,7 @@ const mapFromDB = (prefix: string, item: any): any => {
     case "BOILER_LOG_":
       return item.boiler_data;
     case "HVAC_BOILER_":
-      return item; // 통합 데이터 행 전체 반환
+      return item; 
     default:
       return item.data || item;
   }
@@ -207,10 +207,8 @@ const mapFireExtinguisherToDB = (item: FireExtinguisherItem) => ({
   type: item.type,
   floor: item.floor,
   company: item.company,
-  // Fixed: Property 'serial_no' does not exist on type 'FireExtinguisherItem'. Did you mean 'serialNo'?
   serial_no: item.serialNo,
   phone: item.phone,
-  // Fixed: Property 'cert_no' does not exist on type 'FireExtinguisherItem'. Did you mean 'certNo'?
   cert_no: item.certNo,
   date: item.date,
   remarks: item.remarks
@@ -366,7 +364,6 @@ const fetchSingleGeneric = async (key: string): Promise<any> => {
   if (key.startsWith("FIRE_FAC_")) return await fetchFireFacilityLog(key.replace("FIRE_FAC_", ""));
   if (key.startsWith("ELEV_LOG_")) return await fetchElevatorLog(key.replace("ELEV_LOG_", ""));
   
-  // HVAC_BOILER_ 직접 조회 처리 추가
   if (key.startsWith("HVAC_BOILER_")) {
     const { data } = await supabase.from('hvac_boiler_logs').select("*").eq("id", key).maybeSingle();
     return mapFromDB("HVAC_BOILER_", data);
@@ -520,9 +517,6 @@ export const getInitialSubstationLog = (date: string): SubstationLogData => ({
   },
   acb: {
     time9: { acb1: { v: '', a: '', kw: '' }, acb2: { v: '', a: '', kw: '' }, acb3: { v: '', a: '', kw: '' }, trTemp: { tr1: '', tr2: '', tr3: '' } },
-    /**
-     * Fixed Error: '처리' does not exist in type trTemp. Changed to 'tr3'.
-     */
     time21: { acb1: { v: '', a: '', kw: '' }, acb2: { v: '', a: '', kw: '' }, acb3: { v: '', a: '', kw: '' }, trTemp: { tr1: '', tr2: '', tr3: '' } }
   },
   powerUsage: {
@@ -580,9 +574,6 @@ export const getInitialSafetyCheck = (date: string, type: 'general' | 'ev'): Saf
   } : undefined
 });
 
-/**
- * Added initializers for missing data types to resolve component errors.
- */
 export const getInitialHvacLog = (date: string): HvacLogData => ({
   date,
   unitNo: '1',
@@ -618,9 +609,6 @@ export const getInitialBoilerLog = (date: string): BoilerLogData => ({
   cleaner: { prevStock: '', inQty: '', usedQty: '', stock: '' }
 });
 
-/**
- * Fix: Kept this definition and removed the duplicate at the end of the file.
- */
 export const getInitialAirEnvironmentLog = (date: string): AirEnvironmentLogData => ({
   date,
   emissions: [
@@ -638,10 +626,6 @@ export const getInitialAirEnvironmentLog = (date: string): AirEnvironmentLogData
   tempMax: '7'
 });
 
-/**
- * 저수조 위생점검 초기 데이터 생성 (제공된 이미지에 맞춰 조사사항 및 점검기준 업데이트)
- * 기본값은 'O'로 설정
- */
 export const getInitialWaterTankLog = (date: string): WaterTankLogData => ({
   date,
   buildingName: '새마을운동중앙회 대치동사옥',
@@ -710,13 +694,12 @@ export const saveBoilerLog = async (data: BoilerLogData): Promise<boolean> => {
 };
 
 /**
- * 냉온수기 및 보일러 통합 저장 (하나의 트랜잭션처럼 처리)
+ * 냉온수기 및 보일러 통합 저장
  */
 export const saveHvacBoilerCombined = async (hvacData: HvacLogData | null, boilerData: BoilerLogData | null): Promise<boolean> => {
   const date = hvacData?.date || boilerData?.date;
   if (!date) return false;
   
-  // 만약 한쪽 데이터가 null이면 기존 데이터를 불러와서 병합함 (덮어쓰기 방지)
   let finalHvac = hvacData;
   let finalBoiler = boilerData;
   
@@ -741,7 +724,6 @@ export const saveHvacBoilerCombined = async (hvacData: HvacLogData | null, boile
  * Data Fetch & Save Functions (Supabase Only)
  */
 export const fetchDailyData = async (date: string, force = false): Promise<DailyData | null> => {
-  // 로컬 캐시(임시 데이터) 무시하고 서버에서 무조건 가져오기 위해 상단 캐시 확인 로직 제거
   try {
     const { data } = await supabase.from('daily_reports').select('*').eq('id', date).maybeSingle();
     if (data) {
@@ -752,7 +734,6 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
   return null;
 };
 
-// Fixed Property Name Errors: Changed facility_duty, security_duty, work_log to facilityDuty, securityDuty, workLog on data object to match DailyData interface.
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   const { error } = await supabase.from('daily_reports').upsert({ id: data.date, facility_duty: data.facilityDuty, security_duty: data.securityDuty, utility: data.utility, work_log: data.workLog, last_updated: new Date().toISOString() });
   return !error;
@@ -765,8 +746,8 @@ export const fetchStaffList = async (): Promise<StaffMember[]> => {
       id: s.id, 
       name: s.name, 
       category: s.category, 
-      jobTitle: s.job_title || '', // Map DB field to Model property
-      birthDate: s.birth_date || '', // Map DB field to Model property
+      jobTitle: s.job_title || '', 
+      birthDate: s.birth_date || '', 
       joinDate: s.join_date || '', 
       resignDate: s.resign_date || '', 
       phone: s.phone || '', 
@@ -778,10 +759,25 @@ export const fetchStaffList = async (): Promise<StaffMember[]> => {
   return [];
 };
 
+/**
+ * 빈 문자열을 null로 변환하는 유틸리티
+ */
+const toNullIfEmpty = (val: string | undefined) => (!val || val.trim() === '') ? null : val;
+
 export const saveStaffList = async (list: StaffMember[]): Promise<boolean> => {
-  // Line 741 fixed: s.birth_date -> s.birthDate
-  // Fixed typo: s.job_title changed to s.jobTitle to correctly access property on StaffMember model.
-  const dbData = list.map(s => ({ id: s.id, name: s.name, category: s.category, job_title: s.jobTitle, birth_date: s.birthDate, join_date: s.joinDate, resign_date: s.resignDate, phone: s.phone, area: s.area, note: s.note, photo_url: s.photo }));
+  const dbData = list.map(s => ({ 
+    id: s.id, 
+    name: s.name, 
+    category: s.category, 
+    job_title: s.jobTitle, 
+    birth_date: toNullIfEmpty(s.birthDate), 
+    join_date: toNullIfEmpty(s.joinDate), 
+    resign_date: toNullIfEmpty(s.resignDate), 
+    phone: s.phone, 
+    area: s.area, 
+    note: s.note, 
+    photo_url: s.photo 
+  }));
   const { error } = await supabase.from('staff_members').upsert(dbData);
   return !error;
 };
@@ -946,7 +942,7 @@ export const saveInternalWorkList = async (list: ConstructionWorkItem[]): Promis
 };
 
 /**
- * 공사/작업 로그 영구 삭제 (Row 기반)
+ * 공사/작업 로그 영구 삭제
  */
 export const deleteConstructionWorkItem = async (id: string): Promise<boolean> => {
   const { error } = await supabase.from('construction_logs').delete().eq('id', id);
@@ -997,8 +993,8 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
       type: p.type, 
       location: p.location, 
       company: p.company, 
-      prevPlate: p.prev_plate, // UI expects prevPlate, DB column is prev_plate
-      plateNum: p.plate_num,   // UI expects plateNum, DB column is plate_num
+      prevPlate: p.prev_plate, 
+      plateNum: p.plate_num,   
       note: p.note 
     }));
   } catch (e) {}
@@ -1012,7 +1008,7 @@ export const saveParkingStatusList = async (list: ParkingStatusItem[]): Promise<
 };
 
 /**
- * 지정주차 차량 정보 개별 삭제 (DB 연동 수정)
+ * 지정주차 차량 정보 개별 삭제
  */
 export const deleteParkingStatusItem = async (id: string): Promise<boolean> => {
   const { error } = await supabase.from('parking_status').delete().eq('id', id);
@@ -1041,7 +1037,7 @@ export const fetchContractors = async (): Promise<Contractor[]> => {
       type: c.type, 
       contactPerson: c.contact_person, 
       phoneMain: c.phone_main, 
-      phone_mobile: c.phone_mobile, 
+      phoneMobile: c.phone_mobile, 
       fax: c.fax, 
       note: c.note 
     }));
@@ -1064,7 +1060,6 @@ export const fetchMeterReading = async (month: string): Promise<MeterReadingData
 };
 
 export const saveMeterReading = async (data: MeterReadingData): Promise<boolean> => {
-  // creation_date 전용 컬럼에 저장
   const dbData = { 
     id: `METER_${data.month}`, 
     month: data.month, 
@@ -1102,7 +1097,6 @@ export const fetchSubstationLog = async (date: string, force = false): Promise<S
 };
 
 export const saveSubstationLog = async (data: SubstationLogData): Promise<boolean> => {
-  // Fixed Error 2: Changed snake_case 'power_usage: data.power_usage' to camelCase 'power_usage: data.powerUsage' as expected by Supabase table vs Model mapping.
   const { error } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
   return !error;
 };
@@ -1181,7 +1175,6 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
   try {
     const { data } = await supabase.from('air_environment_logs').select('*').eq('id', `AIR_ENV_${dateStr}`).maybeSingle();
     if (data) {
-      // 수파베이스의 개별 컬럼(weather_condition 등)에서 데이터를 읽어와서 앱 인터페이스에 맞게 매핑
       return { 
         date: data.date, 
         emissions: data.emissions, 
@@ -1195,13 +1188,7 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
   return null;
 };
 
-/**
- * Fixed Error: Ensured data.date is used from the 'data' parameter to avoid name shadowing or undefined 'date' variable.
- * Line 878: Fixed 'Cannot find name date' by using Date constructor.
- */
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
-  // 수파베이스 테이블의 실제 컬럼 이름(snake_case)에 맞춰서 데이터를 전송
-  // Fixed Error: Changed lowercase 'new date()' to 'new Date()' to match global constructor name.
   const { error } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 
     date: data.date, 
@@ -1210,7 +1197,6 @@ export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promis
     weather_condition: data.weatherCondition,
     temp_min: data.tempMin,
     temp_max: data.tempMax,
-    // Fixed: Guaranteed capital 'D' in Date() to resolve name error on line 889.
     last_updated: new Date().toISOString() 
   });
   return !error;
@@ -1224,9 +1210,6 @@ export const fetchWaterTankLog = async (month: string): Promise<WaterTankLogData
   return null;
 };
 
-/**
- * Fixed Error 1: Ensured 'new Date()' is used for capitalization to match global constructor name.
- */
 export const saveWaterTankLog = async (data: WaterTankLogData): Promise<boolean> => {
   const dbData = { id: `WATER_TANK_${data.date.substring(0, 7)}`, date: data.date, building_name: data.buildingName, location: data.location, usage: data.usage, items: data.items, inspector: data.inspector, last_updated: new Date().toISOString() };
   const { error } = await supabase.from('water_tank_logs').upsert(dbData);

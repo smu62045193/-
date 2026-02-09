@@ -37,7 +37,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'STAFF_SAVED') {
-        loadDataForPopup(); // 팝업에서 보내온 신호로 리스트 갱신 (메인창 용)
+        loadDataForPopup(); 
       }
     };
     window.addEventListener('message', handleMessage);
@@ -104,7 +104,6 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     setLoading(true);
     setShowSaveConfirm(false);
     try {
-      const latestStaff = await fetchStaffList();
       const targetId = editId || generateId();
       let finalPhotoUrl = formItem.photo || '';
       
@@ -115,19 +114,13 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         if (uploadedUrl) finalPhotoUrl = uploadedUrl;
       }
 
-      // 2. 날짜 데이터 정제 (빈 문자열 ""을 null로 변환하여 DB 400 에러 방지)
-      const sanitizeDate = (dateStr: string | undefined) => {
-        if (!dateStr || dateStr.trim() === '') return null;
-        return dateStr;
-      };
-
+      // 2. 전체 목록 기반 데이터 업데이트
+      const latestStaff = await fetchStaffList();
+      
       const memberToSave = { 
         ...formItem, 
         id: targetId, 
-        photo: finalPhotoUrl,
-        birthDate: sanitizeDate(formItem.birthDate) as any,
-        joinDate: sanitizeDate(formItem.joinDate) as any,
-        resignDate: sanitizeDate(formItem.resignDate) as any
+        photo: finalPhotoUrl
       };
 
       let newList = [...latestStaff];
@@ -138,7 +131,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         newList = [memberToSave, ...newList]; 
       }
 
-      // 3. 서버 저장 실행
+      // 3. 서버 저장 실행 (dataService에서 날짜 null 처리를 수행함)
       const success = await saveStaffList(newList);
       if (success) { 
         if (window.opener) {
@@ -260,14 +253,13 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     printWindow.document.close();
   };
 
-  // 팝업 창일 경우의 폼 전용 렌더링
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
           <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
                 {editId ? <Edit2 size={20} /> : <UserPlus size={20} />}
               </div>
               <span className="font-black text-lg">{editId ? '직원 정보 수정' : '신규 직원 등록'}</span>
