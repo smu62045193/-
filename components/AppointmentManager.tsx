@@ -319,13 +319,21 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   // [일반 모드] UI - 메인 화면의 목록
   // ==========================================
   return (
-    <div className="p-6 max-w-full mx-auto space-y-6 animate-fade-in relative min-h-screen">
+    <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-6 animate-fade-in relative min-h-screen">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-800 flex items-center">
           <UserCheck className="mr-2 text-blue-600" size={24} />
           안전관리자 선임 현황
         </h2>
         <div className="flex gap-2">
+          <button 
+            onClick={loadData}
+            disabled={loading}
+            className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+          >
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
           <button 
             onClick={() => openIndependentWindow()}
             className="flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 text-sm"
@@ -341,7 +349,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-        <table className="w-full border-collapse min-w-[1000px]">
+        <table className="w-full border-collapse min-w-[900px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-16">No</th>
