@@ -54,7 +54,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 /**
  * UUID 유효성 검사 및 생성 헬퍼
  */
-const isValidUUID = (uuid: string) => {
+export const isValidUUID = (uuid: string) => {
   const s = "" + uuid;
   const match = s.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   return !!match;
@@ -69,6 +69,14 @@ export const generateUUID = () => {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+};
+
+/**
+ * ID가 존재하면 유지하고 없으면 생성하는 헬퍼
+ */
+const ensureID = (id: string | undefined) => {
+  if (id && id.trim() !== '') return id;
+  return generateUUID();
 };
 
 /**
@@ -150,10 +158,10 @@ const mapFromDB = (prefix: string, item: any): any => {
 };
 
 /**
- * 데이터 매퍼 (Mapper) - UUID 형식 강제
+ * 데이터 매퍼 (Mapper) - ID 보존 및 중복 방지 강화
  */
 const mapParkingStatusToDB = (item: ParkingStatusItem) => ({
-  id: isValidUUID(item.id) ? item.id : generateUUID(), 
+  id: ensureID(item.id), 
   date: item.date,
   type: item.type || null,
   location: item.location,
@@ -165,7 +173,7 @@ const mapParkingStatusToDB = (item: ParkingStatusItem) => ({
 });
 
 const mapParkingChangeToDB = (item: ParkingChangeItem) => ({
-  id: isValidUUID(item.id) ? item.id : generateUUID(),
+  id: ensureID(item.id),
   date: item.date,
   type: item.type,
   company: item.company,
@@ -180,7 +188,7 @@ const mapParkingChangeToDB = (item: ParkingChangeItem) => ({
  * 승강기 점검 이력 매퍼
  */
 const mapElevatorInspectionToDB = (item: ElevatorInspectionItem) => ({
-  id: isValidUUID(item.id) ? item.id : generateUUID(),
+  id: ensureID(item.id),
   date: item.date,
   company: item.company,
   content: item.content,
@@ -191,7 +199,7 @@ const mapElevatorInspectionToDB = (item: ElevatorInspectionItem) => ({
  * 소방 점검 이력 매퍼
  */
 const mapFireHistoryToDB = (item: FireHistoryItem) => ({
-  id: isValidUUID(item.id) ? item.id : generateUUID(),
+  id: ensureID(item.id),
   date: item.date,
   company: item.company,
   content: item.content,
@@ -202,7 +210,7 @@ const mapFireHistoryToDB = (item: FireHistoryItem) => ({
  * 소화기 관리 매퍼
  */
 const mapFireExtinguisherToDB = (item: FireExtinguisherItem) => ({
-  id: isValidUUID(item.id) ? item.id : generateUUID(),
+  id: ensureID(item.id),
   manage_no: item.manageNo,
   type: item.type,
   floor: item.floor,
@@ -734,7 +742,6 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
   return null;
 };
 
-// Fix for services/dataService.ts on line 738: facilityDuty, securityDuty, workLog
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   const { error } = await supabase.from('daily_reports').upsert({ id: data.date, facility_duty: data.facilityDuty, security_duty: data.securityDuty, utility: data.utility, work_log: data.workLog, last_updated: new Date().toISOString() });
   return !error;
@@ -767,7 +774,7 @@ const toNullIfEmpty = (val: string | undefined) => (!val || val.trim() === '') ?
 
 export const saveStaffList = async (list: StaffMember[]): Promise<boolean> => {
   const dbData = list.map(s => ({ 
-    id: s.id, 
+    id: ensureID(s.id), 
     name: s.name, 
     category: s.category, 
     job_title: s.jobTitle, 
@@ -931,7 +938,7 @@ export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> =
 };
 
 export const saveExternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
-  const dbData = list.map(w => ({ id: isValidUUID(w.id) ? w.id : generateUUID(), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'external' }));
+  const dbData = list.map(w => ({ id: ensureID(w.id), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'external' }));
   const { error } = await supabase.from('construction_logs').upsert(dbData);
   return !error;
 };
@@ -945,7 +952,7 @@ export const fetchInternalWorkList = async (): Promise<ConstructionWorkItem[]> =
 };
 
 export const saveInternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
-  const dbData = list.map(w => ({ id: isValidUUID(w.id) ? w.id : generateUUID(), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'internal' }));
+  const dbData = list.map(w => ({ id: ensureID(w.id), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'internal' }));
   const { error } = await supabase.from('construction_logs').upsert(dbData);
   return !error;
 };
@@ -1055,7 +1062,16 @@ export const fetchContractors = async (): Promise<Contractor[]> => {
 };
 
 export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
-  const dbData = list.map(c => ({ id: isValidUUID(c.id) ? c.id : generateUUID(), name: c.name, type: c.type, contact_person: c.contactPerson, phone_main: c.phoneMain, phone_mobile: c.phoneMobile, fax: c.fax, note: c.note }));
+  const dbData = list.map(c => ({ 
+    id: ensureID(c.id), 
+    name: c.name, 
+    type: c.type, 
+    contact_person: c.contactPerson, 
+    phone_main: c.phoneMain, 
+    phone_mobile: c.phoneMobile, 
+    fax: c.fax, 
+    note: c.note 
+  }));
   const { error } = await supabase.from('contractors').upsert(dbData);
   return !error;
 };
@@ -1113,7 +1129,6 @@ export const fetchSubstationLog = async (date: string, force = false): Promise<S
   return null;
 };
 
-// Fix for services/dataService.ts on line 1116: powerUsage, dailyStats
 export const saveSubstationLog = async (data: SubstationLogData): Promise<boolean> => {
   const { error } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
   return !error;
@@ -1128,7 +1143,7 @@ export const fetchTenants = async (): Promise<Tenant[]> => {
 };
 
 export const saveTenants = async (list: Tenant[]): Promise<boolean> => {
-  const dbData = list.map(t => ({ id: isValidUUID(t.id) ? t.id : generateUUID(), floor: t.floor, name: t.name, area: parseFloat(t.area?.replace(/,/g, '') || '0'), contact: t.contact, ref_power: parseFloat(t.refPower?.replace(/,/g, '') || '0'), note: t.note }));
+  const dbData = list.map(t => ({ id: ensureID(t.id), floor: t.floor, name: t.name, area: parseFloat(t.area?.replace(/,/g, '') || '0'), contact: t.contact, ref_power: parseFloat(t.refPower?.replace(/,/g, '') || '0'), note: t.note }));
   const { error } = await supabase.from('tenants').upsert(dbData);
   return !error;
 };
@@ -1206,7 +1221,6 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
   return null;
 };
 
-// Fix for services/dataService.ts on line 1213: weatherCondition
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
   const { error } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 
@@ -1257,9 +1271,9 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       type: item.type, 
       floor: item.floor, 
       company: item.company, 
-      serialNo: item.serial_no, 
+      serial_no: item.serial_no, 
       phone: item.phone, 
-      certNo: item.cert_no, 
+      cert_no: item.cert_no, 
       date: item.date, 
       remarks: item.remarks 
     }));

@@ -1,15 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
-import { fetchContractors, saveContractors, deleteContractor } from '../services/dataService';
+import { fetchContractors, saveContractors, deleteContractor, generateUUID } from '../services/dataService';
 import { Save, Plus, Trash2, Search, Briefcase, Printer, Edit2, RotateCcw, RefreshCw, AlertTriangle, X, Cloud, CheckCircle, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ContractorManagerProps {
   isPopupMode?: boolean;
 }
-
-const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const TYPE_ORDER: Record<string, number> = {
   '전기': 1,
@@ -108,7 +106,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
       let targetId = editId;
       const itemToSave = { 
         ...newItem, 
-        id: editId || generateId() 
+        id: editId || generateUUID() 
       };
 
       if (editId) {
