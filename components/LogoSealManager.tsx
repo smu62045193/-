@@ -89,16 +89,26 @@ const LogoSealManager: React.FC = () => {
               <p className="text-sm text-slate-500 font-medium">전기요금 고지서 및 공식 문서에 사용될 이미지를 설정합니다.</p>
             </div>
           </div>
-          <button 
-            onClick={handleSave} 
-            disabled={saveStatus === 'loading'}
-            className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-black shadow-lg transition-all active:scale-95 ${
-              saveStatus === 'success' ? 'bg-emerald-600 text-white shadow-emerald-100' : 'bg-blue-600 text-white shadow-blue-100 hover:bg-blue-700'
-            }`}
-          >
-            {saveStatus === 'loading' ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
-            {saveStatus === 'success' ? '저장 완료' : '설정 저장'}
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={loadSettings}
+              disabled={loading}
+              className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+            >
+              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={saveStatus === 'loading'}
+              className={`flex items-center gap-2 px-8 py-3 rounded-2xl font-black shadow-lg transition-all active:scale-95 ${
+                saveStatus === 'success' ? 'bg-emerald-600 text-white shadow-emerald-100' : 'bg-blue-600 text-white shadow-blue-100 hover:bg-blue-700'
+              }`}
+            >
+              {saveStatus === 'loading' ? <RefreshCw className="animate-spin" size={20} /> : <Save size={20} />}
+              {saveStatus === 'success' ? '저장 완료' : '설정 저장'}
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">

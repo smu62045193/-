@@ -351,9 +351,16 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
             <input type="text" placeholder="성명 또는 담당구역 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" />
             <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
           </div>
-          <button onClick={() => loadDataForPopup()} className="p-2.5 hover:bg-gray-100 rounded-xl text-gray-500 border border-gray-200 bg-white shadow-sm transition-all active:scale-95"><RefreshCw size={20} className={loading ? 'animate-spin text-blue-600' : ''} /></button>
         </div>
         <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
+          <button 
+            onClick={() => loadDataForPopup()}
+            disabled={loading}
+            className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+          >
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
           <button onClick={() => openIndependentWindow()} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95">
             <UserPlus size={18} /> 신규 직원 등록
           </button>

@@ -23,7 +23,7 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -33,6 +33,8 @@ const App: React.FC = () => {
       setIsPopupMode('appointment');
     } else if (popupType === 'staff') {
       setIsPopupMode('staff');
+    } else if (popupType === 'contractor') {
+      setIsPopupMode('contractor');
     }
   }, []);
 
@@ -47,9 +49,11 @@ const App: React.FC = () => {
   }
   
   if (isPopupMode === 'staff') {
-    // StaffStatus는 StaffManager 내부에서 사용되지만 팝업 모드에서는 단독 렌더링
-    // staffList 등은 컴포넌트 내부에서 자체 fetch하므로 빈 배열 전달 후 내부 로직 활성화
     return <StaffStatus staffList={[]} setStaffList={() => {}} isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'contractor') {
+    return <ContractorManager isPopupMode={true} />;
   }
 
   const renderContent = () => {

@@ -1,8 +1,13 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
-import { fetchContractors, saveContractors } from '../services/dataService';
-import { Save, Plus, Trash2, Search, Briefcase, Printer, Edit2, RotateCcw, RefreshCw, AlertTriangle, X, Cloud, CheckCircle } from 'lucide-react';
+import { fetchContractors, saveContractors, deleteContractor } from '../services/dataService';
+import { Save, Plus, Trash2, Search, Briefcase, Printer, Edit2, RotateCcw, RefreshCw, AlertTriangle, X, Cloud, CheckCircle, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
+
+interface ContractorManagerProps {
+  isPopupMode?: boolean;
+}
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -16,14 +21,11 @@ const TYPE_ORDER: Record<string, number> = {
   '기타': 7
 };
 
-const ContractorManager: React.FC = () => {
+const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = false }) => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
-  
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const initialNewItem: Contractor = {
     id: '',
@@ -40,7 +42,28 @@ const ContractorManager: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+    
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (id && id !== 'new') setEditId(id);
+    }
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'CONTRACTOR_SAVED') {
+        loadData();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isPopupMode]);
+
+  useEffect(() => {
+    if (editId && contractors.length > 0) {
+      const item = contractors.find(i => String(i.id) === String(editId));
+      if (item) setNewItem({ ...item });
+    }
+  }, [editId, contractors]);
 
   const loadData = async () => {
     setLoading(true);
@@ -54,15 +77,21 @@ const ContractorManager: React.FC = () => {
     }
   };
 
-  const handleLoadToForm = (item: Contractor) => {
-    setNewItem({ ...item });
-    setEditId(item.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const openIndependentWindow = (id: string = 'new') => {
+    const width = 750;
+    const height = 650;
+    const left = (window.screen.width / 2) - (width / 2);
+    const top = (window.screen.height / 2) - (height / 2);
 
-  const handleCancelEdit = () => {
-    setEditId(null);
-    setNewItem(initialNewItem);
+    const url = new URL(window.location.href);
+    url.searchParams.set('popup', 'contractor');
+    url.searchParams.set('id', id);
+
+    window.open(
+      url.toString(),
+      `ContractorWin_${id}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
+    );
   };
 
   const handleRegister = async () => {
@@ -72,67 +101,65 @@ const ContractorManager: React.FC = () => {
     }
 
     setLoading(true);
-    setShowSaveConfirm(false);
-    const originalList = [...contractors];
     try {
-      let newList = [...contractors];
+      const latestData = await fetchContractors();
+      let newList = [...(latestData || [])];
       
+      let targetId = editId;
+      const itemToSave = { 
+        ...newItem, 
+        id: editId || generateId() 
+      };
+
       if (editId) {
         const index = newList.findIndex(i => String(i.id) === String(editId));
-        if (index >= 0) {
-          newList[index] = { ...newItem };
-        }
+        if (index >= 0) newList[index] = itemToSave;
       } else {
-        const itemToAdd = { ...newItem, id: generateId() };
-        newList = [itemToAdd, ...newList];
+        targetId = itemToSave.id;
+        newList = [itemToSave, ...newList];
       }
       
-      setContractors(newList);
-
       const success = await saveContractors(newList);
       if (success) {
-        handleCancelEdit();
-        alert(editId ? '업체 정보가 수정되었습니다.' : '협력업체가 등록되었습니다.');
+        if (window.opener) {
+          window.opener.postMessage({ type: 'CONTRACTOR_SAVED' }, '*');
+        }
+        if (!editId && targetId) {
+          setEditId(targetId);
+        }
+        alert('저장이 완료되었습니다.');
+        if (!isPopupMode) {
+          setEditId(null);
+          setNewItem(initialNewItem);
+          loadData();
+        }
       } else {
-        setContractors(originalList);
         alert('저장 실패');
       }
     } catch (e) {
       console.error(e);
-      setContractors(originalList);
       alert('오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-
-    const idStr = String(deleteTargetId);
-    const originalList = [...contractors];
-    const newItems = originalList.filter(c => String(c.id) !== idStr);
-    
-    setContractors(newItems);
-    if (String(editId) === idStr) handleCancelEdit();
-    setDeleteTargetId(null); 
-
+  const handleDeleteDirect = async (id: string) => {
+    setLoading(true);
     try {
-      const success = await saveContractors(newItems);
-      if (!success) {
-        setContractors(originalList);
-        alert('삭제 실패 (서버 저장 오류)');
+      const success = await deleteContractor(id);
+      if (success) {
+        setContractors(prev => prev.filter(c => String(c.id) !== String(id)));
+        alert('삭제가 완료되었습니다.');
+      } else {
+        alert('삭제 실패');
       }
     } catch (e) {
       console.error(e);
-      setContractors(originalList);
-      alert('삭제 중 오류가 발생했습니다.');
+      alert('오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent, id: any) => {
-    e.stopPropagation();
-    setDeleteTargetId(String(id));
   };
 
   const filteredList = useMemo(() => {
@@ -224,6 +251,124 @@ const ContractorManager: React.FC = () => {
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-10 whitespace-nowrap";
   const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700 h-10 align-middle bg-white text-center";
 
+  if (isPopupMode) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
+          <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
+                <Briefcase size={20} />
+              </div>
+              <span className="font-black text-lg">{editId ? '업체 정보 수정' : '신규 업체 등록'}</span>
+            </div>
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="p-8 space-y-6 flex-1 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명 *</label>
+                <input 
+                  type="text" 
+                  value={newItem.name} 
+                  onChange={e => setNewItem({...newItem, name: e.target.value})}
+                  placeholder="업체명"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업종</label>
+                <input 
+                  type="text" 
+                  value={newItem.type} 
+                  onChange={e => setNewItem({...newItem, type: e.target.value})}
+                  placeholder="예: 전기, 소방"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">담당자</label>
+                <input 
+                  type="text" 
+                  value={newItem.contactPerson} 
+                  onChange={e => setNewItem({...newItem, contactPerson: e.target.value})}
+                  placeholder="담당자 성명"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">대표번호</label>
+                <input 
+                  type="text" 
+                  value={newItem.phoneMain} 
+                  onChange={e => setNewItem({...newItem, phoneMain: e.target.value})}
+                  placeholder="02-..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">휴대폰</label>
+                <input 
+                  type="text" 
+                  value={newItem.phoneMobile} 
+                  onChange={e => setNewItem({...newItem, phoneMobile: e.target.value})}
+                  placeholder="010-..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">팩스</label>
+                <input 
+                  type="text" 
+                  value={newItem.fax} 
+                  onChange={e => setNewItem({...newItem, fax: e.target.value})}
+                  placeholder="02-..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고 및 특이사항</label>
+              <textarea 
+                value={newItem.note} 
+                onChange={e => setNewItem({...newItem, note: e.target.value})}
+                placeholder="특이사항 입력"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24"
+              />
+            </div>
+          </div>
+
+          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
+            <button 
+              onClick={() => window.close()}
+              className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95"
+            >
+              닫기
+            </button>
+            <button 
+              onClick={handleRegister} 
+              disabled={loading}
+              className={`flex-[2] py-3.5 ${editId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}
+            >
+              {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+              서버에 데이터 저장
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in print:p-0 print:max-w-none print:w-full relative">
       <div className="mb-2 print:hidden flex justify-between items-center">
@@ -231,75 +376,34 @@ const ContractorManager: React.FC = () => {
           <Briefcase className="mr-2 text-blue-600" size={24} />
           협력업체 관리
         </h2>
-        {loading && <RefreshCw size={18} className="animate-spin text-blue-500" />}
+        <div className="flex gap-2">
+          <button 
+            onClick={loadData} 
+            disabled={loading}
+            className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+          >
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
+          <button 
+            onClick={() => openIndependentWindow()}
+            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
+          >
+            <UserPlus size={18} /> 신규 협력 등록
+          </button>
+          <button onClick={handlePrint} className="flex items-center px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md text-sm transition-all active:scale-95">
+            <Printer size={18} className="mr-2" />
+            미리보기
+          </button>
+        </div>
       </div>
       
-      {/* Registration Form */}
-      <div className={`p-6 rounded-xl border shadow-sm transition-all duration-300 print:hidden ${editId ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-6 rounded-full ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}></div>
-            <h3 className="text-lg font-bold text-gray-800">{editId ? '업체 정보 수정' : '신규 업체 등록'}</h3>
-          </div>
-          {editId && (
-            <button onClick={handleCancelEdit} className="flex items-center space-x-1 text-sm text-orange-600 hover:text-orange-800 font-bold bg-white px-3 py-1 rounded-full border border-orange-200 shadow-sm">
-              <RotateCcw size={14} />
-              <span>수정 취소</span>
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">업체명 *</label>
-            <input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} placeholder="업체명" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px] font-bold" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">업종</label>
-            <input type="text" value={newItem.type} onChange={e => setNewItem({...newItem, type: e.target.value})} placeholder="예: 전기, 소방" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">담당자</label>
-            <input type="text" value={newItem.contactPerson} onChange={e => setNewItem({...newItem, contactPerson: e.target.value})} placeholder="담당자 성명" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">대표번호</label>
-            <input type="text" value={newItem.phoneMain} onChange={e => setNewItem({...newItem, phoneMain: e.target.value})} placeholder="02-..." className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">휴대폰</label>
-            <input type="text" value={newItem.phoneMobile} onChange={e => setNewItem({...newItem, phoneMobile: e.target.value})} placeholder="010-..." className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1">팩스</label>
-            <input type="text" value={newItem.fax} onChange={e => setNewItem({...newItem, fax: e.target.value})} placeholder="02-..." className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" />
-          </div>
-          <div className="lg:col-span-2">
-            <label className="block text-xs font-bold text-gray-500 mb-1">비고</label>
-            <input type="text" value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} placeholder="특이사항" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" />
-          </div>
-          <div className="md:col-span-3 lg:col-span-4 flex justify-end mt-2">
-            <button 
-              onClick={() => setShowSaveConfirm(true)} 
-              disabled={loading}
-              className={`flex items-center justify-center space-x-2 text-white px-8 py-2 rounded-lg shadow-md text-sm font-bold h-[42px] transition-colors ${editId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} disabled:bg-gray-400`}
-            >
-              {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
-              <span>{editId ? '수정 완료' : '업체 등록'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Search and Print Controls */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200 print:hidden">
         <div className="relative flex-1 md:w-80 w-full">
           <input type="text" placeholder="업체명, 업종, 담당자 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white text-black shadow-sm" />
           <Search className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
         </div>
-        <button onClick={handlePrint} className="flex items-center px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md text-sm transition-all active:scale-95">
-          <Printer size={18} className="mr-2" />
-          미리보기
-        </button>
       </div>
 
       {/* Contractors Table */}
@@ -323,8 +427,8 @@ const ContractorManager: React.FC = () => {
               <tr><td colSpan={9} className="text-center py-20 text-gray-400 italic">등록된 협력업체가 없습니다.</td></tr>
             ) : (
               filteredList.map((item, index) => (
-                <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
-                  <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>{index + 1}</td>
+                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
+                  <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>{filteredList.length - index}</td>
                   <td className={`${tdClass} font-bold text-blue-600`}>{item.type}</td>
                   <td className={`${tdClass} font-bold text-gray-800`}>{item.name}</td>
                   <td className={tdClass}>{item.contactPerson}</td>
@@ -334,8 +438,8 @@ const ContractorManager: React.FC = () => {
                   <td className={tdClass}>{item.note}</td>
                   <td className={`${tdClass} text-center print:hidden`}>
                     <div className="flex items-center justify-center space-x-1">
-                      <button onClick={() => handleLoadToForm(item)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
-                      <button onClick={(e) => handleDeleteClick(e, item.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
+                      <button onClick={() => openIndependentWindow(item.id)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
+                      <button onClick={() => handleDeleteDirect(item.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
                     </div>
                   </td>
                 </tr>
@@ -344,57 +448,6 @@ const ContractorManager: React.FC = () => {
           </tbody>
         </table>
       </div>
-
-      {/* Save Confirmation Modal */}
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                {editId ? '수정된 업체 정보를' : '작성하신 업체 정보를'}<br/>
-                서버에 안전하게 기록하시겠습니까?
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete Confirmation Modal */}
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-red-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <AlertTriangle className="text-red-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">업체 정보 삭제 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                선택하신 업체 정보를 마스터 DB에서<br/>
-                <span className="text-red-600 font-bold">영구히 삭제</span>하시겠습니까?
-              </p>
-              
-              <div className="flex gap-3">
-                <button onClick={() => setDeleteTargetId(null)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center">
-                  <X size={20} className="mr-2" />
-                  취소
-                </button>
-                <button onClick={confirmDelete} className="flex-1 px-6 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-red-200 flex items-center justify-center active:scale-95">
-                  <Trash2 size={20} className="mr-2" />
-                  삭제 실행
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up {

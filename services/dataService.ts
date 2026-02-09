@@ -734,6 +734,7 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
   return null;
 };
 
+// Fix for services/dataService.ts on line 738: facilityDuty, securityDuty, workLog
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   const { error } = await supabase.from('daily_reports').upsert({ id: data.date, facility_duty: data.facilityDuty, security_duty: data.securityDuty, utility: data.utility, work_log: data.workLog, last_updated: new Date().toISOString() });
   return !error;
@@ -1059,6 +1060,14 @@ export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
   return !error;
 };
 
+/**
+ * 협력업체 개별 삭제
+ */
+export const deleteContractor = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('contractors').delete().eq('id', id);
+  return !error;
+};
+
 export const fetchMeterReading = async (month: string): Promise<MeterReadingData | null> => {
   try {
     const { data } = await supabase.from('meter_readings').select('*').eq('id', `METER_${month}`).maybeSingle();
@@ -1104,6 +1113,7 @@ export const fetchSubstationLog = async (date: string, force = false): Promise<S
   return null;
 };
 
+// Fix for services/dataService.ts on line 1116: powerUsage, dailyStats
 export const saveSubstationLog = async (data: SubstationLogData): Promise<boolean> => {
   const { error } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
   return !error;
@@ -1196,6 +1206,7 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
   return null;
 };
 
+// Fix for services/dataService.ts on line 1213: weatherCondition
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
   const { error } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 
