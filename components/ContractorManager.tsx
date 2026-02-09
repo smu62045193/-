@@ -2,12 +2,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
 import { fetchContractors, saveContractors, deleteContractor, generateUUID } from '../services/dataService';
-import { Save, Plus, Trash2, Search, Briefcase, Printer, Edit2, RotateCcw, RefreshCw, AlertTriangle, X, Cloud, CheckCircle, UserPlus } from 'lucide-react';
+import { Save, Plus, Trash2, Search, Briefcase, Printer, Edit2, RotateCcw, RefreshCw, AlertTriangle, X, Cloud, CheckCircle, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ContractorManagerProps {
   isPopupMode?: boolean;
 }
+
+const ITEMS_PER_PAGE = 10;
 
 const TYPE_ORDER: Record<string, number> = {
   '전기': 1,
@@ -24,6 +26,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const initialNewItem: Contractor = {
     id: '',
@@ -62,6 +65,11 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
       if (item) setNewItem({ ...item });
     }
   }, [editId, contractors]);
+
+  // 검색어나 데이터 총량이 변하면 페이지를 1로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, contractors.length]);
 
   const loadData = async () => {
     setLoading(true);
@@ -174,6 +182,23 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
         return a.name.localeCompare(b.name);
       });
   }, [contractors, searchTerm]);
+
+  // 페이징 처리된 리스트 계산
+  const totalPages = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
+  const paginatedList = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredList.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredList, currentPage]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    return pages;
+  }, [currentPage, totalPages]);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
@@ -399,7 +424,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
       {/* Search and Print Controls */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200 print:hidden">
         <div className="relative flex-1 md:w-80 w-full">
-          <input type="text" placeholder="업체명, 업종, 담당자 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white text-black shadow-sm" />
+          <input type="text" border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white text-black shadow-sm placeholder="업체명, 업종, 담당자 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white text-black shadow-sm" />
           <Search className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
         </div>
       </div>
@@ -421,12 +446,14 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {filteredList.length === 0 ? (
+            {paginatedList.length === 0 ? (
               <tr><td colSpan={9} className="text-center py-20 text-gray-400 italic">등록된 협력업체가 없습니다.</td></tr>
             ) : (
-              filteredList.map((item, index) => (
+              paginatedList.map((item, index) => (
                 <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>{filteredList.length - index}</td>
+                  <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>
+                    {filteredList.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}
+                  </td>
                   <td className={`${tdClass} font-bold text-blue-600`}>{item.type}</td>
                   <td className={`${tdClass} font-bold text-gray-800`}>{item.name}</td>
                   <td className={tdClass}>{item.contactPerson}</td>
@@ -445,6 +472,41 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             )}
           </tbody>
         </table>
+
+        {/* Pagination UI - 소화기 관리와 동일한 방식 */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-200'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`
