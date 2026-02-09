@@ -1,145 +1,377 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppointmentItem } from '../types';
 import { fetchAppointmentList, saveAppointmentList } from '../services/dataService';
-import { Save, Plus, Trash2, UserCheck, Printer, RotateCcw, Edit2, AlertTriangle, X, RefreshCw, Cloud, CheckCircle } from 'lucide-react';
+import { Save, UserCheck, Printer, Edit2, AlertTriangle, X, RefreshCw, UserPlus, CheckCircle, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
+
+interface AppointmentManagerProps {
+  isPopupMode?: boolean;
+}
 
 const CATEGORIES = ['전기', '기계', '소방', '승강기'];
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-const AppointmentManager: React.FC = () => {
+const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = false }) => {
   const [items, setItems] = useState<AppointmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
-  const initialNewItem: AppointmentItem = { id: '', category: CATEGORIES[0], title: '', name: '', agency: '', phone: '', fax: '', appointmentDate: '', trainingDate: '', license: '', note: '' };
+  const initialNewItem: AppointmentItem = { 
+    id: '', 
+    category: CATEGORIES[0], 
+    title: '', 
+    name: '', 
+    agency: '', 
+    phone: '', 
+    fax: '', 
+    appointmentDate: format(new Date(), 'yyyy-MM-dd'), 
+    trainingDate: '', 
+    license: '', 
+    note: '' 
+  };
   const [newItem, setNewItem] = useState<AppointmentItem>(initialNewItem);
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { 
+    loadData();
 
-  const loadData = async () => { setLoading(true); const data = await fetchAppointmentList(); setItems(data || []); setLoading(false); };
+    // 팝업 모드인 경우 URL에서 편집할 ID 추출
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (id && id !== 'new') setEditId(id);
+    }
 
-  const handleRegister = async () => {
+    // 메인 목록 창인 경우, 팝업창에서 보낸 '저장 완료' 메시지 감지
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'APPOINTMENT_SAVED') {
+        loadData();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isPopupMode]);
+
+  // 편집 모드일 때 데이터 세팅
+  useEffect(() => {
+    if (editId && items.length > 0) {
+      const item = items.find(i => String(i.id) === String(editId));
+      if (item) setNewItem({ ...item });
+    }
+  }, [editId, items]);
+
+  const loadData = async () => { 
+    setLoading(true); 
+    const data = await fetchAppointmentList(); 
+    setItems(data || []); 
+    setLoading(false); 
+  };
+
+  /**
+   * 실제 브라우저 독립 팝업창 열기
+   */
+  const openIndependentWindow = (id: string = 'new') => {
+    const width = 750;
+    const height = 850;
+    const left = (window.screen.width / 2) - (width / 2);
+    const top = (window.screen.height / 2) - (height / 2);
+
+    // 배포 환경에서도 작동하도록 현재 URL의 origin과 pathname을 사용
+    const url = new URL(window.location.href);
+    url.searchParams.set('popup', 'appointment');
+    url.searchParams.set('id', id);
+
+    window.open(
+      url.toString(),
+      `AppointmentWin_${id}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
+    );
+  };
+
+  const handleSave = async () => {
     if (!newItem.name || !newItem.title) { 
       alert('선임명칭과 성명은 필수 항목입니다.'); 
-      setShowSaveConfirm(false);
       return; 
     }
-    setLoading(true);
-    setShowSaveConfirm(false);
+    setSaveStatus('loading');
     try {
-      let newList = [...items];
-      if (editId) { const idx = newList.findIndex(i => String(i.id) === String(editId)); if (idx >= 0) newList[idx] = { ...newItem }; }
-      else { newList = [{ ...newItem, id: generateId() }, ...newList]; }
-      if (await saveAppointmentList(newList)) { setItems(newList); setEditId(null); setNewItem(initialNewItem); alert('저장되었습니다.'); }
-    } catch (e) { alert('오류 발생'); } finally { setLoading(false); }
+      const latestData = await fetchAppointmentList();
+      let newList = [...(latestData || [])];
+      
+      if (editId) { 
+        const idx = newList.findIndex(i => String(i.id) === String(editId)); 
+        if (idx >= 0) newList[idx] = { ...newItem }; 
+      } else { 
+        newList = [{ ...newItem, id: generateId() }, ...newList]; 
+      }
+      
+      if (await saveAppointmentList(newList)) { 
+        setSaveStatus('success');
+        
+        // 부모 창(목록 창)이 있다면 새로고침 신호 전송
+        if (window.opener) {
+          window.opener.postMessage({ type: 'APPOINTMENT_SAVED' }, '*');
+        }
+        
+        alert('저장이 완료되었습니다.');
+        setTimeout(() => {
+          setSaveStatus('idle');
+          if (isPopupMode) window.close(); // 팝업창인 경우 자신을 닫음
+        }, 500);
+      }
+    } catch (e) { 
+      alert('오류 발생'); 
+      setSaveStatus('idle');
+    }
   };
 
   const confirmDelete = async () => {
     if (!deleteTargetId) return;
     const newList = items.filter(i => String(i.id) !== deleteTargetId);
-    if (await saveAppointmentList(newList)) { setItems(newList); setDeleteTargetId(null); }
+    if (await saveAppointmentList(newList)) { 
+      setItems(newList); 
+      setDeleteTargetId(null); 
+    }
   };
 
-  const getSortedItems = (itemList: AppointmentItem[]) => {
+  const sortedItems = [...items].sort((a, b) => {
     const orderMap: Record<string, number> = { '전기': 1, '소방': 2, '기계': 3, '승강기': 4 };
-    const fireTitleOrder: Record<string, number> = { '소방안전관리자': 1, '소방안전관리보조자': 2 };
-
-    return [...itemList].sort((a, b) => {
-      const orderA = orderMap[a.category] || 99;
-      const orderB = orderMap[b.category] || 99;
-      if (orderA !== orderB) return orderA - orderB;
-      
-      if (a.category === '소방' && b.category === '소방') {
-        const fireA = fireTitleOrder[a.title] || 99;
-        const fireB = fireTitleOrder[b.title] || 99;
-        if (fireA !== fireB) return fireA - fireB;
-      }
-      
-      return a.name.localeCompare(b.name);
-    });
-  };
+    return (orderMap[a.category] || 99) - (orderMap[b.category] || 99) || a.name.localeCompare(b.name);
+  });
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
     if (!printWindow) return;
-    const sorted = getSortedItems(items);
-    const rows = sorted.map((it, i) => `<tr><td>${i+1}</td><td>${it.category}</td><td>${it.title || ''}</td><td class="bold">${it.name || ''}</td><td>${it.agency || ''}</td><td>${it.phone || ''}</td><td>${it.appointmentDate || ''}</td><td>${it.trainingDate || ''}</td><td>${it.license || ''}</td></tr>`).join('');
+    const rows = sortedItems.map((it, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${it.category}</td>
+        <td>${it.title || ''}</td>
+        <td style="font-weight:bold;">${it.name || ''}</td>
+        <td>${it.agency || ''}</td>
+        <td>${it.phone || ''}</td>
+        <td>${it.appointmentDate || ''}</td>
+        <td>${it.license || ''}</td>
+      </tr>`).join('');
+
     printWindow.document.write(`
-      <html><head><title>선임 현황</title><style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-        @page { size: A4 landscape; margin: 0; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
-        .no-print { display: flex; justify-content: center; padding: 20px; }
-        @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
-        .print-page { width: 297mm; min-height: 210mm; padding: 15mm 12mm 15mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
-        h1 { text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 25px; font-size: 24pt; font-weight: 900; }
-        table { width: 100%; border-collapse: collapse; font-size: 9.5pt; border: 1.5px solid black; }
-        th, td { border: 1px solid black; padding: 8px 4px; text-align: center; }
-        th { background: #f3f4f6; font-weight: bold; }
-        .bold { font-weight: bold; }
+      <html><head><title>안전관리자 선임 현황</title><style>
+        body { font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid black; padding: 8px; text-align: center; font-size: 10pt; }
+        th { background: #f3f4f6; }
       </style></head><body>
-        <div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button></div>
-        <div class="print-page"><h1>안전관리자 선임 현황</h1><table><thead><tr><th style="width:40px;">No</th><th style="width:60px;">구분</th><th style="width:160px;">선임명칭</th><th style="width:70px;">성명</th><th style="width:110px;">기관</th><th style="width:100px;">연락처</th><th style="width:90px;">선임일자</th><th style="width:90px;">교육일자</th><th>자격사항</th></tr></thead><tbody>${rows}</tbody></table></div>
+        <h1 style="text-align:center;">안전관리자 선임 현황</h1>
+        <table><thead><tr><th>No</th><th>구분</th><th>선임명칭</th><th>성명</th><th>기관</th><th>연락처</th><th>선임일자</th><th>자격사항</th></tr></thead><tbody>${rows}</tbody></table>
       </body></html>`);
     printWindow.document.close();
+    printWindow.print();
   };
 
-  const sortedItems = getSortedItems(items);
-
-  return (
-    <div className="p-6 max-w-full mx-auto space-y-6 animate-fade-in relative">
-      <div className="mb-4"><h2 className="text-2xl font-bold text-gray-800 flex items-center"><UserCheck className="mr-2 text-blue-600" size={24} />선임 현황 관리</h2></div>
-      <div className={`p-6 rounded-xl border shadow-sm transition-all ${editId ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-            <div><label className="text-xs font-bold text-gray-500 block mb-1">구분</label><select value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">{CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}</select></div>
-            <div><label className="text-xs font-bold text-gray-500 block mb-1">선임명칭</label><input type="text" value={newItem.title} onChange={e => setNewItem({...newItem, title: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="관리책임자 등" /></div>
-            <div><label className="text-xs font-bold text-gray-500 block mb-1">성명</label><input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="border rounded-lg px-3 py-2 text-sm font-bold w-full bg-white" /></div>
-            <div><label className="text-xs font-bold text-gray-500 block mb-1">기관</label><input type="text" value={newItem.agency} onChange={e => setNewItem({...newItem, agency: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" /></div>
-            <div><label className="text-xs font-bold text-gray-500 block mb-1">연락처</label><input type="text" value={newItem.phone} onChange={e => setNewItem({...newItem, phone: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" /></div>
+  // ==========================================
+  // [팝업 모드] UI - 실제 독립창 내에서 보여질 내용
+  // ==========================================
+  if (isPopupMode) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col">
+          <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+                <UserCheck size={20} />
+              </div>
+              <span className="font-black text-lg">{editId ? '선임 정보 수정' : '신규 선임 등록'}</span>
+            </div>
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+              <X size={24} />
+            </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-            <div><label className="text-xs font-bold text-gray-500 block mb-1">선임일자</label><input type="date" value={newItem.appointmentDate} onChange={e => setNewItem({...newItem, appointmentDate: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" /></div>
-            <div><label className="text-xs font-bold text-gray-500 block mb-1">교육일자</label><input type="date" value={newItem.trainingDate} onChange={e => setNewItem({...newItem, trainingDate: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" /></div>
-            <div className="md:col-span-2"><label className="text-xs font-bold text-gray-500 block mb-1">자격사항</label><input type="text" value={newItem.license} onChange={e => setNewItem({...newItem, license: e.target.value})} className="w-full border rounded-lg px-3 py-2 text-sm bg-white" placeholder="자격증 및 면허 정보" /></div>
-            <button onClick={() => setShowSaveConfirm(true)} className={`w-full text-white font-bold py-2 rounded-lg transition-all ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {editId ? '수정 완료' : '신규 등록'}
+
+          <div className="p-8 space-y-6 flex-1 overflow-y-auto">
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">분야</label>
+                <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                  {CATEGORIES.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => setNewItem({...newItem, category: c})}
+                      className={`flex-1 py-2 rounded-lg text-xs font-black transition-all ${newItem.category === c ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">선임 명칭 *</label>
+                <input 
+                  type="text" 
+                  value={newItem.title} 
+                  onChange={e => setNewItem({...newItem, title: e.target.value})}
+                  placeholder="예: 소방안전관리자"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">성명 *</label>
+                <input 
+                  type="text" 
+                  value={newItem.name} 
+                  onChange={e => setNewItem({...newItem, name: e.target.value})}
+                  placeholder="성명"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">관리 기관</label>
+                <input 
+                  type="text" 
+                  value={newItem.agency} 
+                  onChange={e => setNewItem({...newItem, agency: e.target.value})}
+                  placeholder="예: 한국소방안전원"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">연락처</label>
+                <input 
+                  type="text" 
+                  value={newItem.phone} 
+                  onChange={e => setNewItem({...newItem, phone: e.target.value})}
+                  placeholder="010-0000-0000"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">선임 일자</label>
+                <input 
+                  type="date" 
+                  value={newItem.appointmentDate} 
+                  onChange={e => setNewItem({...newItem, appointmentDate: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">보유 자격 및 면허</label>
+              <input 
+                type="text" 
+                value={newItem.license} 
+                onChange={e => setNewItem({...newItem, license: e.target.value})}
+                placeholder="보유 자격증 정보"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고 및 특이사항</label>
+              <textarea 
+                value={newItem.note} 
+                onChange={e => setNewItem({...newItem, note: e.target.value})}
+                placeholder="기타 참고사항"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24"
+              />
+            </div>
+          </div>
+
+          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
+            <button 
+              onClick={() => window.close()}
+              className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95"
+            >
+              취소 후 창 닫기
+            </button>
+            <button 
+              onClick={handleSave}
+              disabled={saveStatus === 'loading'}
+              className="flex-[2] py-3.5 bg-blue-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+            >
+              {saveStatus === 'loading' ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+              서버에 데이터 저장
             </button>
           </div>
         </div>
       </div>
-      <div className="flex justify-between items-center mt-10"><h3 className="text-lg font-bold text-gray-700">현역 선임 현황</h3><button onClick={handlePrint} className="bg-gray-700 text-white px-4 py-2 rounded-lg font-bold text-sm h-10 flex items-center justify-center"><Printer size={16} className="mr-2" />미리보기</button></div>
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
+    );
+  }
+
+  // ==========================================
+  // [일반 모드] UI - 메인 화면의 목록
+  // ==========================================
+  return (
+    <div className="p-6 max-w-full mx-auto space-y-6 animate-fade-in relative min-h-screen">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center">
+          <UserCheck className="mr-2 text-blue-600" size={24} />
+          안전관리자 선임 현황
+        </h2>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => openIndependentWindow()}
+            className="flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 text-sm"
+          >
+            <UserPlus size={18} className="mr-2" />
+            신규 선임 등록 (독립 창)
+          </button>
+          <button onClick={handlePrint} className="bg-gray-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-gray-800 flex items-center justify-center transition-all active:scale-95">
+            <Printer size={18} className="mr-2" />
+            전체 인쇄
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
         <table className="w-full border-collapse min-w-[1000px]">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider">구분</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider">선임명칭</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider">성명</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider">기관</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider">연락처</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider">선임일자</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider">교육일자</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider">자격사항</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider print:hidden">관리</th>
+              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-16">No</th>
+              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24">구분</th>
+              <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 w-48">선임명칭</th>
+              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28">성명</th>
+              <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 w-44">기관/단체</th>
+              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-36">연락처</th>
+              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-32">선임일자</th>
+              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28 print:hidden">관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {sortedItems.map(it => (
-              <tr key={it.id} className="text-center hover:bg-gray-50 transition-colors">
-                <td className="p-3 text-sm font-bold text-blue-600">{it.category}</td>
-                <td className="p-3 text-sm text-center font-medium text-gray-700">{it.title}</td>
-                <td className="p-3 text-sm font-bold text-gray-900">{it.name}</td>
-                <td className="p-3 text-sm text-gray-600">{it.agency}</td>
-                <td className="p-3 text-sm text-gray-600">{it.phone}</td>
-                <td className="p-3 text-sm text-gray-500 font-mono">{it.appointmentDate}</td>
-                <td className="p-3 text-sm text-gray-500 font-mono">{it.trainingDate}</td>
-                <td className="p-3 text-sm text-center text-gray-600 text-xs">{it.license || '-'}</td>
-                <td className="p-3 text-sm flex justify-center gap-2 print:hidden items-center h-full">
-                  <button onClick={() => {setEditId(it.id); setNewItem(it); window.scrollTo({top:0, behavior:'smooth'});}} className="text-blue-500 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50 transition-all" title="수정"><Edit2 size={16} /></button>
-                  <button onClick={() => setDeleteTargetId(it.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-all" title="삭제"><Trash2 size={16} /></button>
+            {sortedItems.length === 0 ? (
+              <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic">등록된 정보가 없습니다.</td></tr>
+            ) : sortedItems.map((it, idx) => (
+              <tr key={it.id} className="text-center hover:bg-gray-50/50 transition-colors group">
+                <td className="p-4 text-xs text-gray-400 font-mono">{idx + 1}</td>
+                <td className="p-4">
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    it.category === '전기' ? 'bg-blue-100 text-blue-700' :
+                    it.category === '소방' ? 'bg-red-100 text-red-700' :
+                    it.category === '기계' ? 'bg-orange-100 text-orange-700' :
+                    'bg-slate-100 text-slate-700'
+                  }`}>
+                    {it.category}
+                  </span>
+                </td>
+                <td className="p-4 text-sm font-bold text-gray-700 text-left">{it.title}</td>
+                <td className="p-4 text-sm font-black text-gray-900">{it.name}</td>
+                <td className="p-4 text-sm text-gray-600 text-left">{it.agency}</td>
+                <td className="p-4 text-sm text-gray-600">{it.phone}</td>
+                <td className="p-4 text-sm text-gray-500 font-mono">{it.appointmentDate}</td>
+                <td className="p-4 print:hidden">
+                  <div className="flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => openIndependentWindow(it.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="편집">
+                      <Edit2 size={16} />
+                    </button>
+                    <button onClick={() => setDeleteTargetId(it.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -147,36 +379,26 @@ const AppointmentManager: React.FC = () => {
         </table>
       </div>
 
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">선임 정보 저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                작성하신 선임 정보를 서버에 안전하게 기록하시겠습니까?
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-              </div>
+      {/* 삭제 확인 모달 */}
+      {deleteTargetId && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-red-100 p-8 text-center animate-scale-up">
+            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="text-red-600" size={36} />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-2">데이터 영구 삭제</h3>
+            <p className="text-slate-500 mb-8 leading-relaxed font-medium">선택하신 선임 정보를 마스터 DB에서<br/><span className="text-red-600 font-bold">삭제하시겠습니까?</span></p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTargetId(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95">취소</button>
+              <button onClick={confirmDelete} className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg active:scale-95">삭제 실행</button>
             </div>
           </div>
         </div>
       )}
 
-      {deleteTargetId && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 animate-fade-in"><div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-sm text-center border border-gray-100"><h3 className="text-lg font-bold mb-4 text-gray-800">데이터를 삭제하시겠습니까?</h3><div className="flex gap-2"><button onClick={() => setDeleteTargetId(null)} className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-all">취소</button><button onClick={confirmDelete} className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-red-100">삭제</button></div></div></div>}
-
       <style>{`
-        @keyframes scale-up {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-          animation: scale-up 0.2s ease-out forwards;
-        }
+        @keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-scale-up { animation: scale-up 0.2s ease-out forwards; }
       `}</style>
     </div>
   );

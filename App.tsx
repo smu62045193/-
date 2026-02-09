@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -19,15 +19,28 @@ import { MenuId } from './types';
 import { Menu as MenuIcon, X } from 'lucide-react';
 
 const App: React.FC = () => {
-  // 초기 활성화 메뉴를 대시보드(DASHBOARD)로 설정
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isPopupMode, setIsPopupMode] = useState(false);
+
+  // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('popup') === 'appointment') {
+      setIsPopupMode(true);
+    }
+  }, []);
 
   const handleMenuSelect = (id: MenuId) => {
     setActiveMenu(id);
     setSidebarOpen(false);
   };
+
+  // 팝업 모드일 경우 레이아웃 없이 선임현황 컴포넌트만 반환
+  if (isPopupMode) {
+    return <AppointmentManager isPopupMode={true} />;
+  }
 
   const renderContent = () => {
     switch (activeMenu) {
