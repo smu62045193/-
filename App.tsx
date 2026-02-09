@@ -6,6 +6,7 @@ import Dashboard from './components/Dashboard';
 import WorkLog from './components/WorkLog';
 import WeeklyWork from './components/WeeklyWork';
 import StaffManager from './components/StaffManager';
+import StaffStatus from './components/StaffStatus';
 import ConsumablesManager from './components/ConsumablesManager';
 import ParkingManager from './components/ParkingManager';
 import ContractorManager from './components/ContractorManager';
@@ -22,13 +23,16 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState(false);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('popup') === 'appointment') {
-      setIsPopupMode(true);
+    const popupType = params.get('popup');
+    if (popupType === 'appointment') {
+      setIsPopupMode('appointment');
+    } else if (popupType === 'staff') {
+      setIsPopupMode('staff');
     }
   }, []);
 
@@ -37,9 +41,15 @@ const App: React.FC = () => {
     setSidebarOpen(false);
   };
 
-  // 팝업 모드일 경우 레이아웃 없이 선임현황 컴포넌트만 반환
-  if (isPopupMode) {
+  // 팝업 모드일 경우 레이아웃 없이 해당 컴포넌트만 반환
+  if (isPopupMode === 'appointment') {
     return <AppointmentManager isPopupMode={true} />;
+  }
+  
+  if (isPopupMode === 'staff') {
+    // StaffStatus는 StaffManager 내부에서 사용되지만 팝업 모드에서는 단독 렌더링
+    // staffList 등은 컴포넌트 내부에서 자체 fetch하므로 빈 배열 전달 후 내부 로직 활성화
+    return <StaffStatus staffList={[]} setStaffList={() => {}} isPopupMode={true} />;
   }
 
   const renderContent = () => {

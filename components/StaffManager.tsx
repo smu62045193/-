@@ -400,26 +400,26 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
   const cleaningTeam = activeStaff.filter(m => m.category === '미화' && m.id !== manager?.id);
 
   return (
-    <div className="p-6 max-w-full mx-auto space-y-6 animate-fade-in print:p-0">
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in print:p-0">
       <div className="mb-2 print:hidden flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800">직원 관리</h2>
-          <p className="text-gray-500 mt-1 text-base">조직 구성 및 직원 현황을 관리합니다.</p>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight">직원 관리</h2>
+          <p className="text-slate-500 mt-2 text-base font-medium">조직 구성 및 직원 현황을 관리합니다.</p>
         </div>
       </div>
 
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-4 scrollbar-hide border-b border-gray-200 items-center print:hidden">
-        <div className="mr-2 text-gray-500">
+      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center print:hidden">
+        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
            <CalendarDays size={22} />
         </div>
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-full text-base font-medium transition-all duration-200 border ${
+            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
               activeTab === tab.id 
-                ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
             }`}
           >
             {tab.label}
@@ -428,12 +428,12 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
       </div>
 
       {loading && staffList.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
           <RefreshCw className="animate-spin text-blue-500 mb-4" size={32} />
           <p className="text-gray-500 font-bold">직원 정보를 불러오는 중...</p>
         </div>
       ) : activeTab === 'chart' ? (
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200 overflow-hidden print:p-0 print:border-none">
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 overflow-hidden print:p-0 print:border-none">
           <div className="flex justify-end mb-6 print:hidden gap-2">
             <button 
               onClick={loadData}
