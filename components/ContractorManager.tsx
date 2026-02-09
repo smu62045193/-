@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
 import { fetchContractors, saveContractors, deleteContractor, generateUUID } from '../services/dataService';
-import { Save, Plus, Trash2, Search, Briefcase, Printer, Edit2, RotateCcw, RefreshCw, AlertTriangle, X, Cloud, CheckCircle, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Save, Plus, Trash2, Search, Briefcase, Printer, Edit2, RotateCcw, RefreshCw, AlertTriangle, X, Cloud, CheckCircle, UserPlus, ChevronLeft, ChevronRight, LayoutList, Star } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ContractorManagerProps {
@@ -10,6 +10,10 @@ interface ContractorManagerProps {
 }
 
 const ITEMS_PER_PAGE = 10;
+
+const TABS = [
+  { id: 'status', label: '협력업체현황' },
+];
 
 const TYPE_ORDER: Record<string, number> = {
   '전기': 1,
@@ -22,6 +26,7 @@ const TYPE_ORDER: Record<string, number> = {
 };
 
 const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = false }) => {
+  const [activeTab, setActiveTab] = useState('status');
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,7 +41,8 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
     phoneMain: '',
     phoneMobile: '',
     fax: '',
-    note: ''
+    note: '',
+    isImportant: false
   };
 
   const [newItem, setNewItem] = useState<Contractor>(initialNewItem);
@@ -66,7 +72,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
     }
   }, [editId, contractors]);
 
-  // 검색어나 데이터 총량이 변하면 페이지를 1로 리셋
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, contractors.length]);
@@ -183,7 +188,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
       });
   }, [contractors, searchTerm]);
 
-  // 페이징 처리된 리스트 계산
   const totalPages = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
   const paginatedList = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -201,10 +205,18 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
   }, [currentPage, totalPages]);
 
   const handlePrint = () => {
+    // 중요업체만 필터링하여 인쇄
+    const importantContractors = filteredList.filter(c => c.isImportant);
+    
+    if (importantContractors.length === 0) {
+      alert('인쇄할 중요업체가 없습니다. 먼저 업체를 중요업체로 등록해주세요.');
+      return;
+    }
+
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
     if (!printWindow) return;
 
-    const tableRows = filteredList.map((item, index) => `
+    const tableRows = importantContractors.map((item, index) => `
       <tr>
         <td>${index + 1}</td>
         <td>${item.type}</td>
@@ -220,7 +232,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
       <!DOCTYPE html>
       <html>
       <head>
-        <title>협력업체 현황 미리보기</title>
+        <title>중요 협력업체 현황 미리보기</title>
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
           @page { size: A4 portrait; margin: 0; }
@@ -247,7 +259,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
           <button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button>
         </div>
         <div class="print-page">
-          <h1>협력업체 현황</h1>
+          <h1>중요 협력업체 현황</h1>
           <table>
             <thead>
               <tr>
@@ -291,6 +303,25 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
           </div>
 
           <div className="p-8 space-y-6 flex-1 overflow-y-auto">
+            {/* 중요 업체 설정 토글 */}
+            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex items-center justify-between">
+               <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-xl ${newItem.isImportant ? 'bg-amber-500 text-white' : 'bg-white text-amber-200'}`}>
+                    <Star size={20} fill={newItem.isImportant ? "currentColor" : "none"} />
+                  </div>
+                  <div>
+                    <span className="font-black text-amber-800">중요 협력업체로 지정</span>
+                    <p className="text-[10px] text-amber-600 font-bold">인쇄 시 '중요 협력업체 리스트'에 포함됩니다.</p>
+                  </div>
+               </div>
+               <button 
+                 onClick={() => setNewItem({...newItem, isImportant: !newItem.isImportant})}
+                 className={`w-14 h-7 rounded-full transition-all relative ${newItem.isImportant ? 'bg-amber-500' : 'bg-slate-300'}`}
+               >
+                 <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${newItem.isImportant ? 'left-8' : 'left-1'}`}></div>
+               </button>
+            </div>
+
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명 *</label>
@@ -381,7 +412,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             <button 
               onClick={handleRegister} 
               disabled={loading}
-              className={`flex-[2] py-3.5 ${editId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}
+              className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}
             >
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
@@ -393,118 +424,163 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in print:p-0 print:max-w-none print:w-full relative">
-      <div className="mb-2 print:hidden flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-          <Briefcase className="mr-2 text-blue-600" size={24} />
+    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in print:p-0">
+      {/* 1행: 제목 영역 (직원관리와 디자인 통일) */}
+      <div className="mb-2 print:hidden">
+        <h2 className="text-3xl font-black text-slate-800 flex items-center tracking-tight">
+          <Briefcase className="mr-2 text-blue-600" size={32} />
           협력업체 관리
         </h2>
-        <div className="flex gap-2">
-          <button 
-            onClick={loadData} 
-            disabled={loading}
-            className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-          <button 
-            onClick={() => openIndependentWindow()}
-            className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
-          >
-            <UserPlus size={18} /> 신규 협력 등록
-          </button>
-          <button onClick={handlePrint} className="flex items-center px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md text-sm transition-all active:scale-95">
-            <Printer size={18} className="mr-2" />
-            미리보기
-          </button>
-        </div>
-      </div>
-      
-      {/* Search and Print Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200 print:hidden">
-        <div className="relative flex-1 md:w-80 w-full">
-          <input type="text" border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white text-black shadow-sm placeholder="업체명, 업종, 담당자 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm bg-white text-black shadow-sm" />
-          <Search className="absolute left-3 top-2.5 text-gray-400 w-5 h-5" />
-        </div>
+        <p className="text-slate-500 mt-2 text-base font-medium">협력업체 정보 및 연락처를 통합 관리합니다.</p>
       </div>
 
-      {/* Contractors Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden overflow-x-auto">
-        <table className="w-full min-w-[1000px] border-collapse">
-          <thead>
-            <tr>
-              <th className={thClass} style={{ width: '50px' }}>No</th>
-              <th className={thClass} style={{ width: '100px' }}>업종</th>
-              <th className={thClass} style={{ width: '180px' }}>업체명</th>
-              <th className={thClass} style={{ width: '100px' }}>담당자</th>
-              <th className={thClass} style={{ width: '130px' }}>대표번호</th>
-              <th className={thClass} style={{ width: '130px' }}>휴대폰</th>
-              <th className={thClass} style={{ width: '130px' }}>팩스</th>
-              <th className={thClass}>비고</th>
-              <th className={`${thClass} w-24 print:hidden`}>관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {paginatedList.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-20 text-gray-400 italic">등록된 협력업체가 없습니다.</td></tr>
-            ) : (
-              paginatedList.map((item, index) => (
-                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
-                  <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>
-                    {filteredList.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}
-                  </td>
-                  <td className={`${tdClass} font-bold text-blue-600`}>{item.type}</td>
-                  <td className={`${tdClass} font-bold text-gray-800`}>{item.name}</td>
-                  <td className={tdClass}>{item.contactPerson}</td>
-                  <td className={tdClass}>{item.phoneMain}</td>
-                  <td className={tdClass}>{item.phoneMobile}</td>
-                  <td className={tdClass}>{item.fax}</td>
-                  <td className={tdClass}>{item.note}</td>
-                  <td className={`${tdClass} text-center print:hidden`}>
-                    <div className="flex items-center justify-center space-x-1">
-                      <button onClick={() => openIndependentWindow(item.id)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
-                      <button onClick={() => handleDeleteDirect(item.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      {/* 탭 네비게이션 (승강기점검과 디자인 통일) */}
+      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center print:hidden">
+        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
+           <LayoutList size={22} />
+        </div>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
+              activeTab === tab.id 
+                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Pagination UI - 소화기 관리와 동일한 방식 */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="flex items-center gap-1.5 px-4">
-              {visiblePageNumbers.map(pageNum => (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-200'
-                  }`}
+      {/* 메인 콘텐츠 영역 (화이트 카드 스타일) */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
+        {activeTab === 'status' && (
+          <div className="p-6 space-y-6">
+            {/* 검색 및 버튼 툴바 (2행 구조) */}
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
+              <div className="relative flex-1 md:w-80 w-full">
+                <input 
+                  type="text" 
+                  placeholder="업체명, 업종, 담당자 검색" 
+                  value={searchTerm} 
+                  onChange={(e) => setSearchTerm(e.target.value)} 
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm bg-white text-black shadow-sm outline-none" 
+                />
+                <Search className="absolute left-3.5 top-3 text-gray-400 w-5 h-5" />
+              </div>
+
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                <button 
+                  onClick={loadData} 
+                  disabled={loading}
+                  className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
                 >
-                  {pageNum}
+                  <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  새로고침
                 </button>
-              ))}
+                <button 
+                  onClick={() => openIndependentWindow()}
+                  className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
+                >
+                  <UserPlus size={18} /> 신규 협력 등록
+                </button>
+                <button 
+                  onClick={handlePrint} 
+                  className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+                  title="중요업체만 인쇄합니다"
+                >
+                  <Printer size={18} className="mr-2" />
+                  중요업체 인쇄
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-            >
-              <ChevronRight size={18} />
-            </button>
+
+            {/* 테이블 영역 */}
+            <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto">
+              <table className="w-full min-w-[1000px] border-collapse">
+                <thead>
+                  <tr>
+                    <th className={thClass} style={{ width: '50px' }}>No</th>
+                    <th className={thClass} style={{ width: '100px' }}>업종</th>
+                    <th className={thClass} style={{ width: '180px' }}>업체명</th>
+                    <th className={thClass} style={{ width: '100px' }}>담당자</th>
+                    <th className={thClass} style={{ width: '130px' }}>대표번호</th>
+                    <th className={thClass} style={{ width: '130px' }}>휴대폰</th>
+                    <th className={thClass} style={{ width: '130px' }}>팩스</th>
+                    <th className={thClass}>비고</th>
+                    <th className={`${thClass} w-24 print:hidden`}>관리</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {paginatedList.length === 0 ? (
+                    <tr><td colSpan={9} className="text-center py-20 text-gray-400 italic">등록된 협력업체가 없습니다.</td></tr>
+                  ) : (
+                    paginatedList.map((item, index) => (
+                      <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
+                        <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>
+                          {filteredList.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}
+                        </td>
+                        <td className={`${tdClass} font-bold text-blue-600`}>{item.type}</td>
+                        <td className={`${tdClass} font-bold text-gray-800`}>
+                          <div className="flex items-center justify-center gap-1">
+                            {item.isImportant && <Star size={14} className="text-amber-500" fill="currentColor" />}
+                            {item.name}
+                          </div>
+                        </td>
+                        <td className={tdClass}>{item.contactPerson}</td>
+                        <td className={tdClass}>{item.phoneMain}</td>
+                        <td className={tdClass}>{item.phoneMobile}</td>
+                        <td className={tdClass}>{item.fax}</td>
+                        <td className={tdClass}>{item.note}</td>
+                        <td className={`${tdClass} text-center print:hidden`}>
+                          <div className="flex items-center justify-center space-x-1">
+                            <button onClick={() => openIndependentWindow(item.id)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
+                            <button onClick={() => handleDeleteDirect(item.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+
+              {/* 페이지네이션 */}
+              {totalPages > 1 && (
+                <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <div className="flex items-center gap-1.5 px-4">
+                    {visiblePageNumbers.map(pageNum => (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                            : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-200'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

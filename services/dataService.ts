@@ -1055,7 +1055,8 @@ export const fetchContractors = async (): Promise<Contractor[]> => {
       phoneMain: c.phone_main, 
       phoneMobile: c.phone_mobile, 
       fax: c.fax, 
-      note: c.note 
+      note: c.note,
+      isImportant: c.is_important
     }));
   } catch (e) {}
   return [];
@@ -1070,7 +1071,8 @@ export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
     phone_main: c.phoneMain, 
     phone_mobile: c.phoneMobile, 
     fax: c.fax, 
-    note: c.note 
+    note: c.note,
+    is_important: c.isImportant
   }));
   const { error } = await supabase.from('contractors').upsert(dbData);
   return !error;
@@ -1221,6 +1223,10 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
   return null;
 };
 
+/**
+ * Fix Type Errors: Property 'weather_condition', 'temp_min', 'temp_max' do not exist on type 'AirEnvironmentLogData'.
+ * Updated to use camelCase properties from the AirEnvironmentLogData interface.
+ */
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
   const { error } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 

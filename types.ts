@@ -247,6 +247,7 @@ export interface Contractor {
   phoneMobile: string; // 핸드폰 (New)
   fax: string;         // 팩스 (New)
   note: string;      // 비고
+  isImportant?: boolean; // 중요업체 여부
 }
 
 // Emergency Generator Types
