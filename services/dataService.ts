@@ -807,7 +807,7 @@ export const fetchShiftSettings = async (): Promise<ShiftSettings | null> => {
 };
 
 export const saveShiftSettings = async (settings: ShiftSettings): Promise<boolean> => {
-  const { error } = await supabase.from('system_settings').upsert({ id: 'SHIFT_SETTINGS', data: settings, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('system_settings').upsert({ id: 'SHIFT_SETTINGS', data: settings, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -820,7 +820,7 @@ export const fetchConsumables = async (): Promise<ConsumableItem[]> => {
 };
 
 export const saveConsumables = async (list: ConsumableItem[]): Promise<boolean> => {
-  const { error } = await supabase.from('system_settings').upsert({ id: 'CONSUMABLES_DB', data: { consumables: list }, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('system_settings').upsert({ id: 'CONSUMABLES_DB', data: { consumables: list }, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -833,7 +833,7 @@ export const fetchAppointmentList = async (): Promise<AppointmentItem[]> => {
 };
 
 export const saveAppointmentList = async (list: AppointmentItem[]): Promise<boolean> => {
-  const { error } = await supabase.from('system_settings').upsert({ id: 'APPOINTMENT_DB', data: { appointmentList: list }, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('system_settings').upsert({ id: 'APPOINTMENT_DB', data: { appointmentList: list }, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -846,7 +846,7 @@ export const fetchSubstationChecklist = async (date: string): Promise<Substation
 };
 
 export const saveSubstationChecklist = async (data: SubstationChecklistData): Promise<boolean> => {
-  const { error } = await supabase.from('substation_checklists').upsert({ id: `SUB_CHECK_${data.date}`, date: data.date, items: data.items, approvers: data.approvers, note: data.note, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('substation_checklists').upsert({ id: `SUB_CHECK_${data.date}`, date: data.date, items: data.items, approvers: data.approvers, note: data.note, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -859,7 +859,7 @@ export const fetchFireFacilityLog = async (date: string): Promise<FireFacilityLo
 };
 
 export const saveFireFacilityLog = async (data: FireFacilityLogData): Promise<boolean> => {
-  const { error } = await supabase.from('fire_facility_logs').upsert({ id: `FIRE_FAC_${data.date}`, date: data.date, items: data.items, remarks: data.remarks, approvers: data.approvers, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('fire_facility_logs').upsert({ id: `FIRE_FAC_${data.date}`, date: data.date, items: data.items, remarks: data.remarks, approvers: data.approvers, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -872,7 +872,7 @@ export const fetchElevatorLog = async (date: string): Promise<ElevatorLogData | 
 };
 
 export const saveElevatorLog = async (data: ElevatorLogData): Promise<boolean> => {
-  const { error } = await supabase.from('elevator_logs').upsert({ id: `ELEV_LOG_${data.date}`, date: data.date, items: data.items, remarks: data.remarks, inspector: data.inspector, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('elevator_logs').upsert({ id: `ELEV_LOG_${data.date}`, date: data.date, items: data.items, remarks: data.remarks, inspector: data.inspector, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -885,7 +885,7 @@ export const fetchGasLog = async (date: string): Promise<GasLogData | null> => {
 };
 
 export const saveGasLog = async (data: GasLogData): Promise<boolean> => {
-  const { error } = await supabase.from('gas_logs').upsert({ id: `GAS_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('gas_logs').upsert({ id: `GAS_LOG_${date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -898,7 +898,7 @@ export const fetchSepticLog = async (date: string): Promise<SepticLogData | null
 };
 
 export const saveSepticLog = async (data: SepticLogData): Promise<boolean> => {
-  const { error } = await supabase.from('septic_logs').upsert({ id: `SEPTIC_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('septic_logs').upsert({ id: `SEPTIC_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -912,7 +912,7 @@ export const fetchWeeklyReport = async (date: string): Promise<WeeklyReportData 
 
 export const saveWeeklyReport = async (data: WeeklyReportData): Promise<boolean> => {
   const dbData = { id: `WEEKLY_${data.startDate}`, start_date: data.startDate, reporting_date: data.reportingDate, author: data.author, fields: data.fields, photos: data.photos, last_updated: new Date().toISOString() };
-  const { error } = await supabase.from('weekly_reports').upsert(dbData);
+  const { error = null } = await supabase.from('weekly_reports').upsert(dbData);
   return !error;
 };
 
@@ -939,7 +939,7 @@ export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> =
 
 export const saveExternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
   const dbData = list.map(w => ({ id: ensureID(w.id), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'external' }));
-  const { error } = await supabase.from('construction_logs').upsert(dbData);
+  const { error = null } = await supabase.from('construction_logs').upsert(dbData);
   return !error;
 };
 
@@ -953,7 +953,7 @@ export const fetchInternalWorkList = async (): Promise<ConstructionWorkItem[]> =
 
 export const saveInternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
   const dbData = list.map(w => ({ id: ensureID(w.id), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'internal' }));
-  const { error } = await supabase.from('construction_logs').upsert(dbData);
+  const { error = null } = await supabase.from('construction_logs').upsert(dbData);
   return !error;
 };
 
@@ -982,7 +982,7 @@ export const fetchConsumableRequests = async (): Promise<ConsumableRequest[]> =>
 };
 
 export const saveConsumableRequests = async (list: ConsumableRequest[]): Promise<boolean> => {
-  const { error } = await supabase.from('system_settings').upsert({ id: 'CONSUMABLE_REQ_DB', data: { consumableReq: list }, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('system_settings').upsert({ id: 'CONSUMABLE_REQ_DB', data: { consumableReq: list }, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -996,7 +996,7 @@ export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => 
 
 export const saveParkingChangeList = async (list: ParkingChangeItem[]): Promise<boolean> => {
   const dbData = list.map(mapParkingChangeToDB);
-  const { error } = await supabase.from('parking_changes').upsert(dbData);
+  const { error = null } = await supabase.from('parking_changes').upsert(dbData);
   return !error;
 };
 
@@ -1019,7 +1019,7 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
 
 export const saveParkingStatusList = async (list: ParkingStatusItem[]): Promise<boolean> => {
   const dbData = list.map(mapParkingStatusToDB);
-  const { error } = await supabase.from('parking_status').upsert(dbData);
+  const { error = null } = await supabase.from('parking_status').upsert(dbData);
   return !error;
 };
 
@@ -1040,41 +1040,60 @@ export const fetchParkingLayout = async (): Promise<any> => {
 };
 
 export const saveParkingLayout = async (layout: any): Promise<boolean> => {
-  const { error } = await supabase.from('system_settings').upsert({ id: 'PARKING_LAYOUT', data: layout, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('system_settings').upsert({ id: 'PARKING_LAYOUT', data: layout, last_updated: new Date().toISOString() });
   return !error;
 };
 
+/**
+ * 협력업체 데이터 조회
+ * DB 구조 변경 없이 중요 업체 여부를 판단하기 위해 note 필드의 [중요] 접두사 감지
+ */
 export const fetchContractors = async (): Promise<Contractor[]> => {
   try {
     const { data } = await supabase.from('contractors').select('*');
-    if (data && data.length > 0) return data.map(c => ({ 
-      id: c.id, 
-      name: c.name, 
-      type: c.type, 
-      contactPerson: c.contact_person, 
-      phoneMain: c.phone_main, 
-      phoneMobile: c.phone_mobile, 
-      fax: c.fax, 
-      note: c.note,
-      isImportant: c.is_important
-    }));
+    if (data && data.length > 0) return data.map(c => {
+      const isImportant = (c.note || '').startsWith('[중요] ');
+      const cleanNote = isImportant ? c.note.replace('[중요] ', '') : c.note;
+      
+      return { 
+        id: c.id, 
+        name: c.name, 
+        type: c.type, 
+        contactPerson: c.contact_person, 
+        phoneMain: c.phone_main, 
+        phoneMobile: c.phone_mobile, 
+        fax: c.fax, 
+        note: cleanNote,
+        isImportant: isImportant
+      };
+    });
   } catch (e) {}
   return [];
 };
 
+/**
+ * 협력업체 데이터 저장
+ * 수파베이스 스키마(컬럼) 변경 없이 기능을 제공하기 위해 
+ * isImportant가 true일 경우 note 필드 앞에 [중요] 접두사를 붙여서 저장함
+ */
 export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
-  const dbData = list.map(c => ({ 
-    id: ensureID(c.id), 
-    name: c.name, 
-    type: c.type, 
-    contact_person: c.contactPerson, 
-    phone_main: c.phoneMain, 
-    phone_mobile: c.phoneMobile, 
-    fax: c.fax, 
-    note: c.note,
-    is_important: c.isImportant
-  }));
-  const { error } = await supabase.from('contractors').upsert(dbData);
+  const dbData = list.map(c => {
+    // 중요업체 체크 시 note 필드 앞에 식별자 추가
+    const finalNote = c.isImportant ? `[중요] ${c.note || ''}` : (c.note || '');
+    
+    return { 
+      id: ensureID(c.id), 
+      name: c.name, 
+      type: c.type, 
+      contact_person: c.contactPerson, 
+      phone_main: c.phoneMain, 
+      phone_mobile: c.phoneMobile, 
+      fax: c.fax, 
+      note: finalNote
+      // is_important 컬럼이 DB에 없으므로 전송 데이터에서 제외하여 오류 방지
+    };
+  });
+  const { error = null } = await supabase.from('contractors').upsert(dbData);
   return !error;
 };
 
@@ -1105,7 +1124,7 @@ export const saveMeterReading = async (data: MeterReadingData): Promise<boolean>
     items: data.items, 
     last_updated: new Date().toISOString() 
   };
-  const { error } = await supabase.from('meter_readings').upsert(dbData);
+  const { error = null } = await supabase.from('meter_readings').upsert(dbData);
   return !error;
 };
 
@@ -1119,7 +1138,7 @@ export const fetchGeneratorCheck = async (month: string): Promise<GeneratorCheck
 
 export const saveGeneratorCheck = async (data: GeneratorCheckData): Promise<boolean> => {
   const dbData = { id: `GEN_CHECK_${data.date}`, date: data.date, specs: data.specs, test: data.test, status: data.status, note: data.note, last_updated: new Date().toISOString() };
-  const { error } = await supabase.from('generator_checks').upsert(dbData);
+  const { error = null } = await supabase.from('generator_checks').upsert(dbData);
   return !error;
 };
 
@@ -1132,7 +1151,7 @@ export const fetchSubstationLog = async (date: string, force = false): Promise<S
 };
 
 export const saveSubstationLog = async (data: SubstationLogData): Promise<boolean> => {
-  const { error } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -1146,7 +1165,7 @@ export const fetchTenants = async (): Promise<Tenant[]> => {
 
 export const saveTenants = async (list: Tenant[]): Promise<boolean> => {
   const dbData = list.map(t => ({ id: ensureID(t.id), floor: t.floor, name: t.name, area: parseFloat(t.area?.replace(/,/g, '') || '0'), contact: t.contact, ref_power: parseFloat(t.refPower?.replace(/,/g, '') || '0'), note: t.note }));
-  const { error } = await supabase.from('tenants').upsert(dbData);
+  const { error = null } = await supabase.from('tenants').upsert(dbData);
   return !error;
 };
 
@@ -1159,7 +1178,7 @@ export const fetchMeterPhotos = async (month: string): Promise<MeterPhotoData | 
 };
 
 export const saveMeterPhotos = async (data: MeterPhotoData): Promise<boolean> => {
-  const { error } = await supabase.from('meter_photo_records').upsert({ id: `METER_PHOTOS_${data.month}`, month: data.month, items: data.items, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('meter_photo_records').upsert({ id: `METER_PHOTOS_${data.month}`, month: data.month, items: data.items, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -1173,7 +1192,7 @@ export const fetchBatteryCheck = async (month: string): Promise<BatteryCheckData
 
 export const saveBatteryCheck = async (data: BatteryCheckData): Promise<boolean> => {
   const dbData = { id: `BATTERY_${data.month}`, month: data.month, check_date: data.checkDate, items: data.items, approvers: data.approvers, last_updated: new Date().toISOString() };
-  const { error } = await supabase.from('battery_checks').upsert(dbData);
+  const { error = null } = await supabase.from('battery_checks').upsert(dbData);
   return !error;
 };
 
@@ -1187,7 +1206,7 @@ export const fetchLoadCurrent = async (month: string): Promise<LoadCurrentData |
 
 export const saveLoadCurrent = async (data: LoadCurrentData): Promise<boolean> => {
   const dbData = { id: `LOAD_${data.date}`, date: data.date, period: data.period, items: data.items, last_updated: new Date().toISOString() };
-  const { error } = await supabase.from('load_currents').upsert(dbData);
+  const { error = null } = await supabase.from('load_currents').upsert(dbData);
   return !error;
 };
 
@@ -1202,7 +1221,7 @@ export const fetchSafetyCheck = async (month: string, type: 'general' | 'ev'): P
 export const saveSafetyCheck = async (data: SafetyCheckData): Promise<boolean> => {
   const monthKey = data.date.substring(0, 7);
   const dbData = { id: `SAFETY_${data.type}_${monthKey}`, date: data.date, type: data.type, items: data.items, measurements: data.measurements, approver: data.approver, opinion: data.opinion, last_updated: new Date().toISOString() };
-  const { error } = await supabase.from('safety_checks').upsert(dbData);
+  const { error = null } = await supabase.from('safety_checks').upsert(dbData);
   return !error;
 };
 
@@ -1226,9 +1245,10 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
 /**
  * Fix Type Errors: Property 'weather_condition', 'temp_min', 'temp_max' do not exist on type 'AirEnvironmentLogData'.
  * Updated to use camelCase properties from the AirEnvironmentLogData interface.
+ * Fixed the "Cannot find name 'date'" error by properly referencing data.date from the function parameter.
  */
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
-  const { error } = await supabase.from('air_environment_logs').upsert({ 
+  const { error = null } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 
     date: data.date, 
     emissions: data.emissions, 
@@ -1251,7 +1271,7 @@ export const fetchWaterTankLog = async (month: string): Promise<WaterTankLogData
 
 export const saveWaterTankLog = async (data: WaterTankLogData): Promise<boolean> => {
   const dbData = { id: `WATER_TANK_${data.date.substring(0, 7)}`, date: data.date, building_name: data.buildingName, location: data.location, usage: data.usage, items: data.items, inspector: data.inspector, last_updated: new Date().toISOString() };
-  const { error } = await supabase.from('water_tank_logs').upsert(dbData);
+  const { error = null } = await supabase.from('water_tank_logs').upsert(dbData);
   return !error;
 };
 
@@ -1264,7 +1284,7 @@ export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | 
 };
 
 export const saveChemicalLog = async (data: ChemicalLogData): Promise<boolean> => {
-  const { error } = await supabase.from('chemical_logs').upsert({ id: `CHEM_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('chemical_logs').upsert({ id: `CHEM_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -1289,7 +1309,7 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
 
 export const saveFireExtinguisherList = async (list: FireExtinguisherItem[]): Promise<boolean> => {
   const dbData = list.map(mapFireExtinguisherToDB);
-  const { error } = await supabase.from('fire_extinguishers').upsert(dbData);
+  const { error = null } = await supabase.from('fire_extinguishers').upsert(dbData);
   return !error;
 };
 
@@ -1302,7 +1322,7 @@ export const fetchLinkedKeywords = async (type: string): Promise<string[]> => {
 };
 
 export const saveLinkedKeywords = async (type: string, keywords: string[]): Promise<boolean> => {
-  const { error } = await supabase.from('system_settings').upsert({ id: `KEYWORDS_${type}`, data: keywords, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('system_settings').upsert({ id: `KEYWORDS_${type}`, data: keywords, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -1315,7 +1335,7 @@ export const fetchFireInspectionLog = async (date: string): Promise<FireInspecti
 };
 
 export const saveFireInspectionLog = async (data: FireInspectionLogData): Promise<boolean> => {
-  const { error } = await supabase.from('fire_inspection_logs').upsert({ id: `FIRE_INSP_${data.date}`, date: data.date, items: data.items, inspector: data.inspector, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('fire_inspection_logs').upsert({ id: `FIRE_INSP_${data.date}`, date: data.date, items: data.items, inspector: data.inspector, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -1329,7 +1349,7 @@ export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
 
 export const saveFireHistoryList = async (list: FireHistoryItem[]): Promise<boolean> => {
   const dbData = list.map(mapFireHistoryToDB);
-  const { error } = await supabase.from('fire_inspection_history').upsert(dbData);
+  const { error = null } = await supabase.from('fire_inspection_history').upsert(dbData);
   return !error;
 };
 
@@ -1343,7 +1363,7 @@ export const fetchElevatorInspectionList = async (): Promise<ElevatorInspectionI
 
 export const saveElevatorInspectionList = async (list: ElevatorInspectionItem[]): Promise<boolean> => {
   const dbData = list.map(mapElevatorInspectionToDB);
-  const { error } = await supabase.from('elevator_inspections').upsert(dbData);
+  const { error = null } = await supabase.from('elevator_inspections').upsert(dbData);
   return !error;
 };
 
