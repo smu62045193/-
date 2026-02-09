@@ -16,7 +16,6 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   const [items, setItems] = useState<AppointmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
   const initialNewItem: AppointmentItem = { 
@@ -123,12 +122,11 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
     }
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-    const newList = items.filter(i => String(i.id) !== deleteTargetId);
+  const handleDeleteItem = async (id: string) => {
+    const newList = items.filter(i => String(i.id) !== String(id));
     if (await saveAppointmentList(newList)) { 
       setItems(newList); 
-      setDeleteTargetId(null); 
+      alert('삭제가 완료되었습니다.');
     }
   };
 
@@ -412,7 +410,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                     <button onClick={() => openIndependentWindow(it.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="편집">
                       <Edit2 size={16} />
                     </button>
-                    <button onClick={() => setDeleteTargetId(it.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                    <button onClick={() => handleDeleteItem(it.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
                   </div>
                 </td>
               </tr>
@@ -420,22 +418,6 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
           </tbody>
         </table>
       </div>
-
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-sm overflow-hidden border border-red-100 p-8 text-center animate-scale-up">
-            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertTriangle className="text-red-600" size={36} />
-            </div>
-            <h3 className="text-xl font-black text-slate-900 mb-2">데이터 영구 삭제</h3>
-            <p className="text-slate-500 mb-8 leading-relaxed font-medium">선택하신 선임 정보를 마스터 DB에서<br/><span className="text-red-600 font-bold">삭제하시겠습니까?</span></p>
-            <div className="flex gap-3">
-              <button onClick={() => setDeleteTargetId(null)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95">취소</button>
-              <button onClick={confirmDelete} className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-bold transition-all shadow-lg active:scale-95">삭제 실행</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
