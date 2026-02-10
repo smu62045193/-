@@ -7,18 +7,18 @@ import {
   fetchInternalWorkList, 
   saveInternalWorkList,
   uploadFile,
-  deleteConstructionWorkItem
+  deleteConstructionWorkItem,
+  generateUUID
 } from '../services/dataService';
-import { Save, Plus, Trash2, Upload, Download, Image as ImageIcon, RotateCcw, RefreshCw, Search, Edit2, Cloud, X, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Save, Plus, Trash2, Upload, Download, Image as ImageIcon, RotateCcw, RefreshCw, Search, Edit2, Cloud, X, CheckCircle, AlertTriangle, HardHat } from 'lucide-react';
 
 interface ConstructionLogProps {
   mode: 'external' | 'internal';
+  isPopupMode?: boolean;
 }
 
 type WorkSource = 'external' | 'internal';
 type WorkItemWithSource = ConstructionWorkItem & { source: WorkSource };
-
-const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const formatImageUrl = (url: string) => {
   if (!url) return '';
@@ -34,7 +34,7 @@ const resizeImage = (file: File): Promise<string> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_SIZE = 1000; // 작업 사진은 1000px 정도가 적당
+        const MAX_SIZE = 1000;
         if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
@@ -46,21 +46,63 @@ const resizeImage = (file: File): Promise<string> => {
   });
 };
 
-const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
+const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = false }) => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<WorkItemWithSource[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isUpdateMode, setIsUpdateMode] = useState(false);
-  const [showForm, setShowForm] = useState(false); // 등록창 표시 여부
+  const [editId, setEditId] = useState<string | null>(null);
+  
+  const [currentMode, setCurrentMode] = useState<WorkSource>(mode);
   const [currentItem, setCurrentItem] = useState<WorkItemWithSource>({
-    id: generateId(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
+    id: generateUUID(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
   });
 
-  const PHOTO_LIMIT = mode === 'external' ? 20 : 10;
+  const PHOTO_LIMIT = currentMode === 'external' ? 20 : 10;
 
-  useEffect(() => { loadData(); handleReset(false); }, [mode]);
+  useEffect(() => {
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const urlMode = params.get('mode') as WorkSource;
+      const urlId = params.get('id');
+      
+      if (urlMode) setCurrentMode(urlMode);
+      
+      const loadInitial = async () => {
+        setLoading(true);
+        let list: ConstructionWorkItem[] = [];
+        if ((urlMode || mode) === 'external') {
+          list = await fetchExternalWorkList();
+        } else {
+          list = await fetchInternalWorkList();
+        }
+        
+        if (urlId && urlId !== 'new') {
+          const matched = list.find(i => String(i.id) === String(urlId));
+          if (matched) {
+            setCurrentItem({ ...matched, source: urlMode || mode });
+            setEditId(urlId);
+          }
+        } else {
+          setCurrentItem(prev => ({ ...prev, source: urlMode || mode }));
+        }
+        setLoading(false);
+      };
+      loadInitial();
+    } else {
+      loadData();
+    }
+    
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'CONSTRUCTION_LOG_SAVED') {
+        loadData();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [mode, isPopupMode]);
 
   const loadData = async () => {
+    if (isPopupMode) return;
     setLoading(true);
     try {
       let fetchedItems: WorkItemWithSource[] = [];
@@ -76,61 +118,39 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     } catch (e) { setItems([]); } finally { setLoading(false); }
   };
 
-  const getTitle = () => mode === 'external' ? '외부업체 공사' : '시설직 작업';
+  const openIndependentWindow = (id: string = 'new') => {
+    const width = 900;
+    const height = 850;
+    const left = (window.screen.width / 2) - (width / 2);
+    const top = (window.screen.height / 2) - (height / 2);
 
-  const handleReset = (preserveDate: boolean = false) => {
-    setCurrentItem(prev => ({
-      id: generateId(), date: preserveDate ? prev.date : new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
-    }));
-    setIsUpdateMode(false);
-  };
+    const url = new URL(window.location.href);
+    url.searchParams.set('popup', 'construction_log');
+    url.searchParams.set('mode', mode);
+    url.searchParams.set('id', id);
 
-  const handleEdit = (item: WorkItemWithSource) => { 
-    setCurrentItem({ ...item }); 
-    setIsUpdateMode(true); 
-    setShowForm(true); // 수정 시 폼 열기
-    window.scrollTo({ top: 0, behavior: 'smooth' }); 
-  };
-
-  const handleDelete = async (e: React.MouseEvent, item: WorkItemWithSource) => {
-    e.stopPropagation();
-    
-    // 사용자 요청에 따라 확인 과정 없이 즉시 삭제 로직 실행
-    setLoading(true);
-    const idStr = String(item.id);
-
-    try {
-      // 서버에서 직접 삭제 실행
-      const success = await deleteConstructionWorkItem(idStr);
-      
-      if (success) {
-        // 성공 시 로컬 상태 업데이트
-        setItems(prev => prev.filter(i => String(i.id) !== idStr));
-        if (String(currentItem.id) === idStr) handleReset(true);
-        alert('삭제가 완료되었습니다.'); // 요청된 완료 메시지
-      } else {
-        alert('서버 데이터 삭제에 실패했습니다.');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('삭제 중 오류가 발생했습니다.');
-    } finally {
-      setLoading(false);
-    }
+    window.open(
+      url.toString(),
+      `ConstLogWin_${mode}_${id}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
+    );
   };
 
   const handleSaveItem = async () => {
     if (!currentItem.content) { alert('내용은 필수입니다.'); return; }
     
+    if (currentMode === 'external' && !currentItem.company?.trim()) {
+      if (!confirm('업체명이 입력되지 않았습니다. 계속하시겠습니까?')) {
+        return;
+      }
+    }
+
     setLoading(true); 
     try {
-      // 1. 모든 사진을 Storage에 업로드 (새로 추가된 사진만)
       const uploadedPhotos: WorkPhoto[] = [];
       for (let i = 0; i < currentItem.photos.length; i++) {
         const photo = currentItem.photos[i];
-        // Base64 데이터인 경우에만 업로드 진행
         if (photo.dataUrl.startsWith('data:image')) {
-          // 파일명에 타임스탬프를 빼고 고유 photo.id를 사용해 덮어쓰기 유도
           const fileName = `work_${currentItem.id}_${photo.id}.jpg`;
           const publicUrl = await uploadFile('facility', 'construction', fileName, photo.dataUrl);
           uploadedPhotos.push({
@@ -139,14 +159,15 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
             fileName: `${currentItem.content.trim()}_${i + 1}`
           });
         } else {
-          // 이미 URL인 사진은 그대로 유지 (중복 업로드 방지)
           uploadedPhotos.push(photo);
         }
       }
 
-      const isExternal = currentItem.source === 'external';
-      const saveFn = isExternal ? saveExternalWorkList : saveInternalWorkList;
-      const currentList = items.filter(i => i.source === currentItem.source).map(({ source, ...rest }) => rest as ConstructionWorkItem);
+      const saveFn = currentMode === 'external' ? saveExternalWorkList : saveInternalWorkList;
+      const fetchFn = currentMode === 'external' ? fetchExternalWorkList : fetchInternalWorkList;
+      
+      const latestList = await fetchFn();
+      let newList = [...(latestList || [])];
       
       const itemToSave: ConstructionWorkItem = { 
         id: currentItem.id, 
@@ -157,17 +178,21 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
         photos: uploadedPhotos 
       };
 
-      let newList = [...currentList];
       const index = newList.findIndex(i => String(i.id) === String(itemToSave.id));
       if (index >= 0) newList[index] = itemToSave; else newList = [itemToSave, ...newList];
       newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       
       const success = await saveFn(newList);
       if (success) { 
+        if (window.opener) {
+          window.opener.postMessage({ type: 'CONSTRUCTION_LOG_SAVED' }, '*');
+        }
         alert('저장이 완료되었습니다.');
-        await loadData(); 
-        handleReset(true); 
-        setShowForm(false); // 저장 후 폼 닫기
+        if (isPopupMode) {
+          window.close();
+        } else {
+          loadData();
+        }
       } else {
         alert('저장 실패');
       }
@@ -188,7 +213,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     for (const file of fileList) { 
       try { 
         const resized = await resizeImage(file); 
-        newPhotos.push({ id: generateId(), dataUrl: resized, fileName: file.name }); 
+        newPhotos.push({ id: generateUUID(), dataUrl: resized, fileName: file.name }); 
       } catch (err) { 
         alert(`${file.name} 처리 오류`); 
       } 
@@ -213,6 +238,21 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent, item: WorkItemWithSource) => {
+    e.stopPropagation();
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    setLoading(true);
+    try {
+      const success = await deleteConstructionWorkItem(String(item.id));
+      if (success) {
+        setItems(prev => prev.filter(i => String(i.id) !== String(item.id)));
+        alert('삭제가 완료되었습니다.');
+      } else {
+        alert('서버 데이터 삭제에 실패했습니다.');
+      }
+    } catch (e) { alert('삭제 중 오류 발생'); } finally { setLoading(false); }
+  };
+
   const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) return items;
     const lowerSearch = searchTerm.toLowerCase();
@@ -224,18 +264,98 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
     );
   }, [items, searchTerm]);
 
-  const toggleForm = () => {
-    if (showForm && isUpdateMode) {
-      handleReset(true);
-    }
-    setShowForm(!showForm);
-  };
+  if (isPopupMode) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
+          <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
+                <HardHat size={20} />
+              </div>
+              <span className="font-black text-lg">{editId ? `${currentMode === 'external' ? '외부업체' : '시설직'} 작업 수정` : `${currentMode === 'external' ? '외부업체' : '시설직'} 신규 작업 등록`}</span>
+            </div>
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
+              <X size={24} />
+            </button>
+          </div>
+
+          <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">날짜 *</label>
+                <input type="date" value={currentItem.date} onChange={e => setCurrentItem({...currentItem, date: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">구분</label>
+                <select value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value="전기">전기</option>
+                  <option value="기계">기계</option>
+                  <option value="소방">소방</option>
+                  <option value="승강기">승강기</option>
+                  <option value="영선">영선</option>
+                  <option value="미화">미화</option>
+                  <option value="주차">주차</option>
+                </select>
+              </div>
+              {currentMode === 'external' && (
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명</label>
+                  <input type="text" value={currentItem.company || ''} onChange={e => setCurrentItem({...currentItem, company: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="업체명" />
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">작업 내용 *</label>
+              <textarea value={currentItem.content} onChange={e => setCurrentItem({...currentItem, content: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-32" placeholder="작업 내용을 구체적으로 입력하세요." />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">사진 첨부 ({currentItem.photos.length}/{PHOTO_LIMIT})</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                {currentItem.photos.length < PHOTO_LIMIT && (
+                  <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer bg-slate-50 hover:border-blue-400 hover:bg-blue-50 transition-all">
+                    <Upload size={32} className="text-slate-300 mb-2" />
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Upload</span>
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload}/>
+                  </label>
+                )}
+                {currentItem.photos.map((photo) => (
+                  <div key={photo.id} className="relative aspect-square rounded-2xl border border-slate-200 overflow-hidden group shadow-sm bg-white">
+                    <img src={formatImageUrl(photo.dataUrl)} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                      <button onClick={() => downloadPhoto(photo)} className="p-2 bg-white rounded-full text-blue-600 hover:bg-blue-50 shadow-md">
+                        <Download size={16} />
+                      </button>
+                      <button onClick={() => removePhoto(photo.id)} className="p-2 bg-white rounded-full text-red-600 hover:bg-red-50 shadow-md">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-blue-500 mt-3 font-bold">* 저장 시 사진은 압축되어 서버에 최적화 저장됩니다.</p>
+            </div>
+          </div>
+
+          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
+            <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
+            <button onClick={handleSaveItem} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+              {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+              서버에 데이터 저장
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-center mb-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm gap-4">
         <div className="flex items-center gap-4 w-full md:w-auto">
-          <h2 className="text-xl font-bold text-gray-800 whitespace-nowrap">{getTitle()} 관리 대장</h2>
+          <h2 className="text-xl font-bold text-gray-800 whitespace-nowrap">{mode === 'external' ? '외부업체 공사' : '시설직 작업'} 관리 대장</h2>
           <div className="relative flex-1 md:w-64">
             <input 
               type="text" 
@@ -249,11 +369,11 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
           <button 
-            onClick={toggleForm} 
-            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-bold shadow-md transition-all text-sm flex-1 md:flex-none ${showForm ? 'bg-gray-500 text-white hover:bg-gray-600' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            onClick={() => openIndependentWindow()} 
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm flex-1 md:flex-none active:scale-95"
           >
-            {showForm ? <X size={18} /> : <Plus size={18} />}
-            {showForm ? '닫기' : '작업 등록'}
+            <Plus size={18} />
+            작업 등록
           </button>
           <button 
             onClick={loadData} 
@@ -265,67 +385,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
           </button>
         </div>
       </div>
-
-      {showForm && (
-        <div className={`p-6 rounded-xl border shadow-sm animate-fade-in mb-6 transition-all duration-300 ${isUpdateMode ? 'bg-orange-50 border-orange-200' : 'bg-blue-50/50 border-blue-200'}`}>
-          <h3 className="font-bold text-lg text-gray-800 mb-4 pb-2 border-b border-blue-100 flex items-center">
-            <span className={`w-2 h-6 rounded-full mr-3 ${isUpdateMode ? 'bg-orange-500' : 'bg-blue-600'}`}></span>
-            {isUpdateMode ? '작업 내역 수정' : '신규 작업 등록'}
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
-            <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 mb-1">날짜</label><input type="date" value={currentItem.date} onChange={e => setCurrentItem({...currentItem, date: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black focus:ring-1 focus:ring-blue-400 outline-none"/></div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-gray-500 mb-1">구분</label>
-              <select value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black focus:ring-1 focus:ring-blue-400 outline-none">
-                <option value="전기">전기</option>
-                <option value="기계">기계</option>
-                <option value="소방">소방</option>
-                <option value="승강기">승강기</option>
-                <option value="영선">영선</option>
-                <option value="미화">미화</option>
-                <option value="주차">주차</option>
-              </select>
-            </div>
-            {mode === 'external' && <div className="md:col-span-3"><label className="block text-xs font-bold text-gray-500 mb-1">업체명</label><input type="text" value={currentItem.company || ''} onChange={e => setCurrentItem({...currentItem, company: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black placeholder:text-gray-300 focus:ring-1 focus:ring-blue-400 outline-none" placeholder="업체명"/></div>}
-            <div className={mode === 'external' ? "md:col-span-5" : "md:col-span-8"}><label className="block text-xs font-bold text-gray-500 mb-1">내용</label><textarea value={currentItem.content} onChange={e => setCurrentItem({...currentItem, content: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-black resize-none min-h-[42px] focus:ring-1 focus:ring-blue-400 outline-none" placeholder="작업 내용을 상세히 입력하세요."/></div>
-          </div>
-
-          <div className="mb-6">
-            <label className="block text-sm font-bold text-gray-600 mb-2">사진 첨부 ({currentItem.photos.length}/{PHOTO_LIMIT}) <span className="text-[10px] text-blue-500 ml-2">* 저장 시 사진은 압축되어 서버에 최적화 저장됩니다.</span></label>
-            <div className="grid grid-cols-2 sm:grid-cols-5 md:grid-cols-10 gap-2">
-              {currentItem.photos.length < PHOTO_LIMIT && (
-                <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-gray-300 rounded-lg cursor-pointer bg-white hover:border-blue-400 transition-colors">
-                  <Upload size={20} className="text-gray-400" />
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload}/>
-                </label>
-              )}
-              {currentItem.photos.map((photo) => (
-                <div key={photo.id} className="relative aspect-square rounded-lg border border-gray-200 overflow-hidden group">
-                  <img src={formatImageUrl(photo.dataUrl)} className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button onClick={() => downloadPhoto(photo)} className="p-1.5 bg-white rounded-full text-blue-600 hover:bg-blue-50" title="다운로드">
-                      <Download size={14} />
-                    </button>
-                    <button onClick={() => removePhoto(photo.id)} className="p-1.5 bg-white rounded-full text-red-600 hover:bg-red-50" title="삭제">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-blue-100">
-            <button onClick={() => { handleReset(true); setShowForm(false); }} className="flex items-center px-4 py-2 bg-white text-gray-600 rounded-lg hover:bg-gray-50 font-bold border border-gray-200 transition-all text-sm">
-              <RotateCcw size={18} className="mr-2" /> 취소
-            </button>
-            <button onClick={handleSaveItem} disabled={loading} className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-md transition-all text-sm disabled:bg-gray-400 active:scale-95">
-              <Save size={18} className="mr-2" /> {isUpdateMode ? '수정 완료' : '서버저장'}
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transition-all">
         <div className="overflow-x-auto scrollbar-hide">
@@ -345,12 +404,12 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
               {filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={mode === 'external' ? 7 : 6} className="px-4 py-20 text-center text-gray-400 italic text-sm">
-                    등록된 {getTitle()} 내역이 없습니다.
+                    등록된 {mode === 'external' ? '외부업체' : '시설직'} 내역이 없습니다.
                   </td>
                 </tr>
               ) : (
                 filteredItems.map((item, idx) => (
-                  <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${String(currentItem.id) === String(item.id) ? 'bg-orange-50 border-l-4 border-l-orange-400' : ''}`}>
+                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{filteredItems.length - idx}</td>
                     <td className="px-4 py-3 text-center text-sm text-gray-700">{item.date}</td>
                     <td className="px-4 py-3 text-center text-sm font-bold text-blue-600">{item.category}</td>
@@ -364,7 +423,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center space-x-2">
-                        <button onClick={() => handleEdit(item)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
+                        <button onClick={() => openIndependentWindow(String(item.id))} className="text-blue-500 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
                         <button onClick={(e) => handleDelete(e, item)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
                       </div>
                     </td>
@@ -375,16 +434,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode }) => {
           </table>
         </div>
       </div>
-
-      <style>{`
-        @keyframes scale-up {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-          animation: scale-up 0.2s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 };

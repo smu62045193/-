@@ -304,7 +304,9 @@ const ConstructionHistory: React.FC = () => {
                             <HardHat size={14} className={item.type === '외부공사' ? 'text-orange-500' : 'text-green-500'} />
                           </div>
                           <span className="font-bold text-gray-900 text-sm">
-                            {item.company || '시설팀 (자체)'}
+                            {item.type === '시설작업' 
+                              ? (item.company || '시설팀 (자체)') 
+                              : (item.company || '(업체명 미입력)')}
                           </span>
                         </div>
                       </td>

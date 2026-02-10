@@ -16,6 +16,7 @@ import MechCheckManager from './components/MechCheckManager';
 import FireCheckManager from './components/FireCheckManager';
 import ElevatorCheckManager from './components/ElevatorCheckManager';
 import ConstructionManager from './components/ConstructionManager';
+import ConstructionLog from './components/ConstructionLog';
 import ConstructionContractorManager from './components/ConstructionContractorManager';
 import AppointmentManager from './components/AppointmentManager';
 import { MenuId } from './types';
@@ -25,7 +26,7 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -41,6 +42,8 @@ const App: React.FC = () => {
       setIsPopupMode('consumable');
     } else if (popupType === 'construction_contractor') {
       setIsPopupMode('construction_contractor');
+    } else if (popupType === 'construction_log') {
+      setIsPopupMode('construction_log');
     }
   }, []);
 
@@ -68,6 +71,10 @@ const App: React.FC = () => {
 
   if (isPopupMode === 'construction_contractor') {
     return <ConstructionContractorManager isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'construction_log') {
+    return <ConstructionLog mode="external" isPopupMode={true} />;
   }
 
   const renderContent = () => {

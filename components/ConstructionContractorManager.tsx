@@ -18,7 +18,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
   const [editId, setEditId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // 업종(type) 필드를 날짜 저장용으로 재사용합니다.
+  // 업종(type) 필드를 날짜 저장용으로 재사용합니다. 팩스(fax)는 사용하지 않으므로 제외합니다.
   const initialNewItem: Contractor = {
     id: '', 
     name: '', 
@@ -68,7 +68,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 800;
-    const height = 850;
+    const height = 750; // 팩스 삭제로 높이 약간 조절
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -118,7 +118,6 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
     if (!confirm('정말 삭제하시겠습니까?')) return;
     setLoading(true);
     try {
-      // ID를 문자열로 명확히 변환하여 전달
       const targetId = String(id);
       const success = await deleteConstructionContractor(targetId);
       if (success) {
@@ -136,7 +135,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
   const filteredList = useMemo(() => {
     return contractors
       .filter(c => (c.name+(c.type||'')+(c.contactPerson||'')).toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort((a, b) => b.type.localeCompare(a.type)); // 날짜 역순 정렬
+      .sort((a, b) => b.type.localeCompare(a.type)); 
   }, [contractors, searchTerm]);
 
   const totalPages = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
@@ -184,14 +183,10 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">휴대폰</label>
                 <input type="text" value={newItem.phoneMobile} onChange={e => setNewItem({...newItem, phoneMobile: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" placeholder="010-..." />
-              </div>
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">팩스</label>
-                <input type="text" value={newItem.fax} onChange={e => setNewItem({...newItem, fax: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" placeholder="02-..." />
               </div>
             </div>
 
@@ -245,8 +240,8 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto shadow-sm">
-        <table className="w-full min-w-[1200px] border-collapse">
+      <div className="bg-white rounded-xl border border-gray-300 overflow-x-auto scrollbar-hide shadow-sm">
+        <table className="w-full min-w-[1000px] border-collapse">
           <thead>
             <tr>
               <th className={thClass} style={{ width: '60px' }}>No</th>
@@ -255,14 +250,13 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
               <th className={thClass} style={{ width: '100px' }}>담당자</th>
               <th className={thClass} style={{ width: '130px' }}>대표번호</th>
               <th className={thClass} style={{ width: '130px' }}>휴대폰</th>
-              <th className={thClass} style={{ width: '130px' }}>팩스</th>
               <th className={thClass}>비고</th>
               <th className={thClass} style={{ width: '100px' }}>관리</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
             {filteredList.length === 0 ? (
-              <tr><td colSpan={9} className="py-20 text-center text-gray-400 italic">등록된 업체가 없습니다.</td></tr>
+              <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic">등록된 업체가 없습니다.</td></tr>
             ) : (
               paginatedList.map((item, index) => (
                 <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
@@ -272,7 +266,6 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                   <td className={tdClass}>{item.contactPerson}</td>
                   <td className={tdClass}>{item.phoneMain}</td>
                   <td className={tdClass}>{item.phoneMobile}</td>
-                  <td className={tdClass}>{item.fax}</td>
                   <td className={`${tdClass} text-left px-4 font-medium text-gray-600`}>{item.note}</td>
                   <td className={tdClass}>
                     <div className="flex justify-center gap-1">
