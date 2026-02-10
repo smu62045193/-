@@ -25,6 +25,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   
+  // 팝업 모드일 때 현재 어떤 탭(대장/내역)에서 열렸는지 추적하기 위한 상태
+  const [popupViewMode, setPopupViewMode] = useState<'ledger' | 'usage'>('ledger');
+
   // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
@@ -52,7 +55,10 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       const params = new URLSearchParams(window.location.search);
       const id = params.get('id');
       const copyName = params.get('itemName');
+      const vm = params.get('viewMode') as 'ledger' | 'usage';
       
+      if (vm) setPopupViewMode(vm);
+
       if (id && id !== 'new') {
         setEditId(id);
       } else if (copyName) {
@@ -64,7 +70,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           unit: params.get('unit') || 'EA',
           minStock: params.get('minStock') || '5',
           note: params.get('note') || '',
-          details: params.get('details') || ''
+          date: params.get('date') || prev.date,
+          details: '' // 상세내역은 명시적으로 비움 (불러오지 않음)
         }));
       }
     }
@@ -133,6 +140,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     const url = new URL(window.location.href);
     url.searchParams.set('popup', 'consumable');
     url.searchParams.set('id', id);
+    url.searchParams.set('viewMode', viewMode); // 현재 탭 모드 전달
     
     if (initialData && id === 'new') {
       url.searchParams.set('itemName', initialData.itemName);
@@ -141,7 +149,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       url.searchParams.set('unit', initialData.unit || 'EA');
       url.searchParams.set('minStock', initialData.minStock || '5');
       url.searchParams.set('note', initialData.note || '');
-      url.searchParams.set('details', initialData.details || '');
+      url.searchParams.set('date', initialData.date || '');
+      // 상세내역(details)은 파라미터로 전달하지 않음으로써 '불러오지 않기' 구현
     }
 
     window.open(
@@ -349,6 +358,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   const thClass = "border border-gray-300 p-2 bg-gray-50 text-center font-bold text-[12px] text-gray-700 h-10 align-middle uppercase";
 
   if (isPopupMode) {
+    const currentActiveMode = isPopupMode ? popupViewMode : viewMode;
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
         <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
@@ -357,7 +367,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
                 {editId ? <Edit2 size={20} /> : <PackagePlus size={20} />}
               </div>
-              <span className="font-black text-lg">{editId ? '소모품 정보 수정' : '소모품 사용/입고 등록'}</span>
+              <span className="font-black text-lg">{editId ? '소모품 정보 수정' : currentActiveMode === 'ledger' ? '소모품 등록/수정' : '소모품 사용/입고 등록'}</span>
             </div>
             <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
               <X size={24} />
@@ -420,14 +430,18 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
             </div>
 
             <div className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고 (자재 규격 등)</label>
-                <input type="text" value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} placeholder="자재 특징, 정규 규격 등 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">상세내역 (사용 장소/사유)</label>
-                <textarea value={newItem.details} onChange={e => setNewItem({...newItem, details: e.target.value})} placeholder="사용 장소, 작업 내용 등 구체적인 사유 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24" />
-              </div>
+              {currentActiveMode === 'ledger' && (
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고 (자재 규격 등)</label>
+                  <input type="text" value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} placeholder="자재 특징, 정규 규격 등 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              )}
+              {currentActiveMode === 'usage' && (
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">상세내역 (사용 장소/사유)</label>
+                  <textarea value={newItem.details} onChange={e => setNewItem({...newItem, details: e.target.value})} placeholder="사용 장소, 작업 내용 등 구체적인 사유 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24" />
+                </div>
+              )}
             </div>
           </div>
 
