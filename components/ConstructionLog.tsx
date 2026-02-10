@@ -3,14 +3,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ConstructionWorkItem, WorkPhoto } from '../types';
 import { 
   fetchExternalWorkList, 
-  saveExternalWorkList, 
-  fetchInternalWorkList, 
-  saveInternalWorkList,
+  fetchInternalWorkList,
   uploadFile,
   deleteConstructionWorkItem,
-  generateUUID
+  generateUUID,
+  saveConstructionWorkItem
 } from '../services/dataService';
-import { Save, Plus, Trash2, Upload, Download, Image as ImageIcon, RotateCcw, RefreshCw, Search, Edit2, Cloud, X, CheckCircle, AlertTriangle, HardHat, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Save, Plus, Trash2, Upload, Download, Image as ImageIcon, RefreshCw, Search, Edit2, X, ChevronLeft, ChevronRight, HardHat } from 'lucide-react';
 
 interface ConstructionLogProps {
   mode: 'external' | 'internal';
@@ -104,7 +103,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
     return () => window.removeEventListener('message', handleMessage);
   }, [mode, isPopupMode]);
 
-  // 검색어나 모드 변경 시 페이지 초기화
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, mode]);
@@ -171,12 +169,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         }
       }
 
-      const saveFn = currentMode === 'external' ? saveExternalWorkList : saveInternalWorkList;
-      const fetchFn = currentMode === 'external' ? fetchExternalWorkList : fetchInternalWorkList;
-      
-      const latestList = await fetchFn();
-      let newList = [...(latestList || [])];
-      
       const itemToSave: ConstructionWorkItem = { 
         id: currentItem.id, 
         date: currentItem.date, 
@@ -186,11 +178,9 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         photos: uploadedPhotos 
       };
 
-      const index = newList.findIndex(i => String(i.id) === String(itemToSave.id));
-      if (index >= 0) newList[index] = itemToSave; else newList = [itemToSave, ...newList];
-      newList.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // 리스트 전체 저장이 아닌 단일 항목 저장 함수 호출
+      const success = await saveConstructionWorkItem(itemToSave, currentMode);
       
-      const success = await saveFn(newList);
       if (success) { 
         if (window.opener) {
           window.opener.postMessage({ type: 'CONSTRUCTION_LOG_SAVED' }, '*');
@@ -199,6 +189,11 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         if (isPopupMode) {
           window.close();
         } else {
+          // 등록 성공 후 초기화 및 리스트 새로고침
+          setCurrentItem({
+            id: generateUUID(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: currentMode
+          });
+          setEditId(null);
           loadData();
         }
       } else {
@@ -272,7 +267,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
     );
   }, [items, searchTerm]);
 
-  // 페이지네이션 계산
   const totalItems = filteredItems.length;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
   const paginatedItems = useMemo(() => {
@@ -465,7 +459,6 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
           </table>
         </div>
 
-        {/* 페이지네이션 UI */}
         {!loading && totalPages > 1 && (
           <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
             <button

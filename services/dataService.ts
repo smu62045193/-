@@ -944,6 +944,24 @@ export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> =
   return [];
 };
 
+/**
+ * 공사/작업 단일 항목 저장
+ */
+export const saveConstructionWorkItem = async (item: ConstructionWorkItem, source: 'external' | 'internal'): Promise<boolean> => {
+  const dbData = { 
+    id: ensureID(item.id), 
+    date: item.date, 
+    category: item.category, 
+    company: item.company || null, 
+    content: item.content, 
+    photos: item.photos || [], 
+    source: source,
+    last_updated: new Date().toISOString()
+  };
+  const { error = null } = await supabase.from('construction_logs').upsert(dbData);
+  return !error;
+};
+
 export const saveExternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
   const dbData = list.map(w => ({ id: ensureID(w.id), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'external' }));
   const { error = null } = await supabase.from('construction_logs').upsert(dbData);
@@ -1247,6 +1265,7 @@ export const saveMeterPhotos = async (data: MeterPhotoData): Promise<boolean> =>
 export const fetchBatteryCheck = async (month: string): Promise<BatteryCheckData | null> => {
   try {
     const { data } = await supabase.from('battery_checks').select('*').eq('id', `BATTERY_${month}`).maybeSingle();
+    // Fixed Type Error: Property 'check_date' does not exist on type 'BatteryCheckData'. Changed to 'checkDate'.
     if (data) return { month: data.month, checkDate: data.check_date, items: data.items, approvers: data.approvers };
   } catch (err) {}
   return null;
@@ -1354,9 +1373,9 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       type: item.type, 
       floor: item.floor, 
       company: item.company, 
-      serialNo: item.serial_no, 
+      serial_no: item.serial_no, 
       phone: item.phone, 
-      certNo: item.cert_no, 
+      cert_no: item.cert_no, 
       date: item.date, 
       remarks: item.remarks 
     }));
