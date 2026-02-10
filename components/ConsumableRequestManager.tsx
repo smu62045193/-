@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { ConsumableRequest, ConsumableRequestItem, ConsumableItem, StaffMember } from '../types';
 import { fetchConsumableRequests, saveConsumableRequests, fetchConsumables, fetchStaffList } from '../services/dataService';
@@ -128,7 +127,12 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
       const lowStockItems = Object.values(groups)
         .map(g => ({ ...g.lastItem, currentStock: g.totalIn - g.totalOut }))
-        .filter(item => item.currentStock < (parseFloat(item.minStock || '5') || 5));
+        .filter(item => {
+          // 적정재고 값이 문자열 '0'이거나 숫자 0인 경우에도 5로 치환하지 않고 0을 그대로 사용함
+          const minStockStr = String(item.minStock || '').trim();
+          const threshold = minStockStr !== '' ? parseFloat(minStockStr) : 5;
+          return item.currentStock < threshold;
+        });
 
       const newItems: ConsumableRequestItem[] = [];
       SECTIONS.forEach(sec => {
@@ -297,7 +301,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             <Save size={18} className="mr-2" /> 서버저장
           </button>
 
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-slate-700 text-white rounded-xl font-bold shadow-md hover:bg-slate-800 transition-all text-[13px] active:scale-95">
+          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-800 transition-all text-[13px] active:scale-95">
             <Printer size={18} className="mr-2" /> 미리보기
           </button>
         </div>

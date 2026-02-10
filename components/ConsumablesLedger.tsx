@@ -85,6 +85,11 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return () => window.removeEventListener('message', handleMessage);
   }, [isPopupMode]);
 
+  // 탭 전환 시 검색어 초기화 로직 추가
+  useEffect(() => {
+    setSearchTerm('');
+  }, [viewMode]);
+
   useEffect(() => {
     if (items.length > 0) {
       if (editId) {
@@ -133,7 +138,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
 
   const openIndependentWindow = (id: string = 'new', initialData?: ConsumableItem) => {
     const width = 850;
-    const height = 650;
+    const height = 800; // 창 높이를 800px로 확대하여 스크롤 발생 억제
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -351,10 +356,6 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return pages;
   }, [currentPage, totalPages]);
 
-  const availableItemNames = Array.from(new Set(
-    items.filter(item => item.category === newItem.category).map(item => item.itemName.trim())
-  )).sort();
-
   const thClass = "border border-gray-300 p-2 bg-gray-50 text-center font-bold text-[12px] text-gray-700 h-10 align-middle uppercase";
 
   if (isPopupMode) {
@@ -395,8 +396,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">품명 *</label>
-                <input type="text" list="ledger-item-suggestions-popup" value={newItem.itemName} onChange={handleItemNameChange} placeholder="품명 입력/선택" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500" />
-                <datalist id="ledger-item-suggestions-popup">{availableItemNames.map((name, index) => <option key={index} value={name} />)}</datalist>
+                <input type="text" value={newItem.itemName} onChange={handleItemNameChange} placeholder="품명 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">모델명</label>
