@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
 import { fetchContractors, saveContractors, deleteContractor, generateUUID } from '../services/dataService';
@@ -302,7 +301,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             </button>
           </div>
 
-          <div className="p-8 space-y-6 flex-1 overflow-y-auto">
+          <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
             {/* 중요 업체 설정 토글 */}
             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex items-center justify-between">
                <div className="flex items-center gap-3">
@@ -475,7 +474,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
                 <button 
                   onClick={loadData} 
                   disabled={loading}
-                  className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+                  className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
                 >
                   <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
                   새로고침

@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -885,7 +884,7 @@ export const fetchGasLog = async (date: string): Promise<GasLogData | null> => {
 };
 
 export const saveGasLog = async (data: GasLogData): Promise<boolean> => {
-  const { error = null } = await supabase.from('gas_logs').upsert({ id: `GAS_LOG_${date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('gas_logs').upsert({ id: `GAS_LOG_${data.date}`, date: data.date, items: data.items, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -989,7 +988,7 @@ export const saveConsumableRequests = async (list: ConsumableRequest[]): Promise
 export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => {
   try {
     const { data } = await supabase.from('parking_changes').select('*').order('date', { ascending: false });
-    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, company: p.company, location: p.location, prevPlate: p.prev_plate, newPlate: p.new_plate, note: p.note }));
+    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, company: p.company, location: p.location, prev_plate: p.prev_plate, new_plate: p.new_plate, note: p.note }));
   } catch (e) {}
   return [];
 };
@@ -1009,8 +1008,8 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
       type: p.type, 
       location: p.location, 
       company: p.company, 
-      prevPlate: p.prev_plate, 
-      plateNum: p.plate_num,   
+      prev_plate: p.prev_plate, 
+      plate_num: p.plate_num,   
       note: p.note 
     }));
   } catch (e) {}
@@ -1242,11 +1241,6 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
   return null;
 };
 
-/**
- * Fix Type Errors: Property 'weather_condition', 'temp_min', 'temp_max' do not exist on type 'AirEnvironmentLogData'.
- * Updated to use camelCase properties from the AirEnvironmentLogData interface.
- * Fixed the "Cannot find name 'date'" error by properly referencing data.date from the function parameter.
- */
 export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promise<boolean> => {
   const { error = null } = await supabase.from('air_environment_logs').upsert({ 
     id: `AIR_ENV_${data.date}`, 
