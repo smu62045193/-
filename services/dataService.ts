@@ -1,5 +1,4 @@
 
-
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -473,7 +472,6 @@ export const getInitialElevatorLog = (date: string): ElevatorLogData => ({
     { id: 'elv_4', category: '운행상태', content: '카레벨상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
     { id: 'elv_5', category: '운행상태', content: '카운행상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
     { id: 'elv_6', category: '운행상태', content: '감시반이상유무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
-    // Fixed Type Error: Changed property '처리' to 'ev3' to match the results object definition.
     { id: 'elv_7', category: '운행상태', content: '기계실이상유무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' }
   ],
   remarks: '',
@@ -745,10 +743,6 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
 };
 
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
-  /**
-   * Fixed Type Error: Corrected property names from snake_case (facility_duty, etc.) 
-   * to camelCase (facilityDuty, etc.) to match the DailyData type definition.
-   */
   const { error } = await supabase.from('daily_reports').upsert({ 
     id: data.date, 
     facility_duty: data.facilityDuty, 
@@ -1219,7 +1213,6 @@ export const fetchSubstationLog = async (date: string, force = false): Promise<S
 };
 
 export const saveSubstationLog = async (data: SubstationLogData): Promise<boolean> => {
-  // Fixed Type Error: data.power_usage does not exist on SubstationLogData, changed to data.powerUsage.
   const { error = null } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
   return !error;
 };
@@ -1342,10 +1335,6 @@ export const saveWaterTankLog = async (data: WaterTankLogData): Promise<boolean>
 export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | null> => {
   try {
     const { data } = await supabase.from('chemical_logs').select('*').eq('id', `CHEM_LOG_${date}`).maybeSingle();
-    /**
-     * Fixed potential shadowing/undef error: Use 'date' parameter 
-     * if data.date is not explicitly guaranteed from the raw DB response.
-     */
     if (data) return { date: data.date || date, items: data.items };
   } catch (e) {}
   return null;
@@ -1365,9 +1354,9 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       type: item.type, 
       floor: item.floor, 
       company: item.company, 
-      serial_no: item.serial_no, 
+      serialNo: item.serial_no, 
       phone: item.phone, 
-      cert_no: item.cert_no, 
+      certNo: item.cert_no, 
       date: item.date, 
       remarks: item.remarks 
     }));
@@ -1394,10 +1383,6 @@ export const saveLinkedKeywords = async (type: string, keywords: string[]): Prom
   return !error;
 };
 
-/**
- * Fixed Type Error line 888 area: Renamed parameter to 'dateStr' to avoid confusion and 
- * ensured it is used correctly in the eq filter and return object.
- */
 export const fetchFireInspectionLog = async (dateStr: string): Promise<FireInspectionLogData | null> => {
   try {
     const { data } = await supabase.from('fire_inspection_logs').select('*').eq('id', `FIRE_INSP_${dateStr}`).maybeSingle();
@@ -1419,10 +1404,6 @@ export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
   return [];
 };
 
-/**
- * Fixed Type Error line 901 area: Renamed parameter to 'historyList' to follow naming 
- * standards and avoid any local name shadowing issues.
- */
 export const saveFireHistoryList = async (historyList: FireHistoryItem[]): Promise<boolean> => {
   const dbData = historyList.map(mapFireHistoryToDB);
   const { error = null } = await supabase.from('fire_inspection_history').upsert(dbData);

@@ -235,7 +235,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
           @page { size: A4 portrait; margin: 0; }
-          body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
+          body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; background: white !important; -webkit-print-color-adjust: exact; }
           .no-print { display: flex; justify-content: center; padding: 20px; }
           @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
           .print-page { 
@@ -285,146 +285,8 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-10 whitespace-nowrap";
   const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700 h-10 align-middle bg-white text-center";
 
-  if (isPopupMode) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
-          <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
-                <Briefcase size={20} />
-              </div>
-              <span className="font-black text-lg">{editId ? '업체 정보 수정' : '신규 업체 등록'}</span>
-            </div>
-            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
-              <X size={24} />
-            </button>
-          </div>
-
-          <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
-            {/* 중요 업체 설정 토글 */}
-            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex items-center justify-between">
-               <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-xl ${newItem.isImportant ? 'bg-amber-500 text-white' : 'bg-white text-amber-200'}`}>
-                    <Star size={20} fill={newItem.isImportant ? "currentColor" : "none"} />
-                  </div>
-                  <div>
-                    <span className="font-black text-amber-800">중요 협력업체로 지정</span>
-                    <p className="text-[10px] text-amber-600 font-bold">인쇄 시 '중요 협력업체 리스트'에 포함됩니다.</p>
-                  </div>
-               </div>
-               <button 
-                 onClick={() => setNewItem({...newItem, isImportant: !newItem.isImportant})}
-                 className={`w-14 h-7 rounded-full transition-all relative ${newItem.isImportant ? 'bg-amber-500' : 'bg-slate-300'}`}
-               >
-                 <div className={`absolute top-1 w-5 h-5 bg-white rounded-full transition-all ${newItem.isImportant ? 'left-8' : 'left-1'}`}></div>
-               </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명 *</label>
-                <input 
-                  type="text" 
-                  value={newItem.name} 
-                  onChange={e => setNewItem({...newItem, name: e.target.value})}
-                  placeholder="업체명"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업종</label>
-                <input 
-                  type="text" 
-                  value={newItem.type} 
-                  onChange={e => setNewItem({...newItem, type: e.target.value})}
-                  placeholder="예: 전기, 소방"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">담당자</label>
-                <input 
-                  type="text" 
-                  value={newItem.contactPerson} 
-                  onChange={e => setNewItem({...newItem, contactPerson: e.target.value})}
-                  placeholder="담당자 성명"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">대표번호</label>
-                <input 
-                  type="text" 
-                  value={newItem.phoneMain} 
-                  onChange={e => setNewItem({...newItem, phoneMain: e.target.value})}
-                  placeholder="02-..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">휴대폰</label>
-                <input 
-                  type="text" 
-                  value={newItem.phoneMobile} 
-                  onChange={e => setNewItem({...newItem, phoneMobile: e.target.value})}
-                  placeholder="010-..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">팩스</label>
-                <input 
-                  type="text" 
-                  value={newItem.fax} 
-                  onChange={e => setNewItem({...newItem, fax: e.target.value})}
-                  placeholder="02-..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고 및 특이사항</label>
-              <textarea 
-                value={newItem.note} 
-                onChange={e => setNewItem({...newItem, note: e.target.value})}
-                placeholder="특이사항 입력"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24"
-              />
-            </div>
-          </div>
-
-          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
-            <button 
-              onClick={() => window.close()}
-              className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95"
-            >
-              닫기
-            </button>
-            <button 
-              onClick={handleRegister} 
-              disabled={loading}
-              className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}
-            >
-              {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
-              서버에 데이터 저장
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in print:p-0">
-      {/* 1행: 제목 영역 (직원관리와 디자인 통일) */}
       <div className="mb-2 print:hidden">
         <h2 className="text-3xl font-black text-slate-800 flex items-center tracking-tight">
           <Briefcase className="mr-2 text-blue-600" size={32} />
@@ -433,7 +295,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
         <p className="text-slate-500 mt-2 text-base font-medium">협력업체 정보 및 연락처를 통합 관리합니다.</p>
       </div>
 
-      {/* 탭 네비게이션 (승강기점검과 디자인 통일) */}
       <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center print:hidden">
         <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
            <LayoutList size={22} />
@@ -453,11 +314,9 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
         ))}
       </div>
 
-      {/* 메인 콘텐츠 영역 (화이트 카드 스타일) */}
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
         {activeTab === 'status' && (
           <div className="p-6 space-y-6">
-            {/* 검색 및 버튼 툴바 (2행 구조) */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
               <div className="relative flex-1 md:w-80 w-full">
                 <input 
@@ -496,7 +355,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
               </div>
             </div>
 
-            {/* 테이블 영역 */}
             <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto">
               <table className="w-full min-w-[1000px] border-collapse">
                 <thead>
@@ -534,9 +392,9 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
                         <td className={tdClass}>{item.fax}</td>
                         <td className={tdClass}>{item.note}</td>
                         <td className={`${tdClass} text-center print:hidden`}>
-                          <div className="flex items-center justify-center space-x-1">
-                            <button onClick={() => openIndependentWindow(item.id)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
-                            <button onClick={() => handleDeleteDirect(item.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all shadow-sm border border-blue-100" title="수정"><Edit2 size={16} /></button>
+                            <button onClick={() => handleDeleteDirect(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all shadow-sm border border-red-100" title="삭제"><Trash2 size={16} /></button>
                           </div>
                         </td>
                       </tr>
@@ -545,7 +403,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
                 </tbody>
               </table>
 
-              {/* 페이지네이션 */}
               {totalPages > 1 && (
                 <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
                   <button
@@ -583,23 +440,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
           </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes scale-up {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-          animation: scale-up 0.2s ease-out forwards;
-        }
-        @keyframes fade-in {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.3s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 };

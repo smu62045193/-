@@ -339,7 +339,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
           <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
                 {editId ? <Edit2 size={24} /> : <Plus size={24} />}
               </div>
               <span className="font-black text-xl tracking-tight">{editId ? '소화기 정보 수정' : '신규 소화기 등록'}</span>
@@ -452,7 +452,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       </div>
 
       <div className="print:hidden flex items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-black text-gray-400 uppercase tracking-widest min-w-max"><Filter size={16} /> Filter by Floor:</div>
+        <div className="flex items-center gap-2 text-sm font-black text-gray-400 uppercase tracking-widest min-w-max"><Filter size={16} /></div>
         <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-hide pb-1">
           {filterButtons.map(f => (
             <button 
@@ -509,9 +509,9 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
                       <td className="px-3 py-4 text-[12px] text-blue-600 font-bold">{formatToYYMM(item.date || '')}</td>
                       <td className="px-3 py-4 text-[11px] text-slate-400 italic text-left pl-4 max-w-[150px] truncate">{item.remarks || '-'}</td>
                       <td className="px-3 py-4 print:hidden">
-                        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors" title="삭제"><Trash2 size={16} /></button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all shadow-sm border border-blue-100" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all shadow-sm border border-red-100" title="삭제"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
