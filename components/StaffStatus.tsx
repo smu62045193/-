@@ -1,8 +1,7 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { StaffMember } from '../types';
 import { fetchStaffList, saveStaffList, uploadFile, deleteStaffMember } from '../services/dataService';
-import { Save, Plus, Trash2, Search, ArrowLeft, Printer, Edit2, RotateCcw, UserPlus, Check, RefreshCw, Camera, User, Cloud, X, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Save, Plus, Trash2, Search, Printer, Edit2, RotateCcw, UserPlus, Check, RefreshCw, Camera, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface StaffStatusProps {
   staffList: StaffMember[];
@@ -11,25 +10,29 @@ interface StaffStatusProps {
   isPopupMode?: boolean;
 }
 
+const ITEMS_PER_PAGE = 10;
 const generateId = () => `staff_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
 const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBack, isPopupMode = false }) => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const initialFormState: StaffMember = { id: '', category: '시설', jobTitle: '', birthDate: '', joinDate: '', resignDate: '', name: '', phone: '', area: '', note: '', photo: '' };
   const [formItem, setFormItem] = useState<StaffMember>(initialFormState);
 
-  // 팝업 모드일 경우 데이터 로드 및 통신 로직 추가
   useEffect(() => {
     if (isPopupMode) {
       loadDataForPopup();
       const params = new URLSearchParams(window.location.search);
       const id = params.get('id');
       if (id && id !== 'new') setEditId(id);
+    } else {
+      loadDataForPopup();
     }
+    // Removed undefined 'currentMonth' from dependency array
   }, [isPopupMode]);
 
   useEffect(() => {
@@ -52,9 +55,8 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         const item = data.find(m => String(m.id) === String(id));
         if (item) setFormItem(item);
       }
-    } else {
-      setStaffList(data || []);
     }
+    setStaffList(data || []);
     setLoading(false);
   };
 
@@ -131,13 +133,10 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
           window.opener.postMessage({ type: 'STAFF_SAVED' }, '*');
         }
         alert('성공적으로 저장되었습니다.'); 
-        
-        if (!editId) {
-          setFormItem(initialFormState);
-        }
+        if (!editId) setFormItem(initialFormState);
         loadDataForPopup(); 
       } else {
-        alert('서버 저장에 실패했습니다. 날짜 형식을 확인해주세요.');
+        alert('서버 저장에 실패했습니다.');
       }
     } catch (e) { 
       console.error(e);
@@ -148,9 +147,9 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
   };
 
   const handleDeleteDirect = async (id: string) => {
+    if (!confirm('해당 직원 정보를 영구적으로 삭제하시겠습니까?')) return;
     setLoading(true);
     try {
-      // Upsert 방식이 아닌 직접적인 DELETE 함수 호출
       const success = await deleteStaffMember(id);
       if (success) {
         setStaffList(prev => prev.filter(m => String(m.id) !== String(id)));
@@ -171,7 +170,6 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     const base = catOrder[m.category] || 900;
     const title = m.jobTitle || '';
     let sub = 99;
-    
     if (m.category === '현장대리인') {
       if (title.includes('소장')) sub = 1;
       else if (title.includes('과장')) sub = 2;
@@ -189,21 +187,37 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     return base + sub;
   };
 
-  const filteredAndSortedList = staffList
-    .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.area.toLowerCase().includes(searchTerm.toLowerCase()))
-    .sort((a, b) => {
-      const rankA = getRank(a);
-      const rankB = getRank(b);
-      if (rankA !== rankB) return rankA - rankB;
-      return a.name.localeCompare(b.name);
-    });
+  const filteredAndSortedList = useMemo(() => {
+    return staffList
+      .filter(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()) || m.area.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => {
+        const rankA = getRank(a);
+        const rankB = getRank(b);
+        if (rankA !== rankB) return rankA - rankB;
+        return a.name.localeCompare(b.name);
+      });
+  }, [staffList, searchTerm]);
+
+  const totalPages = Math.ceil(filteredAndSortedList.length / ITEMS_PER_PAGE);
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredAndSortedList.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredAndSortedList, currentPage]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    return pages;
+  }, [currentPage, totalPages]);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
     if (!printWindow) return;
-
     const activeStaffForPrint = filteredAndSortedList.filter(m => !m.resignDate || m.resignDate.trim() === '');
-
     const tableRows = activeStaffForPrint.map((m, i) => `
       <tr>
         <td>${i+1}</td>
@@ -215,7 +229,6 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         <td>${m.joinDate || ''}</td>
         <td>${m.area || ''}</td>
       </tr>`).join('');
-
     printWindow.document.write(`
       <html><head><title>직원 현황</title><style>
         @page { size: A4 portrait; margin: 0; }
@@ -232,18 +245,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         <div class="print-page">
           <h1>직원 현황 리스트</h1>
           <table>
-            <thead>
-              <tr>
-                <th style="width:30px;">No</th>
-                <th style="width:70px;">구분</th>
-                <th style="width:60px;">직책</th>
-                <th style="width:60px;">성명</th>
-                <th style="width:85px;">생년월일</th>
-                <th style="width:110px;">전화번호</th>
-                <th style="width:85px;">입사일</th>
-                <th>담당구역</th>
-              </tr>
-            </thead>
+            <thead><tr><th style="width:30px;">No</th><th style="width:70px;">구분</th><th style="width:60px;">직책</th><th style="width:60px;">성명</th><th style="width:85px;">생년월일</th><th style="width:110px;">전화번호</th><th style="width:85px;">입사일</th><th>담당구역</th></tr></thead>
             <tbody>${tableRows}</tbody>
           </table>
         </div>
@@ -262,12 +264,12 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
               </div>
               <span className="font-black text-lg">{editId ? '직원 정보 수정' : '신규 직원 등록'}</span>
             </div>
-            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
               <X size={24} />
             </button>
           </div>
 
-          <div className="p-8 space-y-6 flex-1 overflow-y-auto">
+          <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
             <div className="flex flex-col md:flex-row gap-8">
               <div className="flex flex-col items-center">
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">직원 사진</label>
@@ -344,82 +346,125 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
   }
 
   return (
-    <div className="animate-fade-in relative">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm print:hidden mb-6">
-        <div className="flex items-center space-x-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-64">
-            <input type="text" placeholder="성명 또는 담당구역 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 shadow-inner" />
-            <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] animate-fade-in">
+      <div className="p-6 space-y-6">
+        {/* 작은박스 1: 툴바 영역 */}
+        <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-200 gap-4 print:hidden">
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 md:w-72">
+              <input 
+                type="text" 
+                placeholder="성명 또는 담당구역 검색" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" 
+              />
+              <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <button 
+              onClick={() => loadDataForPopup()}
+              disabled={loading}
+              className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+            >
+              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </button>
+            <button onClick={() => openIndependentWindow()} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95">
+              <UserPlus size={18} /> 신규 직원 등록
+            </button>
+            <button onClick={handlePrint} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-700 text-white px-5 py-2.5 rounded-xl hover:bg-gray-800 transition-all shadow-md text-sm font-black active:scale-95">
+              <Printer size={18} /> 미리보기
+            </button>
           </div>
         </div>
-        <div className="flex items-center space-x-2 w-full md:w-auto justify-end">
-          <button 
-            onClick={() => loadDataForPopup()}
-            disabled={loading}
-            className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-          <button onClick={() => openIndependentWindow()} className="flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95">
-            <UserPlus size={18} /> 신규 직원 등록
-          </button>
-          <button onClick={handlePrint} className="flex items-center gap-2 bg-slate-700 text-white px-5 py-2.5 rounded-xl hover:bg-slate-800 transition-all shadow-md text-sm font-black active:scale-95">
-            <Printer size={18} /> 미리보기
-          </button>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* 작은박스 2: 리스트 영역 */}
+        <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto">
           <table className="w-full border-collapse">
-            <thead className="bg-gray-50/80 border-b border-gray-200">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-24">구분</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-24">직책</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-24">성명</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-32">생년월일</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-32">전화번호</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-28">입사일</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-28">퇴사일</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider text-left">담당구역</th>
-                <th className="px-4 py-4 text-sm font-bold text-gray-500 uppercase tracking-wider w-24 print:hidden">관리</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">구분</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">직책</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">성명</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">생년월일</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">전화번호</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28">입사일</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28">퇴사일</th>
+                <th className="px-4 py-3 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">담당구역</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28 print:hidden">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredAndSortedList.length === 0 ? (
-                <tr><td colSpan={10} className="py-20 text-center text-gray-400 italic">등록된 직원이 없습니다.</td></tr>
+              {loading && paginatedList.length === 0 ? (
+                <tr><td colSpan={10} className="py-24 text-center"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
+              ) : filteredAndSortedList.length === 0 ? (
+                <tr><td colSpan={10} className="py-24 text-center text-gray-400 italic text-sm">등록된 직원이 없습니다.</td></tr>
               ) : (
-                filteredAndSortedList.map((m, idx) => (
-                  <tr key={m.id} className="hover:bg-blue-50/40 transition-colors group text-center">
-                    <td className="px-4 py-4 text-xs text-gray-400 font-mono">{idx + 1}</td>
-                    <td className="px-4 py-4 font-black text-blue-600 text-sm">{m.category}</td>
-                    <td className="px-4 py-4 text-sm font-medium text-slate-600">{m.jobTitle}</td>
-                    <td className="px-4 py-4 text-sm font-black text-slate-900">{m.name}</td>
-                    <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.birthDate || '-'}</td>
-                    <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.phone}</td>
-                    <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.joinDate || '-'}</td>
-                    <td className="px-4 py-4 text-sm text-rose-500 font-bold">{m.resignDate || '-'}</td>
-                    <td className="px-4 py-4 text-sm text-left text-slate-600">{m.area}</td>
-                    <td className="px-4 py-4 print:hidden">
-                      <div className="flex justify-center gap-1">
-                        <button onClick={() => openIndependentWindow(m.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                        <button onClick={() => handleDeleteDirect(m.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                paginatedList.map((m, idx) => {
+                  const globalIdx = filteredAndSortedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
+                  return (
+                    <tr key={m.id} className="hover:bg-blue-50/30 transition-colors group text-center">
+                      <td className="px-4 py-4 text-xs text-gray-400 font-mono">{globalIdx}</td>
+                      <td className="px-4 py-4 font-black text-blue-600 text-sm">{m.category}</td>
+                      <td className="px-4 py-4 text-sm font-medium text-slate-600">{m.jobTitle}</td>
+                      <td className="px-4 py-4 text-sm font-black text-slate-900">{m.name}</td>
+                      <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.birthDate || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.phone}</td>
+                      <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.joinDate || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-rose-500 font-bold">{m.resignDate || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-left text-slate-600">{m.area}</td>
+                      <td className="px-4 py-4 print:hidden">
+                        <div className="flex justify-center gap-1">
+                          <button onClick={() => openIndependentWindow(m.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDeleteDirect(m.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
+          
+          {/* 페이지네이션 (두 번째 작은 박스 하단에 위치) */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <div className="flex items-center gap-1.5 px-4">
+                {visiblePageNumbers.map(pageNum => (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                      currentPage === pageNum
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                        : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-500'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        .animate-scale-up { animation: scale-up 0.2s ease-out forwards; }
-      `}</style>
     </div>
   );
 };
