@@ -302,7 +302,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             </button>
           </div>
 
-          <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
+          <div className="p-8 space-y-6 flex-1 overflow-y-auto">
             {/* 중요 업체 설정 토글 */}
             <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 flex items-center justify-between">
                <div className="flex items-center gap-3">
