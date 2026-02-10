@@ -10,7 +10,7 @@ import {
   deleteConstructionWorkItem,
   generateUUID
 } from '../services/dataService';
-import { Save, Plus, Trash2, Upload, Download, Image as ImageIcon, RotateCcw, RefreshCw, Search, Edit2, Cloud, X, CheckCircle, AlertTriangle, HardHat } from 'lucide-react';
+import { Save, Plus, Trash2, Upload, Download, Image as ImageIcon, RotateCcw, RefreshCw, Search, Edit2, Cloud, X, CheckCircle, AlertTriangle, HardHat, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ConstructionLogProps {
   mode: 'external' | 'internal';
@@ -19,6 +19,8 @@ interface ConstructionLogProps {
 
 type WorkSource = 'external' | 'internal';
 type WorkItemWithSource = ConstructionWorkItem & { source: WorkSource };
+
+const ITEMS_PER_PAGE = 10;
 
 const formatImageUrl = (url: string) => {
   if (!url) return '';
@@ -51,6 +53,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
   const [items, setItems] = useState<WorkItemWithSource[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   
   const [currentMode, setCurrentMode] = useState<WorkSource>(mode);
   const [currentItem, setCurrentItem] = useState<WorkItemWithSource>({
@@ -100,6 +103,11 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [mode, isPopupMode]);
+
+  // 검색어나 모드 변경 시 페이지 초기화
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, mode]);
 
   const loadData = async () => {
     if (isPopupMode) return;
@@ -264,6 +272,24 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
     );
   }, [items, searchTerm]);
 
+  // 페이지네이션 계산
+  const totalItems = filteredItems.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredItems, currentPage]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);
+    return pages;
+  }, [currentPage, totalPages]);
+
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -369,19 +395,19 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
           <button 
-            onClick={() => openIndependentWindow()} 
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm flex-1 md:flex-none active:scale-95"
-          >
-            <Plus size={18} />
-            작업 등록
-          </button>
-          <button 
             onClick={loadData} 
             disabled={loading}
             className="flex-1 md:flex-none flex items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
             <span>새로고침</span>
+          </button>
+          <button 
+            onClick={() => openIndependentWindow()} 
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm flex-1 md:flex-none active:scale-95"
+          >
+            <Plus size={18} />
+            작업 등록
           </button>
         </div>
       </div>
@@ -401,38 +427,88 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredItems.length === 0 ? (
+              {paginatedItems.length === 0 ? (
                 <tr>
                   <td colSpan={mode === 'external' ? 7 : 6} className="px-4 py-20 text-center text-gray-400 italic text-sm">
                     등록된 {mode === 'external' ? '외부업체' : '시설직'} 내역이 없습니다.
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((item, idx) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{filteredItems.length - idx}</td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-700">{item.date}</td>
-                    <td className="px-4 py-3 text-center text-sm font-bold text-blue-600">{item.category}</td>
-                    {mode === 'external' && <td className="px-4 py-3 text-sm text-gray-800">{item.company || '-'}</td>}
-                    <td className="px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">{item.content}</td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1 text-blue-500 font-bold text-xs">
-                        <ImageIcon size={14} />
-                        {item.photos.length}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center space-x-2">
-                        <button onClick={() => openIndependentWindow(String(item.id))} className="text-blue-500 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
-                        <button onClick={(e) => handleDelete(e, item)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                paginatedItems.map((item, idx) => {
+                  const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{globalIdx}</td>
+                      <td className="px-4 py-3 text-center text-sm text-gray-700">{item.date}</td>
+                      <td className="px-4 py-3 text-center">
+                         <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px]">{item.category}</span>
+                      </td>
+                      {mode === 'external' && <td className="px-4 py-3 text-sm font-bold text-gray-800">{item.company || '-'}</td>}
+                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">{item.content}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1 text-blue-500 font-bold text-xs">
+                          <ImageIcon size={14} />
+                          {item.photos.length}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center space-x-2">
+                          <button onClick={() => openIndependentWindow(String(item.id))} className="text-blue-500 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={(e) => handleDelete(e, item)} className="text-red-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+
+        {/* 페이지네이션 UI */}
+        {!loading && totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className={`p-2 rounded-lg border transition-all ${
+                currentPage === 1 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
+              }`}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            
+            <div className="flex items-center gap-1 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className={`p-2 rounded-lg border transition-all ${
+                currentPage === totalPages 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
+              }`}
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

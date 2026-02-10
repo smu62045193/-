@@ -58,6 +58,11 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
     }
   }, [editId, contractors]);
 
+  // 검색 시 페이지 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -138,8 +143,19 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
       .sort((a, b) => b.type.localeCompare(a.type)); 
   }, [contractors, searchTerm]);
 
-  const totalPages = Math.ceil(filteredList.length / ITEMS_PER_PAGE);
+  const totalItems = filteredList.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
   const paginatedList = useMemo(() => filteredList.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE), [filteredList, currentPage]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);
+    return pages;
+  }, [currentPage, totalPages]);
 
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center text-sm text-gray-700 h-10 whitespace-nowrap";
   const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700 h-10 align-middle bg-white text-center";
@@ -240,50 +256,89 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-300 overflow-x-auto scrollbar-hide shadow-sm">
-        <table className="w-full min-w-[1000px] border-collapse">
-          <thead>
-            <tr>
-              <th className={thClass} style={{ width: '60px' }}>No</th>
-              <th className={thClass} style={{ width: '120px' }}>날짜</th>
-              <th className={thClass} style={{ width: '180px' }}>업체명</th>
-              <th className={thClass} style={{ width: '100px' }}>담당자</th>
-              <th className={thClass} style={{ width: '130px' }}>대표번호</th>
-              <th className={thClass} style={{ width: '130px' }}>휴대폰</th>
-              <th className={thClass}>비고</th>
-              <th className={thClass} style={{ width: '100px' }}>관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredList.length === 0 ? (
-              <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic">등록된 업체가 없습니다.</td></tr>
-            ) : (
-              paginatedList.map((item, index) => (
-                <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className={tdClass}>{filteredList.length - ((currentPage-1)*ITEMS_PER_PAGE + index)}</td>
-                  <td className={`${tdClass} font-bold text-blue-600`}>{item.type}</td>
-                  <td className={`${tdClass} font-bold`}>{item.name}</td>
-                  <td className={tdClass}>{item.contactPerson}</td>
-                  <td className={tdClass}>{item.phoneMain}</td>
-                  <td className={tdClass}>{item.phoneMobile}</td>
-                  <td className={`${tdClass} text-left px-4 font-medium text-gray-600`}>{item.note}</td>
-                  <td className={tdClass}>
-                    <div className="flex justify-center gap-1">
-                      <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="수정"><Edit2 size={16}/></button>
-                      <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="삭제"><Trash2 size={16}/></button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[1000px] border-collapse">
+            <thead>
+              <tr>
+                <th className={thClass} style={{ width: '60px' }}>No</th>
+                <th className={thClass} style={{ width: '120px' }}>날짜</th>
+                <th className={thClass} style={{ width: '180px' }}>업체명</th>
+                <th className={thClass} style={{ width: '100px' }}>담당자</th>
+                <th className={thClass} style={{ width: '130px' }}>대표번호</th>
+                <th className={thClass} style={{ width: '130px' }}>휴대폰</th>
+                <th className={thClass}>비고</th>
+                <th className={thClass} style={{ width: '100px' }}>관리</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {paginatedList.length === 0 ? (
+                <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic">등록된 업체가 없습니다.</td></tr>
+              ) : (
+                paginatedList.map((item, index) => (
+                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className={tdClass}>{totalItems - ((currentPage-1)*ITEMS_PER_PAGE + index)}</td>
+                    <td className={`${tdClass} font-bold text-blue-600`}>{item.type}</td>
+                    <td className={`${tdClass} font-bold`}>{item.name}</td>
+                    <td className={tdClass}>{item.contactPerson}</td>
+                    <td className={tdClass}>{item.phoneMain}</td>
+                    <td className={tdClass}>{item.phoneMobile}</td>
+                    <td className={`${tdClass} text-left px-4 font-medium text-gray-600`}>{item.note}</td>
+                    <td className={tdClass}>
+                      <div className="flex justify-center gap-1">
+                        <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="수정"><Edit2 size={16}/></button>
+                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="삭제"><Trash2 size={16}/></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        {totalPages > 1 && (
+        {/* 페이지네이션 UI - 번호형으로 개선 */}
+        {!loading && totalPages > 1 && (
           <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-2 rounded-xl border bg-white disabled:opacity-30"><ChevronLeft size={18} /></button>
-            <span className="text-sm font-bold text-gray-600 px-4">{currentPage} / {totalPages}</span>
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-2 rounded-xl border bg-white disabled:opacity-30"><ChevronRight size={18} /></button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className={`p-2 rounded-lg border transition-all ${
+                currentPage === 1 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
+              }`}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            
+            <div className="flex items-center gap-1 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className={`p-2 rounded-lg border transition-all ${
+                currentPage === totalPages 
+                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
+                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
+              }`}
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
         )}
       </div>
