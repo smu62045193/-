@@ -331,7 +331,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
             <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
-            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
@@ -411,12 +411,12 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
               <thead>
                 <tr>
                   <th className={thClass} style={{ width: '50px' }}>No</th>
-                  <th className={thClass} style={{ width: '100px' }}>업종</th>
+                  <th className={thClass} style={{ width: '70px' }}>업종</th>
                   <th className={thClass} style={{ width: '180px' }}>업체명</th>
-                  <th className={thClass} style={{ width: '100px' }}>담당자</th>
-                  <th className={thClass} style={{ width: '130px' }}>대표번호</th>
-                  <th className={thClass} style={{ width: '130px' }}>휴대폰</th>
-                  <th className={thClass} style={{ width: '130px' }}>팩스</th>
+                  <th className={thClass} style={{ width: '80px' }}>담당자</th>
+                  <th className={thClass} style={{ width: '110px' }}>대표번호</th>
+                  <th className={thClass} style={{ width: '110px' }}>휴대폰</th>
+                  <th className={thClass} style={{ width: '110px' }}>팩스</th>
                   <th className={thClass}>비고</th>
                   <th className={`${thClass} w-24 print:hidden`}>관리</th>
                 </tr>
@@ -453,15 +453,38 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
                 )}
               </tbody>
             </table>
-
-            {totalPages > 1 && (
-              <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-                <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"><ChevronLeft size={18} /></button>
-                <div className="flex items-center gap-1.5 px-4">{visiblePageNumbers.map(pageNum => (<button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>{pageNum}</button>))}</div>
-                <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"><ChevronRight size={18} /></button>
-              </div>
-            )}
           </div>
+
+          {/* 페이지네이션 UI를 박스 외부로 이동 */}
+          {totalPages > 1 && (
+            <div className="py-4 flex items-center justify-center gap-2 print:hidden">
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+                disabled={currentPage === 1} 
+                className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <div className="flex items-center gap-1.5 px-4">
+                {visiblePageNumbers.map(pageNum => (
+                  <button 
+                    key={pageNum} 
+                    onClick={() => setCurrentPage(pageNum)} 
+                    className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+                disabled={currentPage === totalPages} 
+                className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -471,7 +494,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             <div className="p-8 text-center">
               <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100"><Cloud className="text-blue-600" size={36} /></div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">협력업체 데이터를<br/>서버에 안전하게 기록하시겠습니까?</p>
+              <p className="text-slate-500 mb-8 leading-relaxed font-medium">협력업체 데이터를<br/>서버에 안전하게 기록하시습니까?</p>
               <div className="flex gap-3">
                 <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
                 <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
