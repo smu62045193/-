@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -14,7 +13,10 @@ import ContractorManager from './components/ContractorManager';
 import ElecCheckManager from './components/ElecCheckManager';
 import MechCheckManager from './components/MechCheckManager';
 import FireCheckManager from './components/FireCheckManager';
+import FireHistoryList from './components/FireHistoryList';
+import FireExtinguisherCheck from './components/FireExtinguisherCheck';
 import ElevatorCheckManager from './components/ElevatorCheckManager';
+import ElevatorInspectionList from './components/ElevatorInspectionList';
 import ConstructionManager from './components/ConstructionManager';
 import ConstructionLog from './components/ConstructionLog';
 import ConstructionContractorManager from './components/ConstructionContractorManager';
@@ -26,7 +28,7 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -44,6 +46,12 @@ const App: React.FC = () => {
       setIsPopupMode('construction_contractor');
     } else if (popupType === 'construction_log') {
       setIsPopupMode('construction_log');
+    } else if (popupType === 'elevator_contractor') {
+      setIsPopupMode('elevator_contractor');
+    } else if (popupType === 'fire_contractor') {
+      setIsPopupMode('fire_contractor');
+    } else if (popupType === 'fire_extinguisher') {
+      setIsPopupMode('fire_extinguisher');
     }
   }, []);
 
@@ -75,6 +83,18 @@ const App: React.FC = () => {
 
   if (isPopupMode === 'construction_log') {
     return <ConstructionLog mode="external" isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'elevator_contractor') {
+    return <ElevatorInspectionList isKeywordPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'fire_contractor') {
+    return <FireHistoryList isKeywordPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'fire_extinguisher') {
+    return <FireExtinguisherCheck isPopupMode={true} />;
   }
 
   const renderContent = () => {

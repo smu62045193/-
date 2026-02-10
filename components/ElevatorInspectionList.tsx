@@ -1,23 +1,36 @@
-
 import React, { useState, useEffect } from 'react';
 import { ElevatorInspectionItem, DailyData, LogCategory } from '../types';
 import { fetchElevatorInspectionList, saveElevatorInspectionList, apiFetchRange, fetchLinkedKeywords, saveLinkedKeywords } from '../services/dataService';
 import { RefreshCw, Search, Link, Plus, Trash2, X, Save, AlertCircle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
-const ElevatorInspectionList: React.FC = () => {
+interface ElevatorInspectionListProps {
+  isKeywordPopupMode?: boolean;
+}
+
+const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywordPopupMode = false }) => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<ElevatorInspectionItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isKeywordModalOpen, setIsKeywordModalOpen] = useState(false);
   const [keywords, setKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   useEffect(() => {
-    loadData();
+    if (!isKeywordPopupMode) {
+      loadData();
+    }
     loadKeywords();
-  }, []);
+
+    // 팝업 창으로부터 저장 완료 메시지를 받았을 때 데이터 새로고침
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'ELEVATOR_KEYWORDS_SAVED') {
+        loadKeywords();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isKeywordPopupMode]);
 
   const loadData = async () => {
     setLoading(true);
@@ -32,6 +45,22 @@ const ElevatorInspectionList: React.FC = () => {
   };
 
   const normalize = (text: string) => (text || '').replace(/[\s()\-]/g, '').toUpperCase();
+
+  const openIndependentWindow = () => {
+    const width = 500;
+    const height = 600;
+    const left = (window.screen.width / 2) - (width / 2);
+    const top = (window.screen.height / 2) - (height / 2);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('popup', 'elevator_contractor');
+
+    window.open(
+      url.toString(),
+      `ElevatorKeywordWin`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
+    );
+  };
 
   const handleRefresh = async () => {
     if (keywords.length === 0) {
@@ -59,23 +88,16 @@ const ElevatorInspectionList: React.FC = () => {
           
           if (keywordIdx !== -1) {
             const matchedKeyword = keywords[keywordIdx];
-            
-            // 텍스트 청소 로직: 등록된 업체명을 괄호 포함하여 제거
             let cleanContent = task.content;
-            
-            // 정규표현식 특수문자 이스케이프
             const escapedK = matchedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            
             const cleaningPatterns = [
               new RegExp(`\\s?\\(${escapedK}\\)`, 'gi'),
               new RegExp(`\\(${escapedK}\\)`, 'gi'),
               new RegExp(`\\s?${escapedK}`, 'gi')
             ];
-            
             cleaningPatterns.forEach(pattern => {
               cleanContent = cleanContent.replace(pattern, '');
             });
-            
             cleanContent = cleanContent.trim();
 
             const exists = items.some(item => item.date === dateKey && normalize(item.content) === normalize(cleanContent));
@@ -86,7 +108,7 @@ const ElevatorInspectionList: React.FC = () => {
                 date: dateKey,
                 company: matchedKeyword,
                 content: cleanContent,
-                note: '' // 비고란 비움
+                note: ''
               });
             }
           }
@@ -118,11 +140,13 @@ const ElevatorInspectionList: React.FC = () => {
     const success = await saveLinkedKeywords('elevator', keywords);
     if (success) {
       setSaveStatus('saved');
-      // 2초 후 상태 복원 및 모달 닫기
-      setTimeout(() => {
-        setSaveStatus('idle');
-        setIsKeywordModalOpen(false);
-      }, 2000);
+      if (window.opener) {
+        window.opener.postMessage({ type: 'ELEVATOR_KEYWORDS_SAVED' }, '*');
+      }
+      alert('업체 목록이 저장되었습니다.');
+      if (isKeywordPopupMode) {
+        window.close();
+      }
     } else {
       setSaveStatus('idle');
       alert('업체 목록 저장에 실패했습니다.');
@@ -146,9 +170,106 @@ const ElevatorInspectionList: React.FC = () => {
     (item.date || '').includes(searchTerm)
   );
 
+  // 팝업 모드일 때 렌더링할 UI
+  if (isKeywordPopupMode) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col">
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-600 rounded-xl">
+                <Link size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black tracking-tight">자동 연동 업체 관리</h3>
+                <p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Elevator Contractor Setup</p>
+              </div>
+            </div>
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+              <X size={24} />
+            </button>
+          </div>
+          
+          <div className="p-6 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
+            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+              <p className="text-xs text-blue-800 leading-relaxed font-bold">
+                업무일지에 입력되는 업체명을 등록하세요.<br/>
+                <span className="text-blue-600 underline">공백, 괄호 등은 자동으로 무시하고 연동됩니다.</span>
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">New Contractor Name</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={newKeyword}
+                  onChange={(e) => setNewKeyword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
+                  placeholder="예: 현대엘리베이터, 오티스"
+                  className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold shadow-inner"
+                />
+                <button 
+                  onClick={addKeyword}
+                  className="px-6 py-3 bg-slate-800 text-white rounded-xl font-black hover:bg-black transition-all active:scale-95 shadow-md"
+                >
+                  추가
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Registered List</label>
+              <div className="min-h-[200px] border-2 border-dashed border-slate-200 rounded-2xl p-4 bg-slate-50/50">
+                {keywords.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-slate-300">
+                    <AlertCircle size={32} className="mb-2 opacity-20" />
+                    <p className="text-xs font-bold italic">등록된 업체가 없습니다.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {keywords.map(k => (
+                      <span key={k} className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-black shadow-sm group hover:border-red-200 transition-all">
+                        {k}
+                        <button onClick={() => removeKeyword(k)} className="text-slate-300 hover:text-red-500 transition-colors">
+                          <X size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3">
+            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all active:scale-95">취소</button>
+            <button 
+              onClick={handleSaveKeywords} 
+              disabled={saveStatus !== 'idle'}
+              className={`flex-[2] py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
+                saveStatus === 'saving' ? 'bg-blue-400 text-white cursor-wait' : 
+                saveStatus === 'saved' ? 'bg-emerald-600 text-white shadow-emerald-100' : 
+                'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
+              }`}
+            >
+              {saveStatus === 'saving' ? (
+                <><RefreshCw size={18} className="animate-spin" /> 저장 중...</>
+              ) : saveStatus === 'saved' ? (
+                <><CheckCircle size={18} /> 저장 완료</>
+              ) : (
+                <><Save size={18} /> 설정 저장 후 닫기</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 메인 리스트 뷰 렌더링
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-4 animate-fade-in">
-      {/* Toolbar - 한 행으로 구성 */}
       <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-72">
@@ -157,7 +278,7 @@ const ElevatorInspectionList: React.FC = () => {
               placeholder="업체, 내용, 날짜 검색" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner font-bold"
             />
             <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
           </div>
@@ -170,10 +291,10 @@ const ElevatorInspectionList: React.FC = () => {
             className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
+            데이터 연동하기
           </button>
           <button 
-            onClick={() => setIsKeywordModalOpen(true)}
+            onClick={openIndependentWindow}
             className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm active:scale-95"
           >
             <Link size={18} className="mr-2" />
@@ -182,32 +303,31 @@ const ElevatorInspectionList: React.FC = () => {
         </div>
       </div>
 
-      {/* List Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">날짜</th>
-                <th className="px-4 py-3 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-48">업체</th>
-                <th className="px-4 py-3 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">내용</th>
-                <th className="px-4 py-3 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-32">비고</th>
+                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
+                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">날짜</th>
+                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-48">업체</th>
+                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">내용</th>
+                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-32">비고</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading && items.length === 0 ? (
                 <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">로딩 중...</td></tr>
               ) : filteredItems.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">데이터가 없습니다. [새로고침]을 눌러 연동하세요.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">데이터가 없습니다. [데이터 연동하기]를 눌러 가져오세요.</td></tr>
               ) : (
                 filteredItems.map((item, index) => (
                   <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{filteredItems.length - index}</td>
-                    <td className="px-4 py-3 text-center text-sm text-gray-700 font-bold whitespace-nowrap">{item.date}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 font-black">{item.company}</td>
-                    <td className="px-4 py-3 text-sm text-gray-700">{item.content}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{filteredItems.length - index}</td>
+                    <td className="px-4 py-4 text-center text-sm text-gray-700 font-bold whitespace-nowrap">{item.date}</td>
+                    <td className="px-4 py-4 text-sm text-gray-900 font-black">{item.company}</td>
+                    <td className="px-4 py-4 text-sm text-gray-700">{item.content}</td>
+                    <td className="px-4 py-4 text-center">
                       <span className="text-[11px] font-bold text-gray-400">
                         {item.note || '-'}
                       </span>
@@ -219,83 +339,6 @@ const ElevatorInspectionList: React.FC = () => {
           </table>
         </div>
       </div>
-
-      {/* Keyword Modal */}
-      {isKeywordModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
-            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-              <div className="flex items-center gap-2">
-                <Link className="text-blue-600" size={20} />
-                <h3 className="text-lg font-black text-slate-800">자동 연동 업체 관리</h3>
-              </div>
-              <button onClick={() => setIsKeywordModalOpen(false)} className="p-1 hover:bg-gray-200 rounded-full text-gray-400 transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-500 leading-relaxed font-medium">
-                업무일지에 입력되는 업체명을 등록하세요.<br/>
-                <span className="text-blue-600 font-bold">공백, 괄호 등은 자동으로 무시하고 연동됩니다.</span>
-              </p>
-              
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={newKeyword}
-                  onChange={(e) => setNewKeyword(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
-                  placeholder="예: OTIS, 현대엘리베이터"
-                  className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-                <button 
-                  onClick={addKeyword}
-                  className="px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
-                >
-                  추가
-                </button>
-              </div>
-
-              <div className="max-h-[200px] overflow-y-auto border border-gray-100 rounded-xl p-2 bg-slate-50/50">
-                {keywords.length === 0 ? (
-                  <p className="text-center py-8 text-xs text-gray-400 italic">등록된 업체가 없습니다.</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {keywords.map(k => (
-                      <span key={k} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-200 text-blue-700 rounded-lg text-xs font-bold shadow-sm">
-                        {k}
-                        <button onClick={() => removeKeyword(k)} className="hover:text-red-500"><Trash2 size={12} /></button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="p-4 bg-gray-50 flex gap-3">
-              <button onClick={() => setIsKeywordModalOpen(false)} className="flex-1 px-4 py-3 bg-white border border-gray-300 text-slate-600 rounded-2xl font-bold hover:bg-gray-100 transition-all">취소</button>
-              <button 
-                onClick={handleSaveKeywords} 
-                disabled={saveStatus !== 'idle'}
-                className={`flex-1 px-4 py-3 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 shadow-lg ${
-                  saveStatus === 'saving' ? 'bg-blue-400 text-white cursor-wait' : 
-                  saveStatus === 'saved' ? 'bg-emerald-600 text-white shadow-emerald-100' : 
-                  'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
-                }`}
-              >
-                {saveStatus === 'saving' ? (
-                  <><RefreshCw size={18} className="animate-spin" /> 서버저장중...</>
-                ) : saveStatus === 'saved' ? (
-                  <><CheckCircle size={18} /> 서버저장완료</>
-                ) : (
-                  <><Save size={18} /> 서버저장</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

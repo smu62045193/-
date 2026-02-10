@@ -1,20 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { fetchParkingChangeList } from '../services/dataService';
 import { ParkingChangeItem } from '../types';
-import { RefreshCw, Search, History, Printer, Car } from 'lucide-react';
+import { RefreshCw, Search, History, Printer, Car, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ParkingInspectionHistoryProps {
   onSelect: () => void;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onSelect }) => {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<ParkingChangeItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     loadHistory();
   }, []);
+
+  // 검색어나 데이터 길이가 변경되면 페이지를 1로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, history.length]);
 
   const loadHistory = async () => {
     setLoading(true);
@@ -92,12 +100,31 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
     printWindow.document.close();
   };
 
-  const filteredHistory = history.filter(item => 
-    item.company.includes(searchTerm) || 
-    item.location.includes(searchTerm) || 
-    item.newPlate.includes(searchTerm) ||
-    item.date.includes(searchTerm)
-  );
+  const filteredHistory = useMemo(() => {
+    return history.filter(item => 
+      item.company.includes(searchTerm) || 
+      item.location.includes(searchTerm) || 
+      item.newPlate.includes(searchTerm) ||
+      item.date.includes(searchTerm)
+    );
+  }, [history, searchTerm]);
+
+  // 페이지네이션 처리
+  const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+  const paginatedHistory = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredHistory.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredHistory, currentPage]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);
+    return pages;
+  }, [currentPage, totalPages]);
 
   return (
     <div className="p-6 space-y-4 animate-fade-in pb-10">
@@ -124,10 +151,11 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
           </div>
           <button 
             onClick={loadHistory}
-            className="p-2.5 hover:bg-gray-100 rounded-xl transition-all text-gray-500 border border-gray-200 bg-white shadow-sm active:scale-95"
-            title="새로고침"
+            disabled={loading}
+            className="flex items-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
           >
-            <RefreshCw size={20} className={loading ? 'animate-spin text-blue-600' : ''} />
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
           </button>
         </div>
       </div>
@@ -159,9 +187,9 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
                   <td colSpan={7} className="py-24 text-center text-gray-400 italic">저장된 변경 기록이 없습니다.</td>
                 </tr>
               ) : (
-                filteredHistory.map((item, idx) => (
+                paginatedHistory.map((item, idx) => (
                   <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group">
-                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{filteredHistory.length - idx}</td>
+                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{filteredHistory.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx)}</td>
                     <td className="px-4 py-4 text-center">
                       <span className="px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-100 text-xs font-bold">
                         {item.date}
@@ -207,6 +235,41 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
             </tbody>
           </table>
         </div>
+
+        {/* 페이지네이션 UI */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-500'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

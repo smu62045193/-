@@ -230,7 +230,11 @@ const ParkingManager: React.FC = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={loadAllData} className="flex items-center px-4 py-3 bg-white text-slate-600 border border-slate-200 rounded-2xl hover:bg-slate-50 font-bold shadow-sm transition-all active:scale-95 text-sm">
+                <button 
+                  onClick={loadAllData} 
+                  disabled={loading}
+                  className="flex items-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
+                >
                   <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
                   새로고침
                 </button>

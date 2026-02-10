@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ParkingStatusItem } from '../types';
 import { fetchParkingStatusList, saveParkingStatusList, deleteParkingStatusItem, generateUUID } from '../services/dataService';
-import { Trash2, Printer, Plus, Edit2, RotateCcw, AlertTriangle, X, Cloud, CheckCircle, RefreshCw } from 'lucide-react';
+import { Trash2, Printer, Plus, Edit2, RotateCcw, AlertTriangle, X, Cloud, CheckCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
+
+const ITEMS_PER_PAGE = 10;
 
 const ParkingStatusList: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<ParkingStatusItem[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
   
   const [newItem, setNewItem] = useState<ParkingStatusItem>({
     id: '',
@@ -23,6 +26,11 @@ const ParkingStatusList: React.FC = () => {
   useEffect(() => {
     loadData();
   }, []);
+
+  // 데이터 길이가 변경되면 페이지를 1로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [items.length]);
 
   const loadData = async () => {
     setLoading(true);
@@ -132,7 +140,6 @@ const ParkingStatusList: React.FC = () => {
     
     setLoading(true);
     try {
-      // 서버 DB에서 실제 행 삭제 수행
       const success = await deleteParkingStatusItem(idStr);
       
       if (success) {
@@ -226,6 +233,23 @@ const ParkingStatusList: React.FC = () => {
     printWindow.document.close();
   };
 
+  // 페이지네이션 처리
+  const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return items.slice(start, start + ITEMS_PER_PAGE);
+  }, [items, currentPage]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);
+    return pages;
+  }, [currentPage, totalPages]);
+
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center text-[12px] text-gray-700 h-10 align-middle";
   const tdClass = "border border-gray-300 p-0 h-10 align-middle relative bg-white";
 
@@ -269,42 +293,79 @@ const ParkingStatusList: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-        <table className="w-full min-w-[1000px] border-collapse">
-          <thead>
-            <tr>
-              <th className={`${thClass} w-10`}>No</th>
-              <th className={`${thClass} w-28`}>날짜</th>
-              <th className={`${thClass} w-16`}>구분</th>
-              <th className={`${thClass} w-40`}>업체</th>
-              <th className={`${thClass} w-20`}>위치</th>
-              <th className={`${thClass} w-36`}>변경전차량번호</th>
-              <th className={`${thClass} w-36`}>변경후차량번호</th>
-              <th className={`${thClass} w-48`}>비고</th>
-              <th className={`${thClass} w-24 print:hidden`}>관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-300">
-            {items.length === 0 ? (<tr><td colSpan={9} className="text-center py-10 text-gray-400 italic">등록된 차량이 없습니다.</td></tr>) : (
-               items.map((item, index) => (
-                 <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors divide-x divide-gray-100 ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
-                   <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>{items.length - index}</td>
-                   <td className={tdClass}><div className="flex items-center justify-center w-full h-full text-xs text-gray-700">{item.date || '-'}</div></td>
-                   <td className={tdClass}><div className="flex items-center justify-center w-full h-full"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{item.type || '-'}</span></div></td>
-                   <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-gray-800 text-sm px-2 text-center">{item.company}</div></td>
-                   <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-gray-700 text-sm">{item.location}</div></td>
-                   <td className={tdClass}><div className="flex items-center justify-center w-full h-full text-gray-500 text-sm">{item.prevPlate || '-'}</div></td>
-                   <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-blue-600 text-sm">{item.plateNum}</div></td>
-                   <td className={tdClass}><div className="flex items-center justify-start w-full h-full text-gray-600 text-xs px-3 truncate max-w-[12rem]">{item.note || '-'}</div></td>
-                   <td className={`${tdClass} text-center print:hidden`}>
-                     <div className="flex items-center justify-center space-x-1">
-                        <button onClick={() => handleLoadToForm(item)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
-                        <button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
-                     </div>
-                   </td>
-                 </tr>)))}
-          </tbody>
-        </table>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[1000px] border-collapse">
+            <thead>
+              <tr>
+                <th className={`${thClass} w-10`}>No</th>
+                <th className={`${thClass} w-28`}>날짜</th>
+                <th className={`${thClass} w-16`}>구분</th>
+                <th className={`${thClass} w-40`}>업체</th>
+                <th className={`${thClass} w-20`}>위치</th>
+                <th className={`${thClass} w-36`}>변경전차량번호</th>
+                <th className={`${thClass} w-36`}>변경후차량번호</th>
+                <th className={`${thClass} w-48`}>비고</th>
+                <th className={`${thClass} w-24 print:hidden`}>관리</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-300">
+              {paginatedItems.length === 0 ? (<tr><td colSpan={9} className="text-center py-10 text-gray-400 italic">등록된 차량이 없습니다.</td></tr>) : (
+                 paginatedItems.map((item, index) => (
+                   <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors divide-x divide-gray-100 ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
+                     <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>{items.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}</td>
+                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full text-xs text-gray-700">{item.date || '-'}</div></td>
+                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{item.type || '-'}</span></div></td>
+                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-gray-800 text-sm px-2 text-center">{item.company}</div></td>
+                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-gray-700 text-sm">{item.location}</div></td>
+                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full text-gray-500 text-sm">{item.prevPlate || '-'}</div></td>
+                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-blue-600 text-sm">{item.plateNum}</div></td>
+                     <td className={tdClass}><div className="flex items-center justify-start w-full h-full text-gray-600 text-xs px-3 truncate max-w-[12rem]">{item.note || '-'}</div></td>
+                     <td className={`${tdClass} text-center print:hidden`}>
+                       <div className="flex items-center justify-center space-x-1">
+                          <button onClick={() => handleLoadToForm(item)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
+                       </div>
+                     </td>
+                   </tr>)))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 페이지네이션 UI */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-200'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
 
       <style>{`

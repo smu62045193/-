@@ -1,9 +1,12 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { FireExtinguisherItem } from '../types';
 import { fetchFireExtinguisherList, saveFireExtinguisherList, deleteFireExtinguisher, generateUUID } from '../services/dataService';
 import { Save, Plus, Trash2, Printer, Filter, Edit2, RotateCcw, Flame, Check, AlertCircle, X, AlertTriangle, Cloud, CheckCircle, ChevronLeft, ChevronRight, Lock, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+
+interface FireExtinguisherCheckProps {
+  isPopupMode?: boolean;
+}
 
 const ITEMS_PER_PAGE = 15;
 
@@ -38,19 +41,17 @@ const formatToYYMM = (dateStr: string) => {
   return dateStr;
 };
 
-// 지하층 판별 함수 (B1~B6 또는 지하1층~지하6층)
 const isUndergroundFloor = (floor: string) => {
   const f = floor.trim().toUpperCase();
   return f.startsWith('B') || f.startsWith('지하');
 };
 
-// 옥탑층 판별 함수 (옥탑, 옥상, RF 포함)
 const isRooftopFloor = (floor: string) => {
   const f = floor.trim().toUpperCase();
   return f.includes('옥탑') || f.includes('옥상') || f.includes('RF');
 };
 
-const FireExtinguisherCheck: React.FC = () => {
+const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMode = false }) => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<FireExtinguisherItem[]>([]);
   const [activeFloor, setActiveFloor] = useState<string>('전체');
@@ -64,9 +65,31 @@ const FireExtinguisherCheck: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
 
-  // 필터 변경 시 페이지 리셋
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (id && id !== 'new') {
+        setEditId(id);
+      }
+    }
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'FIRE_EXT_SAVED') {
+        loadData();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isPopupMode]);
+
+  useEffect(() => {
+    if (isPopupMode && editId && items.length > 0) {
+      const matched = items.find(i => String(i.id) === String(editId));
+      if (matched) setFormItem(matched);
+    }
+  }, [editId, items, isPopupMode]);
+
   useEffect(() => {
     setCurrentPage(1);
   }, [activeFloor, items.length]);
@@ -84,15 +107,30 @@ const FireExtinguisherCheck: React.FC = () => {
     }
   };
 
-  const handleEdit = (item: FireExtinguisherItem) => {
-    setFormItem({ ...item });
-    setEditId(item.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+  const openIndependentWindow = (id: string = 'new') => {
+    const width = 600;
+    const height = 750;
+    const left = (window.screen.width / 2) - (width / 2);
+    const top = (window.screen.height / 2) - (height / 2);
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('popup', 'fire_extinguisher');
+    url.searchParams.set('id', id);
+
+    window.open(
+      url.toString(),
+      `FireExtWin_${id}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
+    );
   };
 
   const handleCancelEdit = () => {
-    setEditId(null);
-    setFormItem(initialFormState);
+    if (isPopupMode) {
+      window.close();
+    } else {
+      setEditId(null);
+      setFormItem(initialFormState);
+    }
   };
 
   const handleRegister = async () => {
@@ -101,58 +139,49 @@ const FireExtinguisherCheck: React.FC = () => {
       return;
     }
     setLoading(true);
-    const originalList = [...items];
     try {
-      let newItems = [...items];
+      const latestList = await fetchFireExtinguisherList();
+      let newList = [...(latestList || [])];
+      
+      const targetId = editId || generateUUID();
+      const itemToSave = { ...formItem, id: targetId };
+
       if (editId) {
-        newItems = newItems.map(item => String(item.id) === String(editId) ? { ...formItem } : item);
+        newList = newList.map(item => String(item.id) === String(editId) ? itemToSave : item);
       } else {
-        const itemToAdd = { ...formItem, id: generateUUID() };
-        newItems = [itemToAdd, ...newItems];
+        newList = [itemToSave, ...newList];
       }
-      setItems(newItems);
-      const success = await saveFireExtinguisherList(newItems);
+
+      const success = await saveFireExtinguisherList(newList);
       if (success) {
-        setFormItem({ ...initialFormState, floor: formItem.floor });
-        setEditId(null);
+        if (window.opener) {
+          window.opener.postMessage({ type: 'FIRE_EXT_SAVED' }, '*');
+        }
         alert('저장이 완료되었습니다.');
+        // 팝업 모드일 때 창을 닫지 않고 수정 모드로 유지 (요청사항)
+        if (!editId) {
+          setEditId(targetId);
+          setFormItem(itemToSave);
+        }
       } else {
-        setItems(originalList);
         alert('저장 실패 (서버 오류)');
       }
     } catch (e: any) {
-      setItems(originalList);
       alert('오류가 발생했습니다: ' + String(e));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveAll = async () => {
-    setLoading(true);
-    try {
-      const success = await saveFireExtinguisherList(items);
-      if (success) {
-        alert('저장이 완료되었습니다.');
-      } else {
-        alert('저장 실패');
-      }
-    } catch (e: any) {
-      alert('오류가 발생했습니다: ' + String(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 삭제 프로세스 개선: 모달 없이 즉시 삭제 실행
   const handleDeleteItem = async (id: string) => {
     const idStr = String(id);
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    
     setLoading(true);
     try {
       const success = await deleteFireExtinguisher(idStr);
       if (success) {
         setItems(prev => prev.filter(i => String(i.id) !== idStr));
-        if (String(editId) === idStr) handleCancelEdit();
         alert('삭제가 완료되었습니다.');
       } else {
         alert('삭제 실패 (서버 오류)');
@@ -165,35 +194,26 @@ const FireExtinguisherCheck: React.FC = () => {
     }
   };
 
-  // 필터링된 항목 계산
   const filteredItemsSorted = useMemo<FireExtinguisherItem[]>(() => {
     const safeItems = Array.isArray(items) ? items : [];
-    
     let filtered = [...safeItems];
-    
-    if (activeFloor === '지하1~6층') {
-      filtered = filtered.filter(item => isUndergroundFloor(item.floor));
-    } else if (activeFloor === '옥탑') {
-      filtered = filtered.filter(item => isRooftopFloor(item.floor));
-    } else if (activeFloor !== '전체') {
-      filtered = filtered.filter(item => item.floor === activeFloor);
-    }
+    if (activeFloor === '지하1~6층') filtered = filtered.filter(item => isUndergroundFloor(item.floor));
+    else if (activeFloor === '옥탑') filtered = filtered.filter(item => isRooftopFloor(item.floor));
+    else if (activeFloor !== '전체') filtered = filtered.filter(item => item.floor === activeFloor);
 
-    return filtered.sort((a: FireExtinguisherItem, b: FireExtinguisherItem) => {
+    return filtered.sort((a, b) => {
       const scoreDiff = getFloorScore(b.floor) - getFloorScore(a.floor);
       if (scoreDiff !== 0) return scoreDiff;
       return (String(a.manageNo || '')).localeCompare(String(b.manageNo || ''), 'en', { numeric: true });
     });
   }, [items, activeFloor]);
 
-  // 페이지네이션 로직
   const totalPages = Math.ceil(filteredItemsSorted.length / ITEMS_PER_PAGE);
   const paginatedFlatItems = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredItemsSorted.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredItemsSorted, currentPage]);
 
-  // 현재 페이지 아이템들을 다시 그룹화하여 렌더링
   const displayGroups = useMemo(() => {
     const groups: Record<string, FireExtinguisherItem[]> = {};
     paginatedFlatItems.forEach(item => {
@@ -206,20 +226,14 @@ const FireExtinguisherCheck: React.FC = () => {
   }, [paginatedFlatItems]);
 
   const filterButtons = useMemo(() => {
-    // Fix: Explicitly using a type guard to ensure uniqueFloors is string[] and resolve 'unknown' errors below.
     const uniqueFloors = Array.from(new Set(items.map(i => i.floor))).filter((f): f is string => !!f && typeof f === 'string' && f.trim() !== '');
     const aboveGround = uniqueFloors
-      // Fix: Explicitly typed callback parameter as string to fix 'unknown' assignability error.
       .filter((f: string) => !isUndergroundFloor(f) && !isRooftopFloor(f))
-      // Fix: Explicitly typed sort parameters to ensure type consistency.
-      .sort((a: string, b: string) => getFloorScore(String(b)) - getFloorScore(String(a)));
-    // Fix: Explicitly typed callback parameter as string to fix 'unknown' assignability error.
+      .sort((a, b) => getFloorScore(String(b)) - getFloorScore(String(a)));
     const hasUnderground = uniqueFloors.some((f: string) => isUndergroundFloor(f));
-    // Fix: Explicitly typed callback parameter as string to fix 'unknown' assignability error.
     const hasRooftop = uniqueFloors.some((f: string) => isRooftopFloor(f));
     const btns = ['전체'];
     if (hasRooftop) btns.push('옥탑');
-    // Fix: uniqueFloors typing fix above ensures aboveGround is string[], making this spread operation safe.
     btns.push(...aboveGround);
     if (hasUnderground) btns.push('지하1~6층');
     return btns;
@@ -231,7 +245,7 @@ const FireExtinguisherCheck: React.FC = () => {
     let endPage = Math.min(totalPages, startPage + 4);
     if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
     const pages = [];
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);
     return pages;
   }, [currentPage, totalPages]);
 
@@ -244,9 +258,7 @@ const FireExtinguisherCheck: React.FC = () => {
       if (!fullGroups[key]) fullGroups[key] = [];
       fullGroups[key].push(item);
     });
-    const sortedKeys = Object.keys(fullGroups).sort((a: string, b: string) => {
-        return getFloorScore(b) - getFloorScore(a);
-    });
+    const sortedKeys = Object.keys(fullGroups).sort((a: string, b: string) => getFloorScore(b) - getFloorScore(a));
     sortedKeys.forEach((floor: string) => {
       flatRows.push({ isHeader: true, floor: floor });
       const currentGroup = fullGroups[floor];
@@ -309,10 +321,6 @@ const FireExtinguisherCheck: React.FC = () => {
     printWindow.document.close();
   };
 
-  const updateItemInTable = (id: string, field: keyof FireExtinguisherItem, value: string) => {
-    setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       const inputs = document.querySelectorAll('.form-input');
@@ -322,57 +330,138 @@ const FireExtinguisherCheck: React.FC = () => {
     }
   };
 
-  const inputClass = "w-full border border-gray-300 rounded px-2 py-2 !text-[12px] bg-white text-black focus:ring-2 focus:ring-blue-500 outline-none h-[38px] font-normal";
-  const tableInputClass = "w-full h-full text-center outline-none bg-transparent text-black p-1 focus:bg-blue-50 !text-[12px] font-normal flex items-center justify-center min-h-[32px]";
+  const inputClass = "w-full border border-gray-300 rounded px-4 py-2.5 !text-[14px] bg-white text-black focus:ring-2 focus:ring-blue-500 outline-none h-[45px] font-bold shadow-inner";
 
+  // 팝업 모드일 때의 UI
+  if (isPopupMode) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 animate-fade-in">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+          <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+                {editId ? <Edit2 size={24} /> : <Plus size={24} />}
+              </div>
+              <span className="font-black text-xl tracking-tight">{editId ? '소화기 정보 수정' : '신규 소화기 등록'}</span>
+            </div>
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
+              <X size={28} />
+            </button>
+          </div>
+
+          <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">관리번호 *</label>
+                <input type="text" className={`${inputClass} form-input text-blue-700`} value={formItem.manageNo} onChange={(e) => setFormItem({...formItem, manageNo: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: 001" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">종류</label>
+                <select className={`${inputClass} form-input`} value={formItem.type} onChange={(e) => setFormItem({...formItem, type: e.target.value})}>
+                  {EXTINGUISHER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">층별</label>
+                <input type="text" className={`${inputClass} form-input`} value={formItem.floor} onChange={(e) => setFormItem({...formItem, floor: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: 1F" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">정비업체</label>
+                <input type="text" className={`${inputClass} form-input`} value={formItem.company} onChange={(e) => setFormItem({...formItem, company: e.target.value})} onKeyDown={handleKeyDown} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">제조번호</label>
+                <input type="text" className={`${inputClass} form-input`} value={formItem.serialNo} onChange={(e) => setFormItem({...formItem, serialNo: e.target.value})} onKeyDown={handleKeyDown} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">전화번호</label>
+                <input type="text" className={`${inputClass} form-input`} value={formItem.phone} onChange={(e) => setFormItem({...formItem, phone: e.target.value})} onKeyDown={handleKeyDown} placeholder="010-..." />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">검정번호</label>
+                <input type="text" className={`${inputClass} form-input`} value={formItem.certNo} onChange={(e) => setFormItem({...formItem, certNo: e.target.value})} onKeyDown={handleKeyDown} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">일자</label>
+                <input type="month" className={`${inputClass} form-input`} value={formItem.date} onChange={(e) => setFormItem({...formItem, date: e.target.value})} onKeyDown={handleKeyDown} />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고</label>
+              <textarea className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-24 font-medium shadow-inner" value={formItem.remarks} onChange={(e) => setFormItem({...formItem, remarks: e.target.value})} placeholder="특이사항 입력" />
+            </div>
+          </div>
+
+          <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4">
+            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
+            <button 
+              onClick={handleRegister} 
+              disabled={loading}
+              className={`flex-[2] py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 shadow-xl active:scale-95 ${
+                loading ? 'bg-slate-400 cursor-wait' : editId ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {loading ? <RefreshCw size={24} className="animate-spin" /> : <Save size={24} />}
+              서버에 데이터 저장
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 메인 리스트 뷰 UI
   return (
     <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
-      <div className="flex justify-between items-center border-b border-gray-200 pb-4 print:hidden">
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center"><Flame className="mr-2 text-red-600" />소화기 관리대장</h2>
-        <div className="flex gap-2">
-          {/* 새로고침 버튼 추가 */}
-          <button onClick={loadData} disabled={loading} className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 border border-gray-200 rounded hover:bg-gray-200 font-bold shadow-sm transition-colors text-sm disabled:opacity-50">
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침
+      <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-200 pb-4 print:hidden gap-4">
+        <div className="flex items-center gap-2">
+          <Flame className="text-red-600" size={24} />
+          <h2 className="text-2xl font-black text-gray-800 tracking-tight">소화기 관리대장</h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={loadData} 
+            disabled={loading} 
+            className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
+          >
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
           </button>
-          <button onClick={handleSaveAll} disabled={loading} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold shadow-sm transition-colors text-sm disabled:opacity-50"><Save size={18} className="mr-2" />서버저장</button>
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 font-bold shadow-sm transition-colors text-sm"><Printer size={18} className="mr-2" />미리보기</button>
+          <button 
+            onClick={() => openIndependentWindow()}
+            className="flex items-center px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm active:scale-95"
+          >
+            <Plus size={18} className="mr-2" />
+            신규 소화기 등록
+          </button>
+          <button onClick={handlePrint} className="flex items-center px-4 py-2.5 bg-gray-700 text-white rounded-xl hover:bg-gray-800 font-bold shadow-sm transition-colors text-sm active:scale-95">
+            <Printer size={18} className="mr-2" />
+            미리보기
+          </button>
         </div>
       </div>
 
-      <div className={`p-6 rounded-xl border shadow-sm print:hidden transition-all duration-300 ${editId ? 'bg-orange-50 border-orange-200' : 'bg-blue-50/50 border-blue-200'}`}>
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="font-bold text-gray-700 flex items-center">
-            {editId ? <Edit2 size={18} className="mr-2 text-orange-600" /> : <Plus size={18} className="mr-2 text-blue-600" />}
-            {editId ? '소화기 정보 수정' : '신규 소화기 등록'}
-          </h3>
-          {editId && <button onClick={handleCancelEdit} className="text-sm flex items-center text-gray-500 hover:text-gray-700 bg-white px-2 py-1 rounded border border-gray-200 shadow-sm font-bold"><RotateCcw size={12} className="mr-1" />수정 취소</button>}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-9 gap-3 items-end">
-          {/* Added explicit Event type to solve 'unknown' type error in onChange handlers */}
-          <div className="col-span-1"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">관리번호 *</label><input type="text" className={`${inputClass} form-input`} value={formItem.manageNo} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormItem({...formItem, manageNo: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: 001" /></div>
-          <div className="col-span-1"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">종류</label><select className={`${inputClass} form-input`} value={formItem.type} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setFormItem({...formItem, type: e.target.value})}>{EXTINGUISHER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-          <div className="col-span-1"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">층별</label><input type="text" className={`${inputClass} form-input`} value={formItem.floor} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormItem({...formItem, floor: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: 1F" /></div>
-          <div className="col-span-1"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">정비업체</label><input type="text" className={`${inputClass} form-input`} value={formItem.company} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormItem({...formItem, company: e.target.value})} onKeyDown={handleKeyDown} /></div>
-          <div className="col-span-1"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">제조번호</label><input type="text" className={`${inputClass} form-input`} value={formItem.serialNo} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormItem({...formItem, serialNo: e.target.value})} onKeyDown={handleKeyDown} /></div>
-          <div className="col-span-1"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">전화번호</label><input type="text" className={`${inputClass} form-input`} value={formItem.phone} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormItem({...formItem, phone: e.target.value})} onKeyDown={handleKeyDown} placeholder="010-..." /></div>
-          <div className="col-span-1"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">검정번호</label><input type="text" className={`${inputClass} form-input`} value={formItem.certNo} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormItem({...formItem, certNo: e.target.value})} onKeyDown={handleKeyDown} /></div>
-          <div className="col-span-1"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">일자</label><input type="month" className={`${inputClass} form-input`} value={formItem.date} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormItem({...formItem, date: e.target.value})} onKeyDown={handleKeyDown} /></div>
-          <div className="col-span-1"><button onClick={handleRegister} disabled={loading} className={`w-full text-white rounded-lg font-bold h-[38px] transition-colors shadow-md text-sm flex items-center justify-center gap-1 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'}`}>{loading ? '...' : (editId ? <><Check size={14} />수정</> : <><Plus size={14} />등록</>)}</button></div>
-          <div className="col-span-full"><label className="block !text-[12px] font-bold text-gray-500 mb-1 uppercase tracking-tighter">비고</label><input type="text" className={`${inputClass} form-input`} value={formItem.remarks} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormItem({...formItem, remarks: e.target.value})} onKeyDown={handleKeyDown} placeholder="특이사항 입력" /></div>
-        </div>
-      </div>
-
-      <div className="print:hidden flex items-center gap-4 bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-bold text-gray-500 min-w-max"><Filter size={16} />층별 필터:</div>
+      <div className="print:hidden flex items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-2 text-sm font-black text-gray-400 uppercase tracking-widest min-w-max"><Filter size={16} /> Filter by Floor:</div>
         <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-hide pb-1">
           {filterButtons.map(f => (
             <button 
               key={f} 
               onClick={() => setActiveFloor(f)} 
-              className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${
+              className={`px-5 py-2 rounded-xl text-xs font-black border transition-all ${
                 activeFloor === f 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-105' 
-                  : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-white hover:border-gray-300'
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+                  : 'bg-white text-gray-400 border-gray-200 hover:border-blue-200 hover:text-blue-500'
               }`}
             >
               {f}
@@ -381,51 +470,48 @@ const FireExtinguisherCheck: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-center min-w-[1000px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-12">No</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-32">관리번호</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-44">종 류</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-32">층 별</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-24">정비업체</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-24">제조번호</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-32">전화번호</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-24">검정번호</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-24">일 자</th>
-                <th className="border-r border-gray-200 p-2 !text-[12px] font-normal text-gray-500 w-24">비 고</th>
-                <th className="p-2 !text-[12px] font-normal text-gray-500 w-24 print:hidden">관리</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-12">No</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32">관리번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-44">종 류</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32">층 별</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24">정비업체</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24">제조번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32">전화번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24">검정번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24">일 자</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest">비 고</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 print:hidden">관리</th>
               </tr>
             </thead>
-            <tbody>
-              {paginatedFlatItems.length === 0 ? (
-                 <tr><td colSpan={11} className="py-20 text-center text-gray-400 italic">표시할 소화기가 없습니다.</td></tr>
+            <tbody className="divide-y divide-gray-100">
+              {loading && items.length === 0 ? (
+                 <tr><td colSpan={11} className="py-24 text-center text-gray-400 font-bold">로딩 중...</td></tr>
+              ) : paginatedFlatItems.length === 0 ? (
+                 <tr><td colSpan={11} className="py-24 text-center text-gray-400 italic">표시할 데이터가 없습니다.</td></tr>
               ) : displayGroups.map(group => (
                 <React.Fragment key={group.floor}>
-                  <tr className="bg-gray-100 font-normal"><td colSpan={11} className="text-left pl-4 py-2 border-b border-gray-300 text-blue-900 !text-[12px]">[ {String(group.floor)} ]</td></tr>
-                  {group.items.map((item: FireExtinguisherItem, idx: number) => (
-                    <tr key={item.id} className={`hover:bg-gray-50 border-b border-gray-100 last:border-0 group ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
-                      <td className="p-2 !text-[12px] text-gray-400 font-normal">
-                        {/* 전체 목록에서의 인덱스 계산 */}
-                        {filteredItemsSorted.findIndex(fi => fi.id === item.id) + 1}
-                      </td>
-                      {/* Added explicit Event type to solve 'unknown' type error in onChange handlers in table rows */}
-                      <td className="p-0 border-r border-gray-100"><input type="text" className={`${tableInputClass} font-normal`} value={item.manageNo || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItemInTable(item.id, 'manageNo', e.target.value)} /></td>
-                      <td className="p-0 border-r border-gray-100"><div className={tableInputClass}>{item.type || ''}</div></td>
-                      <td className="p-0 border-r border-gray-100"><input type="text" className={tableInputClass} value={item.floor || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItemInTable(item.id, 'floor', e.target.value)} /></td>
-                      <td className="p-0 border-r border-gray-100"><input type="text" className={tableInputClass} value={item.company || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItemInTable(item.id, 'company', e.target.value)} /></td>
-                      <td className="p-0 border-r border-gray-100"><input type="text" className={tableInputClass} value={item.serialNo || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItemInTable(item.id, 'serialNo', e.target.value)} /></td>
-                      <td className="p-0 border-r border-gray-100"><input type="text" className={tableInputClass} value={item.phone || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItemInTable(item.id, 'phone', e.target.value)} /></td>
-                      <td className="p-0 border-r border-gray-100"><input type="text" className={tableInputClass} value={item.certNo || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItemInTable(item.id, 'certNo', e.target.value)} /></td>
-                      <td className="p-0 border-r border-gray-100"><input type="text" className={tableInputClass} value={formatToYYMM(item.date || '')} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItemInTable(item.id, 'date', e.target.value)} /></td>
-                      <td className="p-0 border-r border-gray-100"><input type="text" className={`${tableInputClass} text-left px-2 font-normal`} value={item.remarks || ''} onChange={(e: React.ChangeEvent<HTMLInputElement>) => updateItemInTable(item.id, 'remarks', e.target.value)} /></td>
-                      <td className="p-2 text-center print:hidden">
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => handleEdit(item)} className="text-gray-400 hover:text-blue-600 transition-colors"><Edit2 size={16} /></button>
-                          {/* 삭제 버튼 프로세스 개선 */}
-                          <button onClick={() => handleDeleteItem(item.id)} className="text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                  <tr className="bg-slate-50/50"><td colSpan={11} className="text-left pl-6 py-3 border-b border-gray-200 text-blue-800 font-black text-sm uppercase tracking-widest">[ {String(group.floor)} ]</td></tr>
+                  {group.items.map((item: FireExtinguisherItem) => (
+                    <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
+                      <td className="px-3 py-4 text-[11px] text-gray-400 font-mono">{filteredItemsSorted.findIndex(fi => fi.id === item.id) + 1}</td>
+                      <td className="px-3 py-4 text-sm font-black text-slate-800">{item.manageNo || ''}</td>
+                      <td className="px-3 py-4 text-[12px] font-bold text-slate-600">{item.type || ''}</td>
+                      <td className="px-3 py-4 text-[12px] font-bold text-slate-600">{item.floor || ''}</td>
+                      <td className="px-3 py-4 text-[12px] text-slate-500">{item.company || '-'}</td>
+                      <td className="px-3 py-4 text-[12px] text-slate-500">{item.serialNo || '-'}</td>
+                      <td className="px-3 py-4 text-[12px] text-slate-500 font-mono">{item.phone || '-'}</td>
+                      <td className="px-3 py-4 text-[12px] text-slate-500">{item.certNo || '-'}</td>
+                      <td className="px-3 py-4 text-[12px] text-blue-600 font-bold">{formatToYYMM(item.date || '')}</td>
+                      <td className="px-3 py-4 text-[11px] text-slate-400 italic text-left pl-4 max-w-[150px] truncate">{item.remarks || '-'}</td>
+                      <td className="px-3 py-4 print:hidden">
+                        <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors" title="삭제"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -436,9 +522,8 @@ const FireExtinguisherCheck: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination UI */}
         {totalPages > 1 && (
-          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+          <div className="px-6 py-6 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
@@ -454,7 +539,7 @@ const FireExtinguisherCheck: React.FC = () => {
                   className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
                     currentPage === pageNum
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-200'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
                   }`}
                 >
                   {pageNum}
