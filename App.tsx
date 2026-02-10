@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -8,6 +7,7 @@ import WeeklyWork from './components/WeeklyWork';
 import StaffManager from './components/StaffManager';
 import StaffStatus from './components/StaffStatus';
 import ConsumablesManager from './components/ConsumablesManager';
+import ConsumablesLedger from './components/ConsumablesLedger';
 import ParkingManager from './components/ParkingManager';
 import ContractorManager from './components/ContractorManager';
 import ElecCheckManager from './components/ElecCheckManager';
@@ -23,7 +23,7 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -35,6 +35,8 @@ const App: React.FC = () => {
       setIsPopupMode('staff');
     } else if (popupType === 'contractor') {
       setIsPopupMode('contractor');
+    } else if (popupType === 'consumable') {
+      setIsPopupMode('consumable');
     }
   }, []);
 
@@ -54,6 +56,10 @@ const App: React.FC = () => {
 
   if (isPopupMode === 'contractor') {
     return <ContractorManager isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'consumable') {
+    return <ConsumablesLedger isPopupMode={true} />;
   }
 
   const renderContent = () => {

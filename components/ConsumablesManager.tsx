@@ -1,12 +1,12 @@
-
 import React, { useState } from 'react';
 import ConsumablesLedger from './ConsumablesLedger';
 import ConsumableRequestManager from './ConsumableRequestManager';
 import { LayoutList } from 'lucide-react';
 
 const TABS = [
-  { id: 'ledger', label: '소모품 관리대장' },
-  { id: 'request', label: '소모품 자재 신청서' },
+  { id: 'ledger', label: '소모품관리대장' },
+  { id: 'usage', label: '소모품사용내역' },
+  { id: 'request', label: '소모품자재신청서' },
 ];
 
 const ConsumablesManager: React.FC = () => {
@@ -41,7 +41,9 @@ const ConsumablesManager: React.FC = () => {
 
       {/* Content Area */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden min-h-[500px]">
-        {activeTab === 'ledger' && <ConsumablesLedger />}
+        {(activeTab === 'ledger' || activeTab === 'usage') && (
+          <ConsumablesLedger viewMode={activeTab as 'ledger' | 'usage'} />
+        )}
         {activeTab === 'request' && <ConsumableRequestManager />}
       </div>
     </div>
