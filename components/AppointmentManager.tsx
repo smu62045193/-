@@ -2,17 +2,22 @@
 import React, { useState, useEffect } from 'react';
 import { AppointmentItem } from '../types';
 import { fetchAppointmentList, saveAppointmentList } from '../services/dataService';
-import { Save, UserCheck, Printer, Edit2, AlertTriangle, X, RefreshCw, UserPlus, CheckCircle, Trash2 } from 'lucide-react';
+import { Save, UserCheck, Printer, Edit2, AlertTriangle, X, RefreshCw, UserPlus, CheckCircle, Trash2, LayoutList } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface AppointmentManagerProps {
   isPopupMode?: boolean;
 }
 
+const TABS = [
+  { id: 'status', label: '선임현황' },
+];
+
 const CATEGORIES = ['전기', '기계', '소방', '승강기'];
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = false }) => {
+  const [activeTab, setActiveTab] = useState('status');
   const [items, setItems] = useState<AppointmentItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -123,6 +128,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   };
 
   const handleDeleteItem = async (id: string) => {
+    if (!confirm('해당 선임 정보를 삭제하시겠습니까?')) return;
     const newList = items.filter(i => String(i.id) !== String(id));
     if (await saveAppointmentList(newList)) { 
       setItems(newList); 
@@ -275,7 +281,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
 
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">연락처</label>
+                <label className="block text-[11px] font-black text-slate-400 mb-1 uppercase tracking-widest">연락처</label>
                 <input 
                   type="text" 
                   value={newItem.phone} 
@@ -285,7 +291,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">선임 일자</label>
+                <label className="block text-[11px] font-black text-slate-400 mb-1 uppercase tracking-widest">선임 일자</label>
                 <input 
                   type="date" 
                   value={newItem.appointmentDate} 
@@ -339,84 +345,117 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-6 animate-fade-in relative min-h-screen">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-          <UserCheck className="mr-2 text-blue-600" size={24} />
-          안전관리자 선임 현황
+    <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-8 animate-fade-in relative min-h-screen">
+      {/* 제목 영역 (협력업체 관리 수준으로 글자 크기 상향) */}
+      <div className="mb-2 print:hidden">
+        <h2 className="text-3xl font-black text-slate-800 flex items-center tracking-tight">
+          <UserCheck className="mr-2 text-blue-600" size={32} />
+          안전관리자
         </h2>
-        <div className="flex gap-2">
-          <button 
-            onClick={loadData}
-            disabled={loading}
-            className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-          <button 
-            onClick={() => openIndependentWindow()}
-            className="flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 text-sm"
-          >
-            <UserPlus size={18} className="mr-2" />
-            신규 선임 등록
-          </button>
-          <button onClick={handlePrint} className="bg-gray-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-gray-800 flex items-center justify-center transition-all active:scale-95">
-            <Printer size={18} className="mr-2" />
-            미리보기
-          </button>
-        </div>
+        <p className="text-slate-500 mt-2 text-base font-medium">안전관리자 선임 현황을 관리합니다.</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-        <table className="w-full border-collapse min-w-[1000px]">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-16">No</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24">구분</th>
-              <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 w-44">선임명칭</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24">성명</th>
-              <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 w-40">기관/단체</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-32">연락처</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28">선임일자</th>
-              <th className="px-4 py-4 text-left text-sm font-bold text-gray-500">자격사항</th>
-              <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28 print:hidden">관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {sortedItems.length === 0 ? (
-              <tr><td colSpan={9} className="py-20 text-center text-gray-400 italic">등록된 정보가 없습니다.</td></tr>
-            ) : sortedItems.map((it, idx) => (
-              <tr key={it.id} className="text-center hover:bg-gray-50/50 transition-colors group">
-                <td className="p-4 text-xs text-gray-400 font-mono">{idx + 1}</td>
-                <td className="p-4">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    it.category === '전기' ? 'bg-blue-100 text-blue-700' :
-                    it.category === '소방' ? 'bg-red-100 text-red-700' :
-                    it.category === '기계' ? 'bg-orange-100 text-orange-700' :
-                    'bg-slate-100 text-slate-700'
-                  }`}>
-                    {it.category}
-                  </span>
-                </td>
-                <td className="p-4 text-sm font-bold text-gray-700 text-left">{it.title}</td>
-                <td className="p-4 text-sm font-black text-gray-900">{it.name}</td>
-                <td className="p-4 text-sm text-gray-600 text-left">{it.agency}</td>
-                <td className="p-4 text-sm text-gray-600">{it.phone}</td>
-                <td className="p-4 text-sm text-gray-500 font-mono">{it.appointmentDate}</td>
-                <td className="p-4 text-sm text-gray-600 text-left">{it.license}</td>
-                <td className="p-4 print:hidden">
-                  <div className="flex justify-center gap-1 transition-opacity">
-                    <button onClick={() => openIndependentWindow(it.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="편집">
-                      <Edit2 size={16} />
-                    </button>
-                    <button onClick={() => handleDeleteItem(it.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* 탭 네비게이션 추가 (직원관리/협력업체 스타일 통일) */}
+      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center print:hidden">
+        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
+           <LayoutList size={22} />
+        </div>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
+              activeTab === tab.id 
+                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 메인 컨테이너 (협력업체 스타일의 큰 박스) */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
+        <div className="p-6 space-y-6">
+          {/* 작은박스 1: 툴바 영역 */}
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
+            <div className="flex-1"></div>
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              <button 
+                onClick={loadData}
+                disabled={loading}
+                className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+              >
+                <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+                새로고침
+              </button>
+              <button 
+                onClick={() => openIndependentWindow()}
+                className="flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 text-sm"
+              >
+                <UserPlus size={18} className="mr-2" />
+                신규 선임 등록
+              </button>
+              <button onClick={handlePrint} className="bg-slate-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-slate-800 flex items-center justify-center transition-all active:scale-95">
+                <Printer size={18} className="mr-2" />
+                미리보기
+              </button>
+            </div>
+          </div>
+
+          {/* 작은박스 2: 리스트 테이블 영역 */}
+          <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto">
+            <table className="w-full border-collapse min-w-[1000px]">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-16">No</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24">구분</th>
+                  <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 w-44">선임명칭</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24">성명</th>
+                  <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 w-40">기관/단체</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-32">연락처</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28">선임일자</th>
+                  <th className="px-4 py-4 text-left text-sm font-bold text-gray-500">자격사항</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28 print:hidden">관리</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {sortedItems.length === 0 ? (
+                  <tr><td colSpan={9} className="py-20 text-center text-gray-400 italic">등록된 정보가 없습니다.</td></tr>
+                ) : sortedItems.map((it, idx) => (
+                  <tr key={it.id} className="text-center hover:bg-gray-50/50 transition-colors group">
+                    <td className="p-4 text-xs text-gray-400 font-mono">{idx + 1}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        it.category === '전기' ? 'bg-blue-100 text-blue-700' :
+                        it.category === '소방' ? 'bg-red-100 text-red-700' :
+                        it.category === '기계' ? 'bg-orange-100 text-orange-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {it.category}
+                      </span>
+                    </td>
+                    <td className="p-4 text-sm font-bold text-gray-700 text-left">{it.title}</td>
+                    <td className="p-4 text-sm font-black text-gray-900">{it.name}</td>
+                    <td className="p-4 text-sm text-gray-600 text-left">{it.agency}</td>
+                    <td className="p-4 text-sm text-gray-600">{it.phone}</td>
+                    <td className="p-4 text-sm text-gray-500 font-mono">{it.appointmentDate}</td>
+                    <td className="p-4 text-sm text-gray-600 text-left">{it.license}</td>
+                    <td className="p-4 print:hidden">
+                      <div className="flex justify-center gap-1 transition-opacity">
+                        <button onClick={() => openIndependentWindow(it.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="편집">
+                          <Edit2 size={16} />
+                        </button>
+                        <button onClick={() => handleDeleteItem(it.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <style>{`
