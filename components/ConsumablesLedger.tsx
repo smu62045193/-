@@ -9,10 +9,6 @@ interface ConsumablesLedgerProps {
   isPopupMode?: boolean;
 }
 
-interface HistoryItem extends ConsumableItem {
-  calculatedStock: number;
-}
-
 const generateId = () => `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
 const CATEGORIES = [
@@ -49,18 +45,26 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     minStock: '5' 
   });
 
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [historyTargetItem, setHistoryTargetItem] = useState<{name: string, model: string, category: string}>({name: '', model: '', category: ''});
-  const [historyList, setHistoryList] = useState<HistoryItem[]>([]);
-
   useEffect(() => {
     loadData();
 
     if (isPopupMode) {
       const params = new URLSearchParams(window.location.search);
       const id = params.get('id');
+      const copyName = params.get('itemName');
+      
       if (id && id !== 'new') {
         setEditId(id);
+      } else if (copyName) {
+        setNewItem(prev => ({
+          ...prev,
+          itemName: copyName,
+          modelName: params.get('modelName') || '',
+          category: params.get('category') || CATEGORIES[0],
+          unit: params.get('unit') || 'EA',
+          minStock: params.get('minStock') || '5',
+          details: params.get('details') || ''
+        }));
       }
     }
 
@@ -74,23 +78,33 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   }, [isPopupMode]);
 
   useEffect(() => {
-    if (editId && items.length > 0) {
-      const item = items.find(i => String(i.id) === String(editId));
-      if (item) {
-        setNewItem({ ...item });
-        // 수정 시 베이스 재고 계산
-        const currentIn = parseFloat(String(item.inQty || '0').replace(/,/g, '')) || 0;
-        const currentOut = parseFloat(String(item.outQty || '0').replace(/,/g, '')) || 0;
+    if (items.length > 0) {
+      if (editId) {
+        const item = items.find(i => String(i.id) === String(editId));
+        if (item) {
+          setNewItem({ ...item });
+          const currentIn = parseFloat(String(item.inQty || '0').replace(/,/g, '')) || 0;
+          const currentOut = parseFloat(String(item.outQty || '0').replace(/,/g, '')) || 0;
+          const summary = summaryItems.find(s => 
+            s.category === item.category && 
+            s.itemName.trim() === item.itemName.trim() && 
+            (s.modelName || '').trim() === (item.modelName || '').trim()
+          );
+          const totalStock = parseFloat(summary?.stockQty || '0');
+          setBaseStock(totalStock - currentIn + currentOut);
+        }
+      } else if (isPopupMode && newItem.itemName) {
         const summary = summaryItems.find(s => 
-          s.category === item.category && 
-          s.itemName.trim() === item.itemName.trim() && 
-          (s.modelName || '').trim() === (item.modelName || '').trim()
+          s.category === newItem.category && 
+          s.itemName.trim() === newItem.itemName.trim() && 
+          (s.modelName || '').trim() === (newItem.modelName || '').trim()
         );
         const totalStock = parseFloat(summary?.stockQty || '0');
-        setBaseStock(totalStock - currentIn + currentOut);
+        setBaseStock(totalStock);
+        setNewItem(prev => ({ ...prev, stockQty: totalStock.toString() }));
       }
     }
-  }, [editId, items]);
+  }, [editId, items.length, isPopupMode]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -119,14 +133,18 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     url.searchParams.set('popup', 'consumable');
     url.searchParams.set('id', id);
     
-    // 기록추가 버튼을 통해 들어온 경우 초기 품명/모델명 전달을 위해 (옵션)
-    if (initialData) {
-      // 팝업에서는 items를 직접 쓰므로 별도 파라미터 보다는 id로 처리
+    if (initialData && id === 'new') {
+      url.searchParams.set('itemName', initialData.itemName);
+      url.searchParams.set('modelName', initialData.modelName || '');
+      url.searchParams.set('category', initialData.category);
+      url.searchParams.set('unit', initialData.unit || 'EA');
+      url.searchParams.set('minStock', initialData.minStock || '5');
+      url.searchParams.set('details', initialData.details || '');
     }
 
     window.open(
       url.toString(),
-      `ConsumableWin_${id}`,
+      `ConsumableWin_${id === 'new' ? 'new_' + Date.now() : id}`,
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
     );
   };
@@ -285,25 +303,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     }
   };
 
-  const openHistory = (itemName: string, modelName: string, category: string) => {
-    const trimmedName = itemName.trim();
-    const trimmedModel = (modelName || '').trim();
-    const history = items
-      .filter(i => i.itemName.trim() === trimmedName && (i.modelName || '').trim() === trimmedModel && i.category === category)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    let runningStock = 0;
-    const historyWithCalculated = history.map(item => {
-      const inQty = parseFloat(String(item.inQty || '0').replace(/,/g, '')) || 0;
-      const outQty = parseFloat(String(item.outQty || '0').replace(/,/g, '')) || 0;
-      runningStock += inQty - outQty;
-      return { ...item, calculatedStock: runningStock };
-    });
-    setHistoryList([...historyWithCalculated].reverse());
-    setHistoryTargetItem({ name: trimmedName, model: trimmedModel, category });
-    setIsHistoryOpen(true);
-  };
-
   const processedList = useMemo(() => {
+    // 소모품사용내역(usage) 탭에서는 검색어가 없을 경우 빈 리스트 반환
+    if (viewMode === 'usage' && !searchTerm.trim()) {
+      return [];
+    }
+
     if (viewMode === 'ledger') {
       return summaryItems.filter(item => 
         (item.itemName || '').includes(searchTerm) || 
@@ -346,7 +351,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
           <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}>
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
                 {editId ? <Edit2 size={20} /> : <PackagePlus size={20} />}
               </div>
               <span className="font-black text-lg">{editId ? '소모품 정보 수정' : '신규 소모품 등록'}</span>
@@ -419,7 +424,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
             <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">취소 후 닫기</button>
-            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-500 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
@@ -474,7 +479,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
             onClick={() => openIndependentWindow()}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
           >
-            <PlusCircle size={18} /> 신규 소모품 등록
+            <PlusCircle size={18} /> {viewMode === 'ledger' ? '소모품 등록/수정' : '소모품 사용/입고'}
           </button>
         </div>
       </div>
@@ -498,7 +503,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                   <tr>
                     <th className={`${thClass} w-12`}>No</th>
                     <th className={`${thClass} w-28`}>구분</th>
-                    <th className={`${thClass} text-left pl-4`}>품명 (클릭시 상세변동이력)</th>
+                    <th className={`${thClass} text-left pl-4`}>품명</th>
                     <th className={`${thClass} w-48`}>모델명</th>
                     <th className={`${thClass} w-28 text-emerald-600`}>현재재고</th>
                     <th className={`${thClass} w-20 text-orange-600`}>적정재고</th>
@@ -521,8 +526,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                 )}
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {paginatedList.length === 0 ? (
-                  <tr><td colSpan={10} className="py-20 text-center text-gray-400 italic">내역이 없습니다.</td></tr>
+                {processedList.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="py-20 text-center text-gray-400 italic">
+                      {viewMode === 'usage' && !searchTerm.trim() ? '상단 검색창에 품명을 입력하면 내역이 표시됩니다.' : '내역이 없습니다.'}
+                    </td>
+                  </tr>
                 ) : viewMode === 'ledger' ? (
                   paginatedList.map((item, idx) => {
                     const globalIdx = processedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
@@ -533,7 +542,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                       <tr key={`summary-${item.id}`} className="hover:bg-blue-50/30 transition-colors group">
                         <td className="px-3 py-4 text-center text-gray-400 font-mono text-xs">{globalIdx}</td>
                         <td className="px-3 py-4 text-xs text-gray-600 font-bold text-center">{item.category}</td>
-                        <td className="px-3 py-4 text-left pl-4"><button onClick={() => openHistory(item.itemName, item.modelName, item.category)} className="text-blue-600 hover:text-blue-800 hover:underline text-left font-black text-sm">{item.itemName}</button></td>
+                        <td className="px-3 py-4 text-left pl-4 font-black text-sm text-gray-800">{item.itemName}</td>
                         <td className="px-3 py-4 text-xs text-gray-600 font-bold text-center">{item.modelName || '-'}</td>
                         <td className="px-2 py-4 text-center">
                           <span className={`inline-block px-3 py-1 font-black rounded-lg text-sm ${isLowStock ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -544,7 +553,10 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                         <td className="px-2 py-4 text-center text-gray-500 font-bold text-xs">{item.minStock || '5'}</td>
                         <td className="px-2 py-4 text-xs text-center text-gray-500 font-bold">{item.unit}</td>
                         <td className="px-3 py-4 text-center">
-                          <button onClick={() => openIndependentWindow('new', item)} className="flex items-center gap-1 mx-auto bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg shadow-sm transition-all font-bold text-[11px] active:scale-95"><PlusCircle size={13} /><span>기록추가</span></button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                            <button onClick={() => setDeleteTargetId(item.id)} className="p-1.5 text-red-400 hover:bg-red-100 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -564,9 +576,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                         <td className="px-2 py-4 text-center text-[11px] text-emerald-700 font-bold bg-emerald-50/30">{item.stockQty}</td>
                         <td className="px-3 py-4 text-left pl-4 text-[11px] text-gray-500 italic max-w-[200px] truncate">{item.details}</td>
                         <td className="px-3 py-4 text-center print:hidden">
-                          <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="수정"><Edit2 size={16} /></button>
-                            <button onClick={() => setDeleteTargetId(item.id)} className="p-1.5 text-red-400 hover:bg-red-50 rounded" title="삭제"><Trash2 size={16} /></button>
+                          <div className="flex items-center justify-center gap-2">
+                            <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                            <button onClick={() => setDeleteTargetId(item.id)} className="p-1.5 text-red-400 hover:bg-red-100 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
                           </div>
                         </td>
                       </tr>
@@ -612,62 +624,6 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           )}
         </div>
       </div>
-
-      {/* 역사 모달 (기존 유지) */}
-      {isHistoryOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-fade-in border border-gray-100">
-            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <History className="text-blue-600" size={24} />
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800">[{historyTargetItem.category}] {historyTargetItem.name} 상세 변동 이력</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">{historyTargetItem.model ? `모델명: ${historyTargetItem.model}` : '모델명 없음'}</p>
-                </div>
-              </div>
-              <button onClick={() => setIsHistoryOpen(false)} className="text-gray-400 hover:text-black hover:bg-gray-200 p-2 rounded-full transition-all"><X size={24} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-hide">
-              <div className="bg-blue-50/30 p-4 rounded-xl border border-blue-100 mb-6 flex items-start gap-3">
-                <AlertTriangle className="text-blue-500 mt-0.5" size={18} />
-                <div className="text-xs text-blue-800 leading-relaxed">
-                  <p className="font-bold">알림: 누적 재고 계산 방식 안내</p>
-                  <p>이 화면의 '계산된 누적재고'는 해당 품목의 모든 기록을 <strong>날짜순으로 정렬하여 처음부터 차례대로 합산</strong>한 결과입니다.</p>
-                </div>
-              </div>
-              <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <table className="w-full text-sm border-collapse">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-3 border-b text-center text-xs font-bold text-gray-500 w-12">No</th>
-                      <th className="px-4 py-3 border-b text-center text-xs font-bold text-gray-500 w-28">날짜</th>
-                      <th className="px-4 py-3 border-b text-left text-xs font-bold text-gray-500">사용내역 / 세부사항</th>
-                      <th className="px-4 py-3 border-b text-center text-xs font-bold text-blue-600 w-20">입고</th>
-                      <th className="px-4 py-3 border-b text-center text-xs font-bold text-red-600 w-20">사용</th>
-                      <th className="px-4 py-3 border-b text-center text-xs font-bold text-emerald-600 w-28">계산된 누적재고</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {historyList.map((item, idx) => (
-                      <tr key={`history-${item.id}`} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{historyList.length - idx}</td>
-                        <td className="px-4 py-3 text-center font-medium text-gray-700">{item.date}</td>
-                        <td className="px-4 py-3 text-left font-medium text-gray-800">{item.details || item.note || '-'}</td>
-                        <td className="px-4 py-3 text-center font-bold text-blue-600">{item.inQty !== '0' && item.inQty !== '' ? item.inQty : '-'}</td>
-                        <td className="px-4 py-3 text-center font-bold text-red-600">{item.outQty !== '0' && item.outQty !== '' ? item.outQty : '-'}</td>
-                        <td className="px-4 py-3 text-center"><span className="inline-block px-3 py-1 bg-emerald-50 text-emerald-700 font-black rounded-lg">{item.calculatedStock}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="bg-gray-50 px-6 py-4 border-t flex justify-end">
-              <button onClick={() => setIsHistoryOpen(false)} className="px-6 py-2 bg-gray-700 text-white font-bold rounded-lg hover:bg-gray-800 transition-all shadow-md">닫기</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 삭제 확인 모달 */}
       {deleteTargetId && (
