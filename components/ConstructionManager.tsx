@@ -1,22 +1,25 @@
+
 import React, { useState } from 'react';
 import ConstructionLog from './ConstructionLog';
 import ConstructionHistory from './ConstructionHistory';
+import ConstructionContractorManager from './ConstructionContractorManager';
 import { LayoutList } from 'lucide-react';
 
 const TABS = [
   { id: 'history', label: '공사/작업리스트' },
   { id: 'external', label: '외부업체' },
   { id: 'internal', label: '시설직' },
+  { id: 'contractors', label: '공사업체현황' },
 ];
 
 const ConstructionManager: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'history' | 'external' | 'internal'>('history');
+  const [activeTab, setActiveTab] = useState<'history' | 'external' | 'internal' | 'contractors'>('history');
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-800">공사 및 작업 관리</h2>
-        <p className="text-gray-500 mt-1 text-base">외부 업체 공사 현황 및 시설팀 자체 작업 내역을 사진과 함께 기록합니다.</p>
+        <p className="text-gray-500 mt-1 text-base">외부 업체 공사 현황 및 시설팀 자체 작업 내역, 공사업체 정보를 통합 관리합니다.</p>
       </div>
 
       {/* Tab Navigation */}
@@ -47,6 +50,7 @@ const ConstructionManager: React.FC = () => {
             <ConstructionLog mode={activeTab} />
           </div>
         )}
+        {activeTab === 'contractors' && <ConstructionContractorManager />}
       </div>
     </div>
   );

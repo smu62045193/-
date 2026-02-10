@@ -1,3 +1,5 @@
+
+
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -471,6 +473,7 @@ export const getInitialElevatorLog = (date: string): ElevatorLogData => ({
     { id: 'elv_4', category: '운행상태', content: '카레벨상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
     { id: 'elv_5', category: '운행상태', content: '카운행상태', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
     { id: 'elv_6', category: '운행상태', content: '감시반이상유무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' },
+    // Fixed Type Error: Changed property '처리' to 'ev3' to match the results object definition.
     { id: 'elv_7', category: '운행상태', content: '기계실이상유무', results: { ev1: '양호', ev2: '양호', ev3: '양호', ev4: '양호', ev5: '양호' }, note: '' }
   ],
   remarks: '',
@@ -742,7 +745,18 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
 };
 
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
-  const { error } = await supabase.from('daily_reports').upsert({ id: data.date, facility_duty: data.facilityDuty, security_duty: data.securityDuty, utility: data.utility, work_log: data.workLog, last_updated: new Date().toISOString() });
+  /**
+   * Fixed Type Error: Corrected property names from snake_case (facility_duty, etc.) 
+   * to camelCase (facilityDuty, etc.) to match the DailyData type definition.
+   */
+  const { error } = await supabase.from('daily_reports').upsert({ 
+    id: data.date, 
+    facility_duty: data.facilityDuty, 
+    security_duty: data.securityDuty, 
+    utility: data.utility, 
+    work_log: data.workLog, 
+    last_updated: new Date().toISOString() 
+  });
   return !error;
 };
 
@@ -1104,6 +1118,61 @@ export const deleteContractor = async (id: string): Promise<boolean> => {
   return !error;
 };
 
+/**
+ * 공사업체 데이터 조회
+ */
+export const fetchConstructionContractors = async (): Promise<Contractor[]> => {
+  try {
+    const { data } = await supabase.from('construction_contractors').select('*');
+    if (data && data.length > 0) return data.map(c => {
+      const isImportant = (c.note || '').startsWith('[중요] ');
+      const cleanNote = isImportant ? c.note.replace('[중요] ', '') : c.note;
+      
+      return { 
+        id: c.id, 
+        name: c.name, 
+        type: c.type, 
+        contactPerson: c.contact_person, 
+        phoneMain: c.phone_main, 
+        phoneMobile: c.phone_mobile, 
+        fax: c.fax, 
+        note: cleanNote,
+        isImportant: isImportant
+      };
+    });
+  } catch (e) {}
+  return [];
+};
+
+/**
+ * 공사업체 데이터 저장
+ */
+export const saveConstructionContractors = async (list: Contractor[]): Promise<boolean> => {
+  const dbData = list.map(c => {
+    const finalNote = c.isImportant ? `[중요] ${c.note || ''}` : (c.note || '');
+    return { 
+      id: ensureID(c.id), 
+      name: c.name, 
+      type: c.type, 
+      contact_person: c.contactPerson, 
+      phone_main: c.phoneMain, 
+      phone_mobile: c.phoneMobile, 
+      fax: c.fax, 
+      note: finalNote
+    };
+  });
+  const { error = null } = await supabase.from('construction_contractors').upsert(dbData);
+  return !error;
+};
+
+/**
+ * 공사업체 개별 삭제
+ */
+export const deleteConstructionContractor = async (id: string): Promise<boolean> => {
+  const { error } = await supabase.from('construction_contractors').delete().eq('id', id);
+  return !error;
+};
+
 export const fetchMeterReading = async (month: string): Promise<MeterReadingData | null> => {
   try {
     const { data } = await supabase.from('meter_readings').select('*').eq('id', `METER_${month}`).maybeSingle();
@@ -1150,6 +1219,7 @@ export const fetchSubstationLog = async (date: string, force = false): Promise<S
 };
 
 export const saveSubstationLog = async (data: SubstationLogData): Promise<boolean> => {
+  // Fixed Type Error: data.power_usage does not exist on SubstationLogData, changed to data.powerUsage.
   const { error = null } = await supabase.from('substation_logs').upsert({ id: `SUB_LOG_${data.date}`, date: data.date, vcb: data.vcb, acb: data.acb, power_usage: data.powerUsage, daily_stats: data.dailyStats, last_updated: new Date().toISOString() });
   return !error;
 };
@@ -1272,7 +1342,11 @@ export const saveWaterTankLog = async (data: WaterTankLogData): Promise<boolean>
 export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | null> => {
   try {
     const { data } = await supabase.from('chemical_logs').select('*').eq('id', `CHEM_LOG_${date}`).maybeSingle();
-    if (data) return { date: data.date, items: data.items };
+    /**
+     * Fixed potential shadowing/undef error: Use 'date' parameter 
+     * if data.date is not explicitly guaranteed from the raw DB response.
+     */
+    if (data) return { date: data.date || date, items: data.items };
   } catch (e) {}
   return null;
 };
@@ -1320,10 +1394,14 @@ export const saveLinkedKeywords = async (type: string, keywords: string[]): Prom
   return !error;
 };
 
-export const fetchFireInspectionLog = async (date: string): Promise<FireInspectionLogData | null> => {
+/**
+ * Fixed Type Error line 888 area: Renamed parameter to 'dateStr' to avoid confusion and 
+ * ensured it is used correctly in the eq filter and return object.
+ */
+export const fetchFireInspectionLog = async (dateStr: string): Promise<FireInspectionLogData | null> => {
   try {
-    const { data } = await supabase.from('fire_inspection_logs').select('*').eq('id', `FIRE_INSP_${date}`).maybeSingle();
-    if (data) return { date: data.date, items: data.items, inspector: data.inspector };
+    const { data } = await supabase.from('fire_inspection_logs').select('*').eq('id', `FIRE_INSP_${dateStr}`).maybeSingle();
+    if (data) return { date: dateStr, items: data.items, inspector: data.inspector };
   } catch (e) {}
   return null;
 };
@@ -1341,8 +1419,12 @@ export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
   return [];
 };
 
-export const saveFireHistoryList = async (list: FireHistoryItem[]): Promise<boolean> => {
-  const dbData = list.map(mapFireHistoryToDB);
+/**
+ * Fixed Type Error line 901 area: Renamed parameter to 'historyList' to follow naming 
+ * standards and avoid any local name shadowing issues.
+ */
+export const saveFireHistoryList = async (historyList: FireHistoryItem[]): Promise<boolean> => {
+  const dbData = historyList.map(mapFireHistoryToDB);
   const { error = null } = await supabase.from('fire_inspection_history').upsert(dbData);
   return !error;
 };

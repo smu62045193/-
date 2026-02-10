@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { ConsumableRequest, ConsumableRequestItem, ConsumableItem, StaffMember } from '../types';
 import { fetchConsumableRequests, saveConsumableRequests, fetchConsumables, fetchStaffList } from '../services/dataService';
@@ -37,11 +38,11 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
     // 대리 우선 순위
     const deputy = activeFacilityStaff.find(s => (s.jobTitle || '').includes('대리'));
-    if (deputy) return deputy.name;
+    if ( deputy ) return deputy.name;
 
     // 주임 순위
     const chief = activeFacilityStaff.find(s => (s.jobTitle || '').includes('주임'));
-    if (chief) return chief.name;
+    if ( chief ) return chief.name;
 
     return '';
   };
@@ -128,9 +129,11 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       const lowStockItems = Object.values(groups)
         .map(g => ({ ...g.lastItem, currentStock: g.totalIn - g.totalOut }))
         .filter(item => {
-          // 적정재고 값이 문자열 '0'이거나 숫자 0인 경우에도 5로 치환하지 않고 0을 그대로 사용함
+          // 적정재고 값이 문자열 '0'이거나 숫자 0인 경우에도 5로 치환하지 않고 입력된 값을 그대로 사용
           const minStockStr = String(item.minStock || '').trim();
-          const threshold = minStockStr !== '' ? parseFloat(minStockStr) : 5;
+          const threshold = (minStockStr !== '') ? parseFloat(minStockStr) : 5;
+          
+          // 현재고가 설정된 적정재고보다 적은 경우만 리스트에 포함
           return item.currentStock < threshold;
         });
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -15,6 +16,7 @@ import MechCheckManager from './components/MechCheckManager';
 import FireCheckManager from './components/FireCheckManager';
 import ElevatorCheckManager from './components/ElevatorCheckManager';
 import ConstructionManager from './components/ConstructionManager';
+import ConstructionContractorManager from './components/ConstructionContractorManager';
 import AppointmentManager from './components/AppointmentManager';
 import { MenuId } from './types';
 import { Menu as MenuIcon, X } from 'lucide-react';
@@ -23,7 +25,7 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -37,6 +39,8 @@ const App: React.FC = () => {
       setIsPopupMode('contractor');
     } else if (popupType === 'consumable') {
       setIsPopupMode('consumable');
+    } else if (popupType === 'construction_contractor') {
+      setIsPopupMode('construction_contractor');
     }
   }, []);
 
@@ -60,6 +64,10 @@ const App: React.FC = () => {
 
   if (isPopupMode === 'consumable') {
     return <ConsumablesLedger isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'construction_contractor') {
+    return <ConstructionContractorManager isPopupMode={true} />;
   }
 
   const renderContent = () => {
