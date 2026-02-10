@@ -36,12 +36,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     category: CATEGORIES[0],
     itemName: '',
     modelName: '',
-    details: '',
+    details: '', // 사용처/상세내역
     inQty: '',
     outQty: '',
     stockQty: '',
     unit: 'EA',
-    note: '',
+    note: '',    // 자재특징/비고
     minStock: '5' 
   });
 
@@ -63,6 +63,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           category: params.get('category') || CATEGORIES[0],
           unit: params.get('unit') || 'EA',
           minStock: params.get('minStock') || '5',
+          note: params.get('note') || '',
           details: params.get('details') || ''
         }));
       }
@@ -104,7 +105,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         setNewItem(prev => ({ ...prev, stockQty: totalStock.toString() }));
       }
     }
-  }, [editId, items.length, isPopupMode]);
+  }, [editId, items.length, isPopupMode, newItem.itemName, newItem.category, newItem.modelName]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -125,7 +126,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
 
   const openIndependentWindow = (id: string = 'new', initialData?: ConsumableItem) => {
     const width = 850;
-    const height = 600;
+    const height = 650;
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -139,6 +140,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       url.searchParams.set('category', initialData.category);
       url.searchParams.set('unit', initialData.unit || 'EA');
       url.searchParams.set('minStock', initialData.minStock || '5');
+      url.searchParams.set('note', initialData.note || '');
       url.searchParams.set('details', initialData.details || '');
     }
 
@@ -183,7 +185,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       (item.modelName || '').trim() === (model || '').trim()
     );
     let totalIn = 0; let totalOut = 0;
-    let unit = 'EA'; let details = ''; let minStock = '5';
+    let unit = 'EA'; let note = ''; let minStock = '5';
     matches.forEach(m => {
       totalIn += parseFloat(String(m.inQty || '0').replace(/,/g, '')) || 0;
       totalOut += parseFloat(String(m.outQty || '0').replace(/,/g, '')) || 0;
@@ -191,7 +193,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     const latestMatch = [...matches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
     if (latestMatch) {
       unit = latestMatch.unit || 'EA';
-      details = latestMatch.details || '';
+      note = latestMatch.note || '';
       minStock = latestMatch.minStock || '5';
     }
     const currentCalculatedStock = totalIn - totalOut;
@@ -201,9 +203,10 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     setNewItem(prev => ({
       ...prev,
       unit: latestMatch ? unit : prev.unit,
-      details: latestMatch ? details : prev.details,
+      note: latestMatch ? note : prev.note,
       minStock: latestMatch ? minStock : prev.minStock,
-      stockQty: (currentCalculatedStock + currentIn - currentOut).toString()
+      stockQty: (currentCalculatedStock + currentIn - currentOut).toString(),
+      details: '' // 상세내역(사용사유)은 승계하지 않음
     }));
   };
 
@@ -354,7 +357,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
                 {editId ? <Edit2 size={20} /> : <PackagePlus size={20} />}
               </div>
-              <span className="font-black text-lg">{editId ? '소모품 정보 수정' : '신규 소모품 등록'}</span>
+              <span className="font-black text-lg">{editId ? '소모품 정보 수정' : '소모품 사용/입고 등록'}</span>
             </div>
             <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
               <X size={24} />
@@ -416,9 +419,15 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               </div>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">상세내역 / 비고</label>
-              <textarea value={newItem.details} onChange={e => setNewItem({...newItem, details: e.target.value})} placeholder="규격, 사용처 또는 특이사항 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24" />
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고 (자재 규격 등)</label>
+                <input type="text" value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} placeholder="자재 특징, 정규 규격 등 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">상세내역 (사용 장소/사유)</label>
+                <textarea value={newItem.details} onChange={e => setNewItem({...newItem, details: e.target.value})} placeholder="사용 장소, 작업 내용 등 구체적인 사유 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24" />
+              </div>
             </div>
           </div>
 
@@ -458,7 +467,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           <div className="relative flex-1 md:w-80">
             <input 
               type="text" 
-              placeholder="품명, 모델명, 내역 검색" 
+              placeholder="품명, 모델명, 상세내역 검색" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
               className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner" 
@@ -476,7 +485,19 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
             새로고침
           </button>
           <button 
-            onClick={() => openIndependentWindow()}
+            onClick={() => {
+              let initialData;
+              if (viewMode === 'usage') {
+                if (processedList.length > 0) {
+                  // 검색 결과가 있는 경우 가장 최신(첫 번째) 항목 정보 전달
+                  initialData = processedList[0];
+                } else if (searchTerm.trim()) {
+                  // 검색 결과가 없어도 검색창에 텍스트가 있으면 품명으로 전달
+                  initialData = { itemName: searchTerm.trim() } as any;
+                }
+              }
+              openIndependentWindow('new', initialData);
+            }}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
           >
             <PlusCircle size={18} /> {viewMode === 'ledger' ? '소모품 등록/수정' : '소모품 사용/입고'}
@@ -503,11 +524,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                   <tr>
                     <th className={`${thClass} w-12`}>No</th>
                     <th className={`${thClass} w-28`}>구분</th>
-                    <th className={`${thClass} text-left pl-4`}>품명</th>
+                    <th className={`${thClass} w-40 text-left pl-4`}>품명</th>
                     <th className={`${thClass} w-48`}>모델명</th>
                     <th className={`${thClass} w-28 text-emerald-600`}>현재재고</th>
                     <th className={`${thClass} w-20 text-orange-600`}>적정재고</th>
                     <th className={`${thClass} w-16`}>단위</th>
+                    <th className={`${thClass} text-left pl-4`}>비고</th>
                     <th className={`${thClass} w-36`}>관리</th>
                   </tr>
                 ) : (
@@ -515,7 +537,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                     <th className={`${thClass} w-12`}>No</th>
                     <th className={`${thClass} w-28`}>날짜</th>
                     <th className={`${thClass} w-24`}>구분</th>
-                    <th className={`${thClass} text-left pl-4`}>품명</th>
+                    <th className={`${thClass} w-40 text-left pl-4`}>품명</th>
                     <th className={`${thClass} w-32`}>모델명</th>
                     <th className={`${thClass} w-16 text-blue-600`}>입고</th>
                     <th className={`${thClass} w-16 text-red-600`}>사용</th>
@@ -552,6 +574,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                         </td>
                         <td className="px-2 py-4 text-center text-gray-500 font-bold text-xs">{item.minStock || '5'}</td>
                         <td className="px-2 py-4 text-xs text-center text-gray-500 font-bold">{item.unit}</td>
+                        <td className="px-3 py-4 text-left pl-4 text-[11px] text-gray-500 italic truncate max-w-[200px]">{item.note}</td>
                         <td className="px-3 py-4 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
