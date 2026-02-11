@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
 import { fetchContractors, saveContractors, deleteContractor, generateUUID } from '../services/dataService';
@@ -237,7 +236,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
           @page { size: A4 portrait; margin: 0; }
-          body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: white !important; -webkit-print-color-adjust: exact; }
+          body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; -webkit-print-color-adjust: exact; }
           .no-print { display: flex; justify-content: center; padding: 20px; }
           @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
           .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 15mm 12mm 15mm 12mm; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
@@ -369,7 +368,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
       <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
         <div className="p-6 space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
-            <div className="relative flex-1 md:w-80 w-full">
+            <div className="relative w-[320px]">
               <input 
                 type="text" 
                 placeholder="업체명, 업종, 담당자 검색" 
@@ -401,7 +400,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
                 className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
               >
                 <Printer size={18} className="mr-2" />
-                중요업체 인쇄
+                미리보기
               </button>
             </div>
           </div>
@@ -494,7 +493,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             <div className="p-8 text-center">
               <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100"><Cloud className="text-blue-600" size={36} /></div>
               <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">협력업체 데이터를<br/>서버에 안전하게 기록하시습니까?</p>
+              <p className="text-slate-500 mb-8 leading-relaxed font-medium">협력업체 데이터를<br/>서버에 안전하게 기록하시겠습니까?</p>
               <div className="flex gap-3">
                 <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
                 <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
