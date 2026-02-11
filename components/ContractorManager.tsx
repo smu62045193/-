@@ -248,7 +248,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
       </head>
       <body>
         <div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button></div>
-        <div class="print-page"><h1>중요 협력업체 현황</h1><table><thead><tr><th style="width: 30px;">No</th><th style="width: 40px;">업종</th><th style="width: 110px;">업체명</th><th style="width: 50px;">담당자</th><th style="width: 90px;">대표번호</th><th style="width: 90px;">핸드폰</th><th style="width: 90px;">팩스</th><th>비고</th></tr></thead><tbody>${tableRows}</tbody></table></div>
+        <div class="print-page"><h1>중요 협력업체 현황</h1><table><thead><tr><th style="width: 30px;">No</th><th style="width: 40px;">업종</th><th style="width: 100px;">업체명</th><th style="width: 50px;">담당자</th><th style="width: 95px;">대표번호</th><th style="width: 95px;">핸드폰</th><th style="width: 95px;">팩스</th><th>비고</th></tr></thead><tbody>${tableRows}</tbody></table></div>
       </body>
       </html>`;
     printWindow.document.write(htmlContent);
@@ -411,11 +411,11 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
                 <tr>
                   <th className={thClass} style={{ width: '50px' }}>No</th>
                   <th className={thClass} style={{ width: '70px' }}>업종</th>
-                  <th className={thClass} style={{ width: '180px' }}>업체명</th>
+                  <th className={thClass} style={{ width: '150px' }}>업체명</th>
                   <th className={thClass} style={{ width: '80px' }}>담당자</th>
-                  <th className={thClass} style={{ width: '110px' }}>대표번호</th>
-                  <th className={thClass} style={{ width: '110px' }}>휴대폰</th>
-                  <th className={thClass} style={{ width: '110px' }}>팩스</th>
+                  <th className={thClass} style={{ width: '120px' }}>대표번호</th>
+                  <th className={thClass} style={{ width: '120px' }}>휴대폰</th>
+                  <th className={thClass} style={{ width: '120px' }}>팩스</th>
                   <th className={thClass}>비고</th>
                   <th className={`${thClass} w-24 print:hidden`}>관리</th>
                 </tr>
