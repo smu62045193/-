@@ -163,8 +163,8 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
-            .no-print { display: flex; justify-content: center; padding: 20px; background: #f1f5f9; border-bottom: 1px solid #ddd; }
+            body { font-family: 'Noto Sans KR', sans-serif; background: black; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
+            .no-print { display: flex; justify-content: center; padding: 20px; background: black; border-bottom: 1px solid #333; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
             .print-page { 
               width: 210mm; 
@@ -397,7 +397,10 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                 <UserPlus size={18} className="mr-2" />
                 신규 선임 등록
               </button>
-              <button onClick={handlePrint} className="bg-slate-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md hover:bg-slate-800 flex items-center justify-center transition-all active:scale-95">
+              <button 
+                onClick={handlePrint} 
+                className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+              >
                 <Printer size={18} className="mr-2" />
                 미리보기
               </button>
@@ -409,24 +412,22 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
             <table className="w-full border-collapse min-w-[1000px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-16">No</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24">구분</th>
-                  <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 w-44">선임명칭</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24">성명</th>
-                  <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 w-40">기관/단체</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-32">연락처</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28">선임일자</th>
-                  <th className="px-4 py-4 text-left text-sm font-bold text-gray-500">자격사항</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28 print:hidden">관리</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24 border border-gray-200">구분</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-44 border border-gray-200">선임명칭</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24 border border-gray-200">성명</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-40 border border-gray-200">기관/단체</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-32 border border-gray-200">연락처</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28 border border-gray-200">선임일자</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 border border-gray-200">자격사항</th>
+                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28 print:hidden border border-gray-200">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {sortedItems.length === 0 ? (
-                  <tr><td colSpan={9} className="py-20 text-center text-gray-400 italic">등록된 정보가 없습니다.</td></tr>
+                  <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic border border-gray-200">등록된 정보가 없습니다.</td></tr>
                 ) : sortedItems.map((it, idx) => (
                   <tr key={it.id} className="text-center hover:bg-gray-50/50 transition-colors group">
-                    <td className="p-4 text-xs text-gray-400 font-mono">{idx + 1}</td>
-                    <td className="p-4">
+                    <td className="p-4 border border-gray-200">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         it.category === '전기' ? 'bg-blue-100 text-blue-700' :
                         it.category === '소방' ? 'bg-red-100 text-red-700' :
@@ -436,18 +437,20 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                         {it.category}
                       </span>
                     </td>
-                    <td className="p-4 text-sm font-bold text-gray-700 text-left">{it.title}</td>
-                    <td className="p-4 text-sm font-black text-gray-900">{it.name}</td>
-                    <td className="p-4 text-sm text-gray-600 text-left">{it.agency}</td>
-                    <td className="p-4 text-sm text-gray-600">{it.phone}</td>
-                    <td className="p-4 text-sm text-gray-500 font-mono">{it.appointmentDate}</td>
-                    <td className="p-4 text-sm text-gray-600 text-left">{it.license}</td>
-                    <td className="p-4 print:hidden">
-                      <div className="flex justify-center gap-1 transition-opacity">
-                        <button onClick={() => openIndependentWindow(it.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="편집">
+                    <td className="p-4 text-sm font-bold text-gray-700 text-center border border-gray-200">{it.title}</td>
+                    <td className="p-4 text-sm font-black text-gray-900 border border-gray-200">{it.name}</td>
+                    <td className="p-4 text-sm text-gray-600 text-center border border-gray-200">{it.agency}</td>
+                    <td className="p-4 text-sm text-gray-600 border border-gray-200">{it.phone}</td>
+                    <td className="p-4 text-sm text-gray-500 font-mono border border-gray-200">{it.appointmentDate}</td>
+                    <td className="p-4 text-sm text-gray-600 text-center border border-gray-200">{it.license}</td>
+                    <td className="p-4 print:hidden border border-gray-200">
+                      <div className="flex justify-center gap-1">
+                        <button onClick={() => openIndependentWindow(it.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="편집">
                           <Edit2 size={16} />
                         </button>
-                        <button onClick={() => handleDeleteItem(it.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                        <button onClick={() => handleDeleteItem(it.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제">
+                          <Trash2 size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>
