@@ -61,7 +61,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 750;
-    const height = 850; // 기존 650에서 850으로 높이 상향 조정 (스크롤 방지)
+    const height = 900; // 기존 850에서 900으로 높이 상향 조정 (스크롤 방지)
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -244,7 +244,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         <div class="print-page">
           <h1>직원 현황 리스트</h1>
           <table>
-            <thead><tr><th style="width:30px;">No</th><th style="width:70px;">구분</th><th style="width:60px;">직책</th><th style="width:60px;">성명</th><th style="width:85px;">생년월일</th><th style="width:110px;">전화번호</th><th style="width:85px;">입사일</th><th>담당구역</th></tr></thead>
+            <thead><tr><th style="width:30px;">No</th><th style="width:70px;">구분</th><th style="width:50px;">직책</th><th style="width:60px;">성명</th><th style="width:85px;">생년월일</th><th style="width:130px;">전화번호</th><th style="width:85px;">입사일</th><th>담당구역</th></tr></thead>
             <tbody>${tableRows}</tbody>
           </table>
         </div>
@@ -386,10 +386,10 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
               <tr>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16 border border-gray-200">No</th>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-200">구분</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-200">직책</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20 border border-gray-200">직책</th>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-200">성명</th>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-200">생년월일</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-200">전화번호</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-40 border border-gray-200">전화번호</th>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28 border border-gray-200">입사일</th>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28 border border-gray-200">퇴사일</th>
                 <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider border border-gray-200">담당구역</th>
