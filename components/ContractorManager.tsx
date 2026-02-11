@@ -34,7 +34,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   const initialNewItem: Contractor = {
     id: '',
@@ -116,7 +115,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
     }
 
     setLoading(true);
-    setShowSaveConfirm(false);
     try {
       const latestData = await fetchContractors();
       let newList = [...(latestData || [])];
@@ -331,33 +329,12 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
             <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
-            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
           </div>
         </div>
-
-        {showSaveConfirm && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-              <div className="p-8 text-center">
-                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                  <Cloud className="text-blue-600" size={36} />
-                </div>
-                <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-                <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                  입력하신 협력업체 정보를<br/>
-                  서버에 안전하게 기록하시겠습니까?
-                </p>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                  <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -380,7 +357,11 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${activeTab === tab.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' : 'bg-white text-slate-50 border-slate-200 hover:bg-slate-50'}`}
+            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
+              activeTab === tab.id 
+                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+                : 'bg-white text-slate-50 border-slate-200 hover:bg-slate-50'
+            }`}
           >
             {tab.label}
           </button>
@@ -508,22 +489,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
           )}
         </div>
       </div>
-
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100"><Cloud className="text-blue-600" size={36} /></div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">협력업체 데이터를<br/>서버에 안전하게 기록하시겠습니까?</p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
