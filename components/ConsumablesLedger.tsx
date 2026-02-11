@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ConsumableItem } from '../types';
 import { fetchConsumables, saveConsumables } from '../services/dataService';
-import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, AlertTriangle, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch } from 'lucide-react';
+import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch } from 'lucide-react';
 
 interface ConsumablesLedgerProps {
   onBack?: () => void;
@@ -24,11 +24,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   
   const [popupViewMode, setPopupViewMode] = useState<'ledger' | 'usage'>('ledger');
   const [currentPage, setCurrentPage] = useState(1);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [baseStock, setBaseStock] = useState<number>(0);
 
   const [newItem, setNewItem] = useState<ConsumableItem>({
@@ -226,7 +224,6 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       return;
     }
     setLoading(true);
-    setShowSaveConfirm(false);
     try {
       const latestItems = await fetchConsumables();
       let newList = Array.isArray(latestItems) ? [...latestItems] : [];
@@ -252,7 +249,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           window.opener.postMessage({ type: 'CONSUMABLE_SAVED' }, '*');
         }
         setSaveSuccess(true);
-        alert('저장이 완료되었습니다.');
+        alert('성공적으로 저장되었습니다.');
         if (isPopupMode) {
           window.close();
         } else {
@@ -298,21 +295,27 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     });
   };
 
-  const confirmDelete = async () => {
-    if (!deleteTargetId) return;
-    const idStr = String(deleteTargetId);
+  const handleDeleteItem = async (id: string) => {
+    if (!window.confirm('해당 기록을 장부에서 영구히 삭제하시겠습니까?\n삭제 시 재고가 다시 계산됩니다.')) return;
+    
+    setLoading(true);
+    const idStr = String(id);
     const originalItems = [...items];
     const updatedItems = originalItems.filter(i => String(i.id) !== idStr);
-    setItems(updatedItems);
-    setDeleteTargetId(null);
+    
     try {
       const success = await saveConsumables(updatedItems);
-      if (!success) {
-        setItems(originalItems);
-        alert('삭제 실패');
+      if (success) {
+        setItems(updatedItems);
+        alert('삭제가 완료되었습니다.');
+      } else {
+        alert('저장 실패');
       }
     } catch (e) {
-      setItems(originalItems);
+      console.error(e);
+      alert('오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -351,7 +354,6 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return pages;
   }, [currentPage, totalPages]);
 
-  // 협력업체현황 스타일과 동일하게 헤더 및 셀 스타일 정의
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-10 whitespace-nowrap";
   const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700 h-10 align-middle bg-white text-center";
 
@@ -444,35 +446,19 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
             <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">취소 후 닫기</button>
-            <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
           </div>
         </div>
-
-        {showSaveConfirm && (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-              <div className="p-8 text-center">
-                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100"><Cloud className="text-blue-600" size={36} /></div>
-                <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-                <p className="text-slate-500 mb-8 leading-relaxed font-medium">입력하신 소모품 데이터를<br/>서버에 안전하게 기록하시겠습니까?</p>
-                <div className="flex gap-3">
-                  <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                  <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* 툴바 (협력업체 스타일 박스 1, 검색창 너비 320px 설정) */}
+      {/* 툴바 */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
         <div className="relative w-full md:w-[320px]">
           <input 
@@ -512,7 +498,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         </div>
       </div>
 
-      {/* 리스트 (협력업체 스타일 박스 2) */}
+      {/* 리스트 */}
       <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[1000px] border-collapse">
@@ -574,7 +560,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                       <td className={`${tdClass} print:hidden`}>
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={() => setDeleteTargetId(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -597,7 +583,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                       <td className={`${tdClass} print:hidden`}>
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={() => setDeleteTargetId(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -608,7 +594,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           </table>
         </div>
 
-        {/* 페이지네이션 (박스 하단 내부) */}
+        {/* 페이지네이션 */}
         {totalPages > 1 && (
           <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
             <button
@@ -643,23 +629,6 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           </div>
         )}
       </div>
-
-      {/* 삭제 확인 모달 */}
-      {deleteTargetId && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-scale-up">
-            <div className="p-6 text-center">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100"><AlertTriangle className="text-red-500" size={32} /></div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">기록 삭제 확인</h3>
-              <p className="text-gray-500 mb-8 leading-relaxed">해당 기록을 장부에서 영구히 삭제하시겠습니까?<br/><span className="text-red-500 font-bold text-sm">삭제 시 재고가 다시 계산됩니다.</span></p>
-              <div className="flex gap-3">
-                <button onClick={() => setDeleteTargetId(null)} className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold transition-colors">취소</button>
-                <button onClick={confirmDelete} className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all shadow-lg">삭제 진행</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
