@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
 import { fetchContractors, saveContractors, deleteContractor, generateUUID } from '../services/dataService';
@@ -336,6 +337,27 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             </button>
           </div>
         </div>
+
+        {showSaveConfirm && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
+              <div className="p-8 text-center">
+                <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
+                  <Cloud className="text-blue-600" size={36} />
+                </div>
+                <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
+                <p className="text-slate-500 mb-8 leading-relaxed font-medium">
+                  입력하신 협력업체 정보를<br/>
+                  서버에 안전하게 기록하시겠습니까?
+                </p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
+                  <button onClick={handleRegister} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -454,7 +476,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             </table>
           </div>
 
-          {/* 페이지네이션 UI를 박스 외부로 이동 */}
+          {/* 페이지네이션 UI */}
           {totalPages > 1 && (
             <div className="py-4 flex items-center justify-center gap-2 print:hidden">
               <button 
