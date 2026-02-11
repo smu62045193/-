@@ -36,11 +36,9 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       (!s.resignDate || s.resignDate === '' || s.resignDate > todayStr)
     );
 
-    // 대리 우선 순위
     const deputy = activeFacilityStaff.find(s => (s.jobTitle || '').includes('대리'));
     if ( deputy ) return deputy.name;
 
-    // 주임 순위
     const chief = activeFacilityStaff.find(s => (s.jobTitle || '').includes('주임'));
     if ( chief ) return chief.name;
 
@@ -68,13 +66,11 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     const existing = allRequests.find(r => r.date.startsWith(monthKey));
     
     if (existing) {
-      // 기존 데이터가 있으면 해당 데이터를 유지 (날짜 우선순위 적용됨)
       setActiveRequest({
         ...existing,
         drafter: existing.drafter || autoDrafter
       });
     } else {
-      // 신규 데이터 생성
       const items: ConsumableRequestItem[] = [];
       SECTIONS.forEach(sec => {
         for (let i = 0; i < 5; i++) {
@@ -82,7 +78,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             id: generateId(), 
             category: sec.key, 
             itemName: '', 
-            spec: '', // 모델명 대용
+            spec: '', 
             stock: '', 
             qty: '', 
             receivedDate: '', 
@@ -109,7 +105,6 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     try {
       const ledgerItems = await fetchConsumables();
       
-      // 재고 요약 계산 (적정재고 미달 품목 추출)
       const groups: Record<string, { lastItem: ConsumableItem, totalIn: number, totalOut: number }> = {};
       ledgerItems.forEach(item => {
         const key = `${item.category}_${item.itemName}_${item.modelName || ''}`;
@@ -129,11 +124,8 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       const lowStockItems = Object.values(groups)
         .map(g => ({ ...g.lastItem, currentStock: g.totalIn - g.totalOut }))
         .filter(item => {
-          // 적정재고 값이 문자열 '0'이거나 숫자 0인 경우에도 5로 치환하지 않고 입력된 값을 그대로 사용
           const minStockStr = String(item.minStock || '').trim();
           const threshold = (minStockStr !== '') ? parseFloat(minStockStr) : 5;
-          
-          // 현재고가 설정된 적정재고보다 적은 경우만 리스트에 포함
           return item.currentStock < threshold;
         });
 
@@ -153,7 +145,6 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             amount: 0
           });
         });
-        // 최소 5행 유지
         const currentCount = newItems.filter(ni => ni.category === sec.key).length;
         if (currentCount < 5) {
           for (let i = 0; i < (5 - currentCount); i++) {
@@ -177,10 +168,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     setShowSaveConfirm(false);
     setLoading(true);
 
-    // 품명이 비어 있는 행을 필터링하여 리스트를 위로 정렬(압축)함
     const compressedItems = activeRequest.items.filter(it => it.itemName.trim() !== '');
-    
-    // 만약 품명이 하나도 없으면 저장하지 않거나 경고를 띄울 수 있음 (여기서는 빈 배열로 저장 허용)
     const finalRequest = { ...activeRequest, items: compressedItems };
 
     let newList = [...requests];
@@ -191,7 +179,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     if (await saveConsumableRequests(newList)) {
       alert('서버에 저장되었습니다.');
       setRequests(newList);
-      setActiveRequest(finalRequest); // 로컬 상태도 압축된 데이터로 업데이트
+      setActiveRequest(finalRequest);
       setIsEditMode(false);
     }
     setLoading(false);
@@ -214,11 +202,11 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       return `
         <div style="break-inside: avoid; margin-bottom: 2px;">
           <h3 style="font-size: 13pt; font-weight: bold; margin-bottom: 6px; border-left: 7px solid black; padding-left: 10px; margin-top: 15px;">${sec.label}</h3>
-          <table style="width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed;">
-            <thead><tr style="background:#f2f2f2; height:30px;">
+          <table>
+            <thead><tr style="background:#f3f4f6; height:30px;">
               <th style="width: 40px;">No</th>
-              <th style="width: 120px;">품 명</th>
-              <th style="width: 120px;">모델명</th>
+              <th style="width: 150px;">품 명</th>
+              <th style="width: 150px;">모델명</th>
               <th style="width: 60px;">재고</th>
               <th style="width: 60px;">수량</th>
               <th style="width: 80px;">입고일</th>
@@ -244,17 +232,18 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       <html><head><title>${title}</title><style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
         @page { size: A4 portrait; margin: 0; }
-        body { font-family: "Noto Sans KR", sans-serif; background: #f1f5f9; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
+        body { font-family: "Noto Sans KR", sans-serif; background: black; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
         .no-print { display: flex; justify-content: center; padding: 20px; }
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
         .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
-        .header-title { text-align: center; font-size: 26pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin-bottom: 35px; }
+        h1 { text-align: center; border-bottom: 2.5px solid black; padding-bottom: 10px; margin-bottom: 30px; font-size: 24pt; font-weight: 900; margin-top: 0; }
         .meta-info { display: flex; justify-content: space-between; margin-bottom: 20px; font-weight: bold; font-size: 11pt; padding: 0 5px; }
-        table { border-collapse: collapse; border: 1.5px solid black; }
-        th, td { border: 1px solid black; text-align: center; height: 26px; font-size: 9pt; }
+        table { width: 100%; border-collapse: collapse; font-size: 8.5pt; border: 1.5px solid black; table-layout: fixed; }
+        th, td { border: 1px solid black; padding: 0; text-align: center; word-break: break-all; font-weight: normal; height: 28px; line-height: 28px; }
+        th { background-color: #f3f4f6; font-weight: bold; }
       </style></head><body>
         <div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button></div>
-        <div class="print-page"><div class="header-title">${title}</div><div class="meta-info"><div>신청일자 : ${activeRequest.date}</div><div>신청부서 : ${activeRequest.department}</div><div>작 성 자 : ${activeRequest.drafter}</div></div>${sectionsHtml}</div>
+        <div class="print-page"><h1>${title}</h1><div class="meta-info"><div>신청일자 : ${activeRequest.date}</div><div>신청부서 : ${activeRequest.department}</div><div>작 성 자 : ${activeRequest.drafter}</div></div>${sectionsHtml}</div>
       </body></html>`);
     printWindow.document.close();
   };
@@ -271,47 +260,59 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     syncRequestToDate(next, requests, activeRequest?.drafter || '');
   };
 
-  // 주차관리 스타일 클래스 정의
-  const thClass = "border border-gray-300 p-2 bg-gray-50/80 font-bold text-center text-[12px] text-gray-700 h-10 align-middle uppercase tracking-tighter";
-  const tdClass = "border border-gray-300 p-0 h-10 align-middle relative bg-white transition-colors hover:bg-gray-50/50";
-  const inputClass = "w-full h-full text-center outline-none bg-transparent text-black text-[12px] font-medium p-1 focus:bg-blue-50/50";
-  const editableInputClass = "w-full h-full text-center outline-none bg-orange-50/30 text-blue-700 text-[12px] font-bold p-1 focus:bg-orange-100/50 focus:ring-1 focus:ring-orange-200";
+  const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-10 whitespace-nowrap";
+  const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700 h-10 align-middle bg-white text-center";
+  
+  const inputClass = "w-full h-full text-center outline-none bg-transparent text-black text-sm font-medium p-1 focus:bg-blue-50/50";
+  const editableInputClass = "w-full h-full text-center outline-none bg-orange-50/30 text-blue-700 text-sm font-bold p-1 focus:bg-orange-100/50 focus:ring-1 focus:ring-orange-200";
 
   return (
-    <div className="p-4 sm:p-6 max-w-full mx-auto space-y-6 bg-white min-h-screen text-black relative pb-32 animate-fade-in">
-      {/* 툴바 상단 영역 */}
-      <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-200 pb-4 print:hidden gap-4">
-        <div className="flex items-center space-x-4">
-          <button onClick={handlePrevMonth} className="p-2 hover:bg-gray-100 rounded-full transition-all"><ChevronLeft size={24} /></button>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tight">{format(viewDate, 'yyyy년 MM월')}</h2>
-          <button onClick={handleNextMonth} className="p-2 hover:bg-gray-100 rounded-full transition-all"><ChevronRight size={24} /></button>
+    <div className="p-6 space-y-6">
+      {/* 툴바 상단 영역 (협력업체 스타일) */}
+      <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden gap-4">
+        <div className="flex items-center space-x-2">
+          <button 
+            onClick={handlePrevMonth} 
+            className="p-1.5 transition-all text-gray-400 hover:text-blue-600 active:scale-90"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <h2 className="text-xl font-black text-gray-800 tracking-tight min-w-[140px] text-center">
+            {format(viewDate, 'yyyy년 MM월')}
+          </h2>
+          <button 
+            onClick={handleNextMonth} 
+            className="p-1.5 transition-all text-gray-400 hover:text-blue-600 active:scale-90"
+          >
+            <ChevronRight size={24} />
+          </button>
         </div>
         
         <div className="flex flex-wrap gap-2 justify-center">
-          <button onClick={loadData} disabled={loading} className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-xl font-bold border border-gray-200 shadow-sm hover:bg-gray-200 transition-all text-[13px]">
+          <button onClick={loadData} disabled={loading} className="flex items-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm">
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} /> 새로고침
           </button>
           
-          <button onClick={handleLoadMaterials} disabled={loading} className="flex items-center px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-200 shadow-sm hover:bg-emerald-100 transition-all text-[13px]">
+          <button onClick={handleLoadMaterials} disabled={loading} className="flex items-center px-4 py-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-xl font-bold shadow-sm hover:bg-blue-100 transition-all active:scale-95 text-sm">
             <PackageSearch size={18} className="mr-2" /> 자재불러오기
           </button>
 
-          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-xl font-bold border shadow-sm transition-all text-[13px] ${isEditMode ? 'bg-orange-500 text-white border-orange-600 shadow-orange-100' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'}`}>
+          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-xl font-bold border shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white border-orange-600' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'}`}>
             {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />} {isEditMode ? '수정완료' : '수정'}
           </button>
 
-          <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all text-[13px] active:scale-95">
+          <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className="flex items-center px-5 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 text-sm">
             <Save size={18} className="mr-2" /> 서버저장
           </button>
 
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-800 transition-all text-[13px] active:scale-95">
+          <button onClick={handlePrint} className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95">
             <Printer size={18} className="mr-2" /> 미리보기
           </button>
         </div>
       </div>
 
-      {/* 헤더 정보 영역 */}
-      <div className="bg-gray-50/50 p-6 rounded-2xl border border-gray-200 shadow-inner">
+      {/* 헤더 정보 영역 (협력업체 스타일 서브 박스) */}
+      <div className="bg-gray-50/30 p-6 rounded-2xl border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="flex flex-col">
             <label className="text-[11px] font-black text-gray-400 mb-1.5 uppercase tracking-wider">신청일자</label>
@@ -319,7 +320,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
               type="date" 
               value={activeRequest?.date || ''} 
               onChange={e => setActiveRequest(p => p ? { ...p, date: e.target.value } : null)} 
-              className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 transition-all" 
+              className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" 
               readOnly={!isEditMode}
             />
           </div>
@@ -329,7 +330,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
               type="text" 
               value={activeRequest?.department || ''} 
               onChange={e => setActiveRequest(p => p ? { ...p, department: e.target.value } : null)} 
-              className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 transition-all" 
+              className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" 
               readOnly={!isEditMode}
             />
           </div>
@@ -359,13 +360,13 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
               <h3 className="text-lg font-black text-gray-800">{sec.label}</h3>
             </div>
             
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
+            <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto shadow-sm">
               <table className="w-full min-w-[900px] border-collapse">
                 <thead>
-                  <tr className="bg-gray-50">
-                    <th className={`${thClass} w-12`}>No</th>
-                    <th className={`${thClass} w-[120px]`}>품 명</th>
-                    <th className={`${thClass} w-[120px]`}>모델명</th>
+                  <tr>
+                    <th className={`${thClass} w-16`}>No</th>
+                    <th className={`${thClass} w-[150px]`}>품 명</th>
+                    <th className={`${thClass} w-[150px]`}>모델명</th>
                     <th className={`${thClass} w-24`}>재고</th>
                     <th className={`${thClass} w-24`}>수량</th>
                     <th className={`${thClass} w-32`}>입고일</th>
@@ -374,8 +375,8 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {activeRequest?.items.filter(i => i.category === sec.key).map((it, idx) => (
-                    <tr key={it.id} className="hover:bg-gray-50/50 transition-colors divide-x divide-gray-100 group">
-                      <td className="border border-gray-200 text-center font-mono text-[11px] text-gray-400 bg-gray-50/30 relative">
+                    <tr key={it.id} className="hover:bg-gray-50/50 transition-colors group divide-x divide-gray-100">
+                      <td className="border border-gray-300 text-center font-mono text-xs text-gray-400 bg-gray-50/30 relative h-10">
                         <span className={isEditMode ? "group-hover:opacity-0" : ""}>{idx + 1}</span>
                         {isEditMode && (
                           <button 
@@ -387,7 +388,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                           </button>
                         )}
                       </td>
-                      <td className={tdClass}>
+                      <td className="border border-gray-300 p-0 h-10">
                         <input 
                           type="text" 
                           value={it.itemName} 
@@ -399,7 +400,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                           readOnly={!isEditMode}
                         />
                       </td>
-                      <td className={tdClass}>
+                      <td className="border border-gray-300 p-0 h-10">
                         <input 
                           type="text" 
                           value={it.spec || ''} 
@@ -412,7 +413,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                           placeholder="모델명"
                         />
                       </td>
-                      <td className={`${tdClass} bg-gray-50/30`}>
+                      <td className="border border-gray-300 p-0 h-10 bg-gray-50/30">
                         <input 
                           type="text" 
                           value={it.stock} 
@@ -424,7 +425,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                           readOnly={!isEditMode}
                         />
                       </td>
-                      <td className={tdClass}>
+                      <td className="border border-gray-300 p-0 h-10">
                         <input 
                           type="text" 
                           value={it.qty} 
@@ -437,7 +438,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                           placeholder="수량"
                         />
                       </td>
-                      <td className={tdClass}>
+                      <td className="border border-gray-300 p-0 h-10">
                         <input 
                           type="text" 
                           value={it.receivedDate} 
@@ -450,7 +451,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                           placeholder="00/00"
                         />
                       </td>
-                      <td className={tdClass}>
+                      <td className="border border-gray-300 p-0 h-10">
                         <input 
                           type="text" 
                           value={it.remarks} 

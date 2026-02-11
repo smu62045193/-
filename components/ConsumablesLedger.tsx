@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { ConsumableItem } from '../types';
 import { fetchConsumables, saveConsumables } from '../services/dataService';
-import { Trash2, ArrowLeft, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, AlertTriangle, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch } from 'lucide-react';
+import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, AlertTriangle, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch } from 'lucide-react';
 
 interface ConsumablesLedgerProps {
   onBack?: () => void;
@@ -25,10 +26,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   
-  // 팝업 모드일 때 현재 어떤 탭(대장/내역)에서 열렸는지 추적하기 위한 상태
   const [popupViewMode, setPopupViewMode] = useState<'ledger' | 'usage'>('ledger');
-
-  // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState(1);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [baseStock, setBaseStock] = useState<number>(0);
@@ -39,12 +37,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     category: CATEGORIES[0],
     itemName: '',
     modelName: '',
-    details: '', // 사용처/상세내역
+    details: '', 
     inQty: '',
     outQty: '',
     stockQty: '',
     unit: 'EA',
-    note: '',    // 자재특징/비고
+    note: '',    
     minStock: '5' 
   });
 
@@ -71,7 +69,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           minStock: params.get('minStock') || '5',
           note: params.get('note') || '',
           date: params.get('date') || prev.date,
-          details: '' // 상세내역은 명시적으로 비움 (불러오지 않음)
+          details: '' 
         }));
       }
     }
@@ -85,7 +83,6 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return () => window.removeEventListener('message', handleMessage);
   }, [isPopupMode]);
 
-  // 탭 전환 시 검색어 초기화 로직 추가
   useEffect(() => {
     setSearchTerm('');
   }, [viewMode]);
@@ -138,14 +135,14 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
 
   const openIndependentWindow = (id: string = 'new', initialData?: ConsumableItem) => {
     const width = 850;
-    const height = 800; // 창 높이를 800px로 확대하여 스크롤 발생 억제
+    const height = 800; 
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
     const url = new URL(window.location.href);
     url.searchParams.set('popup', 'consumable');
     url.searchParams.set('id', id);
-    url.searchParams.set('viewMode', viewMode); // 현재 탭 모드 전달
+    url.searchParams.set('viewMode', viewMode); 
     
     if (initialData && id === 'new') {
       url.searchParams.set('itemName', initialData.itemName);
@@ -155,7 +152,6 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       url.searchParams.set('minStock', initialData.minStock || '5');
       url.searchParams.set('note', initialData.note || '');
       url.searchParams.set('date', initialData.date || '');
-      // 상세내역(details)은 파라미터로 전달하지 않음으로써 '불러오지 않기' 구현
     }
 
     window.open(
@@ -220,7 +216,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       note: latestMatch ? note : prev.note,
       minStock: latestMatch ? minStock : prev.minStock,
       stockQty: (currentCalculatedStock + currentIn - currentOut).toString(),
-      details: '' // 상세내역(사용사유)은 승계하지 않음
+      details: '' 
     }));
   };
 
@@ -321,7 +317,6 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   };
 
   const processedList = useMemo(() => {
-    // 소모품사용내역(usage) 탭에서는 검색어가 없을 경우 빈 리스트 반환
     if (viewMode === 'usage' && !searchTerm.trim()) {
       return [];
     }
@@ -356,7 +351,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return pages;
   }, [currentPage, totalPages]);
 
-  const thClass = "border border-gray-300 p-2 bg-gray-50 text-center font-bold text-[12px] text-gray-700 h-10 align-middle uppercase";
+  // 협력업체현황 스타일과 동일하게 헤더 및 셀 스타일 정의
+  const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-10 whitespace-nowrap";
+  const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700 h-10 align-middle bg-white text-center";
 
   if (isPopupMode) {
     const currentActiveMode = isPopupMode ? popupViewMode : viewMode;
@@ -366,11 +363,11 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
-                {editId ? <Edit2 size={20} /> : <PackagePlus size={20} />}
+                {editId ? <Edit2 size={20} className={editId ? 'text-orange-600' : 'text-white'} /> : <PackagePlus size={20} />}
               </div>
               <span className="font-black text-lg">{editId ? '소모품 정보 수정' : currentActiveMode === 'ledger' ? '소모품 등록/수정' : '소모품 사용/입고 등록'}</span>
             </div>
-            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
               <X size={24} />
             </button>
           </div>
@@ -474,26 +471,24 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   }
 
   return (
-    <div className="max-w-full mx-auto space-y-6 animate-fade-in relative">
-      {/* 툴바 (작은박스 1) */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 shadow-sm print:hidden">
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-80">
-            <input 
-              type="text" 
-              placeholder="품명, 모델명, 상세내역 검색" 
-              value={searchTerm} 
-              onChange={(e) => setSearchTerm(e.target.value)} 
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner" 
-            />
-            <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-          </div>
+    <div className="p-6 space-y-6">
+      {/* 툴바 (협력업체 스타일 박스 1, 검색창 너비 320px 설정) */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
+        <div className="relative w-full md:w-[320px]">
+          <input 
+            type="text" 
+            placeholder="품명, 모델명, 상세내역 검색" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm font-bold" 
+          />
+          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto justify-end">
           <button 
             onClick={loadData}
             disabled={loading}
-            className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+            className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
             새로고침
@@ -503,10 +498,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               let initialData;
               if (viewMode === 'usage') {
                 if (processedList.length > 0) {
-                  // 검색 결과가 있는 경우 가장 최신(첫 번째) 항목 정보 전달
                   initialData = processedList[0];
                 } else if (searchTerm.trim()) {
-                  // 검색 결과가 없어도 검색창에 텍스트가 있으면 품명으로 전달
                   initialData = { itemName: searchTerm.trim() } as any;
                 }
               }
@@ -519,153 +512,142 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         </div>
       </div>
 
-      {/* 리스트 (작은박스 2) */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
-        <div className="p-6">
-          <div className="flex items-center space-x-3 mb-4">
-            <h2 className="text-xl font-black text-gray-800">
-              {viewMode === 'ledger' ? '소모품 현재 재고 현황' : '소모품 전체 변동 내역'}
-            </h2>
-            <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
-              {viewMode === 'ledger' ? `총 ${summaryItems.length}개 품목` : `총 ${items.length}건 기록`}
-            </span>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto">
-            <table className="w-full min-w-[1000px] border-collapse">
-              <thead className="bg-blue-50 border-b border-blue-100">
-                {viewMode === 'ledger' ? (
-                  <tr>
-                    <th className={`${thClass} w-12`}>No</th>
-                    <th className={`${thClass} w-28`}>구분</th>
-                    <th className={`${thClass} w-40 text-left pl-4`}>품명</th>
-                    <th className={`${thClass} w-48`}>모델명</th>
-                    <th className={`${thClass} w-28 text-emerald-600`}>현재재고</th>
-                    <th className={`${thClass} w-20 text-orange-600`}>적정재고</th>
-                    <th className={`${thClass} w-16`}>단위</th>
-                    <th className={`${thClass} text-left pl-4`}>비고</th>
-                    <th className={`${thClass} w-36`}>관리</th>
-                  </tr>
-                ) : (
-                  <tr>
-                    <th className={`${thClass} w-12`}>No</th>
-                    <th className={`${thClass} w-28`}>날짜</th>
-                    <th className={`${thClass} w-24`}>구분</th>
-                    <th className={`${thClass} w-40 text-left pl-4`}>품명</th>
-                    <th className={`${thClass} w-32`}>모델명</th>
-                    <th className={`${thClass} w-16 text-blue-600`}>입고</th>
-                    <th className={`${thClass} w-16 text-red-600`}>사용</th>
-                    <th className={`${thClass} w-20 text-emerald-600`}>입력재고</th>
-                    <th className={`${thClass} text-left pl-4`}>상세내역</th>
-                    <th className={`${thClass} w-24 print:hidden`}>관리</th>
-                  </tr>
-                )}
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {processedList.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="py-20 text-center text-gray-400 italic">
-                      {viewMode === 'usage' && !searchTerm.trim() ? '상단 검색창에 품명을 입력하면 내역이 표시됩니다.' : '내역이 없습니다.'}
-                    </td>
-                  </tr>
-                ) : viewMode === 'ledger' ? (
-                  paginatedList.map((item, idx) => {
-                    const globalIdx = processedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
-                    const currentStock = parseFloat(item.stockQty);
-                    const minStock = parseFloat(item.minStock || '5');
-                    const isLowStock = currentStock <= minStock;
-                    return (
-                      <tr key={`summary-${item.id}`} className="hover:bg-blue-50/30 transition-colors group">
-                        <td className="px-3 py-4 text-center text-gray-400 font-mono text-xs">{globalIdx}</td>
-                        <td className="px-3 py-4 text-xs text-gray-600 font-bold text-center">{item.category}</td>
-                        <td className="px-3 py-4 text-left pl-4 font-black text-sm text-gray-800">{item.itemName}</td>
-                        <td className="px-3 py-4 text-xs text-gray-600 font-bold text-center">{item.modelName || '-'}</td>
-                        <td className="px-2 py-4 text-center">
-                          <span className={`inline-block px-3 py-1 font-black rounded-lg text-sm ${isLowStock ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-emerald-100 text-emerald-700'}`}>
-                            {item.stockQty}
-                            {isLowStock && <span className="ml-1 text-[10px]">[부족]</span>}
-                          </span>
-                        </td>
-                        <td className="px-2 py-4 text-center text-gray-500 font-bold text-xs">{item.minStock || '5'}</td>
-                        <td className="px-2 py-4 text-xs text-center text-gray-500 font-bold">{item.unit}</td>
-                        <td className="px-3 py-4 text-left pl-4 text-[11px] text-gray-500 italic truncate max-w-[200px]">{item.note}</td>
-                        <td className="px-3 py-4 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                            <button onClick={() => setDeleteTargetId(item.id)} className="p-1.5 text-red-400 hover:bg-red-100 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  paginatedList.map((item, idx) => {
-                    const globalIdx = processedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
-                    return (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
-                        <td className="px-3 py-4 text-center text-gray-400 font-mono text-[10px]">{globalIdx}</td>
-                        <td className="px-3 py-4 text-[11px] text-gray-700 whitespace-nowrap text-center">{item.date}</td>
-                        <td className="px-3 py-4 text-[11px] text-gray-600 text-center">{item.category}</td>
-                        <td className="px-3 py-4 text-left pl-4 text-[11px] font-bold text-gray-800">{item.itemName}</td>
-                        <td className="px-3 py-4 text-[11px] text-gray-500 font-bold text-center">{item.modelName}</td>
-                        <td className="px-2 py-4 text-center text-[11px] text-blue-600 font-bold">{item.inQty !== '0' && item.inQty !== '' ? item.inQty : ''}</td>
-                        <td className="px-2 py-4 text-center text-[11px] text-red-600 font-bold">{item.outQty !== '0' && item.outQty !== '' ? item.outQty : ''}</td>
-                        <td className="px-2 py-4 text-center text-[11px] text-emerald-700 font-bold bg-emerald-50/30">{item.stockQty}</td>
-                        <td className="px-3 py-4 text-left pl-4 text-[11px] text-gray-500 italic max-w-[200px] truncate">{item.details}</td>
-                        <td className="px-3 py-4 text-center print:hidden">
-                          <div className="flex items-center justify-center gap-2">
-                            <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-100 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                            <button onClick={() => setDeleteTargetId(item.id)} className="p-1.5 text-red-400 hover:bg-red-100 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {totalPages > 1 && (
-            <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2 mt-4 rounded-xl">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <div className="flex items-center gap-1.5 px-4">
-                {visiblePageNumbers.map(pageNum => (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                      currentPage === pageNum
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                        : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          )}
+      {/* 리스트 (협력업체 스타일 박스 2) */}
+      <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[1000px] border-collapse">
+            <thead>
+              {viewMode === 'ledger' ? (
+                <tr>
+                  <th className={`${thClass} w-16`}>No</th>
+                  <th className={`${thClass} w-32`}>구분</th>
+                  <th className={`${thClass} text-left pl-6`}>품명</th>
+                  <th className={`${thClass} w-48`}>모델명</th>
+                  <th className={`${thClass} w-32`}>현재재고</th>
+                  <th className={`${thClass} w-24`}>적정재고</th>
+                  <th className={`${thClass} w-20`}>단위</th>
+                  <th className={`${thClass}`}>비고</th>
+                  <th className={`${thClass} w-28 print:hidden`}>관리</th>
+                </tr>
+              ) : (
+                <tr>
+                  <th className={`${thClass} w-16`}>No</th>
+                  <th className={`${thClass} w-36`}>날짜</th>
+                  <th className={`${thClass} w-24`}>구분</th>
+                  <th className={`${thClass} text-left pl-6`}>품명</th>
+                  <th className={`${thClass} w-40`}>모델명</th>
+                  <th className={`${thClass} w-20`}>입고</th>
+                  <th className={`${thClass} w-20`}>사용</th>
+                  <th className={`${thClass} w-24`}>재고</th>
+                  <th className={`${thClass}`}>상세내역</th>
+                  <th className={`${thClass} w-28 print:hidden`}>관리</th>
+                </tr>
+              )}
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {processedList.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="py-20 text-center text-gray-400 italic">
+                    {viewMode === 'usage' && !searchTerm.trim() ? '상단 검색창에 품명을 입력하면 내역이 표시됩니다.' : '내역이 없습니다.'}
+                  </td>
+                </tr>
+              ) : viewMode === 'ledger' ? (
+                paginatedList.map((item, idx) => {
+                  const globalIdx = processedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
+                  const currentStock = parseFloat(item.stockQty);
+                  const minStock = parseFloat(item.minStock || '5');
+                  const isLowStock = currentStock <= minStock;
+                  return (
+                    <tr key={`summary-${item.id}`} className="hover:bg-gray-50/50 transition-colors">
+                      <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{globalIdx}</td>
+                      <td className={`${tdClass} font-bold text-blue-600`}>{item.category}</td>
+                      <td className={`${tdClass} text-left pl-6 font-bold text-gray-800`}>{item.itemName}</td>
+                      <td className={`${tdClass} text-gray-600`}>{item.modelName || '-'}</td>
+                      <td className={tdClass}>
+                        <span className={`inline-block px-3 py-1 font-black rounded-lg text-sm ${isLowStock ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {item.stockQty}
+                        </span>
+                      </td>
+                      <td className={tdClass}>{item.minStock || '5'}</td>
+                      <td className={tdClass}>{item.unit}</td>
+                      <td className={`${tdClass} text-left px-4 text-gray-500 italic`}>{item.note}</td>
+                      <td className={`${tdClass} print:hidden`}>
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={() => setDeleteTargetId(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              ) : (
+                paginatedList.map((item, idx) => {
+                  const globalIdx = processedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{globalIdx}</td>
+                      <td className={`${tdClass} font-bold text-gray-700`}>{item.date}</td>
+                      <td className={`${tdClass} font-bold text-blue-600`}>{item.category}</td>
+                      <td className={`${tdClass} text-left pl-6 font-bold text-gray-800`}>{item.itemName}</td>
+                      <td className={tdClass}>{item.modelName}</td>
+                      <td className={`${tdClass} text-blue-600 font-bold`}>{item.inQty !== '0' && item.inQty !== '' ? item.inQty : ''}</td>
+                      <td className={`${tdClass} text-red-600 font-bold`}>{item.outQty !== '0' && item.outQty !== '' ? item.outQty : ''}</td>
+                      <td className={`${tdClass} font-black text-emerald-700`}>{item.stockQty}</td>
+                      <td className={`${tdClass} text-left px-4 text-gray-500 italic`}>{item.details}</td>
+                      <td className={`${tdClass} print:hidden`}>
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={() => setDeleteTargetId(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
+
+        {/* 페이지네이션 (박스 하단 내부) */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 삭제 확인 모달 */}
       {deleteTargetId && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-100 animate-scale-up">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-scale-up">
             <div className="p-6 text-center">
               <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-100"><AlertTriangle className="text-red-500" size={32} /></div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">기록 삭제 확인</h3>
