@@ -61,7 +61,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 750;
-    const height = 900; // 기존 850에서 900으로 높이 상향 조정 (스크롤 방지)
+    const height = 930; // 기존 900에서 930으로 높이 상향 조정 (스크롤 방지)
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
