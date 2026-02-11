@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import StaffStatus from './StaffStatus';
 import LogoSealManager from './LogoSealManager';
-import { LayoutList, User, Camera, Printer, RefreshCw, CalendarDays, UserPlus, Image as ImageIcon } from 'lucide-react';
+import { LayoutList, User, Camera, Printer, RefreshCw, CalendarDays, UserPlus, Image as ImageIcon, Users } from 'lucide-react';
 import { fetchStaffList, saveStaffList } from '../services/dataService';
 import { StaffMember } from '../types';
 
@@ -96,7 +95,6 @@ const StaffCard: React.FC<StaffCardProps> = ({ member, isManager = false }) => {
       w-[115px] py-1.5 min-h-[140px] print:w-[120px] print:min-h-[140px]
       ${isManager ? 'bg-blue-50' : 'bg-white'}
     `}>
-      {/* 조직도에서 직접 수정 불가능하도록 div로 변경 및 업로드 로직 제거 */}
       <div className={`
         relative rounded-md flex items-center justify-center mb-1 overflow-hidden border border-gray-100
         w-[88px] h-[88px] print:w-[88px] print:h-[88px]
@@ -297,7 +295,7 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
           <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
           <style>
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; background: black; margin: 0; padding: 0; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
             
@@ -369,7 +367,10 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in print:p-0">
       <div className="mb-2 print:hidden flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">직원 관리</h2>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
+            <Users className="mr-2 text-blue-600" size={32} />
+            직원 관리
+          </h2>
           <p className="text-slate-500 mt-2 text-base font-medium">조직 구성 및 직원 현황을 관리합니다.</p>
         </div>
       </div>
@@ -404,12 +405,15 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
             <button 
               onClick={loadData}
               disabled={loading}
-              className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-lg hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+              className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
             >
               <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침
             </button>
-            <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 font-bold text-sm transition-colors">
-              <Printer size={16} className="mr-2" /> 미리보기
+            <button 
+              onClick={handlePrint} 
+              className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+            >
+              <Printer size={18} className="mr-2" /> 미리보기
             </button>
           </div>
           <div id="staff-org-chart-container" className="flex flex-col items-center min-w-[750px] print:min-w-0 print:w-full">

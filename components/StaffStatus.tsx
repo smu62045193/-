@@ -32,7 +32,6 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     } else {
       loadDataForPopup();
     }
-    // Removed undefined 'currentMonth' from dependency array
   }, [isPopupMode]);
 
   useEffect(() => {
@@ -62,7 +61,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 750;
-    const height = 650;
+    const height = 850; // 기존 650에서 850으로 높이 상향 조정 (스크롤 방지)
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -210,7 +209,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     let endPage = Math.min(totalPages, startPage + 4);
     if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
     const pages = [];
-    for (let i = startPage; i <= endPage; i++) pages.push(i);
+    for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);
     return pages;
   }, [currentPage, totalPages]);
 
@@ -232,7 +231,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     printWindow.document.write(`
       <html><head><title>직원 현황</title><style>
         @page { size: A4 portrait; margin: 0; }
-        body { font-family: sans-serif; background: #f1f5f9; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
+        body { font-family: sans-serif; background: black; padding: 0; margin: 0; -webkit-print-color-adjust: exact; }
         .no-print { display: flex; justify-content: center; padding: 20px; }
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
         .print-page { width: 210mm; min-height: 297mm; padding: 15mm 10mm 15mm 10mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
@@ -351,7 +350,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
         {/* 작은박스 1: 툴바 영역 */}
         <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-200 gap-4 print:hidden">
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 md:w-72">
+            <div className="relative flex-1 md:w-[320px]">
               <input 
                 type="text" 
                 placeholder="성명 또는 담당구역 검색" 
@@ -366,7 +365,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
             <button 
               onClick={() => loadDataForPopup()}
               disabled={loading}
-              className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+              className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
             >
               <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
               새로고침
@@ -374,7 +373,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
             <button onClick={() => openIndependentWindow()} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95">
               <UserPlus size={18} /> 신규 직원 등록
             </button>
-            <button onClick={handlePrint} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-gray-700 text-white px-5 py-2.5 rounded-xl hover:bg-gray-800 transition-all shadow-md text-sm font-black active:scale-95">
+            <button onClick={handlePrint} className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-600 text-white px-5 py-2.5 rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95">
               <Printer size={18} /> 미리보기
             </button>
           </div>
@@ -385,41 +384,41 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
           <table className="w-full border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">구분</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">직책</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">성명</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">생년월일</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">전화번호</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28">입사일</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28">퇴사일</th>
-                <th className="px-4 py-3 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">담당구역</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28 print:hidden">관리</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16 border border-gray-200">No</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-200">구분</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-200">직책</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-200">성명</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-200">생년월일</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-200">전화번호</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28 border border-gray-200">입사일</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28 border border-gray-200">퇴사일</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider border border-gray-200">담당구역</th>
+                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-28 print:hidden border border-gray-200">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && paginatedList.length === 0 ? (
-                <tr><td colSpan={10} className="py-24 text-center"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
+                <tr><td colSpan={10} className="py-24 text-center border border-gray-200"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
               ) : filteredAndSortedList.length === 0 ? (
-                <tr><td colSpan={10} className="py-24 text-center text-gray-400 italic text-sm">등록된 직원이 없습니다.</td></tr>
+                <tr><td colSpan={10} className="py-24 text-center text-gray-400 italic text-sm border border-gray-200">등록된 직원이 없습니다.</td></tr>
               ) : (
                 paginatedList.map((m, idx) => {
                   const globalIdx = filteredAndSortedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
                   return (
                     <tr key={m.id} className="hover:bg-blue-50/30 transition-colors group text-center">
-                      <td className="px-4 py-4 text-xs text-gray-400 font-mono">{globalIdx}</td>
-                      <td className="px-4 py-4 font-black text-blue-600 text-sm">{m.category}</td>
-                      <td className="px-4 py-4 text-sm font-medium text-slate-600">{m.jobTitle}</td>
-                      <td className="px-4 py-4 text-sm font-black text-slate-900">{m.name}</td>
-                      <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.birthDate || '-'}</td>
-                      <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.phone}</td>
-                      <td className="px-4 py-4 text-sm text-slate-500 font-mono">{m.joinDate || '-'}</td>
-                      <td className="px-4 py-4 text-sm text-rose-500 font-bold">{m.resignDate || '-'}</td>
-                      <td className="px-4 py-4 text-sm text-left text-slate-600">{m.area}</td>
-                      <td className="px-4 py-4 print:hidden">
+                      <td className="px-4 py-4 text-xs text-gray-400 font-mono border border-gray-200">{globalIdx}</td>
+                      <td className="px-4 py-4 font-black text-blue-600 text-sm border border-gray-200">{m.category}</td>
+                      <td className="px-4 py-4 text-sm font-medium text-slate-600 border border-gray-200">{m.jobTitle}</td>
+                      <td className="px-4 py-4 text-sm font-black text-slate-900 border border-gray-200">{m.name}</td>
+                      <td className="px-4 py-4 text-sm text-slate-500 font-mono border border-gray-200">{m.birthDate || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-slate-500 font-mono border border-gray-200">{m.phone}</td>
+                      <td className="px-4 py-4 text-sm text-slate-500 font-mono border border-gray-200">{m.joinDate || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-rose-500 font-bold border border-gray-200">{m.resignDate || '-'}</td>
+                      <td className="px-4 py-4 text-sm text-center text-slate-600 border border-gray-200">{m.area}</td>
+                      <td className="px-4 py-4 print:hidden text-center border border-gray-200">
                         <div className="flex justify-center gap-1">
-                          <button onClick={() => openIndependentWindow(m.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDeleteDirect(m.id)} className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                          <button onClick={() => openIndependentWindow(m.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={() => handleDeleteDirect(m.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -428,42 +427,42 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
               )}
             </tbody>
           </table>
-          
-          {/* 페이지네이션 (두 번째 작은 박스 하단에 위치) */}
-          {totalPages > 1 && (
-            <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-              >
-                <ChevronLeft size={18} />
-              </button>
-              <div className="flex items-center gap-1.5 px-4">
-                {visiblePageNumbers.map(pageNum => (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                      currentPage === pageNum
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                        : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-500'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-              </div>
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-              >
-                <ChevronRight size={18} />
-              </button>
-            </div>
-          )}
         </div>
+          
+        {/* 페이지네이션 (두 번째 작은 박스 하단 외부에 위치) */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6 py-4">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-500'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
