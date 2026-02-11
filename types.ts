@@ -206,6 +206,7 @@ export interface ConsumableRequestItem {
 export interface ConsumableRequest {
   id: string;
   date: string;
+  arrivalDate?: string; // 입고일자 추가
   category?: string; // Legacy field, kept for compatibility
   department: string;
   drafter: string; // 기안자

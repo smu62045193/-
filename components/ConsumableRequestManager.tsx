@@ -23,7 +23,6 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
   const [viewDate, setViewDate] = useState(new Date());
   const [activeRequest, setActiveRequest] = useState<ConsumableRequest | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -90,6 +89,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       setActiveRequest({
         id: generateId(),
         date: format(date, 'yyyy-MM-dd'),
+        arrivalDate: '',
         department: '시설관리팀',
         drafter: autoDrafter,
         items,
@@ -165,7 +165,6 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
   const handleSaveForm = async () => {
     if (!activeRequest) return;
-    setShowSaveConfirm(false);
     setLoading(true);
 
     const compressedItems = activeRequest.items.filter(it => it.itemName.trim() !== '');
@@ -177,7 +176,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     else newList = [finalRequest, ...newList];
     
     if (await saveConsumableRequests(newList)) {
-      alert('서버에 저장되었습니다.');
+      alert('성공적으로 저장되었습니다.');
       setRequests(newList);
       setActiveRequest(finalRequest);
       setIsEditMode(false);
@@ -237,13 +236,13 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
         .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
         h1 { text-align: center; border-bottom: 2.5px solid black; padding-bottom: 10px; margin-bottom: 30px; font-size: 24pt; font-weight: 900; margin-top: 0; }
-        .meta-info { display: flex; justify-content: space-between; margin-bottom: 20px; font-weight: bold; font-size: 11pt; padding: 0 5px; }
-        table { width: 100%; border-collapse: collapse; font-size: 8.5pt; border: 1.5px solid black; table-layout: fixed; }
-        th, td { border: 1px solid black; padding: 0; text-align: center; word-break: break-all; font-weight: normal; height: 28px; line-height: 28px; }
-        th { background-color: #f3f4f6; font-weight: bold; }
+        .meta-info { display: flex; justify-content: space-between; margin-bottom: 20px; font-weight: bold; font-size: 9.5pt; padding: 0 5px; }
+        table { width: 100%; border-collapse: collapse; font-size: 8.5pt; border: 1.5px solid black; table-layout: fixed; margin-bottom: 15px; }
+        th, td { border: 1px solid black; padding: 6px; font-size: 8.5pt; vertical-align: top; text-align: center; word-break: break-all; }
+        th { background: #f3f4f6; font-weight: bold; text-align: center; }
       </style></head><body>
         <div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button></div>
-        <div class="print-page"><h1>${title}</h1><div class="meta-info"><div>신청일자 : ${activeRequest.date}</div><div>신청부서 : ${activeRequest.department}</div><div>작 성 자 : ${activeRequest.drafter}</div></div>${sectionsHtml}</div>
+        <div class="print-page"><h1>${title}</h1><div class="meta-info"><div>신청일자 : ${activeRequest.date}</div><div>입고일자 : ${activeRequest.arrivalDate || ''}</div><div>신청부서 : ${activeRequest.department}</div><div>작 성 자 : ${activeRequest.drafter}</div></div>${sectionsHtml}</div>
       </body></html>`);
     printWindow.document.close();
   };
@@ -301,11 +300,11 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />} {isEditMode ? '수정완료' : '수정'}
           </button>
 
-          <button onClick={() => setShowSaveConfirm(true)} disabled={loading} className="flex items-center px-5 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 text-sm">
+          <button onClick={handleSaveForm} disabled={loading} className="flex items-center px-5 py-2 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 text-sm">
             <Save size={18} className="mr-2" /> 서버저장
           </button>
 
-          <button onClick={handlePrint} className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95">
+          <button onClick={handlePrint} className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95" title="신청일자 입고일자 신청부서 작성자">
             <Printer size={18} className="mr-2" /> 미리보기
           </button>
         </div>
@@ -313,7 +312,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
       {/* 헤더 정보 영역 (협력업체 스타일 서브 박스) */}
       <div className="bg-gray-50/30 p-6 rounded-2xl border border-gray-200">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="flex flex-col">
             <label className="text-[11px] font-black text-gray-400 mb-1.5 uppercase tracking-wider">신청일자</label>
             <input 
@@ -321,6 +320,35 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
               value={activeRequest?.date || ''} 
               onChange={e => setActiveRequest(p => p ? { ...p, date: e.target.value } : null)} 
               className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-gray-800 focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" 
+              readOnly={!isEditMode}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label className="text-[11px] font-black text-gray-400 mb-1.5 uppercase tracking-wider">입고일자</label>
+            <input 
+              type="date" 
+              value={activeRequest?.arrivalDate || ''} 
+              onChange={e => {
+                const val = e.target.value;
+                let formattedReceived = '';
+                if (val) {
+                  try {
+                    const d = parseISO(val);
+                    formattedReceived = format(d, 'MM/dd');
+                  } catch (err) {
+                    console.error("Date parse error", err);
+                  }
+                }
+                setActiveRequest(p => {
+                  if (!p) return null;
+                  return { 
+                    ...p, 
+                    arrivalDate: val,
+                    items: p.items.map(it => ({ ...it, receivedDate: formattedReceived }))
+                  };
+                });
+              }} 
+              className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 outline-none font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" 
               readOnly={!isEditMode}
             />
           </div>
@@ -472,35 +500,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
         ))}
       </div>
 
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                작성하신 자재 구입 신청서 내용을<br/>
-                서버에 안전하게 기록하시겠습니까?
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowSaveConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"><X size={20} className="mr-2" />취소</button>
-                <button onClick={handleSaveForm} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"><CheckCircle size={20} className="mr-2" />확인</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <style>{`
-        @keyframes scale-up {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-          animation: scale-up 0.2s ease-out forwards;
-        }
         .animate-fade-in-down {
           animation: fadeInDown 0.4s ease-out forwards;
         }
