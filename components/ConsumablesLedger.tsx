@@ -81,15 +81,13 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return () => window.removeEventListener('message', handleMessage);
   }, [isPopupMode]);
 
-  useEffect(() => {
-    setSearchTerm('');
-  }, [viewMode]);
-
+  // 수정 모드 시 데이터 로드
   useEffect(() => {
     if (items.length > 0) {
       if (editId) {
         const item = items.find(i => String(i.id) === String(editId));
         if (item) {
+          // newItem 필드를 직접 상태 의존성으로 넣지 않고 여기서 한 번만 초기화
           setNewItem({ ...item });
           const currentIn = parseFloat(String(item.inQty || '0').replace(/,/g, '')) || 0;
           const currentOut = parseFloat(String(item.outQty || '0').replace(/,/g, '')) || 0;
@@ -112,7 +110,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         setNewItem(prev => ({ ...prev, stockQty: totalStock.toString() }));
       }
     }
-  }, [editId, items.length, isPopupMode, newItem.itemName, newItem.category, newItem.modelName]);
+    // 의존성 배열에서 newItem.itemName 등을 제거하여 입력 중 리셋되는 현상 방지
+  }, [editId, items.length, isPopupMode]);
 
   useEffect(() => {
     setCurrentPage(1);

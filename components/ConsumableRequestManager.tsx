@@ -65,11 +65,40 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     const existing = allRequests.find(r => r.date.startsWith(monthKey));
     
     if (existing) {
+      // 기존 문서가 있을 경우: 각 섹션별로 최소 5행을 유지하도록 가공
+      const baseItems = [...existing.items];
+      const processedItems: ConsumableRequestItem[] = [];
+
+      SECTIONS.forEach(sec => {
+        const sectionItems = baseItems.filter(it => it.category === sec.key);
+        processedItems.push(...sectionItems);
+        
+        // 해당 섹션의 아이템이 5개 미만이면 빈 행 추가
+        const deficit = 5 - sectionItems.length;
+        if (deficit > 0) {
+          for (let i = 0; i < deficit; i++) {
+            processedItems.push({ 
+              id: generateId(), 
+              category: sec.key, 
+              itemName: '', 
+              spec: '', 
+              stock: '', 
+              qty: '', 
+              receivedDate: '', 
+              remarks: '', 
+              amount: 0 
+            });
+          }
+        }
+      });
+
       setActiveRequest({
         ...existing,
+        items: processedItems,
         drafter: existing.drafter || autoDrafter
       });
     } else {
+      // 신규 문서 생성 시: 각 섹션별로 5행씩 생성
       const items: ConsumableRequestItem[] = [];
       SECTIONS.forEach(sec => {
         for (let i = 0; i < 5; i++) {
@@ -198,7 +227,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     const title = `${format(viewDate, 'yyyy년 MM월')} 소모품자재 구입 신청서`;
 
     const sectionsHtml = SECTIONS.map(sec => {
-      const its = activeRequest.items.filter(i => i.category === sec.key);
+      const its = activeRequest.items.filter(i => i.category === sec.key && i.itemName.trim() !== '');
       return its.length > 0 ? `
         <div style="break-inside: avoid; margin-bottom: 2px;">
           <h3 style="font-size: 13pt; font-weight: bold; margin-bottom: 6px; border-left: 7px solid black; padding-left: 10px; margin-top: 15px;">${sec.label}</h3>
