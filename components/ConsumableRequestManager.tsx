@@ -133,13 +133,14 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       SECTIONS.forEach(sec => {
         const matchingLedger = lowStockItems.filter(l => l.category === sec.key);
         matchingLedger.forEach(l => {
+          const itemUnit = l.unit || 'EA';
           newItems.push({
             id: generateId(),
             category: sec.key,
             itemName: l.itemName,
             spec: l.modelName || '',
-            stock: l.currentStock.toString(),
-            qty: '',
+            stock: `${l.currentStock} ${itemUnit}`, // 단위 추가
+            qty: ` ${itemUnit}`, // 수량 필드에 기본 단위 접미사 추가 (숫자 입력 용이하도록 공백 포함)
             receivedDate: '',
             remarks: '',
             amount: 0
