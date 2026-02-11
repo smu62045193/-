@@ -11,10 +11,10 @@ interface ConsumableRequestManagerProps {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 const SECTIONS = [
-  { key: '전기', label: '1. 전기' },
-  { key: '소방', label: '2. 소방' },
-  { key: '기계', label: '3. 기계' },
-  { key: '공용', label: '4. 공용' }
+  { key: '전기', label: '전기' },
+  { key: '소방', label: '소방' },
+  { key: '기계', label: '기계' },
+  { key: '공용', label: '공용' }
 ];
 
 const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onBack }) => {
@@ -139,8 +139,8 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             category: sec.key,
             itemName: l.itemName,
             spec: l.modelName || '',
-            stock: `${l.currentStock} ${itemUnit}`, // 단위 추가
-            qty: ` ${itemUnit}`, // 수량 필드에 기본 단위 접미사 추가 (숫자 입력 용이하도록 공백 포함)
+            stock: `${l.currentStock} ${itemUnit}`,
+            qty: ` ${itemUnit}`,
             receivedDate: '',
             remarks: '',
             amount: 0
@@ -199,7 +199,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
     const sectionsHtml = SECTIONS.map(sec => {
       const its = activeRequest.items.filter(i => i.category === sec.key);
-      return `
+      return its.length > 0 ? `
         <div style="break-inside: avoid; margin-bottom: 2px;">
           <h3 style="font-size: 13pt; font-weight: bold; margin-bottom: 6px; border-left: 7px solid black; padding-left: 10px; margin-top: 15px;">${sec.label}</h3>
           <table>
@@ -207,8 +207,8 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
               <th style="width: 40px;">No</th>
               <th style="width: 150px;">품 명</th>
               <th style="width: 150px;">모델명</th>
-              <th style="width: 60px;">재고</th>
-              <th style="width: 60px;">수량</th>
+              <th style="width: 80px;">재고</th>
+              <th style="width: 80px;">수량</th>
               <th style="width: 80px;">입고일</th>
               <th>비 고</th>
             </tr></thead>
@@ -225,7 +225,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             </tbody>
           </table>
         </div>
-      `;
+      ` : '';
     }).join('');
 
     printWindow.document.write(`
@@ -268,7 +268,6 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
   return (
     <div className="p-6 space-y-6">
-      {/* 툴바 상단 영역 (협력업체 스타일) */}
       <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden gap-4">
         <div className="flex items-center space-x-2">
           <button 
@@ -305,13 +304,12 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             <Save size={18} className="mr-2" /> 서버저장
           </button>
 
-          <button onClick={handlePrint} className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95" title="신청일자 입고일자 신청부서 작성자">
+          <button onClick={handlePrint} className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95">
             <Printer size={18} className="mr-2" /> 미리보기
           </button>
         </div>
       </div>
 
-      {/* 헤더 정보 영역 (협력업체 스타일 서브 박스) */}
       <div className="bg-gray-50/30 p-6 rounded-2xl border border-gray-200">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="flex flex-col">
@@ -380,7 +378,6 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
         </div>
       </div>
 
-      {/* 테이블 섹션 영역 */}
       <div className="space-y-10">
         {SECTIONS.map(sec => (
           <div key={sec.key} className="animate-fade-in-down">

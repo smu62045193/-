@@ -1007,7 +1007,7 @@ export const fetchConsumableRequests = async (): Promise<ConsumableRequest[]> =>
 };
 
 export const saveConsumableRequests = async (list: ConsumableRequest[]): Promise<boolean> => {
-  const { error = null } = await supabase.from('system_settings').upsert({ id: 'CONSUMABLE_REQ_DB', data: { consumableReq: list }, last_updated: new Date().toISOString() });
+  const { error = null } = await supabase.from('system_settings').upsert({ id: 'CONSUMABLES_REQ_DB', data: { consumableReq: list }, last_updated: new Date().toISOString() });
   return !error;
 };
 
@@ -1265,7 +1265,6 @@ export const saveMeterPhotos = async (data: MeterPhotoData): Promise<boolean> =>
 export const fetchBatteryCheck = async (month: string): Promise<BatteryCheckData | null> => {
   try {
     const { data } = await supabase.from('battery_checks').select('*').eq('id', `BATTERY_${month}`).maybeSingle();
-    // Fixed Type Error: Property 'check_date' does not exist on type 'BatteryCheckData'. Changed to 'checkDate'.
     if (data) return { month: data.month, checkDate: data.check_date, items: data.items, approvers: data.approvers };
   } catch (err) {}
   return null;
