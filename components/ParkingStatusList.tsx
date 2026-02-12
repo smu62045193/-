@@ -57,23 +57,20 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
       
       if (matched) {
         if (mode === 'change') {
-          // [연동 로직] '변경' 버튼을 눌러 들어온 경우: 현재차량번호를 이전차량번호로 자동으로 연동
           setNewItem({
             ...matched,
-            prevPlate: matched.plateNum, // 현재번호 -> 이전번호 필드로 이동
-            plateNum: '', // 새로운 번호 입력을 유도하기 위해 비움
+            prevPlate: matched.plateNum,
+            plateNum: '',
             type: '변경',
             date: format(new Date(), 'yyyy-MM-dd')
           });
         } else {
-          // '수정' 버튼을 눌러 들어온 경우: 기존 데이터 그대로 로드
           setNewItem(matched);
         }
       }
     }
   }, [editId, items, isPopupMode]);
 
-  // 데이터 길이가 변경되면 페이지를 1로 리셋
   useEffect(() => {
     setCurrentPage(1);
   }, [items.length, searchTerm]);
@@ -94,7 +91,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     const url = new URL(window.location.href);
     url.searchParams.set('popup', 'parking_status');
     url.searchParams.set('id', id);
-    url.searchParams.set('mode', mode); // 모드 파라미터 추가
+    url.searchParams.set('mode', mode);
 
     window.open(
       url.toString(),
@@ -118,7 +115,6 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
       const searchParams = new URLSearchParams(window.location.search);
       const mode = searchParams.get('mode');
 
-      // 1. 차량 현황(상태) 업데이트
       const currentList = await fetchParkingStatusList();
       let updatedList = [...(currentList || [])];
       
@@ -153,17 +149,17 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
       const successStatus = await saveParkingStatusList(updatedList);
 
-      // 2. [이력 반영 로직] '변경' 모드일 경우 '지정주차변경이력' 리스트에도 자동 추가
-      if (successStatus && mode === 'change') {
+      // [연동 로직] 변경 모드 또는 신규 등록 시 '지정주차변경이력' 리스트에도 자동 추가
+      if (successStatus && (mode === 'change' || !editId)) {
         const currentHistory = await fetchParkingChangeList();
         const newHistoryItem: ParkingChangeItem = {
           id: generateUUID(),
           date: newItem.date,
-          type: '변경',
+          type: !editId ? '추가' : '변경',
           company: newItem.company,
           location: newItem.location,
           prevPlate: newItem.prevPlate || '',
-          newPlate: newItem.plateNum, // 현재 입력한 번호가 새 번호가 됨
+          newPlate: newItem.plateNum,
           note: newItem.note || ''
         };
         await saveParkingChangeList([newHistoryItem, ...(currentHistory || [])]);
@@ -192,14 +188,34 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
   const handleDelete = async (id: string) => {
     const idStr = String(id);
-    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const itemToDelete = items.find(i => String(i.id) === idStr);
+    if (!itemToDelete) return;
+
+    if (!confirm('정말 삭제하시겠습니까? (관련 변경 이력도 함께 삭제됩니다)')) return;
     
     setLoading(true);
     try {
+      // 1. 현황 데이터 삭제
       const success = await deleteParkingStatusItem(idStr);
       if (success) {
+        // 2. [연동 로직] 변경 이력에서도 해당 차량 관련 이력 모두 삭제
+        const currentHistory = await fetchParkingChangeList();
+        if (currentHistory && currentHistory.length > 0) {
+          const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
+          const targetLoc = normalize(itemToDelete.location);
+          const targetPlate = normalize(itemToDelete.plateNum);
+          
+          const filteredHistory = currentHistory.filter(h => 
+            !(normalize(h.location) === targetLoc && normalize(h.newPlate) === targetPlate)
+          );
+          
+          if (filteredHistory.length !== currentHistory.length) {
+            await saveParkingChangeList(filteredHistory);
+          }
+        }
+
         setItems(prev => prev.filter(i => String(i.id) !== idStr));
-        alert('삭제가 완료되었습니다.');
+        alert('삭제가 완료되었습니다. (관련 이력 포함)');
       } else {
         alert('삭제 실패');
       }
@@ -284,7 +300,6 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     );
   }, [items, searchTerm]);
 
-  // 페이지네이션 처리
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -312,7 +327,6 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
   const formInputClass = "w-full border border-gray-300 rounded-xl px-4 py-2.5 !text-[14px] bg-white text-black focus:ring-2 focus:ring-blue-500 outline-none h-[45px] font-bold shadow-inner";
 
-  // 팝업 모드일 때의 UI (등록/수정 폼만 표시)
   if (isPopupMode) {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get('mode');
@@ -407,10 +421,8 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     );
   }
 
-  // 메인 리스트 뷰 UI
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      {/* 툴바 개편: 검색창 좌측 320px, 버튼 우측 배치 */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
         <div className="relative w-full md:w-[320px]">
           <input 
@@ -447,7 +459,6 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
         </div>
       </div>
 
-      {/* 리스트 테이블 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[1000px] border-collapse border border-gray-300">
@@ -497,7 +508,6 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
         </div>
       </div>
 
-      {/* 페이지네이션 */}
       {totalPages > 1 && (
         <div className="px-6 py-4 flex items-center justify-center gap-2">
           <button

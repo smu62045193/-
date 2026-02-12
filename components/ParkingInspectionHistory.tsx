@@ -20,7 +20,6 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
     loadHistory();
   }, []);
 
-  // 검색어나 데이터 길이가 변경되면 페이지를 1로 리셋
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, history.length]);
@@ -110,7 +109,6 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
     );
   }, [history, searchTerm]);
 
-  // 페이지네이션 처리
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
   const paginatedHistory = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -129,7 +127,6 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
 
   return (
     <div className="p-6 space-y-4 animate-fade-in pb-10">
-      {/* 타이틀 삭제 및 레이아웃 개편: 검색창 좌측 320px, 새로고침 우측 */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
         <div className="relative w-full md:w-[320px]">
           <input 
@@ -165,7 +162,7 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">위치</th>
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">변경전차량번호</th>
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">변경후차량번호</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">상세보기</th>
+                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">미리보기</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -208,19 +205,13 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
                         {item.newPlate}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-center flex gap-2 justify-center">
+                    <td className="px-4 py-4 text-center">
                       <button 
                         onClick={() => handleViewDetail(item)}
-                        className="flex items-center gap-1 bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
+                        className="flex items-center gap-1 mx-auto bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
                       >
-                        상세보기
+                        미리보기
                         <Printer size={12} />
-                      </button>
-                      <button 
-                        onClick={onSelect}
-                        className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-gray-200 transition-all active:scale-95"
-                      >
-                        이동
                       </button>
                     </td>
                   </tr>
@@ -231,7 +222,6 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
         </div>
       </div>
 
-      {/* 페이지네이션 */}
       {totalPages > 1 && (
         <div className="px-6 py-4 flex items-center justify-center gap-2">
           <button
