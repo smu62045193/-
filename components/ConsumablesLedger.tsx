@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ConsumableItem } from '../types';
 import { fetchConsumables, saveConsumables } from '../services/dataService';
 import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch } from 'lucide-react';
@@ -28,6 +28,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   const [popupViewMode, setPopupViewMode] = useState<'ledger' | 'usage'>('ledger');
   const [currentPage, setCurrentPage] = useState(1);
   const [baseStock, setBaseStock] = useState<number>(0);
+  
+  // 데이터 초기화 여부를 추적하여 입력 중 초기화 방지
+  const hasInitializedRef = useRef(false);
 
   const [newItem, setNewItem] = useState<ConsumableItem>({
     id: '',
@@ -69,6 +72,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           date: params.get('date') || prev.date,
           details: '' 
         }));
+        hasInitializedRef.current = true;
       }
     }
 
@@ -81,23 +85,25 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return () => window.removeEventListener('message', handleMessage);
   }, [isPopupMode]);
 
-  // 수정 모드 시 데이터 로드
+  // 수정 모드 시 데이터 로드 - 1회만 실행되도록 ref 사용
   useEffect(() => {
-    if (items.length > 0) {
+    if (items.length > 0 && !hasInitializedRef.current) {
       if (editId) {
         const item = items.find(i => String(i.id) === String(editId));
         if (item) {
-          // newItem 필드를 직접 상태 의존성으로 넣지 않고 여기서 한 번만 초기화
           setNewItem({ ...item });
           const currentIn = parseFloat(String(item.inQty || '0').replace(/,/g, '')) || 0;
           const currentOut = parseFloat(String(item.outQty || '0').replace(/,/g, '')) || 0;
+          
           const summary = summaryItems.find(s => 
             s.category === item.category && 
             s.itemName.trim() === item.itemName.trim() && 
             (s.modelName || '').trim() === (item.modelName || '').trim()
           );
+          
           const totalStock = parseFloat(summary?.stockQty || '0');
           setBaseStock(totalStock - currentIn + currentOut);
+          hasInitializedRef.current = true;
         }
       } else if (isPopupMode && newItem.itemName) {
         const summary = summaryItems.find(s => 
@@ -108,9 +114,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         const totalStock = parseFloat(summary?.stockQty || '0');
         setBaseStock(totalStock);
         setNewItem(prev => ({ ...prev, stockQty: totalStock.toString() }));
+        hasInitializedRef.current = true;
       }
     }
-    // 의존성 배열에서 newItem.itemName 등을 제거하여 입력 중 리셋되는 현상 방지
   }, [editId, items.length, isPopupMode]);
 
   useEffect(() => {
@@ -363,8 +369,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
           <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
-                {editId ? <Edit2 size={20} className={editId ? 'text-orange-600' : 'text-white'} /> : <PackagePlus size={20} />}
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
+                {editId ? <Edit2 size={20} className="text-white" /> : <PackagePlus size={20} className="text-white" />}
               </div>
               <span className="font-black text-lg">{editId ? '소모품 정보 수정' : currentActiveMode === 'ledger' ? '소모품 등록/수정' : '소모품 사용/입고 등록'}</span>
             </div>
@@ -445,7 +451,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
             <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">취소 후 닫기</button>
-            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
