@@ -84,7 +84,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
   const openIndependentWindow = (id: string = 'new', mode: 'edit' | 'change' = 'edit') => {
     const width = 600;
-    const height = 950; // 스크롤바 방지를 위해 기존 750에서 950으로 증설
+    const height = 900; // 요청에 따라 900px로 설정
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -370,13 +370,16 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
           </div>
 
           <div className="p-8 space-y-6 flex-1 overflow-visible">
-            {mode === 'change' && (
+            {/* 신규 등록 또는 차량 변경 모드일 때 안내 박스 표시 */}
+            {(mode === 'change' || !editId) && (
               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center gap-3">
                 <div className="p-2 bg-white rounded-xl shadow-sm text-emerald-600">
-                  <RotateCcw size={20} />
+                  {mode === 'change' ? <RotateCcw size={20} /> : <Plus size={20} />}
                 </div>
                 <div>
-                  <p className="text-xs font-black text-emerald-800">차량 변경 모드</p>
+                  <p className="text-xs font-black text-emerald-800">
+                    {mode === 'change' ? '차량 변경 모드' : '신규 차량 등록 모드'}
+                  </p>
                   <p className="text-[11px] text-emerald-600 font-medium">저장 시 변경 이력이 자동으로 기록됩니다.</p>
                 </div>
               </div>
@@ -460,7 +463,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
           <button 
             onClick={loadData} 
             disabled={loading}
-            className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+            className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
             새로고침
