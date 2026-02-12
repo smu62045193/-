@@ -55,7 +55,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
 
   const openIndependentWindow = () => {
     const width = 500;
-    const height = 770; // 요청에 따라 770px로 설정
+    const height = 800; // 요청에 따라 800px로 설정
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -201,7 +201,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
   if (isKeywordPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-[770px]">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-[800px]">
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl">
