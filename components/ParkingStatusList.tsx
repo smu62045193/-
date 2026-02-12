@@ -2,16 +2,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ParkingStatusItem } from '../types';
 import { fetchParkingStatusList, saveParkingStatusList, deleteParkingStatusItem, generateUUID } from '../services/dataService';
-import { Trash2, Printer, Plus, Edit2, RotateCcw, AlertTriangle, X, Cloud, CheckCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+// Added Save to the lucide-react imports to fix the error on line 345
+import { Trash2, Printer, Plus, Edit2, RotateCcw, AlertTriangle, X, Cloud, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Search, Car, Save } from 'lucide-react';
 import { format } from 'date-fns';
+
+interface ParkingStatusListProps {
+  isPopupMode?: boolean;
+}
 
 const ITEMS_PER_PAGE = 10;
 
-const ParkingStatusList: React.FC = () => {
+const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = false }) => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<ParkingStatusItem[]>([]);
   const [editId, setEditId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
   
   const [newItem, setNewItem] = useState<ParkingStatusItem>({
     id: '',
@@ -26,12 +32,35 @@ const ParkingStatusList: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (id && id !== 'new') {
+        setEditId(id);
+      }
+    }
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'PARKING_SAVED') {
+        loadData();
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isPopupMode]);
+
+  useEffect(() => {
+    if (isPopupMode && editId && items.length > 0) {
+      const matched = items.find(i => String(i.id) === String(editId));
+      if (matched) setNewItem(matched);
+    }
+  }, [editId, items, isPopupMode]);
 
   // 데이터 길이가 변경되면 페이지를 1로 리셋
   useEffect(() => {
     setCurrentPage(1);
-  }, [items.length]);
+  }, [items.length, searchTerm]);
 
   const loadData = async () => {
     setLoading(true);
@@ -40,27 +69,21 @@ const ParkingStatusList: React.FC = () => {
     setLoading(false);
   };
 
-  const handleLoadToForm = (item: ParkingStatusItem) => {
-    setNewItem({ 
-      ...item, 
-      prevPlate: item.plateNum 
-    });
-    setEditId(item.id);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  const openIndependentWindow = (id: string = 'new') => {
+    const width = 600;
+    const height = 750;
+    const left = (window.screen.width / 2) - (width / 2);
+    const top = (window.screen.height / 2) - (height / 2);
 
-  const handleCancelEdit = () => {
-    setEditId(null);
-    setNewItem({
-      id: '',
-      date: format(new Date(), 'yyyy-MM-dd'),
-      type: '변경',
-      company: '',
-      location: '',
-      plateNum: '',
-      prevPlate: '',
-      note: ''
-    });
+    const url = new URL(window.location.href);
+    url.searchParams.set('popup', 'parking_status');
+    url.searchParams.set('id', id);
+
+    window.open(
+      url.toString(),
+      `ParkingWin_${id}`,
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
+    );
   };
 
   const handleRegister = async () => {
@@ -74,33 +97,24 @@ const ParkingStatusList: React.FC = () => {
     }
 
     setLoading(true);
-    const originalList = [...items];
     try {
       const currentList = await fetchParkingStatusList();
       let updatedList = [...(currentList || [])];
       
+      const targetId = editId || generateUUID();
+      const itemToSave = { ...newItem, id: targetId };
+
       if (editId) {
         const index = updatedList.findIndex(s => String(s.id) === String(editId));
-        if (index >= 0) {
-          updatedList[index] = { ...newItem };
-        }
+        if (index >= 0) updatedList[index] = itemToSave;
       } else {
         const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
         const targetLocation = normalize(newItem.location);
-        
-        let existingIndex = -1;
-        if (targetLocation) {
-          existingIndex = updatedList.findIndex(s => normalize(s.location) === targetLocation);
-        }
-
-        const itemToSave = { 
-          ...newItem, 
-          id: existingIndex >= 0 ? updatedList[existingIndex].id : generateUUID() 
-        };
+        const existingIndex = updatedList.findIndex(s => normalize(s.location) === targetLocation);
 
         if (existingIndex >= 0) {
           if (window.confirm(`해당 위치(${newItem.location})에 이미 차량이 등록되어 있습니다. 정보를 덮어쓰시겠습니까?`)) {
-            updatedList[existingIndex] = itemToSave;
+            updatedList[existingIndex] = { ...itemToSave, id: updatedList[existingIndex].id };
           } else {
             setLoading(false);
             return;
@@ -116,19 +130,22 @@ const ParkingStatusList: React.FC = () => {
         return locA.localeCompare(locB, undefined, { numeric: true });
       });
 
-      setItems(updatedList);
-
       const success = await saveParkingStatusList(updatedList);
       if (success) {
-        handleCancelEdit();
+        if (window.opener) {
+          window.opener.postMessage({ type: 'PARKING_SAVED' }, '*');
+        }
         alert('저장이 완료되었습니다.');
+        if (isPopupMode) {
+          window.close();
+        } else {
+          loadData();
+        }
       } else {
-        setItems(originalList);
         alert('저장 실패');
       }
     } catch (e) {
       console.error(e);
-      setItems(originalList);
       alert('오류가 발생했습니다.');
     } finally {
       setLoading(false);
@@ -137,19 +154,16 @@ const ParkingStatusList: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     const idStr = String(id);
-    const originalList = [...items];
+    if (!confirm('정말 삭제하시겠습니까?')) return;
     
     setLoading(true);
     try {
       const success = await deleteParkingStatusItem(idStr);
-      
       if (success) {
-        const newItems = originalList.filter(i => String(i.id) !== idStr);
-        setItems(newItems);
-        if (String(editId) === idStr) handleCancelEdit();
+        setItems(prev => prev.filter(i => String(i.id) !== idStr));
         alert('삭제가 완료되었습니다.');
       } else {
-        alert('서버 저장 실패로 삭제가 취소되었습니다.');
+        alert('삭제 실패');
       }
     } catch (e) {
       console.error(e);
@@ -163,7 +177,7 @@ const ParkingStatusList: React.FC = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
     if (!printWindow) return;
 
-    const tableRows = items.map((item, index) => `
+    const tableRows = filteredItems.map((item, index) => `
       <tr>
         <td class="text-center">${index + 1}</td>
         <td class="text-center">${item.date || ''}</td>
@@ -183,23 +197,14 @@ const ParkingStatusList: React.FC = () => {
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
           @page { size: A4 portrait; margin: 0; }
-          body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; background: white !important; -webkit-print-color-adjust: exact; }
+          body { font-family: 'Noto Sans KR', sans-serif; background: white !important; -webkit-print-color-adjust: exact; margin: 0; padding: 0; }
           .no-print { display: flex; justify-content: center; padding: 20px; }
-          @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
-          .print-page { 
-            width: 210mm; 
-            min-height: 297mm; 
-            padding: 25mm 12mm 10mm 12mm; 
-            background: white; 
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); 
-            box-sizing: border-box; 
-          }
+          @media print { .no-print { display: none !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
+          .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
           h1 { text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 30px; font-size: 24pt; font-weight: 900; }
           table { width: 100%; border-collapse: collapse; font-size: 9.5pt; border: 1.5px solid black; table-layout: fixed; }
           th, td { border: 1px solid black; padding: 8px 4px; text-align: center; word-break: break-all; }
           th { background-color: #f3f4f6; font-weight: bold; }
-          .text-left { text-align: left; }
-          .text-center { text-align: center; }
           .font-bold { font-weight: bold; }
         </style>
       </head>
@@ -233,12 +238,20 @@ const ParkingStatusList: React.FC = () => {
     printWindow.document.close();
   };
 
+  const filteredItems = useMemo(() => {
+    return items.filter(item => 
+      (item.company || '').includes(searchTerm) || 
+      (item.location || '').includes(searchTerm) || 
+      (item.plateNum || '').includes(searchTerm)
+    );
+  }, [items, searchTerm]);
+
   // 페이지네이션 처리
-  const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return items.slice(start, start + ITEMS_PER_PAGE);
-  }, [items, currentPage]);
+    return filteredItems.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredItems, currentPage]);
 
   const visiblePageNumbers = useMemo(() => {
     const halfWindow = 2;
@@ -250,90 +263,185 @@ const ParkingStatusList: React.FC = () => {
     return pages;
   }, [currentPage, totalPages]);
 
-  const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center text-[12px] text-gray-700 h-10 align-middle";
-  const tdClass = "border border-gray-300 p-0 h-10 align-middle relative bg-white";
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      const inputs = document.querySelectorAll('.form-input');
+      const index = Array.from(inputs).indexOf(e.target as any);
+      if (index > -1 && index < inputs.length - 1) (inputs[index + 1] as HTMLElement).focus();
+      else if (index === inputs.length - 1) handleRegister();
+    }
+  };
 
-  return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in relative">
-      <div className={`p-6 rounded-xl border shadow-sm transition-all duration-300 ${editId ? 'bg-orange-50 border-orange-200' : 'bg-blue-50 border-blue-200'}`}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2"><div className={`w-2 h-6 rounded-full ${editId ? 'bg-orange-500' : 'bg-blue-600'}`}></div><h3 className="text-lg font-bold text-gray-800">{editId ? '차량 정보 수정' : '신규 차량 등록'}</h3></div>
-          {editId && <button onClick={handleCancelEdit} className="flex items-center space-x-1 text-sm text-orange-600 hover:text-orange-800 font-bold bg-white px-3 py-1 rounded-full border border-orange-200 shadow-sm"><RotateCcw size={14} /><span>수정 취소</span></button>}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
-          <div><label className="block text-xs font-bold text-gray-500 mb-1">날짜</label><input type="date" value={newItem.date} onChange={e => setNewItem({...newItem, date: e.target.value})} className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
-          <div><label className="block text-xs font-bold text-gray-500 mb-1">구분</label><select value={newItem.type || '변경'} onChange={e => setNewItem({...newItem, type: e.target.value})} className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]"><option value="변경">변경</option><option value="추가">추가</option></select></div>
-          <div><label className="block text-xs font-bold text-gray-500 mb-1">업체</label><input type="text" value={newItem.company} onChange={e => setNewItem({...newItem, company: e.target.value})} placeholder="업체명" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
-          <div><label className="block text-xs font-bold text-gray-500 mb-1">위치 *</label><input type="text" value={newItem.location} onChange={e => setNewItem({...newItem, location: e.target.value})} placeholder="예: B2-1" className="w-full border border-blue-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px] font-bold" /></div>
-          <div><label className="block text-xs font-bold text-gray-500 mb-1">변경전차량번호</label><input type="text" value={newItem.prevPlate || ''} onChange={e => setNewItem({...newItem, prevPlate: e.target.value})} placeholder="변경 시 입력" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
-          <div><label className="block text-xs font-bold text-gray-500 mb-1">변경후차량번호 *</label><input type="text" value={newItem.plateNum} onChange={e => setNewItem({...newItem, plateNum: e.target.value})} placeholder="현재 차량번호" className="w-full border border-blue-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px] font-bold" /></div>
-          <div><label className="block text-xs font-bold text-gray-500 mb-1">비고</label><input type="text" value={newItem.note || ''} onChange={e => setNewItem({...newItem, note: e.target.value})} placeholder="비고" className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black h-[38px]" /></div>
-          <button onClick={handleRegister} disabled={loading} className={`flex items-center justify-center space-x-2 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-bold h-[38px] transition-colors ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} disabled:bg-gray-400`}>{editId ? <Edit2 size={18} /> : <Plus size={18} />}<span>서버저장</span></button>
+  const formInputClass = "w-full border border-gray-300 rounded-xl px-4 py-2.5 !text-[14px] bg-white text-black focus:ring-2 focus:ring-blue-500 outline-none h-[45px] font-bold shadow-inner";
+
+  // 팝업 모드일 때의 UI (등록/수정 폼만 표시)
+  if (isPopupMode) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 animate-fade-in">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+          <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
+                {editId ? <Edit2 size={24} /> : <Plus size={24} />}
+              </div>
+              <span className="font-black text-xl tracking-tight">{editId ? '차량 정보 수정' : '신규 차량 등록'}</span>
+            </div>
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
+              <X size={28} />
+            </button>
+          </div>
+
+          <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">날짜</label>
+                <input type="date" className={`${formInputClass} form-input`} value={newItem.date} onChange={(e) => setNewItem({...newItem, date: e.target.value})} onKeyDown={handleKeyDown} />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">구분</label>
+                <select className={`${formInputClass} form-input`} value={newItem.type || '변경'} onChange={(e) => setNewItem({...newItem, type: e.target.value})}>
+                  <option value="변경">변경</option>
+                  <option value="추가">추가</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">주차 위치 *</label>
+                <input type="text" className={`${formInputClass} form-input text-blue-700`} value={newItem.location} onChange={(e) => setNewItem({...newItem, location: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: B2-1" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명</label>
+                <input type="text" className={`${formInputClass} form-input`} value={newItem.company} onChange={(e) => setNewItem({...newItem, company: e.target.value})} onKeyDown={handleKeyDown} placeholder="업체명 입력" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">변경전 차량번호</label>
+                <input type="text" className={`${formInputClass} form-input`} value={newItem.prevPlate || ''} onChange={(e) => setNewItem({...newItem, prevPlate: e.target.value})} onKeyDown={handleKeyDown} placeholder="이전 차량 정보" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">현재 차량번호 *</label>
+                <input type="text" className={`${formInputClass} form-input text-blue-700`} value={newItem.plateNum} onChange={(e) => setNewItem({...newItem, plateNum: e.target.value})} onKeyDown={handleKeyDown} placeholder="변경후 차량번호" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고</label>
+              <textarea className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-32 font-medium shadow-inner" value={newItem.note || ''} onChange={(e) => setNewItem({...newItem, note: e.target.value})} placeholder="특이사항 입력" />
+            </div>
+          </div>
+
+          <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4">
+            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
+            <button 
+              onClick={handleRegister} 
+              disabled={loading}
+              className={`flex-[2] py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 shadow-xl active:scale-95 ${
+                loading ? 'bg-slate-400 cursor-wait' : editId ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {loading ? <RefreshCw size={24} className="animate-spin" /> : <Save size={24} />}
+              서버에 데이터 저장
+            </button>
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex items-center gap-2">
-          <h2 className="text-xl font-bold text-gray-800">지정주차 차량 현황</h2>
-          <span className="text-sm text-gray-400 font-normal">총 {items.length}대</span>
+  // 메인 리스트 뷰 UI
+  return (
+    <div className="p-6 space-y-6 animate-fade-in">
+      {/* 툴바 개편: 검색창 좌측 320px, 버튼 우측 배치 */}
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
+        <div className="relative w-full md:w-[320px]">
+          <input 
+            type="text" 
+            placeholder="업체명, 위치, 차량번호 검색" 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm font-bold" 
+          />
+          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
           <button 
             onClick={loadData} 
             disabled={loading}
-            className="flex items-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
+            className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
             새로고침
           </button>
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md text-sm">
-            <Printer size={18} className="mr-2" />
-            미리보기
+          <button 
+            onClick={() => openIndependentWindow()}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
+          >
+            <Plus size={18} /> 신규 차량 등록
+          </button>
+          <button 
+            onClick={handlePrint} 
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-600 text-white px-5 py-2.5 rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+          >
+            <Printer size={18} /> 미리보기
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      {/* 리스트 테이블 */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[1000px] border-collapse">
+          <table className="w-full min-w-[1000px] border-collapse border border-gray-300">
             <thead>
-              <tr>
-                <th className={`${thClass} w-10`}>No</th>
-                <th className={`${thClass} w-28`}>날짜</th>
-                <th className={`${thClass} w-16`}>구분</th>
-                <th className={`${thClass} w-40`}>업체</th>
-                <th className={`${thClass} w-20`}>위치</th>
-                <th className={`${thClass} w-36`}>변경전차량번호</th>
-                <th className={`${thClass} w-36`}>변경후차량번호</th>
-                <th className={`${thClass} w-48`}>비고</th>
-                <th className={`${thClass} w-24 print:hidden`}>관리</th>
+              <tr className="bg-gray-50 divide-x divide-gray-300">
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-12">No</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-32">등록일자</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-16">구분</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-44">업체명</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-24">주차위치</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-36">이전차량번호</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-36">현재차량번호</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700">비고</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-24 print:hidden">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-300">
-              {paginatedItems.length === 0 ? (<tr><td colSpan={9} className="text-center py-10 text-gray-400 italic">등록된 차량이 없습니다.</td></tr>) : (
-                 paginatedItems.map((item, index) => (
-                   <tr key={item.id} className={`hover:bg-gray-50/50 transition-colors divide-x divide-gray-100 ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
-                     <td className={`${tdClass} text-center text-gray-400 font-mono text-xs`}>{items.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}</td>
-                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full text-xs text-gray-700">{item.date || '-'}</div></td>
-                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{item.type || '-'}</span></div></td>
-                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-gray-800 text-sm px-2 text-center">{item.company}</div></td>
-                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-gray-700 text-sm">{item.location}</div></td>
-                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full text-gray-500 text-sm">{item.prevPlate || '-'}</div></td>
-                     <td className={tdClass}><div className="flex items-center justify-center w-full h-full font-bold text-blue-600 text-sm">{item.plateNum}</div></td>
-                     <td className={tdClass}><div className="flex items-center justify-start w-full h-full text-gray-600 text-xs px-3 truncate max-w-[12rem]">{item.note || '-'}</div></td>
-                     <td className={`${tdClass} text-center print:hidden`}>
-                       <div className="flex items-center justify-center space-x-1">
-                          <button onClick={() => handleLoadToForm(item)} className="text-blue-500 hover:text-blue-700 p-1.5 rounded hover:bg-blue-50" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50" title="삭제"><Trash2 size={16} /></button>
-                       </div>
-                     </td>
-                   </tr>)))}
+              {paginatedItems.length === 0 ? (
+                <tr><td colSpan={9} className="text-center py-20 text-gray-400 italic">검색 결과가 없습니다.</td></tr>
+              ) : (
+                paginatedItems.map((item, index) => (
+                  <tr key={item.id} className="hover:bg-blue-50/30 transition-colors divide-x divide-gray-300 text-center">
+                    <td className="p-3 text-gray-400 font-mono text-xs">{filteredItems.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}</td>
+                    <td className="p-3 text-xs text-gray-700">{item.date || '-'}</td>
+                    <td className="p-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                        {item.type || '-'}
+                      </span>
+                    </td>
+                    <td className="p-3 font-bold text-gray-900 text-sm">{item.company}</td>
+                    <td className="p-3 font-black text-gray-700 text-sm">{item.location}</td>
+                    <td className="p-3 text-gray-500 text-sm">{item.prevPlate || '-'}</td>
+                    <td className="p-3 font-black text-blue-600 text-sm">{item.plateNum}</td>
+                    <td className="p-3 text-left pl-4 text-gray-600 text-xs truncate max-w-[200px]">{item.note || '-'}</td>
+                    <td className="p-3 print:hidden">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                        <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* 페이지네이션 - 리스트 박스 외부로 이동 */}
+      {/* 페이지네이션 */}
       {totalPages > 1 && (
         <div className="px-6 py-4 flex items-center justify-center gap-2">
           <button
@@ -351,7 +459,7 @@ const ParkingStatusList: React.FC = () => {
                 className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
                   currentPage === pageNum
                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-200'
+                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
                 }`}
               >
                 {pageNum}
@@ -369,13 +477,10 @@ const ParkingStatusList: React.FC = () => {
       )}
 
       <style>{`
-        @keyframes scale-up {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-          animation: scale-up 0.2s ease-out forwards;
-        }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-fade-in { animation: fade-in 0.3s ease-out; }
+        .animate-scale-up { animation: scale-up 0.2s ease-out forwards; }
       `}</style>
     </div>
   );

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import ParkingStatusList from './ParkingStatusList';
 import ParkingInspectionHistory from './ParkingInspectionHistory';
@@ -202,33 +203,29 @@ const ParkingManager: React.FC = () => {
         {activeTab === 'status' && <ParkingStatusList />}
         {activeTab === 'location' && (
           <div className="p-8 flex flex-col items-center">
+            {/* 타이틀 삭제 및 배치 조정: 층 버튼 좌측, 액션 버튼 우측 */}
             <div className="flex flex-col md:flex-row justify-between items-center w-full max-w-6xl mb-10 gap-6">
-              <div className="flex flex-col md:flex-row items-center gap-6">
-                <div className="flex items-center gap-3">
-                  <MapIcon className="text-blue-600" size={28} />
-                  <h3 className="text-2xl font-black text-slate-800">지정주차 차량 배치도</h3>
-                </div>
-                <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
-                  <button 
-                    onClick={() => setCurrentFloor('B2F')} 
-                    className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B2F' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                  >
-                    B2F
-                  </button>
-                  <button 
-                    onClick={() => setCurrentFloor('B3F_Yeongdong')} 
-                    className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yeongdong' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                  >
-                    B3F (영동변)
-                  </button>
-                  <button 
-                    onClick={() => setCurrentFloor('B3F_Yusuji')} 
-                    className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yusuji' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                  >
-                    B3F (유수지)
-                  </button>
-                </div>
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
+                <button 
+                  onClick={() => setCurrentFloor('B2F')} 
+                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B2F' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  B2F
+                </button>
+                <button 
+                  onClick={() => setCurrentFloor('B3F_Yeongdong')} 
+                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yeongdong' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  B3F (영동변)
+                </button>
+                <button 
+                  onClick={() => setCurrentFloor('B3F_Yusuji')} 
+                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yusuji' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  B3F (유수지)
+                </button>
               </div>
+              
               <div className="flex items-center gap-2">
                 <button 
                   onClick={loadAllData} 
