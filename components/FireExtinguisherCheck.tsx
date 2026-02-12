@@ -36,6 +36,7 @@ const formatToYYMM = (dateStr: string) => {
   if (!dateStr) return '';
   if (dateStr.includes('-')) {
     const parts = dateStr.split('-');
+    // YYYY-MM 또는 YYYY-MM-DD 대응
     if (parts[0].length === 4) return `${parts[0].substring(2)}/${parts[1]}`;
   }
   return dateStr;
@@ -307,7 +308,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
           <th style="width: 80px;">제조번호</th>
           <th style="width: 90px;">전화번호</th>
           <th style="width: 80px;">검정번호</th>
-          <th style="width: 50px;">제조년월일</th>
+          <th style="width: 50px;">제조년월</th>
         </tr>
       </thead>
     `;
@@ -410,8 +411,8 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
                 <input type="text" className={`${formInputClass} form-input`} value={formItem.phone} onChange={(e) => setFormItem({...formItem, phone: e.target.value})} onKeyDown={handleKeyDown} placeholder="010-0000-0000" />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">제조년월일</label>
-                <input type="date" className={`${formInputClass} form-input`} value={formItem.date} onChange={(e) => setFormItem({...formItem, date: e.target.value})} onKeyDown={handleKeyDown} />
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">제조년월</label>
+                <input type="month" className={`${formInputClass} form-input text-center`} value={formItem.date} onChange={(e) => setFormItem({...formItem, date: e.target.value})} onKeyDown={handleKeyDown} />
               </div>
             </div>
 
@@ -513,7 +514,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">제조번호</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">전화번호</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">검정번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">제조년월일</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">제조년월</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest border border-gray-200">비 고</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 print:hidden border border-gray-200">관리</th>
               </tr>
