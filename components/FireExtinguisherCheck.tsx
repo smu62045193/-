@@ -109,7 +109,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 600;
-    const height = 770; // 독립창 전체 높이 770 설정
+    const height = 790; // 독립창 전체 높이 790 설정
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -188,7 +188,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       } else {
         alert('삭제 실패 (서버 오류)');
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
       alert('오류가 발생했습니다: ' + String(e));
     } finally {
@@ -231,7 +231,8 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
     const uniqueFloors = Array.from(new Set(items.map(i => i.floor))).filter((f): f is string => !!f && typeof f === 'string' && f.trim() !== '');
     const aboveGround = uniqueFloors
       .filter((f: string) => !isUndergroundFloor(f) && !isRooftopFloor(f))
-      .sort((a, b) => getFloorScore(String(b)) - getFloorScore(String(a)));
+      // Fixed TypeError: Property 'floor' does not exist on type 'string'. 'a' is already a string.
+      .sort((a, b) => getFloorScore(String(b)) - getFloorScore(a));
     const hasUnderground = uniqueFloors.some((f: string) => isUndergroundFloor(f));
     const hasRooftop = uniqueFloors.some((f: string) => isRooftopFloor(f));
     const btns = ['전체'];
@@ -338,7 +339,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 animate-fade-in">
-        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[720px]">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[740px]">
           <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
@@ -427,13 +428,26 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
   return (
     <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-200 pb-4 print:hidden gap-4">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-red-50 text-red-600 rounded-xl">
-            <Flame size={24} />
+        {/* '소화기 관리대장' 제목을 삭제하고 층별 필터 버튼을 배치 */}
+        <div className="flex-1 overflow-hidden flex items-center">
+          <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-hide pb-1">
+            {filterButtons.map(f => (
+              <button 
+                key={f} 
+                onClick={() => setActiveFloor(f)} 
+                className={`px-5 py-2 rounded-xl text-xs font-black border transition-all ${
+                  activeFloor === f 
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+                    : 'bg-white text-gray-400 border-gray-200 hover:border-blue-200 hover:text-blue-500'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
           </div>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tight">소화기 관리대장</h2>
         </div>
-        <div className="flex flex-wrap gap-2">
+        
+        <div className="flex flex-wrap gap-2 shrink-0">
           <button 
             onClick={loadData} 
             disabled={loading} 
@@ -456,25 +470,6 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
             <Printer size={18} className="mr-2" />
             미리보기
           </button>
-        </div>
-      </div>
-
-      <div className="print:hidden flex items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-black text-gray-400 uppercase tracking-widest min-w-max"><Filter size={16} /></div>
-        <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-hide pb-1">
-          {filterButtons.map(f => (
-            <button 
-              key={f} 
-              onClick={() => setActiveFloor(f)} 
-              className={`px-5 py-2 rounded-xl text-xs font-black border transition-all ${
-                activeFloor === f 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                  : 'bg-white text-gray-400 border-gray-200 hover:border-blue-200 hover:text-blue-500'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
         </div>
       </div>
 
