@@ -20,8 +20,8 @@ const getFloorScore = (f: any) => {
   const s = String(f || '').toUpperCase().trim();
   if (!s || s === '미지정') return -9999;
   if (s === '옥상' || s === 'RF' || s.includes('옥탑')) return 1000;
+  if (s === '창고') return -500; // 창고는 지하보다 더 낮게 설정
   if (s === '지하3~5층') return -3.5;
-  if (s === '창고') return -10;
   if (s.startsWith('B') || s.startsWith('지하')) {
     const numStr = s.replace(/[^0-9]/g, '');
     const num = parseInt(numStr);
@@ -43,12 +43,17 @@ const formatToYYMM = (dateStr: string) => {
 
 const isUndergroundFloor = (floor: string) => {
   const f = floor.trim().toUpperCase();
-  return f.startsWith('B') || f.startsWith('지하');
+  return (f.startsWith('B') || f.startsWith('지하')) && f !== '창고';
 };
 
 const isRooftopFloor = (floor: string) => {
   const f = floor.trim().toUpperCase();
   return f.includes('옥탑') || f.includes('옥상') || f.includes('RF');
+};
+
+const isStorageFloor = (floor: string) => {
+  const f = floor.trim();
+  return f.includes('창고');
 };
 
 const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMode = false }) => {
@@ -123,15 +128,6 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       `FireExtWin_${id}`,
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
     );
-  };
-
-  const handleCancelEdit = () => {
-    if (isPopupMode) {
-      window.close();
-    } else {
-      setEditId(null);
-      setFormItem(initialFormState);
-    }
   };
 
   const handleRegister = async () => {
@@ -213,6 +209,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
     if (activeFloor === '지하1~6층') filtered = filtered.filter(item => isUndergroundFloor(item.floor));
     else if (activeFloor === '옥탑') filtered = filtered.filter(item => isRooftopFloor(item.floor));
+    else if (activeFloor === '창고') filtered = filtered.filter(item => isStorageFloor(item.floor));
     else if (activeFloor !== '전체') filtered = filtered.filter(item => item.floor === activeFloor);
 
     return filtered.sort((a, b) => {
@@ -241,15 +238,22 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   const filterButtons = useMemo(() => {
     const uniqueFloors = Array.from(new Set(items.map(i => i.floor))).filter((f): f is string => !!f && typeof f === 'string' && f.trim() !== '');
+    
+    // 지상층 (10~1)
     const aboveGround = uniqueFloors
-      .filter((f: string) => !isUndergroundFloor(f) && !isRooftopFloor(f))
+      .filter((f: string) => !isUndergroundFloor(f) && !isRooftopFloor(f) && !isStorageFloor(f))
       .sort((a, b) => getFloorScore(String(b)) - getFloorScore(a));
+    
     const hasUnderground = uniqueFloors.some((f: string) => isUndergroundFloor(f));
     const hasRooftop = uniqueFloors.some((f: string) => isRooftopFloor(f));
+    const hasStorage = uniqueFloors.some((f: string) => isStorageFloor(f));
+    
     const btns = ['전체'];
     if (hasRooftop) btns.push('옥탑');
     btns.push(...aboveGround);
     if (hasUnderground) btns.push('지하1~6층');
+    if (hasStorage) btns.push('창고');
+    
     return btns;
   }, [items]);
 
@@ -503,13 +507,13 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
               <tr>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-12 border border-gray-200">No</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">관리번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">종 류</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-20 border border-gray-200">층 별</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-20 border border-gray-200">정비업체</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">제조번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">종 류</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">층 별</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">정비업체</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">제조번호</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">전화번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">검정번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">제조년월일</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">검정번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">제조년월일</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest border border-gray-200">비 고</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 print:hidden border border-gray-200">관리</th>
               </tr>
