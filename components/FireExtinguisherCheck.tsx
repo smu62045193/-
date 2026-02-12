@@ -109,7 +109,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 600;
-    const height = 750; // 독립창 전체 높이 750 설정
+    const height = 770; // 독립창 전체 높이 770 설정
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -338,7 +338,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 animate-fade-in">
-        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[700px]">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[720px]">
           <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
               <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
@@ -518,10 +518,6 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
                       <td className="px-3 py-4 text-[11px] text-slate-400 italic text-left pl-4 max-w-[150px] truncate border border-gray-200">{item.remarks || '-'}</td>
                       <td className="px-3 py-4 print:hidden border border-gray-200">
                         <div className="flex items-center justify-center gap-2">
-                          {/* 
-                              Fixed Error in file components/FireExtinguisherCheck.tsx on line 513 (reported as 516): 
-                              Removed redundant second argument to openIndependentWindow call as the definition only accepts one 'id' parameter.
-                          */}
                           <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all shadow-sm border border-blue-100" title="수정"><Edit2 size={16} /></button>
                           <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all shadow-sm border border-red-100" title="삭제"><Trash2 size={16} /></button>
                         </div>
