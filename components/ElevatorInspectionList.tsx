@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { ElevatorInspectionItem, DailyData, LogCategory } from '../types';
 import { fetchElevatorInspectionList, saveElevatorInspectionList, apiFetchRange, fetchLinkedKeywords, saveLinkedKeywords } from '../services/dataService';
 import { RefreshCw, Search, Link, Plus, Trash2, X, Save, AlertCircle, CheckCircle } from 'lucide-react';
@@ -7,6 +8,8 @@ import { format } from 'date-fns';
 interface ElevatorInspectionListProps {
   isKeywordPopupMode?: boolean;
 }
+
+const ITEMS_PER_PAGE = 15;
 
 const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywordPopupMode = false }) => {
   const [loading, setLoading] = useState(false);
@@ -22,7 +25,6 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
     }
     loadKeywords();
 
-    // 팝업 창으로부터 저장 완료 메시지를 받았을 때 데이터 새로고침
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'ELEVATOR_KEYWORDS_SAVED') {
         loadKeywords();
@@ -48,7 +50,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
 
   const openIndependentWindow = () => {
     const width = 500;
-    const height = 600;
+    const height = 750; // 요청에 따라 750px로 설정
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -170,12 +172,14 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
     (item.date || '').includes(searchTerm)
   );
 
-  // 팝업 모드일 때 렌더링할 UI
+  const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-11 whitespace-nowrap uppercase tracking-wider";
+  const tdClass = "border border-gray-300 px-3 py-4 text-sm text-gray-700 h-10 align-middle bg-white text-center";
+
   if (isKeywordPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-full">
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl">
                 <Link size={20} />
@@ -242,8 +246,8 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
             </div>
           </div>
 
-          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3">
-            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all active:scale-95">취소</button>
+          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 active:scale-95">취소</button>
             <button 
               onClick={handleSaveKeywords} 
               disabled={saveStatus !== 'idle'}
@@ -267,67 +271,74 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
     );
   }
 
-  // 메인 리스트 뷰 렌더링
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-4 animate-fade-in">
-      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 gap-4">
+    <div className="p-6 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-200 gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 md:w-72">
+          <div className="relative w-[320px]">
             <input 
               type="text" 
               placeholder="업체, 내용, 날짜 검색" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner font-bold"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-sm bg-white text-black shadow-sm outline-none font-bold" 
             />
             <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <button 
+            onClick={loadData}
+            disabled={loading}
+            className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+          >
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
           <button 
             onClick={handleRefresh}
             disabled={loading}
-            className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
+            className="flex items-center justify-center px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl font-bold shadow-sm hover:bg-indigo-50 transition-all text-sm active:scale-95 disabled:opacity-50"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
             데이터 연동하기
           </button>
           <button 
             onClick={openIndependentWindow}
-            className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm active:scale-95"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-md text-sm transition-all active:scale-95"
           >
-            <Link size={18} className="mr-2" />
+            <Link size={18} />
             자동연동업체등록
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] border-collapse">
+      <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[1000px] border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">날짜</th>
-                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-48">업체</th>
-                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">내용</th>
-                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-32">비고</th>
+                <th className={`${thClass} w-16`}>No</th>
+                <th className={`${thClass} w-32`}>날짜</th>
+                <th className={`${thClass} w-48 text-left pl-6`}>업체</th>
+                <th className={`${thClass} text-left pl-6`}>점검/작업내용</th>
+                <th className={`${thClass} w-32`}>비고</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading && items.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">로딩 중...</td></tr>
+                <tr><td colSpan={5} className="py-24 text-center border border-gray-200"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
               ) : filteredItems.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">데이터가 없습니다. [데이터 연동하기]를 눌러 가져오세요.</td></tr>
+                <tr><td colSpan={5} className="py-24 text-center text-gray-400 italic text-sm border border-gray-200">데이터가 없습니다. [데이터 연동하기]를 눌러 가져오세요.</td></tr>
               ) : (
                 filteredItems.map((item, index) => (
                   <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{filteredItems.length - index}</td>
-                    <td className="px-4 py-4 text-center text-sm text-gray-700 font-bold whitespace-nowrap">{item.date}</td>
-                    <td className="px-4 py-4 text-sm text-gray-900 font-black">{item.company}</td>
-                    <td className="px-4 py-4 text-sm text-gray-700">{item.content}</td>
-                    <td className="px-4 py-4 text-center">
+                    <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{filteredItems.length - index}</td>
+                    <td className={`${tdClass} font-bold text-gray-700 whitespace-nowrap`}>{item.date}</td>
+                    <td className={`${tdClass} font-black text-blue-800 text-left pl-6`}>{item.company}</td>
+                    <td className={`${tdClass} text-left pl-6 text-gray-700 font-medium`}>{item.content}</td>
+                    <td className={tdClass}>
                       <span className="text-[11px] font-bold text-gray-400">
                         {item.note || '-'}
                       </span>
