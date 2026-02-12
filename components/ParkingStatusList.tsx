@@ -124,32 +124,31 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
       const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
 
       if (editId) {
-        // 기존 정보 찾기 (이력 연동용)
-        const oldItem = updatedList.find(s => String(s.id) === String(editId));
+        // [수정 모드] 현황 정보 업데이트
         const index = updatedList.findIndex(s => String(s.id) === String(editId));
         if (index >= 0) updatedList[index] = itemToSave;
 
-        // [수정 연동 로직] 수정 모드일 때 이력에 이미 있는 데이터를 업데이트
-        if (oldItem) {
+        // [이력 연동] 단순 수정일 경우, 이력 중 가장 최근의 동일 위치 항목만 업데이트
+        if (mode === 'edit') {
           const currentHistory = await fetchParkingChangeList();
-          const targetLoc = normalize(oldItem.location);
-          const targetPlate = normalize(oldItem.plateNum);
-
-          const updatedHistory = currentHistory.map(h => {
-            if (normalize(h.location) === targetLoc && normalize(h.newPlate) === targetPlate) {
-              return {
-                ...h,
-                company: newItem.company,
-                location: newItem.location,
-                newPlate: newItem.plateNum,
-                note: newItem.note || h.note
-              };
-            }
-            return h;
-          });
-          await saveParkingChangeList(updatedHistory);
+          const targetLoc = normalize(newItem.location);
+          
+          // 해당 위치의 가장 최근 이력 1건만 찾음 (과거 내역 보존을 위해)
+          const latestHistoryIdx = currentHistory.findIndex(h => normalize(h.location) === targetLoc);
+          
+          if (latestHistoryIdx !== -1) {
+            const updatedHistory = [...currentHistory];
+            updatedHistory[latestHistoryIdx] = {
+              ...updatedHistory[latestHistoryIdx],
+              company: newItem.company,
+              newPlate: newItem.plateNum,
+              note: newItem.note || updatedHistory[latestHistoryIdx].note
+            };
+            await saveParkingChangeList(updatedHistory);
+          }
         }
       } else {
+        // [신규 등록]
         const targetLocation = normalize(newItem.location);
         const existingIndex = updatedList.findIndex(s => normalize(s.location) === targetLocation);
 
@@ -173,7 +172,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
       const successStatus = await saveParkingStatusList(updatedList);
 
-      // [추가 연동 로직] 변경 모드 또는 순수 신규 등록 시에만 이력 추가
+      // [이력 추가] '변경' 모드이거나 아예 '신규' 등록일 때만 새로운 이력 행 생성
       if (successStatus && (mode === 'change' || !editId)) {
         const currentHistory = await fetchParkingChangeList();
         const newHistoryItem: ParkingChangeItem = {
@@ -186,6 +185,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
           newPlate: newItem.plateNum,
           note: newItem.note || ''
         };
+        // 최신이 위로 오도록 추가
         await saveParkingChangeList([newHistoryItem, ...(currentHistory || [])]);
       }
 
@@ -215,22 +215,23 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     const itemToDelete = items.find(i => String(i.id) === idStr);
     if (!itemToDelete) return;
 
-    if (!window.confirm('정말 삭제하시겠습니까? 해당 위치의 모든 변경 이력도 함께 삭제됩니다.')) return;
+    if (!window.confirm(`정말 삭제하시겠습니까?\n'${itemToDelete.location}' 위치의 모든 변경 이력도 함께 삭제됩니다.`)) return;
     
     setLoading(true);
     try {
       // 1. 현황 데이터 삭제
       const success = await deleteParkingStatusItem(idStr);
       if (success) {
-        // 2. [삭제 연동 로직] 변경 이력에서도 해당 위치(location)와 관련된 모든 기록을 삭제
+        // 2. [삭제 연동 로직] 변경 이력에서도 해당 위치(location)와 관련된 모든 기록을 삭제 (추가/변경 기록 전체)
         const currentHistory = await fetchParkingChangeList();
         if (currentHistory && currentHistory.length > 0) {
           const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
           const targetLoc = normalize(itemToDelete.location);
           
-          // 해당 위치(예: B2-1)의 모든 이력 항목 제거 (추가, 변경 모두 포함)
+          // 해당 위치(예: B2-1)인 모든 이력 항목 제거
           const filteredHistory = currentHistory.filter(h => normalize(h.location) !== targetLoc);
           
+          // 필터링된 리스트를 서버에 덮어씌움으로써 관련 이력 완전 삭제
           await saveParkingChangeList(filteredHistory);
         }
 
