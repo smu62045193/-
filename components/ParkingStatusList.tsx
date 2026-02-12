@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { ParkingStatusItem } from '../types';
 import { fetchParkingStatusList, saveParkingStatusList, deleteParkingStatusItem, generateUUID } from '../services/dataService';
@@ -188,7 +189,6 @@ const ParkingStatusList: React.FC = () => {
           .print-page { 
             width: 210mm; 
             min-height: 297mm; 
-            margin: 20px auto; 
             padding: 25mm 12mm 10mm 12mm; 
             background: white; 
             box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); 
@@ -331,42 +331,42 @@ const ParkingStatusList: React.FC = () => {
             </tbody>
           </table>
         </div>
-
-        {/* 페이지네이션 UI */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="flex items-center gap-1.5 px-4">
-              {visiblePageNumbers.map(pageNum => (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-200'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* 페이지네이션 - 리스트 박스 외부로 이동 */}
+      {totalPages > 1 && (
+        <div className="px-6 py-4 flex items-center justify-center gap-2">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="flex items-center gap-1.5 px-4">
+            {visiblePageNumbers.map(pageNum => (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                  currentPage === pageNum
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-200'
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
 
       <style>{`
         @keyframes scale-up {

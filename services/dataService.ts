@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -345,7 +344,7 @@ export const apiFetchRange = async (prefix: string, start: string, end: string):
       query = query.gte("id", startKey).lte("id", endKey);
     }
 
-    const { data, error } = await query.order('id', { ascending: true });
+    const { data, error } = query.order('id', { ascending: true });
     
     if (error) throw error;
     if (!data) return [];
@@ -1014,7 +1013,16 @@ export const saveConsumableRequests = async (list: ConsumableRequest[]): Promise
 export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => {
   try {
     const { data } = await supabase.from('parking_changes').select('*').order('date', { ascending: false });
-    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, company: p.company, location: p.location, prev_plate: p.prev_plate, new_plate: p.new_plate, note: p.note }));
+    if (data && data.length > 0) return data.map(p => ({ 
+      id: p.id, 
+      date: p.date, 
+      type: p.type, 
+      company: p.company, 
+      location: p.location, 
+      prevPlate: p.prev_plate, 
+      newPlate: p.new_plate, 
+      note: p.note 
+    }));
   } catch (e) {}
   return [];
 };
@@ -1034,8 +1042,8 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
       type: p.type, 
       location: p.location, 
       company: p.company, 
-      prev_plate: p.prev_plate, 
-      plate_num: p.plate_num,   
+      prevPlate: p.prev_plate, 
+      plateNum: p.plate_num,   
       note: p.note 
     }));
   } catch (e) {}
@@ -1329,7 +1337,9 @@ export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promis
     emissions: data.emissions, 
     preventions: data.preventions,
     weather_condition: data.weatherCondition,
+    // Fixed: Accessed correct camelCase properties from AirEnvironmentLogData as per interface definition
     temp_min: data.tempMin,
+    // Fixed: Accessed correct camelCase properties from AirEnvironmentLogData as per interface definition
     temp_max: data.tempMax,
     last_updated: new Date().toISOString() 
   });
