@@ -193,6 +193,38 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     }
   };
 
+  const toggleEditMode = () => {
+    if (!isEditMode && activeRequest) {
+      // 수정 모드로 진입할 때 섹션별로 최소 5행이 있는지 확인하고 부족하면 채워넣음
+      const currentItems = [...activeRequest.items];
+      const paddedItems: ConsumableRequestItem[] = [];
+
+      SECTIONS.forEach(sec => {
+        const sectionItems = currentItems.filter(it => it.category === sec.key);
+        paddedItems.push(...sectionItems);
+        
+        const deficit = 5 - sectionItems.length;
+        if (deficit > 0) {
+          for (let i = 0; i < deficit; i++) {
+            paddedItems.push({ 
+              id: generateId(), 
+              category: sec.key, 
+              itemName: '', 
+              spec: '', 
+              stock: '', 
+              qty: '', 
+              receivedDate: '', 
+              remarks: '', 
+              amount: 0 
+            });
+          }
+        }
+      });
+      setActiveRequest({ ...activeRequest, items: paddedItems });
+    }
+    setIsEditMode(!isEditMode);
+  };
+
   const handleSaveForm = async () => {
     if (!activeRequest) return;
     setLoading(true);
@@ -233,12 +265,12 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
           <h3 style="font-size: 13pt; font-weight: bold; margin-bottom: 6px; border-left: 7px solid black; padding-left: 10px; margin-top: 15px;">${sec.label}</h3>
           <table>
             <thead><tr style="background:#f3f4f6; height:30px;">
-              <th style="width: 40px;">No</th>
-              <th style="width: 150px;">품 명</th>
-              <th style="width: 150px;">모델명</th>
-              <th style="width: 80px;">재고</th>
-              <th style="width: 80px;">수량</th>
-              <th style="width: 80px;">입고일</th>
+              <th style="width: 30px;">No</th>
+              <th style="width: 120px;">품 명</th>
+              <th style="width: 120px;">모델명</th>
+              <th style="width: 45px;">재고</th>
+              <th style="width: 45px;">수량</th>
+              <th style="width: 65px;">입고일</th>
               <th>비 고</th>
             </tr></thead>
             <tbody>${its.map((item, idx) => `
@@ -325,7 +357,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             <PackageSearch size={18} className="mr-2" /> 자재불러오기
           </button>
 
-          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-xl font-bold border shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white border-orange-600' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'}`}>
+          <button onClick={toggleEditMode} className={`flex items-center px-4 py-2 rounded-xl font-bold border shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white border-orange-600' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'}`}>
             {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />} {isEditMode ? '수정완료' : '수정'}
           </button>
 
@@ -428,9 +460,9 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                     <th className={thClass}>비 고</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
+                <tbody className="">
                   {activeRequest?.items.filter(i => i.category === sec.key).map((it, idx) => (
-                    <tr key={it.id} className="hover:bg-gray-50/50 transition-colors group divide-x divide-gray-100">
+                    <tr key={it.id} className="hover:bg-gray-50/50 transition-colors group">
                       <td className="border border-gray-300 text-center font-mono text-xs text-gray-400 bg-gray-50/30 relative h-10">
                         <span className={isEditMode ? "group-hover:opacity-0" : ""}>{idx + 1}</span>
                         {isEditMode && (
