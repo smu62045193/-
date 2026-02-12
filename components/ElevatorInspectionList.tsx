@@ -55,7 +55,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
 
   const openIndependentWindow = () => {
     const width = 500;
-    const height = 800; // 요청에 따라 800px로 설정
+    const height = 650; // 요청에 따라 독립창 전체 높이 650px로 설정
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -201,32 +201,32 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
   if (isKeywordPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-[800px]">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white shrink-0">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-[600px]">
+          <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl">
-                <Link size={20} />
+                <Link size={18} />
               </div>
               <div>
-                <h3 className="text-lg font-black tracking-tight">자동 연동 업체 관리</h3>
-                <p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Elevator Contractor Setup</p>
+                <h3 className="text-base font-black tracking-tight">자동 연동 업체 관리</h3>
+                <p className="text-[9px] text-blue-300 font-bold uppercase tracking-widest">Elevator Contractor Setup</p>
               </div>
             </div>
             <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
-              <X size={24} />
+              <X size={20} />
             </button>
           </div>
           
-          <div className="p-5 space-y-4 flex-1 flex flex-col overflow-hidden">
-            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 shrink-0">
-              <p className="text-xs text-blue-800 leading-relaxed font-bold">
+          <div className="p-4 space-y-4 flex-1 flex flex-col overflow-hidden">
+            <div className="bg-blue-50 p-3 rounded-2xl border border-blue-100 shrink-0">
+              <p className="text-[11px] text-blue-800 leading-snug font-bold">
                 업무일지에 입력되는 업체명을 등록하세요.<br/>
                 <span className="text-blue-600 underline">공백, 괄호 등은 자동으로 무시하고 연동됩니다.</span>
               </p>
             </div>
             
-            <div className="space-y-2 shrink-0">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">New Contractor Name</label>
+            <div className="space-y-1.5 shrink-0">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">New Contractor Name</label>
               <div className="flex gap-2">
                 <input 
                   type="text" 
@@ -234,32 +234,32 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
                   onChange={(e) => setNewKeyword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addKeyword()}
                   placeholder="예: 현대엘리베이터, 오티스"
-                  className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold shadow-inner"
+                  className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none font-bold shadow-inner"
                 />
                 <button 
                   onClick={addKeyword}
-                  className="px-6 py-3 bg-slate-800 text-white rounded-xl font-black hover:bg-black transition-all active:scale-95 shadow-md"
+                  className="px-5 py-2.5 bg-slate-800 text-white rounded-xl font-black hover:bg-black transition-all active:scale-95 shadow-md text-sm"
                 >
                   추가
                 </button>
               </div>
             </div>
 
-            <div className="space-y-2 flex-1 flex flex-col min-h-0">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Registered List</label>
-              <div className="flex-1 border-2 border-dashed border-slate-200 rounded-2xl p-4 bg-slate-50/50 overflow-y-auto scrollbar-hide">
+            <div className="space-y-1.5 flex-1 flex flex-col min-h-0">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Registered List</label>
+              <div className="flex-1 border-2 border-dashed border-slate-200 rounded-2xl p-3 bg-slate-50/50 overflow-y-auto scrollbar-hide">
                 {keywords.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-slate-300">
-                    <AlertCircle size={32} className="mb-2 opacity-20" />
-                    <p className="text-xs font-bold italic">등록된 업체가 없습니다.</p>
+                    <AlertCircle size={24} className="mb-2 opacity-20" />
+                    <p className="text-[11px] font-bold italic">등록된 업체가 없습니다.</p>
                   </div>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {keywords.map(k => (
-                      <span key={k} className="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-black shadow-sm group hover:border-red-200 transition-all">
+                      <span key={k} className="inline-flex items-center gap-2 px-2.5 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-[11px] font-black shadow-sm group hover:border-red-200 transition-all">
                         {k}
                         <button onClick={() => removeKeyword(k)} className="text-slate-300 hover:text-red-500 transition-colors">
-                          <X size={14} />
+                          <X size={12} />
                         </button>
                       </span>
                     ))}
@@ -270,22 +270,22 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
           </div>
 
           <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
-            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 active:scale-95">닫기</button>
+            <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 active:scale-95">닫기</button>
             <button 
               onClick={handleSaveKeywords} 
               disabled={saveStatus !== 'idle'}
-              className={`flex-[2] py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
+              className={`flex-[2] py-3.5 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-lg active:scale-95 ${
                 saveStatus === 'saving' ? 'bg-blue-400 text-white cursor-wait' : 
                 saveStatus === 'saved' ? 'bg-emerald-600 text-white shadow-emerald-100' : 
                 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
               }`}
             >
               {saveStatus === 'saving' ? (
-                <><RefreshCw size={18} className="animate-spin" /> 저장 중...</>
+                <><RefreshCw size={16} className="animate-spin" /> 저장 중...</>
               ) : saveStatus === 'saved' ? (
-                <><CheckCircle size={18} /> 저장 완료</>
+                <><CheckCircle size={16} /> 저장 완료</>
               ) : (
-                <><Save size={18} /> 설정 저장 후 닫기</>
+                <><Save size={16} /> 설정 저장 후 닫기</>
               )}
             </button>
           </div>
