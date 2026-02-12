@@ -215,24 +215,21 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     const itemToDelete = items.find(i => String(i.id) === idStr);
     if (!itemToDelete) return;
 
-    if (!window.confirm('정말 삭제하시겠습니까? 해당 차량의 모든 변경 이력도 함께 삭제됩니다.')) return;
+    if (!window.confirm('정말 삭제하시겠습니까? 해당 위치의 모든 변경 이력도 함께 삭제됩니다.')) return;
     
     setLoading(true);
     try {
       // 1. 현황 데이터 삭제
       const success = await deleteParkingStatusItem(idStr);
       if (success) {
-        // 2. [삭제 연동 로직] 변경 이력에서도 해당 차량(위치+차량번호)의 모든 기록을 삭제
+        // 2. [삭제 연동 로직] 변경 이력에서도 해당 위치(location)와 관련된 모든 기록을 삭제
         const currentHistory = await fetchParkingChangeList();
         if (currentHistory && currentHistory.length > 0) {
           const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
           const targetLoc = normalize(itemToDelete.location);
-          const targetPlate = normalize(itemToDelete.plateNum);
           
-          // 위치와 변경후 차량번호가 일치하는 모든 이력 항목 제거
-          const filteredHistory = currentHistory.filter(h => 
-            !(normalize(h.location) === targetLoc && normalize(h.newPlate) === targetPlate)
-          );
+          // 해당 위치(예: B2-1)의 모든 이력 항목 제거 (추가, 변경 모두 포함)
+          const filteredHistory = currentHistory.filter(h => normalize(h.location) !== targetLoc);
           
           await saveParkingChangeList(filteredHistory);
         }
