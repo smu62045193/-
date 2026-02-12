@@ -217,15 +217,15 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
             </button>
           </div>
           
-          <div className="p-6 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
-            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+          <div className="p-5 space-y-4 flex-1 flex flex-col overflow-hidden">
+            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 shrink-0">
               <p className="text-xs text-blue-800 leading-relaxed font-bold">
                 업무일지에 입력되는 업체명을 등록하세요.<br/>
                 <span className="text-blue-600 underline">공백, 괄호 등은 자동으로 무시하고 연동됩니다.</span>
               </p>
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-2 shrink-0">
               <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">New Contractor Name</label>
               <div className="flex gap-2">
                 <input 
@@ -245,11 +245,11 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 flex flex-col min-h-0">
               <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Registered List</label>
-              <div className="min-h-[200px] border-2 border-dashed border-slate-200 rounded-2xl p-4 bg-slate-50/50">
+              <div className="flex-1 border-2 border-dashed border-slate-200 rounded-2xl p-4 bg-slate-50/50 overflow-y-auto scrollbar-hide">
                 {keywords.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-slate-300">
+                  <div className="flex flex-col items-center justify-center h-full text-slate-300">
                     <AlertCircle size={32} className="mb-2 opacity-20" />
                     <p className="text-xs font-bold italic">등록된 업체가 없습니다.</p>
                   </div>
@@ -269,7 +269,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
             </div>
           </div>
 
-          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+          <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
             <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 active:scale-95">닫기</button>
             <button 
               onClick={handleSaveKeywords} 
