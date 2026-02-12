@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ConsumableItem } from '../types';
 import { fetchConsumables, saveConsumables } from '../services/dataService';
-import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch } from 'lucide-react';
+import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch, Lock } from 'lucide-react';
 
 interface ConsumablesLedgerProps {
   onBack?: () => void;
@@ -72,7 +71,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           date: params.get('date') || prev.date,
           details: '' 
         }));
-        hasInitializedRef.current = true;
+        // 여기서 바로 true를 설정하면 재고 계산 useEffect가 실행되지 않으므로 제거
       }
     }
 
@@ -85,13 +84,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return () => window.removeEventListener('message', handleMessage);
   }, [isPopupMode]);
 
-  // 수정 모드 시 데이터 로드 - 1회만 실행되도록 ref 사용
+  // 수정 모드 또는 신규 입력 시 재고 데이터 동기화
   useEffect(() => {
     if (items.length > 0 && !hasInitializedRef.current) {
       if (editId) {
         const item = items.find(i => String(i.id) === String(editId));
         if (item) {
-          setNewItem({ ...item });
           const currentIn = parseFloat(String(item.inQty || '0').replace(/,/g, '')) || 0;
           const currentOut = parseFloat(String(item.outQty || '0').replace(/,/g, '')) || 0;
           
@@ -103,6 +101,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           
           const totalStock = parseFloat(summary?.stockQty || '0');
           setBaseStock(totalStock - currentIn + currentOut);
+          setNewItem({ ...item });
           hasInitializedRef.current = true;
         }
       } else if (isPopupMode && newItem.itemName) {
@@ -117,7 +116,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         hasInitializedRef.current = true;
       }
     }
-  }, [editId, items.length, isPopupMode]);
+  }, [editId, items.length, isPopupMode, newItem.itemName]); // newItem.itemName 의존성 추가
 
   useEffect(() => {
     setCurrentPage(1);
@@ -479,7 +478,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           <button 
             onClick={loadData}
             disabled={loading}
-            className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+            className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
             새로고침
