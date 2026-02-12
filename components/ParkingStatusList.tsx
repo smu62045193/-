@@ -102,11 +102,11 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
   const handleRegister = async () => {
     if (!newItem.location?.trim()) {
-      alert('주차 위치(예: B2-1)를 입력해주세요.');
+      window.alert('주차 위치(예: B2-1)를 입력해주세요.');
       return;
     }
     if (!newItem.plateNum?.trim()) {
-      alert('현재 차량번호(변경후)는 필수입니다.');
+      window.alert('현재 차량번호(변경후)는 필수입니다.');
       return;
     }
 
@@ -169,18 +169,18 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
         if (window.opener) {
           window.opener.postMessage({ type: 'PARKING_SAVED' }, '*');
         }
-        alert('저장이 완료되었습니다. (변경이력 자동 기록됨)');
+        window.alert('저장이 완료되었습니다.');
         if (isPopupMode) {
           window.close();
         } else {
           loadData();
         }
       } else {
-        alert('저장 실패');
+        window.alert('저장 실패');
       }
     } catch (e) {
       console.error(e);
-      alert('오류가 발생했습니다.');
+      window.alert('오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -191,7 +191,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     const itemToDelete = items.find(i => String(i.id) === idStr);
     if (!itemToDelete) return;
 
-    if (!confirm('정말 삭제하시겠습니까? (관련 변경 이력도 함께 삭제됩니다)')) return;
+    if (!window.confirm('정말 삭제하시겠습니까? (관련 변경 이력도 함께 삭제됩니다)')) return;
     
     setLoading(true);
     try {
@@ -215,13 +215,13 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
         }
 
         setItems(prev => prev.filter(i => String(i.id) !== idStr));
-        alert('삭제가 완료되었습니다. (관련 이력 포함)');
+        window.alert('삭제가 완료되었습니다.');
       } else {
-        alert('삭제 실패');
+        window.alert('삭제 실패');
       }
     } catch (e) {
       console.error(e);
-      alert('삭제 중 오류가 발생했습니다.');
+      window.alert('삭제 중 오류가 발생했습니다.');
     } finally {
       setLoading(false);
     }

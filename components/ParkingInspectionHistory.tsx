@@ -162,7 +162,7 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">위치</th>
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">변경전차량번호</th>
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">변경후차량번호</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">미리보기</th>
+                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">상세내역</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

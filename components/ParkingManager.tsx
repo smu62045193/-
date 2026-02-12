@@ -60,7 +60,6 @@ const ParkingManager: React.FC = () => {
   const [layout, setLayout] = useState<any>(INITIAL_LAYOUT);
   const [loading, setLoading] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [currentFloor, setCurrentFloor] = useState<'B2F' | 'B3F_Yeongdong' | 'B3F_Yusuji'>('B2F');
 
@@ -96,21 +95,20 @@ const ParkingManager: React.FC = () => {
 
   const handleSaveLayout = async () => {
     setSaveStatus('loading');
-    setShowSaveConfirm(false);
     try {
       const success = await saveParkingLayout(layout);
       if (success) {
         setSaveStatus('success');
         setIsEditMode(false);
-        alert('저장이 완료되었습니다.');
+        window.alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
-        alert('저장에 실패했습니다.');
+        window.alert('저장에 실패했습니다.');
       }
     } catch (e) {
       setSaveStatus('error');
-      alert('오류가 발생했습니다.');
+      window.alert('오류가 발생했습니다.');
     }
   };
 
@@ -243,7 +241,9 @@ const ParkingManager: React.FC = () => {
                 <button 
                   onClick={() => {
                     if (isEditMode) {
-                      setShowSaveConfirm(true);
+                      if (window.confirm('배치 수정 내용을 서버에 저장하시겠습니까?')) {
+                        handleSaveLayout();
+                      }
                     } else {
                       setIsEditMode(true);
                     }
@@ -337,40 +337,6 @@ const ParkingManager: React.FC = () => {
           </div>
         )}
       </div>
-
-      {/* 서버 저장 확인 팝업 모달 */}
-      {showSaveConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                배치 수정 내용을 서버에 저장하고<br/>
-                수정 모드를 종료하시겠습니까?
-              </p>
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowSaveConfirm(false)} 
-                  className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center"
-                >
-                  <X size={20} className="mr-2" />
-                  취소
-                </button>
-                <button 
-                  onClick={handleSaveLayout} 
-                  className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95"
-                >
-                  <CheckCircle size={20} className="mr-2" />
-                  확인
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <style>{`
         @keyframes scale-up {
