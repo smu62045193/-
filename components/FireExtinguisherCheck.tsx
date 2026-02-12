@@ -402,7 +402,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
             <div>
               <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고</label>
-              <textarea className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-24 font-medium shadow-inner" value={formItem.remarks || ''} onChange={(e) => setFormItem({...formItem, remarks: e.target.value})} placeholder="특이사항 입력" />
+              <textarea className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-16 font-medium shadow-inner" value={formItem.remarks || ''} onChange={(e) => setFormItem({...formItem, remarks: e.target.value})} placeholder="특이사항 입력" />
             </div>
           </div>
 
@@ -449,7 +449,10 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
             <Plus size={18} className="mr-2" />
             신규 소화기 등록
           </button>
-          <button onClick={handlePrint} className="flex items-center px-4 py-2.5 bg-gray-700 text-white rounded-xl hover:bg-gray-800 font-bold shadow-sm transition-colors text-sm active:scale-95">
+          <button 
+            onClick={handlePrint} 
+            className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+          >
             <Printer size={18} className="mr-2" />
             미리보기
           </button>
