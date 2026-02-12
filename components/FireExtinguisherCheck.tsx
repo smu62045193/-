@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FireExtinguisherItem } from '../types';
 import { fetchFireExtinguisherList, saveFireExtinguisherList, deleteFireExtinguisher, generateUUID } from '../services/dataService';
-import { Save, Plus, Trash2, Printer, Filter, Edit2, RotateCcw, Flame, Check, AlertCircle, X, AlertTriangle, Cloud, CheckCircle, ChevronLeft, ChevronRight, Lock, RefreshCw } from 'lucide-react';
+import { Save, Plus, Trash2, Printer, Filter, Edit2, RotateCcw, Flame, Check, AlertCircle, X, AlertTriangle, Cloud, CheckCircle, ChevronLeft, ChevronRight, Lock, RefreshCw, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface FireExtinguisherCheckProps {
@@ -55,6 +55,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<FireExtinguisherItem[]>([]);
   const [activeFloor, setActiveFloor] = useState<string>('전체');
+  const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -92,7 +93,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFloor, items.length]);
+  }, [activeFloor, items.length, searchTerm]);
 
   const loadData = async () => {
     setLoading(true);
@@ -109,7 +110,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 600;
-    const height = 790; // 독립창 전체 높이 790 설정
+    const height = 790;
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -199,6 +200,17 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
   const filteredItemsSorted = useMemo<FireExtinguisherItem[]>(() => {
     const safeItems = Array.isArray(items) ? items : [];
     let filtered = [...safeItems];
+
+    if (searchTerm.trim()) {
+      const lower = searchTerm.toLowerCase();
+      filtered = filtered.filter(it => 
+        (it.manageNo || '').toLowerCase().includes(lower) ||
+        (it.floor || '').toLowerCase().includes(lower) ||
+        (it.company || '').toLowerCase().includes(lower) ||
+        (it.serialNo || '').toLowerCase().includes(lower)
+      );
+    }
+
     if (activeFloor === '지하1~6층') filtered = filtered.filter(item => isUndergroundFloor(item.floor));
     else if (activeFloor === '옥탑') filtered = filtered.filter(item => isRooftopFloor(item.floor));
     else if (activeFloor !== '전체') filtered = filtered.filter(item => item.floor === activeFloor);
@@ -208,7 +220,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       if (scoreDiff !== 0) return scoreDiff;
       return (String(a.manageNo || '')).localeCompare(String(b.manageNo || ''), 'en', { numeric: true });
     });
-  }, [items, activeFloor]);
+  }, [items, activeFloor, searchTerm]);
 
   const totalPages = Math.ceil(filteredItemsSorted.length / ITEMS_PER_PAGE);
   const paginatedFlatItems = useMemo(() => {
@@ -231,7 +243,6 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
     const uniqueFloors = Array.from(new Set(items.map(i => i.floor))).filter((f): f is string => !!f && typeof f === 'string' && f.trim() !== '');
     const aboveGround = uniqueFloors
       .filter((f: string) => !isUndergroundFloor(f) && !isRooftopFloor(f))
-      // Fixed TypeError: Property 'floor' does not exist on type 'string'. 'a' is already a string.
       .sort((a, b) => getFloorScore(String(b)) - getFloorScore(a));
     const hasUnderground = uniqueFloors.some((f: string) => isUndergroundFloor(f));
     const hasRooftop = uniqueFloors.some((f: string) => isRooftopFloor(f));
@@ -292,7 +303,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
           <th style="width: 80px;">제조번호</th>
           <th style="width: 90px;">전화번호</th>
           <th style="width: 80px;">검정번호</th>
-          <th style="width: 50px;">일 자</th>
+          <th style="width: 50px;">제조년월일</th>
         </tr>
       </thead>
     `;
@@ -335,7 +346,6 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   const formInputClass = "w-full border border-gray-300 rounded-xl px-4 py-2.5 !text-[14px] bg-white text-black focus:ring-2 focus:ring-blue-500 outline-none h-[45px] font-bold shadow-inner";
 
-  // 독립창(팝업) 모드 렌더링
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 animate-fade-in">
@@ -396,7 +406,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
                 <input type="text" className={`${formInputClass} form-input`} value={formItem.phone} onChange={(e) => setFormItem({...formItem, phone: e.target.value})} onKeyDown={handleKeyDown} placeholder="010-0000-0000" />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">설치/정비 일자</label>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">제조년월일</label>
                 <input type="date" className={`${formInputClass} form-input`} value={formItem.date} onChange={(e) => setFormItem({...formItem, date: e.target.value})} onKeyDown={handleKeyDown} />
               </div>
             </div>
@@ -428,23 +438,16 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
   return (
     <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-200 pb-4 print:hidden gap-4">
-        {/* '소화기 관리대장' 제목을 삭제하고 층별 필터 버튼을 배치 */}
-        <div className="flex-1 overflow-hidden flex items-center">
-          <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-hide pb-1">
-            {filterButtons.map(f => (
-              <button 
-                key={f} 
-                onClick={() => setActiveFloor(f)} 
-                className={`px-5 py-2 rounded-xl text-xs font-black border transition-all ${
-                  activeFloor === f 
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                    : 'bg-white text-gray-400 border-gray-200 hover:border-blue-200 hover:text-blue-500'
-                }`}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
+        {/* 검색창 좌측 배치 (320px) */}
+        <div className="relative w-full md:w-[320px]">
+          <input 
+            type="text" 
+            placeholder="관리번호, 위치, 업체명 검색..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm font-bold" 
+          />
+          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
         </div>
         
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -473,6 +476,26 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
         </div>
       </div>
 
+      {/* 층별 필터 리스트 바로 위로 이동 */}
+      <div className="print:hidden flex items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="flex items-center gap-2 text-sm font-black text-gray-400 uppercase tracking-widest min-w-max"><Filter size={16} /></div>
+        <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-hide pb-1">
+          {filterButtons.map(f => (
+            <button 
+              key={f} 
+              onClick={() => setActiveFloor(f)} 
+              className={`px-5 py-2 rounded-xl text-xs font-black border transition-all ${
+                activeFloor === f 
+                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+                  : 'bg-white text-gray-400 border-gray-200 hover:border-blue-200 hover:text-blue-500'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-center min-w-[1000px] border border-gray-300">
@@ -480,13 +503,13 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
               <tr>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-12 border border-gray-200">No</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">관리번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-44 border border-gray-200">종 류</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">층 별</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">정비업체</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">종 류</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-20 border border-gray-200">층 별</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-20 border border-gray-200">정비업체</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">제조번호</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">전화번호</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">검정번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">일 자</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">제조년월일</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest border border-gray-200">비 고</th>
                 <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 print:hidden border border-gray-200">관리</th>
               </tr>
@@ -510,7 +533,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
                       <td className="px-3 py-4 text-[12px] text-slate-500 font-mono border border-gray-200">{item.phone || '-'}</td>
                       <td className="px-3 py-4 text-[12px] text-slate-900 font-black border border-gray-200 text-center">{item.certNo || '-'}</td>
                       <td className="px-3 py-4 text-[12px] text-blue-600 font-bold border border-gray-200">{formatToYYMM(item.date || '')}</td>
-                      <td className="px-3 py-4 text-[11px] text-slate-400 italic text-left pl-4 max-w-[150px] truncate border border-gray-200">{item.remarks || '-'}</td>
+                      <td className="px-3 py-4 text-[11px] text-slate-400 italic text-left pl-4 border border-gray-200">{item.remarks || '-'}</td>
                       <td className="px-3 py-4 print:hidden border border-gray-200">
                         <div className="flex items-center justify-center gap-2">
                           <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all shadow-sm border border-blue-100" title="수정"><Edit2 size={16} /></button>
