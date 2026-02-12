@@ -10,7 +10,7 @@ interface ConsumablesLedgerProps {
   isPopupMode?: boolean;
 }
 
-const generateId = () => `item_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+const generateId = () => `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 const CATEGORIES = [
   '전기', '기계', '소방', '공용'
@@ -23,7 +23,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   const [items, setItems] = useState<ConsumableItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveSuccess, setSaveStatus] = useState(false);
   
   const [popupViewMode, setPopupViewMode] = useState<'ledger' | 'usage'>('ledger');
   const [currentPage, setCurrentPage] = useState(1);
@@ -253,13 +253,13 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         if (window.opener) {
           window.opener.postMessage({ type: 'CONSUMABLE_SAVED' }, '*');
         }
-        setSaveSuccess(true);
+        setSaveStatus(true);
         alert('성공적으로 저장되었습니다.');
         if (isPopupMode) {
           window.close();
         } else {
           setItems(newList);
-          setTimeout(() => setSaveSuccess(false), 2000);
+          setTimeout(() => setSaveStatus(false), 2000);
         }
       } else {
         alert('저장에 실패했습니다.');
@@ -598,42 +598,42 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
             </tbody>
           </table>
         </div>
-
-        {/* 페이지네이션 */}
-        {totalPages > 1 && (
-          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="flex items-center gap-1.5 px-4">
-              {visiblePageNumbers.map(pageNum => (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* 페이지네이션 - 리스트 박스 외부로 이동 */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-6 py-4">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="flex items-center gap-1.5 px-4">
+            {visiblePageNumbers.map(pageNum => (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                  currentPage === pageNum
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
 
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
