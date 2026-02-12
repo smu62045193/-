@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { ParkingStatusItem } from '../types';
-import { fetchParkingStatusList, saveParkingStatusList, deleteParkingStatusItem, generateUUID } from '../services/dataService';
-// Added Save to the lucide-react imports to fix the error on line 345
+import { ParkingStatusItem, ParkingChangeItem } from '../types';
+import { fetchParkingStatusList, saveParkingStatusList, deleteParkingStatusItem, generateUUID, fetchParkingChangeList, saveParkingChangeList } from '../services/dataService';
 import { Trash2, Printer, Plus, Edit2, RotateCcw, AlertTriangle, X, Cloud, CheckCircle, RefreshCw, ChevronLeft, ChevronRight, Search, Car, Save } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -52,8 +51,25 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
   useEffect(() => {
     if (isPopupMode && editId && items.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode'); // 'edit' 또는 'change'
       const matched = items.find(i => String(i.id) === String(editId));
-      if (matched) setNewItem(matched);
+      
+      if (matched) {
+        if (mode === 'change') {
+          // [연동 로직] '변경' 버튼을 눌러 들어온 경우: 현재차량번호를 이전차량번호로 자동으로 연동
+          setNewItem({
+            ...matched,
+            prevPlate: matched.plateNum, // 현재번호 -> 이전번호 필드로 이동
+            plateNum: '', // 새로운 번호 입력을 유도하기 위해 비움
+            type: '변경',
+            date: format(new Date(), 'yyyy-MM-dd')
+          });
+        } else {
+          // '수정' 버튼을 눌러 들어온 경우: 기존 데이터 그대로 로드
+          setNewItem(matched);
+        }
+      }
     }
   }, [editId, items, isPopupMode]);
 
@@ -69,7 +85,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     setLoading(false);
   };
 
-  const openIndependentWindow = (id: string = 'new') => {
+  const openIndependentWindow = (id: string = 'new', mode: 'edit' | 'change' = 'edit') => {
     const width = 600;
     const height = 750;
     const left = (window.screen.width / 2) - (width / 2);
@@ -78,10 +94,11 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     const url = new URL(window.location.href);
     url.searchParams.set('popup', 'parking_status');
     url.searchParams.set('id', id);
+    url.searchParams.set('mode', mode); // 모드 파라미터 추가
 
     window.open(
       url.toString(),
-      `ParkingWin_${id}`,
+      `ParkingWin_${id}_${mode}`,
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
     );
   };
@@ -92,12 +109,16 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
       return;
     }
     if (!newItem.plateNum?.trim()) {
-      alert('변경후 차량번호는 필수입니다.');
+      alert('현재 차량번호(변경후)는 필수입니다.');
       return;
     }
 
     setLoading(true);
     try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const mode = searchParams.get('mode');
+
+      // 1. 차량 현황(상태) 업데이트
       const currentList = await fetchParkingStatusList();
       let updatedList = [...(currentList || [])];
       
@@ -130,12 +151,29 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
         return locA.localeCompare(locB, undefined, { numeric: true });
       });
 
-      const success = await saveParkingStatusList(updatedList);
-      if (success) {
+      const successStatus = await saveParkingStatusList(updatedList);
+
+      // 2. [이력 반영 로직] '변경' 모드일 경우 '지정주차변경이력' 리스트에도 자동 추가
+      if (successStatus && mode === 'change') {
+        const currentHistory = await fetchParkingChangeList();
+        const newHistoryItem: ParkingChangeItem = {
+          id: generateUUID(),
+          date: newItem.date,
+          type: '변경',
+          company: newItem.company,
+          location: newItem.location,
+          prevPlate: newItem.prevPlate || '',
+          newPlate: newItem.plateNum, // 현재 입력한 번호가 새 번호가 됨
+          note: newItem.note || ''
+        };
+        await saveParkingChangeList([newHistoryItem, ...(currentHistory || [])]);
+      }
+
+      if (successStatus) {
         if (window.opener) {
           window.opener.postMessage({ type: 'PARKING_SAVED' }, '*');
         }
-        alert('저장이 완료되었습니다.');
+        alert('저장이 완료되었습니다. (변경이력 자동 기록됨)');
         if (isPopupMode) {
           window.close();
         } else {
@@ -197,7 +235,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
           @page { size: A4 portrait; margin: 0; }
-          body { font-family: 'Noto Sans KR', sans-serif; background: white !important; -webkit-print-color-adjust: exact; margin: 0; padding: 0; }
+          body { font-family: 'Noto Sans KR', sans-serif; background: black !important; -webkit-print-color-adjust: exact; margin: 0; padding: 0; }
           .no-print { display: flex; justify-content: center; padding: 20px; }
           @media print { .no-print { display: none !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
           .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
@@ -276,15 +314,20 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
   // 팝업 모드일 때의 UI (등록/수정 폼만 표시)
   if (isPopupMode) {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 animate-fade-in">
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
           <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
-                {editId ? <Edit2 size={24} /> : <Plus size={24} />}
+              <div className={`p-2 rounded-xl ${mode === 'change' ? 'bg-emerald-600' : editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
+                {mode === 'change' ? <RotateCcw size={24} /> : editId ? <Edit2 size={24} /> : <Plus size={24} />}
               </div>
-              <span className="font-black text-xl tracking-tight">{editId ? '차량 정보 수정' : '신규 차량 등록'}</span>
+              <span className="font-black text-xl tracking-tight">
+                {mode === 'change' ? '차량 정보 변경' : editId ? '차량 정보 수정' : '신규 차량 등록'}
+              </span>
             </div>
             <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
               <X size={28} />
@@ -292,6 +335,18 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
           </div>
 
           <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
+            {mode === 'change' && (
+              <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center gap-3">
+                <div className="p-2 bg-white rounded-xl shadow-sm text-emerald-600">
+                  <RotateCcw size={20} />
+                </div>
+                <div>
+                  <p className="text-xs font-black text-emerald-800">차량 변경 모드</p>
+                  <p className="text-[11px] text-emerald-600 font-medium">저장 시 변경 이력이 자동으로 기록됩니다.</p>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">날짜</label>
@@ -320,11 +375,11 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">변경전 차량번호</label>
-                <input type="text" className={`${formInputClass} form-input`} value={newItem.prevPlate || ''} onChange={(e) => setNewItem({...newItem, prevPlate: e.target.value})} onKeyDown={handleKeyDown} placeholder="이전 차량 정보" />
+                <input type="text" className={`${formInputClass} form-input bg-slate-50 text-slate-500`} value={newItem.prevPlate || ''} onChange={(e) => setNewItem({...newItem, prevPlate: e.target.value})} onKeyDown={handleKeyDown} placeholder="이전 차량 정보" />
               </div>
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">현재 차량번호 *</label>
-                <input type="text" className={`${formInputClass} form-input text-blue-700`} value={newItem.plateNum} onChange={(e) => setNewItem({...newItem, plateNum: e.target.value})} onKeyDown={handleKeyDown} placeholder="변경후 차량번호" />
+                <input type="text" className={`${formInputClass} form-input text-blue-700 ring-2 ring-blue-100`} value={newItem.plateNum} onChange={(e) => setNewItem({...newItem, plateNum: e.target.value})} onKeyDown={handleKeyDown} placeholder="변경후 차량번호 입력" />
               </div>
             </div>
 
@@ -340,7 +395,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
               onClick={handleRegister} 
               disabled={loading}
               className={`flex-[2] py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 shadow-xl active:scale-95 ${
-                loading ? 'bg-slate-400 cursor-wait' : editId ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-blue-600 text-white hover:bg-blue-700'
+                loading ? 'bg-slate-400 cursor-wait' : mode === 'change' ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-100' : editId ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-blue-600 text-white hover:bg-blue-700'
               }`}
             >
               {loading ? <RefreshCw size={24} className="animate-spin" /> : <Save size={24} />}
@@ -406,7 +461,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
                 <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-36">이전차량번호</th>
                 <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-36">현재차량번호</th>
                 <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700">비고</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-24 print:hidden">관리</th>
+                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-28 print:hidden">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-300">
@@ -429,7 +484,8 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
                     <td className="p-3 text-left pl-4 text-gray-600 text-xs truncate max-w-[200px]">{item.note || '-'}</td>
                     <td className="p-3 print:hidden">
                       <div className="flex items-center justify-center gap-1.5">
-                        <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                        <button onClick={() => openIndependentWindow(item.id, 'edit')} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                        <button onClick={() => openIndependentWindow(item.id, 'change')} className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-all" title="변경"><RotateCcw size={16} /></button>
                         <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
                       </div>
                     </td>

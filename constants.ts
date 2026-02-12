@@ -15,7 +15,7 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: MenuId.MECH_CHECK, label: '기계점검', subItems: ['저수조위생점검'] },
   { id: MenuId.FIRE_CHECK, label: '소방점검', subItems: ['소방점검이력', '소화기 관리'] },
   { id: MenuId.ELEVATOR_CHECK, label: '승강기점검', subItems: ['승강기점검이력'] },
-  { id: MenuId.PARKING_CHECK, label: '주차점검', subItems: ['지정주차차량현황', '주차점검이력', '지정주차차량위치'] },
+  { id: MenuId.PARKING_CHECK, label: '주차점검', subItems: ['지정주차차량현황', '지정주차변경이력', '지정주차차량위치'] },
   { id: MenuId.CONSUMABLES, label: '소모품관리', subItems: ['관리대장', '자재신청서'] },
   { id: MenuId.APPOINTMENTS, label: '선임현황' },
   { id: MenuId.STAFF, label: '직원관리' },
