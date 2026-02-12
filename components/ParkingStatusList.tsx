@@ -121,11 +121,35 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
       const targetId = editId || generateUUID();
       const itemToSave = { ...newItem, id: targetId };
 
+      const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
+
       if (editId) {
+        // 기존 정보 찾기 (이력 연동용)
+        const oldItem = updatedList.find(s => String(s.id) === String(editId));
         const index = updatedList.findIndex(s => String(s.id) === String(editId));
         if (index >= 0) updatedList[index] = itemToSave;
+
+        // [수정 연동 로직] 수정 모드일 때 이력에 이미 있는 데이터를 업데이트
+        if (oldItem) {
+          const currentHistory = await fetchParkingChangeList();
+          const targetLoc = normalize(oldItem.location);
+          const targetPlate = normalize(oldItem.plateNum);
+
+          const updatedHistory = currentHistory.map(h => {
+            if (normalize(h.location) === targetLoc && normalize(h.newPlate) === targetPlate) {
+              return {
+                ...h,
+                company: newItem.company,
+                location: newItem.location,
+                newPlate: newItem.plateNum,
+                note: newItem.note || h.note
+              };
+            }
+            return h;
+          });
+          await saveParkingChangeList(updatedHistory);
+        }
       } else {
-        const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
         const targetLocation = normalize(newItem.location);
         const existingIndex = updatedList.findIndex(s => normalize(s.location) === targetLocation);
 
@@ -149,7 +173,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
       const successStatus = await saveParkingStatusList(updatedList);
 
-      // [연동 로직] 변경 모드 또는 신규 등록 시 '지정주차변경이력' 리스트에도 자동 추가
+      // [추가 연동 로직] 변경 모드 또는 순수 신규 등록 시에만 이력 추가
       if (successStatus && (mode === 'change' || !editId)) {
         const currentHistory = await fetchParkingChangeList();
         const newHistoryItem: ParkingChangeItem = {
@@ -191,27 +215,26 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     const itemToDelete = items.find(i => String(i.id) === idStr);
     if (!itemToDelete) return;
 
-    if (!window.confirm('정말 삭제하시겠습니까? (관련 변경 이력도 함께 삭제됩니다)')) return;
+    if (!window.confirm('정말 삭제하시겠습니까? 해당 차량의 모든 변경 이력도 함께 삭제됩니다.')) return;
     
     setLoading(true);
     try {
       // 1. 현황 데이터 삭제
       const success = await deleteParkingStatusItem(idStr);
       if (success) {
-        // 2. [연동 로직] 변경 이력에서도 해당 차량 관련 이력 모두 삭제
+        // 2. [삭제 연동 로직] 변경 이력에서도 해당 차량(위치+차량번호)의 모든 기록을 삭제
         const currentHistory = await fetchParkingChangeList();
         if (currentHistory && currentHistory.length > 0) {
           const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
           const targetLoc = normalize(itemToDelete.location);
           const targetPlate = normalize(itemToDelete.plateNum);
           
+          // 위치와 변경후 차량번호가 일치하는 모든 이력 항목 제거
           const filteredHistory = currentHistory.filter(h => 
             !(normalize(h.location) === targetLoc && normalize(h.newPlate) === targetPlate)
           );
           
-          if (filteredHistory.length !== currentHistory.length) {
-            await saveParkingChangeList(filteredHistory);
-          }
+          await saveParkingChangeList(filteredHistory);
         }
 
         setItems(prev => prev.filter(i => String(i.id) !== idStr));
