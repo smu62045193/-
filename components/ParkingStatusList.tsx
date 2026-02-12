@@ -84,7 +84,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
 
   const openIndependentWindow = (id: string = 'new', mode: 'edit' | 'change' = 'edit') => {
     const width = 600;
-    const height = 750;
+    const height = 950; // 스크롤바 방지를 위해 기존 750에서 950으로 증설
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -369,7 +369,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
             </button>
           </div>
 
-          <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
+          <div className="p-8 space-y-6 flex-1 overflow-visible">
             {mode === 'change' && (
               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center gap-3">
                 <div className="p-2 bg-white rounded-xl shadow-sm text-emerald-600">
