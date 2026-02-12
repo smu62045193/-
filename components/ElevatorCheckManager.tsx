@@ -18,7 +18,7 @@ const ElevatorCheckManager: React.FC<ElevatorCheckManagerProps> = () => {
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
       <div className="mb-2">
         <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
-          <ArrowUpDown className="mr-2 text-blue-600" size={32} />
+          <ArrowUpDown className="mr-3 text-blue-600" size={32} />
           승강기 점검
         </h2>
         <p className="text-slate-500 mt-2 text-base font-medium">승강기 정기 점검 및 수리 이력을 관리합니다.</p>

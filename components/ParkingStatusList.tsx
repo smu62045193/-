@@ -285,7 +285,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
       </head>
       <body>
         <div class="no-print">
-          <button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button>
+          <button onclick="window.print()" style="padding: 10px 24 image/png; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button>
         </div>
         <div class="print-page">
           <h1>지정주차 차량 현황</h1>

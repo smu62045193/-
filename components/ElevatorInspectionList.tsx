@@ -55,7 +55,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
 
   const openIndependentWindow = () => {
     const width = 500;
-    const height = 750; // 요청에 따라 750px로 설정
+    const height = 770; // 요청에 따라 770px로 설정
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -179,7 +179,6 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
     );
   }, [items, searchTerm]);
 
-  // 페이지네이션 로직
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -202,7 +201,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
   if (isKeywordPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-[750px]">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-[770px]">
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl">
@@ -213,7 +212,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
                 <p className="text-[10px] text-blue-300 font-bold uppercase tracking-widest">Elevator Contractor Setup</p>
               </div>
             </div>
-            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+            <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
               <X size={24} />
             </button>
           </div>
@@ -271,7 +270,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
           </div>
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
-            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 active:scale-95">취소</button>
+            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 active:scale-95">닫기</button>
             <button 
               onClick={handleSaveKeywords} 
               disabled={saveStatus !== 'idle'}
