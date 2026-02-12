@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ElevatorInspectionItem, DailyData, LogCategory } from '../types';
 import { fetchElevatorInspectionList, saveElevatorInspectionList, apiFetchRange, fetchLinkedKeywords, saveLinkedKeywords } from '../services/dataService';
-import { RefreshCw, Search, Link, Plus, Trash2, X, Save, AlertCircle, CheckCircle } from 'lucide-react';
+import { RefreshCw, Search, Link, Plus, Trash2, X, Save, AlertCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ElevatorInspectionListProps {
@@ -18,6 +18,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
   const [keywords, setKeywords] = useState<string[]>([]);
   const [newKeyword, setNewKeyword] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     if (!isKeywordPopupMode) {
@@ -33,6 +34,10 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [isKeywordPopupMode]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, items.length]);
 
   const loadData = async () => {
     setLoading(true);
@@ -166,11 +171,30 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
     setKeywords(keywords.filter(item => item !== k));
   };
 
-  const filteredItems = items.filter(item => 
-    (item.company || '').includes(searchTerm) || 
-    (item.content || '').includes(searchTerm) ||
-    (item.date || '').includes(searchTerm)
-  );
+  const filteredItems = useMemo(() => {
+    return items.filter(item => 
+      (item.company || '').includes(searchTerm) || 
+      (item.content || '').includes(searchTerm) ||
+      (item.date || '').includes(searchTerm)
+    );
+  }, [items, searchTerm]);
+
+  // 페이지네이션 로직
+  const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
+  const paginatedItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredItems.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredItems, currentPage]);
+
+  const visiblePageNumbers = useMemo(() => {
+    const halfWindow = 2;
+    let startPage = Math.max(1, currentPage - halfWindow);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);
+    return pages;
+  }, [currentPage, totalPages]);
 
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-11 whitespace-nowrap uppercase tracking-wider";
   const tdClass = "border border-gray-300 px-3 py-4 text-sm text-gray-700 h-10 align-middle bg-white text-center";
@@ -178,7 +202,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
   if (isKeywordPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-full">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-[750px]">
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white shrink-0">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl">
@@ -329,12 +353,12 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
             <tbody className="divide-y divide-gray-200">
               {loading && items.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center border border-gray-200"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
-              ) : filteredItems.length === 0 ? (
+              ) : paginatedItems.length === 0 ? (
                 <tr><td colSpan={5} className="py-24 text-center text-gray-400 italic text-sm border border-gray-200">데이터가 없습니다. [데이터 연동하기]를 눌러 가져오세요.</td></tr>
               ) : (
-                filteredItems.map((item, index) => (
+                paginatedItems.map((item, index) => (
                   <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{filteredItems.length - index}</td>
+                    <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{filteredItems.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}</td>
                     <td className={`${tdClass} font-bold text-gray-700 whitespace-nowrap`}>{item.date}</td>
                     <td className={`${tdClass} font-black text-blue-800 text-left pl-6`}>{item.company}</td>
                     <td className={`${tdClass} text-left pl-6 text-gray-700 font-medium`}>{item.content}</td>
@@ -350,6 +374,41 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
           </table>
         </div>
       </div>
+
+      {/* 페이지네이션 - 리스트 박스 외부(하단)에 위치 */}
+      {totalPages > 1 && (
+        <div className="py-4 flex items-center justify-center gap-2 print:hidden">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="flex items-center gap-1.5 px-4">
+            {visiblePageNumbers.map(pageNum => (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                  currentPage === pageNum
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };
