@@ -334,7 +334,7 @@ export const apiFetchRange = async (prefix: string, start: string, end: string):
     const startKey = isSpecialPrefix ? start : `${prefix}${start}`;
     const endKey = isSpecialPrefix ? end : `${prefix}${end}`;
 
-    if (prefix === "HV_LOG_" || prefix === "BOILER_LOG_") {
+    if (prefix === "HVAC_LOG_" || prefix === "BOILER_LOG_") {
       query = query.gte("id", `HVAC_BOILER_${start}`).lte("id", `HVAC_BOILER_${end}`);
     } else if (prefix === "DAILY_") {
       query = query.gte("id", start).lte("id", end);
@@ -744,12 +744,9 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   const { error } = await supabase.from('daily_reports').upsert({ 
     id: data.date, 
-    // Fixed: Property 'facilityDuty' should be used instead of 'facility_duty' on the data object.
     facility_duty: data.facilityDuty, 
-    // Fixed: Property 'securityDuty' should be used instead of 'security_duty' on the data object.
     security_duty: data.securityDuty, 
     utility: data.utility, 
-    // Fixed: Property 'workLog' should be used instead of 'work_log' on the data object.
     work_log: data.workLog, 
     last_updated: new Date().toISOString() 
   });
@@ -919,9 +916,6 @@ export const fetchWeeklyReport = async (date: string): Promise<WeeklyReportData 
   return null;
 };
 
-/**
- * Fixed Error in saveWeeklyReport on line 920: Property 'reporting_date' does not exist on type 'WeeklyReportData'.
- */
 export const saveWeeklyReport = async (data: WeeklyReportData): Promise<boolean> => {
   const dbData = { id: `WEEKLY_${data.startDate}`, start_date: data.startDate, reporting_date: data.reportingDate, author: data.author, fields: data.fields, photos: data.photos, last_updated: new Date().toISOString() };
   const { error = null } = await supabase.from('weekly_reports').upsert(dbData);
@@ -1085,7 +1079,6 @@ export const saveParkingLayout = async (layout: any): Promise<boolean> => {
 
 /**
  * 협력업체 데이터 조회
- * DB 구조 변경 없이 중요 업체 여부를 판단하기 위해 note 필드의 [중요] 접두사 감지
  */
 export const fetchContractors = async (): Promise<Contractor[]> => {
   try {
@@ -1112,14 +1105,10 @@ export const fetchContractors = async (): Promise<Contractor[]> => {
 
 /**
  * 협력업체 데이터 저장
- * 수파베이스 스키마(컬럼) 변경 없이 기능을 제공하기 위해 
- * isImportant가 true일 경우 note 필드 앞에 [중요] 접두사를 붙여서 저장함
  */
 export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
   const dbData = list.map(c => {
-    // 중요업체 체크 시 note 필드 앞에 식별자 추가
     const finalNote = c.isImportant ? `[중요] ${c.note || ''}` : (c.note || '');
-    
     return { 
       id: ensureID(c.id), 
       name: c.name, 
@@ -1129,7 +1118,6 @@ export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
       phone_mobile: c.phoneMobile, 
       fax: c.fax, 
       note: finalNote
-      // is_important 컬럼이 DB에 없으므로 전송 데이터에서 제외하여 오류 방지
     };
   });
   const { error = null } = await supabase.from('contractors').upsert(dbData);
@@ -1343,9 +1331,7 @@ export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promis
     emissions: data.emissions, 
     preventions: data.preventions,
     weather_condition: data.weatherCondition,
-    // Fixed: Accessed correct camelCase properties from AirEnvironmentLogData as per interface definition
     temp_min: data.tempMin,
-    // Fixed: Accessed correct camelCase properties from AirEnvironmentLogData as per interface definition
     temp_max: data.tempMax,
     last_updated: new Date().toISOString() 
   });

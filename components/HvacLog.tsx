@@ -106,6 +106,7 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
       let hBase = 0;
       let bBase = 0;
 
+      // 냉온수기 전일 데이터 연동
       if (recentHvacLogs.length > 0) {
         recentHvacLogs.sort((a: any, b: any) => b.key.localeCompare(a.key));
         const latest = recentHvacLogs[0];
@@ -116,9 +117,11 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
           hBase = safeParseFloat(latest.data?.gas?.monthTotal);
         }
         
+        // 가스 전일지침
         if (finalHvac.gas && (!finalHvac.gas.prev || finalHvac.gas.prev === '0' || finalHvac.gas.prev === '')) {
           if (latest.data?.gas?.curr) finalHvac.gas.prev = latest.data.gas.curr;
         }
+        // 살균제 전일재고
         if (finalHvac.sterilizer && (!finalHvac.sterilizer.prevStock || finalHvac.sterilizer.prevStock === '0' || finalHvac.sterilizer.prevStock === '')) {
           if (latest.data?.sterilizer?.stock) {
             finalHvac.sterilizer.prevStock = latest.data.sterilizer.stock;
@@ -126,6 +129,7 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
         }
       }
 
+      // 보일러 전일 데이터 연동
       if (recentBoilerLogs.length > 0) {
         recentBoilerLogs.sort((a: any, b: any) => b.key.localeCompare(a.key));
         const latest = recentBoilerLogs[0];
@@ -136,12 +140,15 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
           bBase = safeParseFloat(latest.data?.gas?.monthTotal);
         }
         
+        // 가스 전일지침
         if (finalBoiler.gas && (!finalBoiler.gas.prev || finalBoiler.gas.prev === '0' || finalBoiler.gas.prev === '')) {
           if (latest.data?.gas?.curr) finalBoiler.gas.prev = latest.data.gas.curr;
         }
+        // 소금 전일재고
         if (finalBoiler.salt && (!finalBoiler.salt.prevStock || finalBoiler.salt.prevStock === '0' || finalBoiler.salt.prevStock === '')) {
           if (latest.data?.salt?.stock) finalBoiler.salt.prevStock = latest.data.salt.stock;
         }
+        // 청관제 전일재고
         if (finalBoiler.cleaner && (!finalBoiler.cleaner.prevStock || finalBoiler.cleaner.prevStock === '0' || finalBoiler.cleaner.prevStock === '')) {
           if (latest.data?.cleaner?.stock) finalBoiler.cleaner.prevStock = latest.data.cleaner.stock;
         }
@@ -149,6 +156,7 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
 
       historySumsRef.current = { hvac: hBase, boiler: bBase };
 
+      // 계산 로직 (가스)
       if (finalHvac.gas) {
         const p = safeParseFloat(finalHvac.gas.prev);
         const c = safeParseFloat(finalHvac.gas.curr);
@@ -174,6 +182,7 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
         }
       }
 
+      // 계산 로직 (약품)
       if (finalHvac.sterilizer) {
           const p = safeParseFloat(finalHvac.sterilizer.prevStock);
           const i = safeParseFloat(finalHvac.sterilizer.inQty);
