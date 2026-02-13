@@ -1,5 +1,5 @@
 
-import { format, startOfMonth, subDays } from 'date-fns';
+import { format, startOfMonth, subDays, parseISO } from 'date-fns';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetchRange, fetchDailyData, fetchSubstationLog, getInitialSubstationLog, saveDailyData, saveSubstationLog, getInitialDailyData } from '../services/dataService';
 import { AcbReadings, PowerUsageReadings, SubstationLogData, VcbReadings, DailyData } from '../types';
@@ -31,13 +31,23 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  useEffect(() => {
-    const currentUsage = data.dailyStats?.activePower;
-    if (onUsageChange && currentUsage && currentUsage !== '0' && currentUsage !== lastSyncedUsageRef.current) {
-      lastSyncedUsageRef.current = currentUsage;
-      onUsageChange(currentUsage);
-    }
-  }, [data.dailyStats?.activePower, onUsageChange]);
+  /**
+   * 전력량 데이터 객체의 키를 표준(영문 CamelCase)으로 정규화하는 헬퍼 함수
+   * DB 원본 데이터와 앱 내 데이터를 통합 관리 (모든 케이스 대응)
+   */
+  const normalizePowerReadings = (raw: any): PowerUsageReadings => {
+    const result: PowerUsageReadings = { activeMid: '', activeMax: '', activeLight: '', reactiveMid: '', reactiveMax: '' };
+    if (!raw || typeof raw !== 'object') return result;
+    
+    // DB의 snake_case와 앱의 camelCase, 한글 키 모두 대응
+    result.activeMid = String(raw.activeMid || raw.active_mid || raw["중간"] || raw["active_mid"] || '').trim();
+    result.activeMax = String(raw.activeMax || raw.active_max || raw["최대"] || raw["active_max"] || '').trim();
+    result.activeLight = String(raw.activeLight || raw.active_light || raw["경부하"] || raw["active_light"] || '').trim();
+    result.reactiveMid = String(raw.reactiveMid || raw.reactive_mid || raw["무효중간"] || raw["reactive_mid"] || '').trim();
+    result.reactiveMax = String(raw.reactiveMax || raw.reactive_max || raw["무효최대"] || raw["reactive_max"] || '').trim();
+
+    return result;
+  };
 
   const calculateDailyAnalysis = useCallback((currentData: SubstationLogData, hSum: number) => {
     if (!currentData) return getInitialSubstationLog(dateKey);
@@ -45,38 +55,39 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     const newData = JSON.parse(JSON.stringify(currentData)) as SubstationLogData; 
     const { powerUsage, dailyStats } = newData;
 
-    if (!powerUsage?.usage || !dailyStats) return newData;
+    if (!powerUsage || !dailyStats) return newData;
 
-    const isEquipmentReplaced = 
-      powerUsage.usage.activeMid === '' || 
-      powerUsage.usage.activeMax === '' || 
-      powerUsage.usage.activeLight === '' ||
-      powerUsage.usage.reactiveMid === '' ||
-      powerUsage.usage.reactiveMax === '';
+    const fields: (keyof PowerUsageReadings)[] = ['activeMid', 'activeMax', 'activeLight', 'reactiveMid', 'reactiveMax'];
+    let totalActiveUsage = 0;
+    let totalReactiveUsage = 0;
 
-    if (isEquipmentReplaced) {
-      dailyStats.activePower = '';
-      dailyStats.reactivePower = '';
-      dailyStats.monthTotal = Math.round(hSum).toString();
-      dailyStats.maxPower = '';
-      dailyStats.powerFactor = '';
-      dailyStats.loadFactor = '';
-      dailyStats.demandFactor = '';
-      return newData;
-    }
+    fields.forEach(f => {
+      const p = safeParseFloat(powerUsage.prev[f]);
+      const c = safeParseFloat(powerUsage.curr[f]);
+      
+      if (c > 0) {
+        let diff = 0;
+        if (c < p) {
+          const rolloverBase = p < 100000 ? 100000 : 1000000;
+          diff = (rolloverBase + c) - p;
+        } else {
+          diff = c - p;
+        }
+        
+        const usage = Math.round(diff * 1200);
+        powerUsage.usage[f] = usage.toString();
+        
+        if (f.startsWith('active')) totalActiveUsage += usage;
+        else if (f.startsWith('reactive')) totalReactiveUsage += usage;
+      } else {
+        powerUsage.usage[f] = '';
+      }
+    });
 
-    const activeMid = safeParseFloat(powerUsage.usage.activeMid);
-    const activeMax = safeParseFloat(powerUsage.usage.activeMax);
-    const activeLight = safeParseFloat(powerUsage.usage.activeLight);
-    const totalActive = activeMid + activeMax + activeLight;
-
-    const reactiveMid = safeParseFloat(powerUsage.usage.reactiveMid);
-    const reactiveMax = safeParseFloat(powerUsage.usage.reactiveMax);
-    const totalReactive = reactiveMid + reactiveMax;
-
-    dailyStats.activePower = totalActive.toString();
-    dailyStats.reactivePower = totalReactive.toString();
-    dailyStats.monthTotal = Math.round(hSum + totalActive).toString();
+    dailyStats.activePower = totalActiveUsage > 0 ? totalActiveUsage.toString() : '';
+    dailyStats.reactivePower = totalReactiveUsage > 0 ? totalReactiveUsage.toString() : '';
+    // 금월누계 = 이전 일자들 합계(hSum) + 오늘 실시간 사용량
+    dailyStats.monthTotal = Math.round(hSum + totalActiveUsage).toString();
 
     const vcbMain = newData.vcb?.time9?.main || newData.vcb?.time21?.main;
     if (vcbMain && (vcbMain.pf || vcbMain.a)) {
@@ -86,16 +97,16 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       const maxPowerNum = kVA_Const * currentA * (pfNum / 100);
       dailyStats.maxPower = maxPowerNum > 0 ? Math.round(maxPowerNum).toString() : '0';
 
-      if (totalActive > 0) {
-        const pfCalc = (totalActive / Math.sqrt(Math.pow(totalActive, 2) + Math.pow(totalReactive, 2))) * 100;
+      if (totalActiveUsage > 0) {
+        const totalApparent = Math.sqrt(Math.pow(totalActiveUsage, 2) + Math.pow(totalReactiveUsage, 2));
+        const pfCalc = (totalActiveUsage / totalApparent) * 100;
         dailyStats.powerFactor = isNaN(pfCalc) ? '0' : pfCalc.toFixed(1);
       }
-
-      if (maxPowerNum > 0 && totalActive > 0) {
-        const loadFactorCalc = ((totalActive / 24) / maxPowerNum) * 100;
+      if (maxPowerNum > 0 && totalActiveUsage > 0) {
+        const loadFactorCalc = ((totalActiveUsage / 24) / maxPowerNum) * 100;
         dailyStats.loadFactor = isNaN(loadFactorCalc) ? '0' : loadFactorCalc.toFixed(1);
       }
-
+      // 수용율 계산 로직 수정: (최대전력 / 계약전력 1600kW) * 100
       if (maxPowerNum > 0) {
         const demandFactorCalc = (maxPowerNum / 1600) * 100;
         dailyStats.demandFactor = isNaN(demandFactorCalc) ? '0' : demandFactorCalc.toFixed(1);
@@ -104,6 +115,14 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
 
     return newData;
   }, [dateKey]);
+
+  useEffect(() => {
+    const currentUsage = data.dailyStats?.activePower;
+    if (onUsageChange && currentUsage && currentUsage !== '0' && currentUsage !== lastSyncedUsageRef.current) {
+      lastSyncedUsageRef.current = currentUsage;
+      onUsageChange(currentUsage);
+    }
+  }, [data.dailyStats?.activePower, onUsageChange]);
 
   const loadData = useCallback(async (force = false) => {
     setData(getInitialSubstationLog(dateKey));
@@ -116,51 +135,64 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       const monthStartStr = format(monthStart, 'yyyy-MM-dd');
       const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
       
+      // 1. 이번 달 과거 데이터 전체 조회 (누계 계산 및 연동용)
+      const logsForMonth = await apiFetchRange("SUB_LOG_", monthStartStr, yesterdayStr);
+      
       let hSum = 0;
-      if (currentDate.getDate() > 1) {
-        const dailyRows = await apiFetchRange("DAILY_", monthStartStr, yesterdayStr);
-        dailyRows.forEach(row => {
-          if (row.data?.utility?.electricity) {
-            hSum += safeParseFloat(row.data.utility.electricity);
-          }
+      let latestPrevRecord = null;
+      let sortedLogs: any[] = [];
+
+      if (logsForMonth && logsForMonth.length > 0) {
+        // 오늘 날짜(`SUB_LOG_${dateKey}`)보다 엄격하게 이전인 기록만 필터링
+        const filteredHistory = logsForMonth.filter(row => {
+          const rowDate = row.key.replace("SUB_LOG_", "");
+          return rowDate < dateKey;
+        });
+        
+        sortedLogs = [...filteredHistory].sort((a, b) => b.key.localeCompare(a.key));
+        
+        if (sortedLogs.length > 0) {
+          latestPrevRecord = sortedLogs[0].data;
+        }
+
+        // 금월 누계 합산 (오늘 이전 기록들의 사용량 합계)
+        filteredHistory.forEach(row => {
+          const stats = row.data?.dailyStats || row.data?.daily_stats;
+          const rowActive = stats?.activePower || stats?.active_power;
+          if (rowActive) hSum += safeParseFloat(rowActive);
         });
       }
       historySumRef.current = hSum;
 
+      // 2. 현재 날짜의 저장된 데이터 로드
       const fetched = await fetchSubstationLog(dateKey, force);
       let finalData: SubstationLogData = fetched || getInitialSubstationLog(dateKey);
 
-      const isPrevEmpty = !finalData.powerUsage.prev?.activeMid || finalData.powerUsage.prev.activeMid === '0' || finalData.powerUsage.prev.activeMid === '';
+      // 데이터 정규화 강제 수행 (DB 필드명 불일치 방지)
+      const rawPU = (finalData.powerUsage || (finalData as any).power_usage) || {};
+      finalData.powerUsage = {
+        prev: normalizePowerReadings(rawPU.prev || rawPU["이전"]),
+        curr: normalizePowerReadings(rawPU.curr || rawPU["현재"]),
+        usage: normalizePowerReadings(rawPU.usage || rawPU["사용량"])
+      };
+
+      // 3. 전일 지침 자동 연동
+      // 현재 전일지침이 비어있는 경우에만, 찾아낸 가장 최근 과거 기록의 '금일지침'을 가져옵니다.
+      const currentPrevMid = finalData.powerUsage?.prev?.activeMid;
+      const isPrevEmpty = !currentPrevMid || currentPrevMid.trim() === '' || currentPrevMid === '0';
       
-      if (isPrevEmpty) {
-          const searchStart = format(subDays(currentDate, 30), 'yyyy-MM-dd');
-          const recentLogs = await apiFetchRange("SUB_LOG_", searchStart, yesterdayStr);
-          
-          if (recentLogs.length > 0) {
-            recentLogs.sort((a, b) => b.key.localeCompare(a.key));
-            const latestLog = recentLogs[0].data;
-            
-            if (latestLog?.powerUsage?.curr && latestLog.powerUsage.curr.activeMid !== '') {
-              finalData.powerUsage.prev = { ...latestLog.powerUsage.curr };
-            }
+      if (isPrevEmpty && latestPrevRecord) {
+        const prevPU = latestPrevRecord.powerUsage || (latestPrevRecord as any).power_usage;
+        if (prevPU) {
+          const prevCurrRaw = prevPU.curr || prevPU["현재"] || prevPU.current;
+          if (prevCurrRaw) {
+            finalData.powerUsage.prev = normalizePowerReadings(prevCurrRaw);
+            console.log(`[연동 성공] 이전 기록(${latestPrevRecord.date || '알수없음'})의 금일지침을 금일 전일지침으로 가져왔습니다.`);
           }
+        }
       }
 
-      if (finalData.powerUsage.prev?.activeMid !== '' && finalData.powerUsage.curr?.activeMid !== '') {
-         const fields: (keyof PowerUsageReadings)[] = ['activeMid', 'activeMax', 'activeLight', 'reactiveMid', 'reactiveMax'];
-         fields.forEach(field => {
-            const p = safeParseFloat(finalData.powerUsage.prev[field]);
-            const c = safeParseFloat(finalData.powerUsage.curr[field]);
-            if (c > 0) {
-              if (c < p) {
-                finalData.powerUsage.usage[field] = '';
-              } else {
-                finalData.powerUsage.usage[field] = Math.round((c - p) * 1200).toString();
-              }
-            }
-         });
-      }
-
+      // 4. 분석 수행 및 상태 반영
       const analyzedData = calculateDailyAnalysis(finalData, hSum);
       setData(analyzedData);
       lastLoadedDate.current = dateKey;
@@ -235,25 +267,12 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   };
 
   const updatePower = (row: 'prev' | 'curr' | 'usage', field: keyof PowerUsageReadings, value: string) => {
-    if (row === 'prev' || row === 'usage') return; 
+    if (row === 'usage') return; 
     setData(prev => {
       if (!prev) return prev;
       const next = JSON.parse(JSON.stringify(prev)) as SubstationLogData;
       if (next.powerUsage) {
         next.powerUsage[row][field] = value;
-        if (row === 'curr') {
-          const p = safeParseFloat(next.powerUsage.prev[field]);
-          const c = safeParseFloat(next.powerUsage.curr[field]);
-          if (c > 0) {
-            if (c < p) {
-              next.powerUsage.usage[field] = '';
-            } else {
-              next.powerUsage.usage[field] = Math.round((c - p) * 1200).toString();
-            }
-          } else {
-            next.powerUsage.usage[field] = '';
-          }
-        }
       }
       return calculateDailyAnalysis(next, historySumRef.current);
     });
@@ -262,10 +281,10 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   const handlePrint = () => {
     const printContent = document.getElementById('substation-log-print-area');
     if (!printContent) return;
-    const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
     const formattedYear = format(currentDate, 'yyyy');
     const formattedMonth = format(currentDate, 'MM');
     const formattedDay = format(currentDate, 'dd');
+    const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
     const formattedDayName = days[currentDate.getDay()];
     
     const inputs = printContent.querySelectorAll('input');
@@ -292,7 +311,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             }
             .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
             @media print { .no-print { display: none !important; } body { background: white !important; } }
-            
             .print-page { 
               width: 210mm; 
               min-height: 297mm;
@@ -303,7 +321,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
               box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
             }
             @media print { .print-page { box-shadow: none !important; margin: 0; } }
-
             table { 
               width: 100% !important; 
               border-collapse: collapse !important; 
@@ -314,15 +331,12 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             }
             th, td { 
               border: 1px solid black !important; 
-              border-color: black !important;
-              border-style: solid !important;
               text-align: center !important; 
               height: 42px !important; 
               color: black !important; 
               background: white !important; 
               box-sizing: border-box !important;
               padding: 0 !important;
-              border-width: 1px !important;
             }
             th { 
               font-weight: bold !important; 
@@ -330,9 +344,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
               font-size: 8.5pt !important; 
               background-color: #f9fafb !important;
             }
-            td { 
-              font-size: 10pt !important; 
-            }
+            td { font-size: 10pt !important; }
             input { 
               border: none !important; 
               width: 100% !important; 
@@ -345,44 +357,13 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             }
             .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; min-height: 100px; }
             .title-box { flex: 1; text-align: center; }
-            .doc-title { font-size: 32pt; font-weight: 900; letter-spacing: 4px; white-space: nowrap; margin: 0; padding: 0; line-height: 1.0; color: black !important; }
-            
-            .approval-table { 
-              width: 90mm !important; 
-              border: 1.5px solid black !important; 
-              border-collapse: collapse !important; 
-              margin-left: auto; 
-              flex-shrink: 0; 
-              table-layout: fixed !important;
-            }
-            .approval-table th { 
-              height: 22px !important; 
-              font-size: 8.5pt !important; 
-              background: #f3f4f6 !important; 
-              padding: 0 !important; 
-              font-weight: bold; 
-              border: 1px solid black !important;
-            }
-            .approval-table td { 
-              height: 70px !important; 
-              border: 1px solid black !important;
-              background: white !important;
-            }
-            .approval-table .side-header { 
-              width: 28px !important; 
-            }
-            
-            .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: bold; font-size: 11pt; clear: both; color: black !important; }
-            
-            h3 { 
-              font-size: 12.5pt !important; 
-              margin-top: 15px !important; 
-              margin-bottom: 8px !important; 
-              font-weight: 900 !important; 
-              border-left: 7px solid black !important; 
-              padding-left: 10px; 
-              color: black !important; 
-            }
+            .doc-title { font-size: 32pt; font-weight: 900; letter-spacing: 4px; line-height: 1.0; }
+            .approval-table { width: 90mm !important; border: 1.5px solid black !important; margin-left: auto; flex-shrink: 0; table-layout: fixed !important; }
+            .approval-table th { height: 22px !important; font-size: 8.5pt !important; background: #f3f4f6 !important; font-weight: bold; border: 1px solid black !important; }
+            .approval-table td { height: 70px !important; border: 1px solid black !important; }
+            .approval-table .side-header { width: 28px !important; }
+            .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: bold; font-size: 11pt; }
+            h3 { font-size: 12.5pt !important; margin-top: 15px !important; margin-bottom: 8px !important; font-weight: 900 !important; border-left: 7px solid black !important; padding-left: 10px; }
           </style>
         </head>
         <body>
@@ -391,29 +372,14 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
           </div>
           <div class="print-page">
             <div class="flex-header">
-              <div class="title-box">
-                <div class="doc-title">수변전반일지</div>
-              </div>
+              <div class="title-box"><div class="doc-title">수변전반일지</div></div>
               <table class="approval-table">
-                <tr>
-                  <th rowspan="2" class="side-header">결<br>재</th>
-                  <th>담 당</th>
-                  <th>주 임</th>
-                  <th>대 리</th>
-                  <th>과 장</th>
-                  <th>소 장</th>
-                </tr>
+                <tr><th rowspan="2" class="side-header">결<br>재</th><th>담 당</th><th>주 임</th><th>대 리</th><th>과 장</th><th>소 장</th></tr>
                 <tr><td></td><td></td><td></td><td></td><td></td></tr>
               </table>
             </div>
-            
-            <div class="info-row">
-              <div>${formattedYear}년 ${formattedMonth}월 ${formattedDay}일 ${formattedDayName}</div>
-            </div>
-
-            <div class="overflow-visible">
-              ${printContent.innerHTML}
-            </div>
+            <div class="info-row"><div>${formattedYear}년 ${formattedMonth}월 ${formattedDay}일 ${formattedDayName}</div></div>
+            <div class="overflow-visible">${printContent.innerHTML}</div>
           </div>
         </body>
       </html>
@@ -540,10 +506,12 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
                 </thead>
                 <tbody>
                   {['prev', 'curr', 'usage'].map((row) => {
-                    const isReadOnlyRow = row === 'usage' || row === 'prev';
+                    // 'usage' 행만 읽기 전용으로 설정하여 'prev'(전일지침)는 입력 가능하게 함
+                    const isReadOnlyRow = row === 'usage';
+                    const rowLabel = row === 'prev' ? '전일지침' : row === 'curr' ? '금일지침' : '사용량';
                     return (
                       <tr key={row}>
-                        <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{row === 'prev' ? '전일지침' : row === 'curr' ? '금일지침' : '사용량'}</td>
+                        <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{rowLabel}</td>
                         <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeMid || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeMid', e.target.value)} readOnly={isReadOnlyRow} /></td>
                         <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeMax || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeMax', e.target.value)} readOnly={isReadOnlyRow} /></td>
                         <td className={tdClass}><input type="text" className={isReadOnlyRow ? readonlyInputClass : inputClass} value={data.powerUsage?.[row as 'prev' | 'curr' | 'usage']?.activeLight || ''} onChange={isReadOnlyRow ? undefined : e => updatePower(row as any, 'activeLight', e.target.value)} readOnly={isReadOnlyRow} /></td>

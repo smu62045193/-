@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -345,7 +344,7 @@ export const apiFetchRange = async (prefix: string, start: string, end: string):
       query = query.gte("id", startKey).lte("id", endKey);
     }
 
-    const { data, error } = await query.order('id', { ascending: true });
+    const { data, error } = query.order('id', { ascending: true });
     
     if (error) throw error;
     if (!data) return [];
@@ -564,7 +563,7 @@ export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
     { id: 'bat-ind-8', label: '8', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
     { id: 'bat-ind-9', label: '9', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
     { id: 'bat-gen-1', label: '10', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' },
-    { id: 'bat-gen-2', label: '11', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' }
+    { id: 'bat-gen-2', label: '11', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' }
   ],
   approvers: { staff: '', assistant: '', manager: '', director: '' }
 });
@@ -1014,7 +1013,16 @@ export const saveConsumableRequests = async (list: ConsumableRequest[]): Promise
 export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => {
   try {
     const { data } = await supabase.from('parking_changes').select('*').order('date', { ascending: false });
-    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, company: p.company, location: p.location, prev_plate: p.prev_plate, new_plate: p.new_plate, note: p.note }));
+    if (data && data.length > 0) return data.map(p => ({ 
+      id: p.id, 
+      date: p.date, 
+      type: p.type, 
+      company: p.company, 
+      location: p.location, 
+      prevPlate: p.prev_plate, 
+      newPlate: p.new_plate, 
+      note: p.note 
+    }));
   } catch (e) {}
   return [];
 };
@@ -1034,7 +1042,7 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
       type: p.type, 
       location: p.location, 
       company: p.company, 
-      prev_plate: p.prev_plate, 
+      prevPlate: p.prev_plate, 
       plate_num: p.plate_num,   
       note: p.note 
     }));
@@ -1071,7 +1079,6 @@ export const saveParkingLayout = async (layout: any): Promise<boolean> => {
 
 /**
  * 협력업체 데이터 조회
- * DB 구조 변경 없이 중요 업체 여부를 판단하기 위해 note 필드의 [중요] 접두사 감지
  */
 export const fetchContractors = async (): Promise<Contractor[]> => {
   try {
@@ -1098,14 +1105,10 @@ export const fetchContractors = async (): Promise<Contractor[]> => {
 
 /**
  * 협력업체 데이터 저장
- * 수파베이스 스키마(컬럼) 변경 없이 기능을 제공하기 위해 
- * isImportant가 true일 경우 note 필드 앞에 [중요] 접두사를 붙여서 저장함
  */
 export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
   const dbData = list.map(c => {
-    // 중요업체 체크 시 note 필드 앞에 식별자 추가
     const finalNote = c.isImportant ? `[중요] ${c.note || ''}` : (c.note || '');
-    
     return { 
       id: ensureID(c.id), 
       name: c.name, 
@@ -1115,7 +1118,6 @@ export const saveContractors = async (list: Contractor[]): Promise<boolean> => {
       phone_mobile: c.phoneMobile, 
       fax: c.fax, 
       note: finalNote
-      // is_important 컬럼이 DB에 없으므로 전송 데이터에서 제외하여 오류 방지
     };
   });
   const { error = null } = await supabase.from('contractors').upsert(dbData);
@@ -1372,9 +1374,9 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       type: item.type, 
       floor: item.floor, 
       company: item.company, 
-      serial_no: item.serial_no, 
+      serialNo: item.serial_no, 
       phone: item.phone, 
-      cert_no: item.cert_no, 
+      certNo: item.cert_no, 
       date: item.date, 
       remarks: item.remarks 
     }));
@@ -1417,7 +1419,13 @@ export const saveFireInspectionLog = async (data: FireInspectionLogData): Promis
 export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
   try {
     const { data } = await supabase.from('fire_inspection_history').select('*').order('date', { ascending: false });
-    if (data && data.length > 0) return data;
+    if (data && data.length > 0) return data.map(item => ({
+      id: item.id,
+      date: item.date,
+      company: item.company,
+      content: item.content,
+      note: item.note
+    }));
   } catch (err) {}
   return [];
 };

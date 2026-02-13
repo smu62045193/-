@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FireExtinguisherItem } from '../types';
 import { fetchFireExtinguisherList, saveFireExtinguisherList, deleteFireExtinguisher, generateUUID } from '../services/dataService';
-import { Save, Plus, Trash2, Printer, Filter, Edit2, RotateCcw, Flame, Check, AlertCircle, X, AlertTriangle, Cloud, CheckCircle, ChevronLeft, ChevronRight, Lock, RefreshCw } from 'lucide-react';
+import { Save, Plus, Trash2, Printer, Filter, Edit2, RotateCcw, Flame, Check, AlertCircle, X, AlertTriangle, Cloud, CheckCircle, ChevronLeft, ChevronRight, Lock, RefreshCw, Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface FireExtinguisherCheckProps {
@@ -20,8 +20,8 @@ const getFloorScore = (f: any) => {
   const s = String(f || '').toUpperCase().trim();
   if (!s || s === '미지정') return -9999;
   if (s === '옥상' || s === 'RF' || s.includes('옥탑')) return 1000;
+  if (s === '창고') return -500; // 창고는 지하보다 더 낮게 설정
   if (s === '지하3~5층') return -3.5;
-  if (s === '창고') return -10;
   if (s.startsWith('B') || s.startsWith('지하')) {
     const numStr = s.replace(/[^0-9]/g, '');
     const num = parseInt(numStr);
@@ -36,6 +36,7 @@ const formatToYYMM = (dateStr: string) => {
   if (!dateStr) return '';
   if (dateStr.includes('-')) {
     const parts = dateStr.split('-');
+    // YYYY-MM 또는 YYYY-MM-DD 대응
     if (parts[0].length === 4) return `${parts[0].substring(2)}/${parts[1]}`;
   }
   return dateStr;
@@ -43,7 +44,7 @@ const formatToYYMM = (dateStr: string) => {
 
 const isUndergroundFloor = (floor: string) => {
   const f = floor.trim().toUpperCase();
-  return f.startsWith('B') || f.startsWith('지하');
+  return (f.startsWith('B') || f.startsWith('지하')) && f !== '창고';
 };
 
 const isRooftopFloor = (floor: string) => {
@@ -51,10 +52,16 @@ const isRooftopFloor = (floor: string) => {
   return f.includes('옥탑') || f.includes('옥상') || f.includes('RF');
 };
 
+const isStorageFloor = (floor: string) => {
+  const f = floor.trim();
+  return f.includes('창고');
+};
+
 const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMode = false }) => {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<FireExtinguisherItem[]>([]);
   const [activeFloor, setActiveFloor] = useState<string>('전체');
+  const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -92,7 +99,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFloor, items.length]);
+  }, [activeFloor, items.length, searchTerm]);
 
   const loadData = async () => {
     setLoading(true);
@@ -109,7 +116,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 600;
-    const height = 750;
+    const height = 790;
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -122,15 +129,6 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       `FireExtWin_${id}`,
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
     );
-  };
-
-  const handleCancelEdit = () => {
-    if (isPopupMode) {
-      window.close();
-    } else {
-      setEditId(null);
-      setFormItem(initialFormState);
-    }
   };
 
   const handleRegister = async () => {
@@ -158,10 +156,12 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
           window.opener.postMessage({ type: 'FIRE_EXT_SAVED' }, '*');
         }
         alert('저장이 완료되었습니다.');
-        // 팝업 모드일 때 창을 닫지 않고 수정 모드로 유지 (요청사항)
-        if (!editId) {
-          setEditId(targetId);
-          setFormItem(itemToSave);
+        if (isPopupMode) {
+          window.close();
+        } else {
+          setEditId(null);
+          setFormItem(initialFormState);
+          loadData();
         }
       } else {
         alert('저장 실패 (서버 오류)');
@@ -186,8 +186,8 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       } else {
         alert('삭제 실패 (서버 오류)');
       }
-    } catch (e: any) {
-      console.error(String(e));
+    } catch (e) {
+      console.error(e);
       alert('오류가 발생했습니다: ' + String(e));
     } finally {
       setLoading(false);
@@ -197,8 +197,20 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
   const filteredItemsSorted = useMemo<FireExtinguisherItem[]>(() => {
     const safeItems = Array.isArray(items) ? items : [];
     let filtered = [...safeItems];
+
+    if (searchTerm.trim()) {
+      const lower = searchTerm.toLowerCase();
+      filtered = filtered.filter(it => 
+        (it.manageNo || '').toLowerCase().includes(lower) ||
+        (it.floor || '').toLowerCase().includes(lower) ||
+        (it.company || '').toLowerCase().includes(lower) ||
+        (it.serialNo || '').toLowerCase().includes(lower)
+      );
+    }
+
     if (activeFloor === '지하1~6층') filtered = filtered.filter(item => isUndergroundFloor(item.floor));
     else if (activeFloor === '옥탑') filtered = filtered.filter(item => isRooftopFloor(item.floor));
+    else if (activeFloor === '창고') filtered = filtered.filter(item => isStorageFloor(item.floor));
     else if (activeFloor !== '전체') filtered = filtered.filter(item => item.floor === activeFloor);
 
     return filtered.sort((a, b) => {
@@ -206,7 +218,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       if (scoreDiff !== 0) return scoreDiff;
       return (String(a.manageNo || '')).localeCompare(String(b.manageNo || ''), 'en', { numeric: true });
     });
-  }, [items, activeFloor]);
+  }, [items, activeFloor, searchTerm]);
 
   const totalPages = Math.ceil(filteredItemsSorted.length / ITEMS_PER_PAGE);
   const paginatedFlatItems = useMemo(() => {
@@ -227,15 +239,22 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
   const filterButtons = useMemo(() => {
     const uniqueFloors = Array.from(new Set(items.map(i => i.floor))).filter((f): f is string => !!f && typeof f === 'string' && f.trim() !== '');
+    
+    // 지상층 (10~1)
     const aboveGround = uniqueFloors
-      .filter((f: string) => !isUndergroundFloor(f) && !isRooftopFloor(f))
-      .sort((a, b) => getFloorScore(String(b)) - getFloorScore(String(a)));
+      .filter((f: string) => !isUndergroundFloor(f) && !isRooftopFloor(f) && !isStorageFloor(f))
+      .sort((a, b) => getFloorScore(String(b)) - getFloorScore(a));
+    
     const hasUnderground = uniqueFloors.some((f: string) => isUndergroundFloor(f));
     const hasRooftop = uniqueFloors.some((f: string) => isRooftopFloor(f));
+    const hasStorage = uniqueFloors.some((f: string) => isStorageFloor(f));
+    
     const btns = ['전체'];
     if (hasRooftop) btns.push('옥탑');
     btns.push(...aboveGround);
     if (hasUnderground) btns.push('지하1~6층');
+    if (hasStorage) btns.push('창고');
+    
     return btns;
   }, [items]);
 
@@ -286,10 +305,10 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
           <th style="width: 100px;">종 류</th>
           <th style="width: 70px;">층 별</th>
           <th style="width: 70px;">정비업체</th>
-          <th style="width: 70px;">제조번호</th>
+          <th style="width: 80px;">제조번호</th>
           <th style="width: 90px;">전화번호</th>
-          <th style="width: 70px;">검정번호</th>
-          <th style="width: 50px;">일 자</th>
+          <th style="width: 80px;">검정번호</th>
+          <th style="width: 50px;">제조년월</th>
         </tr>
       </thead>
     `;
@@ -298,7 +317,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       const isFirstPage = index === 0;
       const rowsHtml = chunk.map(row => {
         if (row.isHeader) return `<tr><td colspan="9" style="background-color: #f3f4f6 !important; font-weight: bold; text-align: left; padding: 8px 10px; border-top: 1.5px solid black; font-size: 10pt;">[ ${row.floor} ]</td></tr>`;
-        return `<tr><td>${row.globalIndex}</td><td>${row.manageNo || ''}</td><td>${row.type || ''}</td><td>${row.floor || ''}</td><td>${row.company || ''}</td><td>${row.serialNo || ''}</td><td>${row.phone || ''}</td><td>${row.certNo || ''}</td><td>${formatToYYMM(row.date || '')}</td></tr>`;
+        return `<tr><td>${row.globalIndex}</td><td>${row.manageNo || ''}</td><td>${row.type || ''}</td><td>${row.floor || ''}</td><td>${row.company || ''}</td><td style="font-weight:bold;">${row.serialNo || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${row.certNo || ''}</td><td>${formatToYYMM(row.date || '')}</td></tr>`;
       }).join('');
       pagesContent += `<div class="print-page ${index < chunks.length - 1 ? 'page-break' : ''}">${isFirstPage ? `<div class="header-flex"><div class="title-area"><div class="doc-title">소화기 관리대장</div></div></div>` : ''}<table class="main-print-table">${tableHeader}<tbody>${rowsHtml}</tbody></table></div>`;
     });
@@ -306,7 +325,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       <html><head><title>소화기 관리대장 미리보기</title><style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
         @page { size: A4 portrait; margin: 0; }
-        body { font-family: 'Noto Sans KR', sans-serif; background: #f1f5f9; padding: 0; margin: 0; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
+        body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; -webkit-print-color-adjust: exact; }
         .no-print { display: flex; justify-content: center; padding: 20px; }
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
         .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
@@ -330,19 +349,20 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
     }
   };
 
-  const inputClass = "w-full border border-gray-300 rounded px-4 py-2.5 !text-[14px] bg-white text-black focus:ring-2 focus:ring-blue-500 outline-none h-[45px] font-bold shadow-inner";
+  const formInputClass = "w-full border border-gray-300 rounded-xl px-4 py-2.5 !text-[14px] bg-white text-black focus:ring-2 focus:ring-blue-500 outline-none h-[45px] font-bold shadow-inner";
 
-  // 팝업 모드일 때의 UI
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 animate-fade-in">
-        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
-          <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+        <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[740px]">
+          <div className="p-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
                 {editId ? <Edit2 size={24} /> : <Plus size={24} />}
               </div>
-              <span className="font-black text-xl tracking-tight">{editId ? '소화기 정보 수정' : '신규 소화기 등록'}</span>
+              <span className="font-black text-xl tracking-tight">
+                {editId ? '소화기 정보 수정' : '신규 소화기 등록'}
+              </span>
             </div>
             <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors text-white">
               <X size={28} />
@@ -353,11 +373,11 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">관리번호 *</label>
-                <input type="text" className={`${inputClass} form-input text-blue-700`} value={formItem.manageNo} onChange={(e) => setFormItem({...formItem, manageNo: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: 001" />
+                <input type="text" className={`${formInputClass} form-input text-blue-700`} value={formItem.manageNo} onChange={(e) => setFormItem({...formItem, manageNo: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: 001" />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">종류</label>
-                <select className={`${inputClass} form-input`} value={formItem.type} onChange={(e) => setFormItem({...formItem, type: e.target.value})}>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">소화기 종류</label>
+                <select className={`${formInputClass} form-input`} value={formItem.type} onChange={(e) => setFormItem({...formItem, type: e.target.value})}>
                   {EXTINGUISHER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
@@ -365,50 +385,50 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">층별</label>
-                <input type="text" className={`${inputClass} form-input`} value={formItem.floor} onChange={(e) => setFormItem({...formItem, floor: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: 1F" />
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">설치 위치(층) *</label>
+                <input type="text" className={`${formInputClass} form-input`} value={formItem.floor} onChange={(e) => setFormItem({...formItem, floor: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: B2F, 1F" />
               </div>
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">정비업체</label>
-                <input type="text" className={`${inputClass} form-input`} value={formItem.company} onChange={(e) => setFormItem({...formItem, company: e.target.value})} onKeyDown={handleKeyDown} />
+                <input type="text" className={`${formInputClass} form-input`} value={formItem.company} onChange={(e) => setFormItem({...formItem, company: e.target.value})} onKeyDown={handleKeyDown} placeholder="업체명 입력" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">제조번호</label>
-                <input type="text" className={`${inputClass} form-input`} value={formItem.serialNo} onChange={(e) => setFormItem({...formItem, serialNo: e.target.value})} onKeyDown={handleKeyDown} />
+                <input type="text" className={`${formInputClass} form-input text-blue-700`} value={formItem.serialNo} onChange={(e) => setFormItem({...formItem, serialNo: e.target.value})} onKeyDown={handleKeyDown} placeholder="제조번호 입력" />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">전화번호</label>
-                <input type="text" className={`${inputClass} form-input`} value={formItem.phone} onChange={(e) => setFormItem({...formItem, phone: e.target.value})} onKeyDown={handleKeyDown} placeholder="010-..." />
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">검정번호</label>
+                <input type="text" className={`${formInputClass} form-input text-blue-700`} value={formItem.certNo} onChange={(e) => setFormItem({...formItem, certNo: e.target.value})} onKeyDown={handleKeyDown} placeholder="검정번호 입력" />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">검정번호</label>
-                <input type="text" className={`${inputClass} form-input`} value={formItem.certNo} onChange={(e) => setFormItem({...formItem, certNo: e.target.value})} onKeyDown={handleKeyDown} />
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">전화번호</label>
+                <input type="text" className={`${formInputClass} form-input`} value={formItem.phone} onChange={(e) => setFormItem({...formItem, phone: e.target.value})} onKeyDown={handleKeyDown} placeholder="010-0000-0000" />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">일자</label>
-                <input type="month" className={`${inputClass} form-input`} value={formItem.date} onChange={(e) => setFormItem({...formItem, date: e.target.value})} onKeyDown={handleKeyDown} />
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">제조년월</label>
+                <input type="month" className={`${formInputClass} form-input text-center`} value={formItem.date} onChange={(e) => setFormItem({...formItem, date: e.target.value})} onKeyDown={handleKeyDown} />
               </div>
             </div>
 
             <div>
               <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고</label>
-              <textarea className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-24 font-medium shadow-inner" value={formItem.remarks} onChange={(e) => setFormItem({...formItem, remarks: e.target.value})} placeholder="특이사항 입력" />
+              <textarea className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none h-16 font-medium shadow-inner" value={formItem.remarks || ''} onChange={(e) => setFormItem({...formItem, remarks: e.target.value})} placeholder="특이사항 입력" />
             </div>
           </div>
 
-          <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4">
+          <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4 shrink-0">
             <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
             <button 
               onClick={handleRegister} 
               disabled={loading}
               className={`flex-[2] py-4 rounded-2xl font-black text-lg transition-all flex items-center justify-center gap-2 shadow-xl active:scale-95 ${
-                loading ? 'bg-slate-400 cursor-wait' : editId ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-blue-600 text-white hover:bg-blue-700'
+                loading ? 'bg-slate-400 cursor-wait' : editId ? 'bg-orange-600 text-white hover:bg-orange-700 shadow-orange-100' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100'
               }`}
             >
               {loading ? <RefreshCw size={24} className="animate-spin" /> : <Save size={24} />}
@@ -420,15 +440,22 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
     );
   }
 
-  // 메인 리스트 뷰 UI
   return (
     <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
       <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-200 pb-4 print:hidden gap-4">
-        <div className="flex items-center gap-2">
-          <Flame className="text-red-600" size={24} />
-          <h2 className="text-2xl font-black text-gray-800 tracking-tight">소화기 관리대장</h2>
+        {/* 검색창 좌측 배치 (320px) */}
+        <div className="relative w-full md:w-[320px]">
+          <input 
+            type="text" 
+            placeholder="관리번호, 위치, 업체명 검색..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm font-bold" 
+          />
+          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
         </div>
-        <div className="flex flex-wrap gap-2">
+        
+        <div className="flex flex-wrap gap-2 shrink-0">
           <button 
             onClick={loadData} 
             disabled={loading} 
@@ -444,13 +471,17 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
             <Plus size={18} className="mr-2" />
             신규 소화기 등록
           </button>
-          <button onClick={handlePrint} className="flex items-center px-4 py-2.5 bg-gray-700 text-white rounded-xl hover:bg-gray-800 font-bold shadow-sm transition-colors text-sm active:scale-95">
+          <button 
+            onClick={handlePrint} 
+            className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+          >
             <Printer size={18} className="mr-2" />
             미리보기
           </button>
         </div>
       </div>
 
+      {/* 층별 필터 리스트 바로 위로 이동 */}
       <div className="print:hidden flex items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
         <div className="flex items-center gap-2 text-sm font-black text-gray-400 uppercase tracking-widest min-w-max"><Filter size={16} /></div>
         <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-hide pb-1">
@@ -472,43 +503,43 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
 
       <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-center min-w-[1000px]">
+          <table className="w-full border-collapse text-center min-w-[1000px] border border-gray-300">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-12">No</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32">관리번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-44">종 류</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32">층 별</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24">정비업체</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24">제조번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32">전화번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24">검정번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24">일 자</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest">비 고</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 print:hidden">관리</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-12 border border-gray-200">No</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">관리번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">종 류</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">층 별</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">정비업체</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">제조번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">전화번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">검정번호</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">제조년월</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest border border-gray-200">비 고</th>
+                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 print:hidden border border-gray-200">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && items.length === 0 ? (
-                 <tr><td colSpan={11} className="py-24 text-center text-gray-400 font-bold">로딩 중...</td></tr>
+                 <tr><td colSpan={11} className="py-24 text-center text-gray-400 font-bold border border-gray-200">로딩 중...</td></tr>
               ) : paginatedFlatItems.length === 0 ? (
-                 <tr><td colSpan={11} className="py-24 text-center text-gray-400 italic">표시할 데이터가 없습니다.</td></tr>
+                 <tr><td colSpan={11} className="py-24 text-center text-gray-400 italic border border-gray-200">표시할 데이터가 없습니다.</td></tr>
               ) : displayGroups.map(group => (
                 <React.Fragment key={group.floor}>
-                  <tr className="bg-slate-50/50"><td colSpan={11} className="text-left pl-6 py-3 border-b border-gray-200 text-blue-800 font-black text-sm uppercase tracking-widest">[ {String(group.floor)} ]</td></tr>
+                  <tr className="bg-slate-50/50"><td colSpan={11} className="text-left pl-6 py-3 border border-gray-200 text-blue-800 font-black text-sm uppercase tracking-widest">[ {String(group.floor)} ]</td></tr>
                   {group.items.map((item: FireExtinguisherItem) => (
                     <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="px-3 py-4 text-[11px] text-gray-400 font-mono">{filteredItemsSorted.findIndex(fi => fi.id === item.id) + 1}</td>
-                      <td className="px-3 py-4 text-sm font-black text-slate-800">{item.manageNo || ''}</td>
-                      <td className="px-3 py-4 text-[12px] font-bold text-slate-600">{item.type || ''}</td>
-                      <td className="px-3 py-4 text-[12px] font-bold text-slate-600">{item.floor || ''}</td>
-                      <td className="px-3 py-4 text-[12px] text-slate-500">{item.company || '-'}</td>
-                      <td className="px-3 py-4 text-[12px] text-slate-500">{item.serialNo || '-'}</td>
-                      <td className="px-3 py-4 text-[12px] text-slate-500 font-mono">{item.phone || '-'}</td>
-                      <td className="px-3 py-4 text-[12px] text-slate-500">{item.certNo || '-'}</td>
-                      <td className="px-3 py-4 text-[12px] text-blue-600 font-bold">{formatToYYMM(item.date || '')}</td>
-                      <td className="px-3 py-4 text-[11px] text-slate-400 italic text-left pl-4 max-w-[150px] truncate">{item.remarks || '-'}</td>
-                      <td className="px-3 py-4 print:hidden">
+                      <td className="px-3 py-4 text-[11px] text-gray-400 font-mono border border-gray-200">{filteredItemsSorted.findIndex(fi => fi.id === item.id) + 1}</td>
+                      <td className="px-3 py-4 text-sm font-black text-slate-800 border border-gray-200">{item.manageNo || ''}</td>
+                      <td className="px-3 py-4 text-[12px] font-bold text-slate-600 border border-gray-200">{item.type || ''}</td>
+                      <td className="px-3 py-4 text-[12px] font-bold text-slate-600 border border-gray-200">{item.floor || ''}</td>
+                      <td className="px-3 py-4 text-[12px] text-slate-500 border border-gray-200">{item.company || '-'}</td>
+                      <td className="px-3 py-4 text-[12px] text-slate-900 font-black border border-gray-200 text-center">{item.serialNo || '-'}</td>
+                      <td className="px-3 py-4 text-[12px] text-slate-500 font-mono border border-gray-200">{item.phone || '-'}</td>
+                      <td className="px-3 py-4 text-[12px] text-slate-900 font-black border border-gray-200 text-center">{item.certNo || '-'}</td>
+                      <td className="px-3 py-4 text-[12px] text-blue-600 font-bold border border-gray-200">{formatToYYMM(item.date || '')}</td>
+                      <td className="px-3 py-4 text-[11px] text-slate-400 italic text-left pl-4 border border-gray-200">{item.remarks || '-'}</td>
+                      <td className="px-3 py-4 print:hidden border border-gray-200">
                         <div className="flex items-center justify-center gap-2">
                           <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all shadow-sm border border-blue-100" title="수정"><Edit2 size={16} /></button>
                           <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all shadow-sm border border-red-100" title="삭제"><Trash2 size={16} /></button>
@@ -521,41 +552,41 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
             </tbody>
           </table>
         </div>
-
-        {totalPages > 1 && (
-          <div className="px-6 py-6 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <div className="flex items-center gap-1.5 px-4">
-              {visiblePageNumbers.map(pageNum => (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="py-4 flex items-center justify-center gap-2 print:hidden">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <div className="flex items-center gap-1.5 px-4">
+            {visiblePageNumbers.map(pageNum => (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                  currentPage === pageNum
+                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

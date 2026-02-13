@@ -218,8 +218,8 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col">
           <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
-                <UserCheck size={20} />
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
+                <UserCheck size={20} className="text-white" />
               </div>
               <span className="font-black text-lg">{editId ? '선임 정보 수정' : '신규 선임 등록'}</span>
             </div>
@@ -333,7 +333,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
             <button 
               onClick={handleSave} 
               disabled={saveStatus === 'loading'}
-              className="flex-[2] py-3.5 bg-blue-600 text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"
+              className={`flex-[2] py-3.5 ${editId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}
             >
               {saveStatus === 'loading' ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장

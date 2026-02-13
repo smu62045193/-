@@ -53,7 +53,6 @@ import ElevatorLog from './ElevatorLog';
 import AirEnvironmentLog from './AirEnvironmentLog';
 import SubstationChecklistLog from './SubstationChecklistLog';
 import { fetchWeatherInfo } from '../services/geminiService';
-// Added missing import to resolve "Cannot find name 'WORK_LOG_TABS'"
 import { WORK_LOG_TABS } from '../constants';
 import { 
   getAutomatedElectricalTasks, 
@@ -270,7 +269,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     setLoading(true);
     isInitialLoad.current = true;
     try {
-      const searchStart = format(subDays(currentDate, 7), 'yyyy-MM-dd');
+      const searchStart = format(subDays(currentDate, 14), 'yyyy-MM-dd');
       const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
 
       const batchResults = await apiFetchBatch([
@@ -302,31 +301,30 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       
       let finalWorkLog: WorkLogData = deepMerge(INITIAL_WORKLOG, { ...rawWorkLog, scheduled: currentScheduled });
 
-      // 어제의 재고 자동 가져오기 로직
+      // 기계 탭 약품 재고 연동 로직 보강
       if (yesterdayFullLog?.mechanicalChemicals) {
         if (!finalWorkLog.mechanicalChemicals) {
-          finalWorkLog.mechanicalChemicals = { ...INITIAL_CHEMICALS };
+          finalWorkLog.mechanicalChemicals = JSON.parse(JSON.stringify(INITIAL_CHEMICALS));
         }
-        if (!finalWorkLog.mechanicalChemicals.seed) finalWorkLog.mechanicalChemicals.seed = { prev: '', incoming: '', used: '', stock: '' };
-        if (!finalWorkLog.mechanicalChemicals.sterilizer) finalWorkLog.mechanicalChemicals.sterilizer = { prev: '', incoming: '', used: '', stock: '' };
-
-        if (!finalWorkLog.mechanicalChemicals.seed.prev && yesterdayFullLog.mechanicalChemicals.seed?.stock) {
-          finalWorkLog.mechanicalChemicals.seed.prev = yesterdayFullLog.mechanicalChemicals.seed.stock;
-        }
-        if (!finalWorkLog.mechanicalChemicals.sterilizer.prev && yesterdayFullLog.mechanicalChemicals.sterilizer?.stock) {
-          finalWorkLog.mechanicalChemicals.sterilizer.prev = yesterdayFullLog.mechanicalChemicals.sterilizer.stock;
-        }
+        
+        const chemKeys = ['seed', 'sterilizer'] as const;
+        chemKeys.forEach(key => {
+          const chem = finalWorkLog.mechanicalChemicals![key];
+          const yesterdayChem = yesterdayFullLog.mechanicalChemicals![key];
+          
+          if (yesterdayChem && yesterdayChem.stock && (!chem.prev || chem.prev === '' || chem.prev === '0')) {
+            chem.prev = yesterdayChem.stock;
+          }
+        });
       }
 
+      // 최종 재고 계산
       if (finalWorkLog.mechanicalChemicals) {
         ['seed', 'sterilizer'].forEach((key) => {
-          if (!finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer']) {
-            finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer'] = { prev: '', incoming: '', used: '', stock: '' };
-          }
           const chem = finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer'];
-          const p = parseFloat(chem.prev || '0');
-          const i = parseFloat(chem.incoming || '0');
-          const u = parseFloat(chem.used || '0');
+          const p = parseFloat(String(chem.prev || '0').replace(/,/g, ''));
+          const i = parseFloat(String(chem.incoming || '0').replace(/,/g, ''));
+          const u = parseFloat(String(chem.used || '0').replace(/,/g, ''));
           const s = p + i - u;
           chem.stock = isNaN(s) ? (chem.prev || '0') : s.toString();
         });
@@ -641,11 +639,11 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
   const handleChemicalUpdate = (type: 'seed' | 'sterilizer', field: keyof ChemicalStatusItem, value: string) => {
     setLogData(prev => {
-      const currentChem = prev.mechanicalChemicals || INITIAL_CHEMICALS;
+      const currentChem = prev.mechanicalChemicals || JSON.parse(JSON.stringify(INITIAL_CHEMICALS));
       const target = { ...currentChem[type], [field]: value };
-      const p = parseFloat(target.prev || '0');
-      const i = parseFloat(target.incoming || '0');
-      const u = parseFloat(target.used || '0');
+      const p = parseFloat(String(target.prev || '0').replace(/,/g, ''));
+      const i = parseFloat(String(target.incoming || '0').replace(/,/g, ''));
+      const u = parseFloat(String(target.used || '0').replace(/,/g, ''));
       const s = p + i - u;
       target.stock = isNaN(s) ? target.prev : s.toString();
       return { ...prev, mechanicalChemicals: { ...currentChem, [type]: target } };
