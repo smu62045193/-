@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -10,7 +9,6 @@ import StaffStatus from './components/StaffStatus';
 import ConsumablesManager from './components/ConsumablesManager';
 import ConsumablesLedger from './components/ConsumablesLedger';
 import ParkingManager from './components/ParkingManager';
-import ParkingStatusList from './components/ParkingStatusList';
 import ContractorManager from './components/ContractorManager';
 import ElecCheckManager from './components/ElecCheckManager';
 import MechCheckManager from './components/MechCheckManager';
@@ -30,7 +28,7 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | 'parking_status' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -54,8 +52,6 @@ const App: React.FC = () => {
       setIsPopupMode('fire_contractor');
     } else if (popupType === 'fire_extinguisher') {
       setIsPopupMode('fire_extinguisher');
-    } else if (popupType === 'parking_status') {
-      setIsPopupMode('parking_status');
     }
   }, []);
 
@@ -99,10 +95,6 @@ const App: React.FC = () => {
 
   if (isPopupMode === 'fire_extinguisher') {
     return <FireExtinguisherCheck isPopupMode={true} />;
-  }
-
-  if (isPopupMode === 'parking_status') {
-    return <ParkingStatusList isPopupMode={true} />;
   }
 
   const renderContent = () => {

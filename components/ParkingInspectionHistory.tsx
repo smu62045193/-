@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { fetchParkingChangeList } from '../services/dataService';
 import { ParkingChangeItem } from '../types';
@@ -20,6 +19,7 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
     loadHistory();
   }, []);
 
+  // 검색어나 데이터 길이가 변경되면 페이지를 1로 리셋
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, history.length]);
@@ -102,13 +102,14 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
 
   const filteredHistory = useMemo(() => {
     return history.filter(item => 
-      (item.company || '').includes(searchTerm) || 
-      (item.location || '').includes(searchTerm) || 
-      (item.newPlate || '').includes(searchTerm) ||
-      (item.date || '').includes(searchTerm)
+      item.company.includes(searchTerm) || 
+      item.location.includes(searchTerm) || 
+      item.newPlate.includes(searchTerm) ||
+      item.date.includes(searchTerm)
     );
   }, [history, searchTerm]);
 
+  // 페이지네이션 처리
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
   const paginatedHistory = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -128,18 +129,26 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
   return (
     <div className="p-6 space-y-4 animate-fade-in pb-10">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="relative w-full md:w-[320px]">
-          <input 
-            type="text" 
-            placeholder="업체명, 위치, 차량번호 검색" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 text-black outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner font-bold"
-          />
-          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+            <History size={24} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">주차점검이력 (변경내용)</h2>
+            <p className="text-xs text-gray-400 mt-0.5">지정주차 차량의 추가 및 변경 기록 목록입니다.</p>
+          </div>
         </div>
-        
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="relative flex-1 md:w-72">
+            <input 
+              type="text" 
+              placeholder="업체명, 위치, 차량번호 검색" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 text-black outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner"
+            />
+            <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+          </div>
           <button 
             onClick={loadHistory}
             disabled={loading}
@@ -156,13 +165,13 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
           <table className="w-full min-w-[900px] border-collapse">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200">
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20">No</th>
+                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">변경일자</th>
                 <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-48">업체</th>
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">위치</th>
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">변경전차량번호</th>
                 <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">변경후차량번호</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">상세내역</th>
+                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">상세보기</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -205,13 +214,19 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
                         {item.newPlate}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-center">
+                    <td className="px-4 py-4 text-center flex gap-2 justify-center">
                       <button 
                         onClick={() => handleViewDetail(item)}
-                        className="flex items-center gap-1 mx-auto bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
+                        className="flex items-center gap-1 bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
                       >
-                        미리보기
+                        상세보기
                         <Printer size={12} />
+                      </button>
+                      <button 
+                        onClick={onSelect}
+                        className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-gray-200 transition-all active:scale-95"
+                      >
+                        이동
                       </button>
                     </td>
                   </tr>
@@ -220,41 +235,42 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
             </tbody>
           </table>
         </div>
-      </div>
 
-      {totalPages > 1 && (
-        <div className="px-6 py-4 flex items-center justify-center gap-2">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div className="flex items-center gap-1.5 px-4">
-            {visiblePageNumbers.map(pageNum => (
-              <button
-                key={pageNum}
-                onClick={() => setCurrentPage(pageNum)}
-                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                  currentPage === pageNum
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                }`}
-              >
-                {pageNum}
-              </button>
-            ))}
+        {/* 페이지네이션 UI */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200 hover:border-blue-200 hover:text-blue-500'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

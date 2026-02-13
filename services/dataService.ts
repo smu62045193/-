@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -334,7 +335,7 @@ export const apiFetchRange = async (prefix: string, start: string, end: string):
     const startKey = isSpecialPrefix ? start : `${prefix}${start}`;
     const endKey = isSpecialPrefix ? end : `${prefix}${end}`;
 
-    if (prefix === "HV_LOG_" || prefix === "BOILER_LOG_") {
+    if (prefix === "HVAC_LOG_" || prefix === "BOILER_LOG_") {
       query = query.gte("id", `HVAC_BOILER_${start}`).lte("id", `HVAC_BOILER_${end}`);
     } else if (prefix === "DAILY_") {
       query = query.gte("id", start).lte("id", end);
@@ -344,7 +345,7 @@ export const apiFetchRange = async (prefix: string, start: string, end: string):
       query = query.gte("id", startKey).lte("id", endKey);
     }
 
-    const { data, error } = query.order('id', { ascending: true });
+    const { data, error } = await query.order('id', { ascending: true });
     
     if (error) throw error;
     if (!data) return [];
@@ -563,7 +564,7 @@ export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
     { id: 'bat-ind-8', label: '8', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
     { id: 'bat-ind-9', label: '9', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
     { id: 'bat-gen-1', label: '10', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' },
-    { id: 'bat-gen-2', label: '11', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' }
+    { id: 'bat-gen-2', label: '11', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' }
   ],
   approvers: { staff: '', assistant: '', manager: '', director: '' }
 });
@@ -744,12 +745,9 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
 export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   const { error } = await supabase.from('daily_reports').upsert({ 
     id: data.date, 
-    // Fixed: Property 'facilityDuty' should be used instead of 'facility_duty' on the data object.
     facility_duty: data.facilityDuty, 
-    // Fixed: Property 'securityDuty' should be used instead of 'security_duty' on the data object.
     security_duty: data.securityDuty, 
     utility: data.utility, 
-    // Fixed: Property 'workLog' should be used instead of 'work_log' on the data object.
     work_log: data.workLog, 
     last_updated: new Date().toISOString() 
   });
@@ -919,9 +917,6 @@ export const fetchWeeklyReport = async (date: string): Promise<WeeklyReportData 
   return null;
 };
 
-/**
- * Fixed Error in saveWeeklyReport on line 920: Property 'reporting_date' does not exist on type 'WeeklyReportData'.
- */
 export const saveWeeklyReport = async (data: WeeklyReportData): Promise<boolean> => {
   const dbData = { id: `WEEKLY_${data.startDate}`, start_date: data.startDate, reporting_date: data.reportingDate, author: data.author, fields: data.fields, photos: data.photos, last_updated: new Date().toISOString() };
   const { error = null } = await supabase.from('weekly_reports').upsert(dbData);
@@ -1019,16 +1014,7 @@ export const saveConsumableRequests = async (list: ConsumableRequest[]): Promise
 export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => {
   try {
     const { data } = await supabase.from('parking_changes').select('*').order('date', { ascending: false });
-    if (data && data.length > 0) return data.map(p => ({ 
-      id: p.id, 
-      date: p.date, 
-      type: p.type, 
-      company: p.company, 
-      location: p.location, 
-      prevPlate: p.prev_plate, 
-      newPlate: p.new_plate, 
-      note: p.note 
-    }));
+    if (data && data.length > 0) return data.map(p => ({ id: p.id, date: p.date, type: p.type, company: p.company, location: p.location, prev_plate: p.prev_plate, new_plate: p.new_plate, note: p.note }));
   } catch (e) {}
   return [];
 };
@@ -1048,7 +1034,7 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
       type: p.type, 
       location: p.location, 
       company: p.company, 
-      prevPlate: p.prev_plate, 
+      prev_plate: p.prev_plate, 
       plate_num: p.plate_num,   
       note: p.note 
     }));
@@ -1343,9 +1329,7 @@ export const saveAirEnvironmentLog = async (data: AirEnvironmentLogData): Promis
     emissions: data.emissions, 
     preventions: data.preventions,
     weather_condition: data.weatherCondition,
-    // Fixed: Accessed correct camelCase properties from AirEnvironmentLogData as per interface definition
     temp_min: data.tempMin,
-    // Fixed: Accessed correct camelCase properties from AirEnvironmentLogData as per interface definition
     temp_max: data.tempMax,
     last_updated: new Date().toISOString() 
   });
@@ -1388,9 +1372,9 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       type: item.type, 
       floor: item.floor, 
       company: item.company, 
-      serialNo: item.serial_no, 
+      serial_no: item.serial_no, 
       phone: item.phone, 
-      certNo: item.cert_no, 
+      cert_no: item.cert_no, 
       date: item.date, 
       remarks: item.remarks 
     }));
@@ -1433,13 +1417,7 @@ export const saveFireInspectionLog = async (data: FireInspectionLogData): Promis
 export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
   try {
     const { data } = await supabase.from('fire_inspection_history').select('*').order('date', { ascending: false });
-    if (data && data.length > 0) return data.map(item => ({
-      id: item.id,
-      date: item.date,
-      company: item.company,
-      content: item.content,
-      note: item.note
-    }));
+    if (data && data.length > 0) return data;
   } catch (err) {}
   return [];
 };

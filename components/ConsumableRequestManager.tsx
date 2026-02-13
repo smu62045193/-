@@ -65,20 +65,63 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     const existing = allRequests.find(r => r.date.startsWith(monthKey));
     
     if (existing) {
-      // 기존 문서가 있을 경우: 저장된 데이터만 로드 (빈 행 추가 로직 제거)
+      // 기존 문서가 있을 경우: 각 섹션별로 최소 5행을 유지하도록 가공
+      const baseItems = [...existing.items];
+      const processedItems: ConsumableRequestItem[] = [];
+
+      SECTIONS.forEach(sec => {
+        const sectionItems = baseItems.filter(it => it.category === sec.key);
+        processedItems.push(...sectionItems);
+        
+        // 해당 섹션의 아이템이 5개 미만이면 빈 행 추가
+        const deficit = 5 - sectionItems.length;
+        if (deficit > 0) {
+          for (let i = 0; i < deficit; i++) {
+            processedItems.push({ 
+              id: generateId(), 
+              category: sec.key, 
+              itemName: '', 
+              spec: '', 
+              stock: '', 
+              qty: '', 
+              receivedDate: '', 
+              remarks: '', 
+              amount: 0 
+            });
+          }
+        }
+      });
+
       setActiveRequest({
         ...existing,
+        items: processedItems,
         drafter: existing.drafter || autoDrafter
       });
     } else {
-      // 신규 문서 생성 시: 빈 상태로 시작 (수정 버튼 클릭 시 행 생성)
+      // 신규 문서 생성 시: 각 섹션별로 5행씩 생성
+      const items: ConsumableRequestItem[] = [];
+      SECTIONS.forEach(sec => {
+        for (let i = 0; i < 5; i++) {
+          items.push({ 
+            id: generateId(), 
+            category: sec.key, 
+            itemName: '', 
+            spec: '', 
+            stock: '', 
+            qty: '', 
+            receivedDate: '', 
+            remarks: '', 
+            amount: 0 
+          });
+        }
+      });
       setActiveRequest({
         id: generateId(),
         date: format(date, 'yyyy-MM-dd'),
         arrivalDate: '',
         department: '시설관리팀',
         drafter: autoDrafter,
-        items: [],
+        items,
         totalAmount: 0,
         status: '작성중'
       });
@@ -150,43 +193,10 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     }
   };
 
-  const toggleEditMode = () => {
-    if (!isEditMode && activeRequest) {
-      // 수정 모드로 진입할 때만 각 섹션별로 최소 5행을 보장함
-      const currentItems = [...activeRequest.items];
-      const paddedItems: ConsumableRequestItem[] = [];
-
-      SECTIONS.forEach(sec => {
-        const sectionItems = currentItems.filter(it => it.category === sec.key);
-        paddedItems.push(...sectionItems);
-        
-        const deficit = 5 - sectionItems.length;
-        if (deficit > 0) {
-          for (let i = 0; i < deficit; i++) {
-            paddedItems.push({ 
-              id: generateId(), 
-              category: sec.key, 
-              itemName: '', 
-              spec: '', 
-              stock: '', 
-              qty: '', 
-              receivedDate: '', 
-              remarks: '', 
-              amount: 0 
-            });
-          }
-        }
-      });
-      setActiveRequest({ ...activeRequest, items: paddedItems });
-    }
-    setIsEditMode(!isEditMode);
-  };
-
   const handleSaveForm = async () => {
     if (!activeRequest) return;
     setLoading(true);
 
-    // 저장 시에는 품명이 있는 실제 데이터만 걸러서 저장
     const compressedItems = activeRequest.items.filter(it => it.itemName.trim() !== '');
     const finalRequest = { ...activeRequest, items: compressedItems };
 
@@ -223,12 +233,12 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
           <h3 style="font-size: 13pt; font-weight: bold; margin-bottom: 6px; border-left: 7px solid black; padding-left: 10px; margin-top: 15px;">${sec.label}</h3>
           <table>
             <thead><tr style="background:#f3f4f6; height:30px;">
-              <th style="width: 30px;">No</th>
-              <th style="width: 120px;">품 명</th>
-              <th style="width: 120px;">모델명</th>
-              <th style="width: 45px;">재고</th>
-              <th style="width: 45px;">수량</th>
-              <th style="width: 65px;">입고일</th>
+              <th style="width: 40px;">No</th>
+              <th style="width: 150px;">품 명</th>
+              <th style="width: 150px;">모델명</th>
+              <th style="width: 80px;">재고</th>
+              <th style="width: 80px;">수량</th>
+              <th style="width: 80px;">입고일</th>
               <th>비 고</th>
             </tr></thead>
             <tbody>${its.map((item, idx) => `
@@ -315,7 +325,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             <PackageSearch size={18} className="mr-2" /> 자재불러오기
           </button>
 
-          <button onClick={toggleEditMode} className={`flex items-center px-4 py-2 rounded-xl font-bold border shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white border-orange-600' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'}`}>
+          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-xl font-bold border shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-500 text-white border-orange-600' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'}`}>
             {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />} {isEditMode ? '수정완료' : '수정'}
           </button>
 
@@ -398,135 +408,123 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       </div>
 
       <div className="space-y-10">
-        {SECTIONS.map(sec => {
-          const sectionItems = activeRequest?.items.filter(i => i.category === sec.key) || [];
-          
-          // 조회 모드일 때는 이름이 있는 것만 표시, 수정 모드일 때는 패딩된 행 전체 표시
-          const displayItems = isEditMode 
-            ? sectionItems 
-            : sectionItems.filter(it => it.itemName && it.itemName.trim() !== '');
-
-          // 조회 모드인데 표시할 항목이 없으면 섹션 자체를 숨김
-          if (!isEditMode && displayItems.length === 0) return null;
-
-          return (
-            <div key={sec.key} className="animate-fade-in-down">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-2 h-6 bg-gray-800 rounded-full"></div>
-                <h3 className="text-lg font-black text-gray-800">{sec.label}</h3>
-              </div>
-              
-              <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto shadow-sm">
-                <table className="w-full min-w-[900px] border-collapse">
-                  <thead>
-                    <tr>
-                      <th className={`${thClass} w-16`}>No</th>
-                      <th className={`${thClass} w-[150px]`}>품 명</th>
-                      <th className={`${thClass} w-[150px]`}>모델명</th>
-                      <th className={`${thClass} w-24`}>재고</th>
-                      <th className={`${thClass} w-24`}>수량</th>
-                      <th className={`${thClass} w-32`}>입고일</th>
-                      <th className={thClass}>비 고</th>
-                    </tr>
-                  </thead>
-                  <tbody className="">
-                    {displayItems.map((it, idx) => (
-                      <tr key={it.id} className="hover:bg-gray-50/50 transition-colors group">
-                        <td className="border border-gray-300 text-center font-mono text-xs text-gray-400 bg-gray-50/30 relative h-10">
-                          <span className={isEditMode ? "group-hover:opacity-0" : ""}>{idx + 1}</span>
-                          {isEditMode && (
-                            <button 
-                              onClick={() => handleDeleteItem(it.id)}
-                              className="absolute inset-0 flex items-center justify-center text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="항목 삭제"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </td>
-                        <td className="border border-gray-300 p-0 h-10">
-                          <input 
-                            type="text" 
-                            value={it.itemName} 
-                            onChange={e => {
-                              const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, itemName: e.target.value } : i);
-                              setActiveRequest({ ...activeRequest, items: ni });
-                            }} 
-                            className={isEditMode ? editableInputClass : inputClass}
-                            readOnly={!isEditMode}
-                          />
-                        </td>
-                        <td className="border border-gray-300 p-0 h-10">
-                          <input 
-                            type="text" 
-                            value={it.spec || ''} 
-                            onChange={e => {
-                              const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, spec: e.target.value } : i);
-                              setActiveRequest({ ...activeRequest, items: ni });
-                            }} 
-                            className={isEditMode ? editableInputClass : inputClass}
-                            readOnly={!isEditMode}
-                            placeholder="모델명"
-                          />
-                        </td>
-                        <td className="border border-gray-300 p-0 h-10 bg-gray-50/30">
-                          <input 
-                            type="text" 
-                            value={it.stock} 
-                            onChange={e => {
-                              const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, stock: e.target.value } : i);
-                              setActiveRequest({ ...activeRequest, items: ni });
-                            }} 
-                            className={`${inputClass} font-bold text-gray-500`}
-                            readOnly={!isEditMode}
-                          />
-                        </td>
-                        <td className="border border-gray-300 p-0 h-10">
-                          <input 
-                            type="text" 
-                            value={it.qty} 
-                            onChange={e => {
-                              const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, qty: e.target.value } : i);
-                              setActiveRequest({ ...activeRequest, items: ni });
-                            }} 
-                            className={editableInputClass}
-                            readOnly={!isEditMode}
-                            placeholder="수량"
-                          />
-                        </td>
-                        <td className="border border-gray-300 p-0 h-10">
-                          <input 
-                            type="text" 
-                            value={it.receivedDate} 
-                            onChange={e => {
-                              const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, receivedDate: e.target.value } : i);
-                              setActiveRequest({ ...activeRequest, items: ni });
-                            }} 
-                            className={editableInputClass}
-                            readOnly={!isEditMode}
-                            placeholder="00/00"
-                          />
-                        </td>
-                        <td className="border border-gray-300 p-0 h-10">
-                          <input 
-                            type="text" 
-                            value={it.remarks} 
-                            onChange={e => {
-                              const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, remarks: e.target.value } : i);
-                              setActiveRequest({ ...activeRequest, items: ni });
-                            }} 
-                            className={isEditMode ? editableInputClass : inputClass}
-                            readOnly={!isEditMode}
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        {SECTIONS.map(sec => (
+          <div key={sec.key} className="animate-fade-in-down">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-2 h-6 bg-gray-800 rounded-full"></div>
+              <h3 className="text-lg font-black text-gray-800">{sec.label}</h3>
             </div>
-          );
-        })}
+            
+            <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto shadow-sm">
+              <table className="w-full min-w-[900px] border-collapse">
+                <thead>
+                  <tr>
+                    <th className={`${thClass} w-16`}>No</th>
+                    <th className={`${thClass} w-[150px]`}>품 명</th>
+                    <th className={`${thClass} w-[150px]`}>모델명</th>
+                    <th className={`${thClass} w-24`}>재고</th>
+                    <th className={`${thClass} w-24`}>수량</th>
+                    <th className={`${thClass} w-32`}>입고일</th>
+                    <th className={thClass}>비 고</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {activeRequest?.items.filter(i => i.category === sec.key).map((it, idx) => (
+                    <tr key={it.id} className="hover:bg-gray-50/50 transition-colors group divide-x divide-gray-100">
+                      <td className="border border-gray-300 text-center font-mono text-xs text-gray-400 bg-gray-50/30 relative h-10">
+                        <span className={isEditMode ? "group-hover:opacity-0" : ""}>{idx + 1}</span>
+                        {isEditMode && (
+                          <button 
+                            onClick={() => handleDeleteItem(it.id)}
+                            className="absolute inset-0 flex items-center justify-center text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="항목 삭제"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </td>
+                      <td className="border border-gray-300 p-0 h-10">
+                        <input 
+                          type="text" 
+                          value={it.itemName} 
+                          onChange={e => {
+                            const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, itemName: e.target.value } : i);
+                            setActiveRequest({ ...activeRequest, items: ni });
+                          }} 
+                          className={isEditMode ? editableInputClass : inputClass}
+                          readOnly={!isEditMode}
+                        />
+                      </td>
+                      <td className="border border-gray-300 p-0 h-10">
+                        <input 
+                          type="text" 
+                          value={it.spec || ''} 
+                          onChange={e => {
+                            const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, spec: e.target.value } : i);
+                            setActiveRequest({ ...activeRequest, items: ni });
+                          }} 
+                          className={isEditMode ? editableInputClass : inputClass}
+                          readOnly={!isEditMode}
+                          placeholder="모델명"
+                        />
+                      </td>
+                      <td className="border border-gray-300 p-0 h-10 bg-gray-50/30">
+                        <input 
+                          type="text" 
+                          value={it.stock} 
+                          onChange={e => {
+                            const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, stock: e.target.value } : i);
+                            setActiveRequest({ ...activeRequest, items: ni });
+                          }} 
+                          className={`${inputClass} font-bold text-gray-500`}
+                          readOnly={!isEditMode}
+                        />
+                      </td>
+                      <td className="border border-gray-300 p-0 h-10">
+                        <input 
+                          type="text" 
+                          value={it.qty} 
+                          onChange={e => {
+                            const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, qty: e.target.value } : i);
+                            setActiveRequest({ ...activeRequest, items: ni });
+                          }} 
+                          className={editableInputClass}
+                          readOnly={!isEditMode}
+                          placeholder="수량"
+                        />
+                      </td>
+                      <td className="border border-gray-300 p-0 h-10">
+                        <input 
+                          type="text" 
+                          value={it.receivedDate} 
+                          onChange={e => {
+                            const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, receivedDate: e.target.value } : i);
+                            setActiveRequest({ ...activeRequest, items: ni });
+                          }} 
+                          className={editableInputClass}
+                          readOnly={!isEditMode}
+                          placeholder="00/00"
+                        />
+                      </td>
+                      <td className="border border-gray-300 p-0 h-10">
+                        <input 
+                          type="text" 
+                          value={it.remarks} 
+                          onChange={e => {
+                            const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, remarks: e.target.value } : i);
+                            setActiveRequest({ ...activeRequest, items: ni });
+                          }} 
+                          className={isEditMode ? editableInputClass : inputClass}
+                          readOnly={!isEditMode}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
       </div>
 
       <style>{`

@@ -1,13 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import ParkingStatusList from './ParkingStatusList';
 import ParkingInspectionHistory from './ParkingInspectionHistory';
 import { fetchParkingStatusList, fetchParkingLayout, saveParkingLayout } from '../services/dataService';
 import { ParkingStatusItem } from '../types';
-import { LayoutList, Printer, Map as MapIcon, RefreshCw, Save, Cloud, X, CheckCircle, Edit2, Lock, Car } from 'lucide-react';
+import { LayoutList, Printer, Map as MapIcon, RefreshCw, Save, Cloud, X, CheckCircle, Edit2, Lock } from 'lucide-react';
 
 const TABS = [
-  { id: 'history', label: '지정주차변경이력' },
+  { id: 'history', label: '주차점검이력' },
   { id: 'status', label: '지정주차차량현황' },
   { id: 'location', label: '지정주차차량위치' },
 ];
@@ -100,15 +99,15 @@ const ParkingManager: React.FC = () => {
       if (success) {
         setSaveStatus('success');
         setIsEditMode(false);
-        window.alert('저장이 완료되었습니다.');
+        alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
-        window.alert('저장에 실패했습니다.');
+        alert('저장에 실패했습니다.');
       }
     } catch (e) {
       setSaveStatus('error');
-      window.alert('오류가 발생했습니다.');
+      alert('오류가 발생했습니다.');
     }
   };
 
@@ -132,13 +131,13 @@ const ParkingManager: React.FC = () => {
           <script src="https://cdn.tailwindcss.com"></script>
           <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
           <style>
-            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; background: black !important; margin: 0; }
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; background: #f1f5f9; margin: 0; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             input { border: none !important; background: transparent !important; }
             @media print { 
               @page { size: landscape; margin: 0; }
               .no-print { display: none !important; }
-              body { background: black !important; padding: 0; }
+              body { background: white !important; padding: 0; }
             }
             .preview-page {
               background: white;
@@ -149,7 +148,7 @@ const ParkingManager: React.FC = () => {
               border: 1px solid #eee;
               box-sizing: border-box;
             }
-            @media print { .preview-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; padding: 10mm 15mm; } }
+            @media print { .preview-page { box-shadow: none !important; margin: 0; border: none; width: 100%; } }
           </style>
         </head>
         <body>
@@ -175,10 +174,7 @@ const ParkingManager: React.FC = () => {
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
       <div className="mb-6">
-        <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-          <Car className="text-blue-600" size={32} />
-          주차 점검 및 관리
-        </h2>
+        <h2 className="text-3xl font-black text-slate-800 tracking-tight">주차 점검 및 관리</h2>
         <p className="text-slate-500 mt-2 text-base font-medium">지정주차 차량 현황 관리 및 배치도 조회를 수행합니다.</p>
       </div>
 
@@ -206,58 +202,54 @@ const ParkingManager: React.FC = () => {
         {activeTab === 'status' && <ParkingStatusList />}
         {activeTab === 'location' && (
           <div className="p-8 flex flex-col items-center">
-            {/* 배치 조정: 층 버튼 좌측, 액션 버튼 우측 */}
             <div className="flex flex-col md:flex-row justify-between items-center w-full max-w-6xl mb-10 gap-6">
-              <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
-                <button 
-                  onClick={() => setCurrentFloor('B2F')} 
-                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B2F' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                >
-                  B2F
-                </button>
-                <button 
-                  onClick={() => setCurrentFloor('B3F_Yeongdong')} 
-                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yeongdong' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                >
-                  B3F (영동변)
-                </button>
-                <button 
-                  onClick={() => setCurrentFloor('B3F_Yusuji')} 
-                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yusuji' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                >
-                  B3F (유수지)
-                </button>
+              <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="flex items-center gap-3">
+                  <MapIcon className="text-blue-600" size={28} />
+                  <h3 className="text-2xl font-black text-slate-800">지정주차 차량 배치도</h3>
+                </div>
+                <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
+                  <button 
+                    onClick={() => setCurrentFloor('B2F')} 
+                    className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B2F' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    B2F
+                  </button>
+                  <button 
+                    onClick={() => setCurrentFloor('B3F_Yeongdong')} 
+                    className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yeongdong' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    B3F (영동변)
+                  </button>
+                  <button 
+                    onClick={() => setCurrentFloor('B3F_Yusuji')} 
+                    className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yusuji' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    B3F (유수지)
+                  </button>
+                </div>
               </div>
-              
               <div className="flex items-center gap-2">
                 <button 
                   onClick={loadAllData} 
                   disabled={loading}
-                  className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
+                  className="flex items-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
                 >
                   <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
                   새로고침
                 </button>
                 <button 
-                  onClick={() => {
-                    if (isEditMode) {
-                      if (window.confirm('배치 수정 내용을 서버에 저장하시겠습니까?')) {
-                        handleSaveLayout();
-                      }
-                    } else {
-                      setIsEditMode(true);
-                    }
-                  }} 
-                  className={`flex items-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
+                  onClick={() => setIsEditMode(!isEditMode)} 
+                  className={`flex items-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
                 >
                   {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
-                  {isEditMode ? '수정완료' : '수정'}
+                  {isEditMode ? '수정취소' : '수정'}
                 </button>
                 <button onClick={handleSaveLayout} disabled={loading} className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 font-bold shadow-lg transition-all active:scale-95 text-sm">
                   <Save size={20} className="mr-2" />
                   서버저장
                 </button>
-                <button onClick={handlePrintMap} className="flex items-center px-6 py-3 bg-amber-600 text-white rounded-2xl hover:bg-amber-700 font-bold shadow-lg transition-all active:scale-95 text-sm">
+                <button onClick={handlePrintMap} className="flex items-center px-6 py-3 bg-slate-700 text-white rounded-2xl hover:bg-slate-800 font-bold shadow-lg transition-all active:scale-95 text-sm">
                   <Printer size={20} className="mr-2" />
                   미리보기
                 </button>

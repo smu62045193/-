@@ -25,6 +25,7 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
     }
     loadKeywords();
 
+    // 팝업 창으로부터 저장 완료 메시지를 받았을 때 데이터 새로고침
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'FIRE_KEYWORDS_SAVED') {
         loadKeywords();
@@ -34,6 +35,7 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
     return () => window.removeEventListener('message', handleMessage);
   }, [isKeywordPopupMode]);
 
+  // 검색어나 데이터가 변경되면 페이지를 1로 리셋
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, items.length]);
@@ -54,7 +56,7 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
 
   const openIndependentWindow = () => {
     const width = 500;
-    const height = 650;
+    const height = 600;
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
@@ -176,6 +178,7 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
     );
   }, [items, searchTerm]);
 
+  // 페이지네이션 로직
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const paginatedItems = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -192,11 +195,12 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
     return pages;
   }, [currentPage, totalPages]);
 
+  // 팝업 모드일 때 렌더링할 UI
   if (isKeywordPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col h-[600px]">
-          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white shrink-0">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100 animate-fade-in flex flex-col">
+          <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-900 text-white">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-600 rounded-xl">
                 <Link size={20} />
@@ -211,15 +215,15 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
             </button>
           </div>
           
-          <div className="p-6 space-y-6 flex-1 flex flex-col overflow-hidden">
-            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 shrink-0">
+          <div className="p-6 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
+            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
               <p className="text-xs text-blue-800 leading-relaxed font-bold">
                 업무일지에 입력되는 업체명을 등록하세요.<br/>
                 <span className="text-blue-600 underline">공백, 괄호 등은 자동으로 무시하고 연동됩니다.</span>
               </p>
             </div>
             
-            <div className="space-y-2 shrink-0">
+            <div className="space-y-2">
               <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">New Contractor Name</label>
               <div className="flex gap-2">
                 <input 
@@ -239,9 +243,9 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
               </div>
             </div>
 
-            <div className="space-y-2 flex-1 flex flex-col min-h-0">
+            <div className="space-y-2">
               <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Registered List</label>
-              <div className="flex-1 border-2 border-dashed border-slate-200 rounded-2xl p-4 bg-slate-50/50 overflow-y-auto scrollbar-hide">
+              <div className="min-h-[200px] border-2 border-dashed border-slate-200 rounded-2xl p-4 bg-slate-50/50">
                 {keywords.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-slate-300">
                     <AlertCircle size={32} className="mb-2 opacity-20" />
@@ -263,8 +267,8 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
             </div>
           </div>
 
-          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
-            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 active:scale-95">취소</button>
+          <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-3">
+            <button onClick={() => window.close()} className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-100 transition-all active:scale-95">취소</button>
             <button 
               onClick={handleSaveKeywords} 
               disabled={saveStatus !== 'idle'}
@@ -288,74 +292,67 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
     );
   }
 
+  // 메인 리스트 뷰 렌더링
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in">
-      <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-200 gap-4">
+    <div className="p-6 max-w-7xl mx-auto space-y-4 animate-fade-in">
+      <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-200 gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative w-full md:w-[320px]">
+          <div className="relative flex-1 md:w-72">
             <input 
               type="text" 
               placeholder="업체, 내용, 날짜 검색" 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm font-bold"
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner font-bold"
             />
             <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+        <div className="flex items-center gap-2 w-full md:w-auto">
           <button 
-            onClick={loadData}
+            onClick={handleRefresh}
             disabled={loading}
-            className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+            className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
             새로고침
           </button>
           <button 
-            onClick={handleRefresh}
-            disabled={loading}
-            className="flex items-center justify-center px-4 py-2.5 bg-white text-indigo-600 border border-indigo-200 rounded-xl font-bold shadow-sm hover:bg-indigo-50 transition-all active:scale-95 text-sm"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            데이터연동하기
-          </button>
-          <button 
             onClick={openIndependentWindow}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg text-sm transition-all active:scale-95"
+            className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm active:scale-95"
           >
-            <Link size={18} />
+            <Link size={18} className="mr-2" />
             자동연동업체등록
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[1000px] border-collapse border border-gray-300">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px] border-collapse">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16 border border-gray-200">No</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-200">날짜</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-48 border border-gray-200">업체</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider border border-gray-200">내용</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-200">비고</th>
+                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
+                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">날짜</th>
+                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-48">업체</th>
+                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">내용</th>
+                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-32">비고</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {loading && items.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-20 text-center border border-gray-200 text-gray-400">로딩 중...</td></tr>
+                <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">로딩 중...</td></tr>
               ) : filteredItems.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-20 text-center border border-gray-200 text-gray-400 italic">데이터가 없습니다. [데이터연동하기]를 눌러 연동하세요.</td></tr>
+                <tr><td colSpan={5} className="px-4 py-20 text-center text-gray-400 italic text-sm">데이터가 없습니다. [새로고침]을 눌러 연동하세요.</td></tr>
               ) : (
                 paginatedItems.map((item, index) => (
                   <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs border border-gray-200">{filteredItems.length - ((currentPage-1)*ITEMS_PER_PAGE + index)}</td>
-                    <td className="px-4 py-4 text-center text-sm text-gray-700 font-bold whitespace-nowrap border border-gray-200">{item.date}</td>
-                    <td className="px-4 py-4 text-sm text-gray-900 font-black border border-gray-200 text-center">{item.company}</td>
-                    <td className="px-4 py-4 text-sm text-gray-700 border border-gray-200 text-center">{item.content}</td>
-                    <td className="px-4 py-4 text-center border border-gray-200">
+                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{filteredItems.length - ((currentPage-1)*ITEMS_PER_PAGE + index)}</td>
+                    <td className="px-4 py-4 text-center text-sm text-gray-700 font-bold whitespace-nowrap">{item.date}</td>
+                    <td className="px-4 py-4 text-sm text-gray-900 font-black">{item.company}</td>
+                    <td className="px-4 py-4 text-sm text-gray-700">{item.content}</td>
+                    <td className="px-4 py-4 text-center">
                       <span className="text-[11px] font-bold text-gray-400">{item.note || '-'}</span>
                     </td>
                   </tr>
@@ -364,41 +361,42 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
             </tbody>
           </table>
         </div>
-      </div>
 
-      {totalPages > 1 && (
-        <div className="py-4 flex items-center justify-center gap-2 print:hidden">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div className="flex items-center gap-1.5 px-4">
-            {visiblePageNumbers.map(pageNum => (
-              <button
-                key={pageNum}
-                onClick={() => setCurrentPage(pageNum)}
-                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                  currentPage === pageNum
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                }`}
-              >
-                {pageNum}
-              </button>
-            ))}
+        {/* Pagination UI */}
+        {totalPages > 1 && (
+          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div className="flex items-center gap-1.5 px-4">
+              {visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                    currentPage === pageNum
+                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
+                      : 'bg-white text-gray-400 border border-gray-100 hover:border-blue-200 hover:text-blue-500'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

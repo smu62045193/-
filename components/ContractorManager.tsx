@@ -263,8 +263,8 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
         <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-slate-200 overflow-hidden flex flex-col animate-fade-in">
           <div className="p-5 bg-slate-900 text-white flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
-                {editId ? <Edit2 size={20} className="text-white" /> : <UserPlus size={20} className="text-white" />}
+              <div className={`p-2 rounded-xl ${editId ? 'bg-orange-50' : 'bg-blue-600'}`}>
+                {editId ? <Edit2 size={20} className={editId ? 'text-orange-600' : 'text-white'} /> : <UserPlus size={20} />}
               </div>
               <span className="font-black text-lg">{editId ? '협력업체 정보 수정' : '신규 협력업체 등록'}</span>
             </div>
@@ -329,7 +329,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
             <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
-            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
