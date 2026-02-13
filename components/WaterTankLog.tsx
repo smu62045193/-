@@ -146,7 +146,7 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.1; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.1; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
             .print-page { width: 210mm; min-height: 297mm; padding: 20mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
@@ -209,23 +209,18 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
       <button 
         onClick={loadData} 
         disabled={loading} 
-        className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+        className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold h-10 hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"
       >
         <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
         새로고침
       </button>
 
       <button 
-        onClick={() => {
-          if (isEditMode) {
-            alert('저장이 완료되었습니다.');
-          }
-          setIsEditMode(!isEditMode);
-        }} 
-        className={`flex items-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
+        onClick={() => setIsEditMode(!isEditMode)} 
+        className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
       >
         {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
-        {isEditMode ? '수정완료' : '수정'}
+        {isEditMode ? '수정 취소' : '수정'}
       </button>
 
       <button 
@@ -241,7 +236,7 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
 
       <button 
         onClick={handlePrint} 
-        className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+        className="flex items-center px-5 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-800 font-bold shadow-md transition-all active:scale-95 text-sm"
       >
         <Printer size={18} className="mr-2" />
         미리보기
@@ -354,16 +349,6 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
           />
         </div>
       </div>
-
-      <style>{`
-        @keyframes scale-up {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-          animation: scale-up 0.2s ease-out forwards;
-        }
-      `}</style>
     </LogSheetLayout>
   );
 };

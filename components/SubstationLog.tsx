@@ -1,5 +1,5 @@
 
-import { format, startOfMonth, subDays, parseISO } from 'date-fns';
+import { format, startOfMonth, subDays } from 'date-fns';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetchRange, fetchDailyData, fetchSubstationLog, getInitialSubstationLog, saveDailyData, saveSubstationLog, getInitialDailyData } from '../services/dataService';
 import { AcbReadings, PowerUsageReadings, SubstationLogData, VcbReadings, DailyData } from '../types';
@@ -130,7 +130,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       const fetched = await fetchSubstationLog(dateKey, force);
       let finalData: SubstationLogData = fetched || getInitialSubstationLog(dateKey);
 
-      // 전일지침 연동 로직 강화
       const isPrevEmpty = !finalData.powerUsage.prev?.activeMid || finalData.powerUsage.prev.activeMid === '0' || finalData.powerUsage.prev.activeMid === '';
       
       if (isPrevEmpty) {
@@ -142,12 +141,11 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             const latestLog = recentLogs[0].data;
             
             if (latestLog?.powerUsage?.curr && latestLog.powerUsage.curr.activeMid !== '') {
-              finalData.powerUsage.prev = JSON.parse(JSON.stringify(latestLog.powerUsage.curr));
+              finalData.powerUsage.prev = { ...latestLog.powerUsage.curr };
             }
           }
       }
 
-      // 현재 입력된 지침이 있다면 사용량 자동 계산
       if (finalData.powerUsage.prev?.activeMid !== '' && finalData.powerUsage.curr?.activeMid !== '') {
          const fields: (keyof PowerUsageReadings)[] = ['activeMid', 'activeMax', 'activeLight', 'reactiveMid', 'reactiveMax'];
          fields.forEach(field => {
@@ -542,7 +540,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
                 </thead>
                 <tbody>
                   {['prev', 'curr', 'usage'].map((row) => {
-                    const isReadOnlyRow = row === 'usage';
+                    const isReadOnlyRow = row === 'usage' || row === 'prev';
                     return (
                       <tr key={row}>
                         <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{row === 'prev' ? '전일지침' : row === 'curr' ? '금일지침' : '사용량'}</td>
