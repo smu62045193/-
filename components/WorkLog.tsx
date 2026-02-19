@@ -295,7 +295,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         nextHvac.gas.usage = Math.round(u).toString();
         nextHvac.gas.monthTotal = Math.round(sums.hvac + u).toString();
       } else {
-        // 오늘 지침이 없으면 사용량은 비우고 누계는 이전까지의 합계만 표시
         nextHvac.gas.usage = '';
         nextHvac.gas.monthTotal = Math.round(sums.hvac).toString();
       }
@@ -334,7 +333,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         { type: 'get', key: `SEPTIC_LOG_${dateKey}` },
         { type: 'range', prefix: "DAILY_", start: searchStart, end: yesterdayStr },
         { type: 'get', key: `HVAC_BOILER_${dateKey}` },
-        // 1일부터 어제까지의 기계 기록 조회하여 누계 베이스 구축
         { type: 'range', prefix: "HVAC_LOG_", start: monthStartStr, end: yesterdayStr },
         { type: 'range', prefix: "BOILER_LOG_", start: monthStartStr, end: yesterdayStr }
       ]);
@@ -349,14 +347,20 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const hvacHistory = batchResults[5]?.data || [];
       const boilerHistory = batchResults[6]?.data || [];
 
+      // [추가] 어제 리포트 직접 조회 (종균제/소독제 전일재고용)
+      const { data: yDailyRaw } = await supabase
+        .from('daily_reports')
+        .select('work_log')
+        .eq('id', yesterdayStr)
+        .maybeSingle();
+      const yesterdayDirectReport = yDailyRaw?.work_log as WorkLogData;
+
       setGasLog(gasData || getInitialGasLog(dateKey));
       setSepticLog(septicData || getInitialSepticLog(dateKey));
 
-      // 이번 달 누계 기초값 계산 (1일~어제) 및 전일 지침 연동
       let hSum = 0; let bSum = 0;
       let hLatestRecord = null; let bLatestRecord = null;
 
-      // 냉온수기 과거 기록 처리
       if (hvacHistory.length > 0) {
         const filtered = hvacHistory.filter((row: any) => row.key.replace('HVAC_LOG_', '') < dateKey);
         filtered.forEach((row: any) => {
@@ -367,7 +371,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         if (sorted.length > 0) hLatestRecord = sorted[0].data;
       }
 
-      // 보일러 과거 기록 처리
       if (boilerHistory.length > 0) {
         const filtered = boilerHistory.filter((row: any) => row.key.replace('BOILER_LOG_', '') < dateKey);
         filtered.forEach((row: any) => {
@@ -383,7 +386,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       let initialH = hvacBoilerCombined?.hvac_data || getInitialHvacLog(dateKey);
       let initialB = hvacBoilerCombined?.boiler_data || getInitialBoilerLog(dateKey);
 
-      // 전일 지침 자동 연동 (어제 기록의 금일 지침을 오늘 전일 지침으로)
       if (hLatestRecord && (!initialH.gas?.prev || initialH.gas.prev === '0' || initialH.gas.prev === '')) {
         const lastCurr = hLatestRecord.gas?.curr || hLatestRecord.hvac_data?.gas?.curr;
         if (lastCurr) initialH.gas.prev = lastCurr;
@@ -404,27 +406,28 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       }
       
       const rawWorkLog = serverDataResult?.workLog || INITIAL_WORKLOG;
-      const yesterdayFullLog = lastWorkdayLog?.workLog;
       const currentScheduled = Array.isArray(rawWorkLog?.scheduled) ? rawWorkLog.scheduled : [];
       
       let finalWorkLog: WorkLogData = deepMerge(INITIAL_WORKLOG, { ...rawWorkLog, scheduled: currentScheduled });
 
-      // 기계 탭 약품 재고 연동
-      if (yesterdayFullLog && yesterdayFullLog.mechanicalChemicals) {
+      // [수정] 기계 탭 약품 재고 연동 - 직접 호출한 yesterdayDirectReport 활용
+      if (yesterdayDirectReport && yesterdayDirectReport.mechanicalChemicals) {
         if (!finalWorkLog.mechanicalChemicals) {
           finalWorkLog.mechanicalChemicals = JSON.parse(JSON.stringify(INITIAL_CHEMICALS));
         }
         const chemKeys = ['seed', 'sterilizer'] as const;
         chemKeys.forEach(key => {
           const currentChem = finalWorkLog.mechanicalChemicals![key];
-          const yesterdayChem = yesterdayFullLog.mechanicalChemicals![key];
+          const yesterdayChem = yesterdayDirectReport.mechanicalChemicals![key];
           const yesterdayStock = yesterdayChem.stock || (yesterdayChem as any).currentStock || '0';
+          // 오늘의 전일재고가 비어있다면 어제의 최종재고를 할당
           if (yesterdayStock && (!currentChem.prev || currentChem.prev === '' || currentChem.prev === '0')) {
             currentChem.prev = String(yesterdayStock);
           }
         });
       }
 
+      // 합산 재계산 (비어있는 입력은 safeParseFloat에 의해 0으로 처리됨)
       if (finalWorkLog.mechanicalChemicals) {
         ['seed', 'sterilizer'].forEach((key) => {
           const chem = finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer'];
@@ -459,8 +462,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
           cat.tomorrow = autoTasksTomorrow.map(t => ({ ...t, status: undefined }));
         }
-        if (yesterdayFullLog && (yesterdayFullLog as any)[key]?.tomorrow) {
-          const prevTomorrow = (yesterdayFullLog as any)[key].tomorrow as TaskItem[];
+        if (lastWorkdayLog?.workLog && (lastWorkdayLog.workLog as any)[key]?.tomorrow) {
+          const prevTomorrow = (lastWorkdayLog.workLog as any)[key].tomorrow as TaskItem[];
           prevTomorrow.forEach(item => {
             if (item?.content?.trim()) {
               const normalizedPrev = normalizeContent(item.content);
@@ -614,26 +617,19 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             <table><thead><tr><th style="width:50%;">작 &nbsp; 업 &nbsp; 사 &nbsp; 항</th><th>예 &nbsp; 정 &nbsp; 사 &nbsp; 항</th></tr></thead>
               <tbody><tr style="height:209px;"><td class="text-left" style="vertical-align:top; padding:0px !important;">${generateFixedRowsHtml('mechanical', 'today', 11, 19)}</td><td class="text-left" style="vertical-align:top; padding:0px !important;">${generateFixedRowsHtml('mechanical', 'tomorrow', 11, 19)}</td></tr></tbody>
             </table>
-            <div class="section-header">2. 가스 사용 현황</div>
-            <table><thead><tr><th style="width:20%;">구분</th><th style="width:20%;">전일(m³)</th><th style="width:20%;">금일(m³)</th><th style="width:20%;">사용(m³)</th><th style="width:20%;">누계(m³)</th></tr></thead>
-              <tbody>
-                <tr style="height:19px;"><td style="background:#f9f9f9; font-weight:bold;">냉온수기</td><td>${hvacGasReadings.gas?.prev}</td><td>${hvacGasReadings.gas?.curr}</td><td>${hvacGasReadings.gas?.usage}</td><td>${hvacGasReadings.gas?.monthTotal}</td></tr>
-                <tr style="height:19px;"><td style="background:#f9f9f9; font-weight:bold;">보일러</td><td>${boilerGasReadings.gas?.prev}</td><td>${boilerGasReadings.gas?.curr}</td><td>${boilerGasReadings.gas?.usage}</td><td>${boilerGasReadings.gas?.monthTotal}</td></tr>
-              </tbody>
-            </table>
             <div style="display: flex; gap: 8mm; align-items: flex-start; margin-top: 8px;">
               <div style="flex: 1;">
-                <div class="section-header" style="margin-top:0;">3. 가스일일점검</div>
+                <div class="section-header" style="margin-top:0;">2. 가스일일점검</div>
                 <table><thead><tr><th style="width:60px;">구분</th><th>점검내용</th><th style="width:60px;">결과</th></tr></thead>
                   <tbody>${safeGas.items.map((item, idx, arr) => { const firstInCat = arr.findIndex(i => i.category === item.category) === idx; const catCount = arr.filter(i => i.category === item.category).length; return `<tr>${firstInCat ? `<td rowspan="${catCount}" style="background:#f9f9f9; font-weight:bold;">${item.category.replace(' ', '<br/>')}</td>` : ''}<td class="text-left" style="font-size:8pt;">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || ''}</td></tr>`; }).join('')}</tbody>
                 </table>
               </div>
               <div style="flex: 1;">
-                <div class="section-header" style="margin-top:0;">4. 정화조일일점검</div>
+                <div class="section-header" style="margin-top:0;">3. 정화조일일점검</div>
                 <table><thead><tr><th>점검내용</th><th style="width:60px;">결과</th></tr></thead>
                   <tbody>${safeSeptic.items.map(item => `<tr><td class="text-left" style="font-size:8pt;">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || ''}</td></tr>`).join('')}</tbody>
                 </table>
-                <div class="section-header">5. 종균제 / 소독제</div>
+                <div class="section-header">4. 종균제 / 소독제</div>
                 <table><thead><tr style="background:#f8f9fa;"><th>구 분</th><th>전일</th><th>입고</th><th>투입</th><th>재고</th></tr></thead>
                   <tbody>
                     <tr style="height:19px;"><td style="background:#f9f9f9; font-weight:bold;">종균제(l)</td><td>${chemicals.seed.prev}</td><td>${chemicals.seed.incoming}</td><td>${chemicals.seed.used}</td><td style="font-weight:bold; color:blue;">${chemicals.seed.stock}</td></tr>
@@ -819,37 +815,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             onPrint={() => handlePrintCategory('mechanical')}
             onRefresh={() => loadData(() => false, true)}
           />
-
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-            <div className="bg-gray-50/50 px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-              <Zap className="text-orange-600" size={20} />
-              <h4 className="font-bold text-gray-800">냉·온수기 및 보일러 가스 사용 현황</h4>
-            </div>
-            <div className="p-4 overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-200 text-center text-xs table-fixed">
-                <thead className="bg-gray-50">
-                  <tr><th className="border border-gray-200 p-2 w-20">구분</th><th className="border border-gray-200 p-2">전일(m³)</th><th className="border border-gray-200 p-2">금일(m³)</th><th className="border border-gray-200 p-2 text-blue-600 font-bold">사용(m³)</th><th className="border border-gray-200 p-2 text-blue-700 font-bold">누계(m³)</th></tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="border border-gray-200 p-2 font-bold bg-gray-50/30">냉·온수기</td>
-                    <td className="border border-gray-200 p-0"><input type="text" value={hvacGasReadings.gas?.prev || ''} onChange={e => handleGasReadingUpdate('hvac', 'prev', e.target.value)} className="w-full h-full text-center outline-none bg-orange-50/20 py-2 font-bold focus:bg-orange-100/50" /></td>
-                    <td className="border border-gray-200 p-0"><input type="text" value={hvacGasReadings.gas?.curr || ''} onChange={e => handleGasReadingUpdate('hvac', 'curr', e.target.value)} className="w-full h-full text-center outline-none bg-white py-2 font-black text-blue-700 focus:bg-blue-50/30" /></td>
-                    <td className="border border-gray-200 p-2 font-bold bg-slate-50/50">{hvacGasReadings.gas?.usage || ''}</td>
-                    <td className="border border-gray-200 p-2 font-black text-blue-800 bg-blue-50/30">{hvacGasReadings.gas?.monthTotal || '0'}</td>
-                  </tr>
-                  <tr>
-                    <td className="border border-gray-200 p-2 font-bold bg-gray-50/30">보일러</td>
-                    <td className="border border-gray-200 p-0"><input type="text" value={boilerGasReadings.gas?.prev || ''} onChange={e => handleGasReadingUpdate('boiler', 'prev', e.target.value)} className="w-full h-full text-center outline-none bg-orange-50/20 py-2 font-bold focus:bg-orange-100/50" /></td>
-                    <td className="border border-gray-200 p-0"><input type="text" value={boilerGasReadings.gas?.curr || ''} onChange={e => handleGasReadingUpdate('boiler', 'curr', e.target.value)} className="w-full h-full text-center outline-none bg-white py-2 font-black text-blue-700 focus:bg-blue-50/30" /></td>
-                    <td className="border border-gray-200 p-2 font-bold bg-slate-50/50">{boilerGasReadings.gas?.usage || ''}</td>
-                    <td className="border border-gray-200 p-2 font-black text-blue-800 bg-blue-50/30">{boilerGasReadings.gas?.monthTotal || '0'}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p className="text-[10px] text-gray-400 mt-2 italic">* 금일 지침을 입력하면 사용량과 금월 누계가 자동 계산됩니다. (과거 기록 자동 연동)</p>
-            </div>
-          </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
