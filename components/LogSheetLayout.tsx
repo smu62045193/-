@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { Save, Printer, Trash2, RefreshCw, CheckCircle, X, Cloud, Info } from 'lucide-react';
+import React from 'react';
+import { Save, Printer, Trash2, RefreshCw, CheckCircle, Info } from 'lucide-react';
 
 interface LogSheetLayoutProps {
   title: React.ReactNode;
@@ -39,16 +39,9 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
   hideRefresh = false,
   children 
 }) => {
-  const [showConfirm, setShowConfirm] = useState(false);
-
   const containerClass = isEmbedded 
     ? "p-4 sm:p-6 space-y-6 w-full bg-white" 
     : "p-4 sm:p-8 max-w-[1200px] mx-auto space-y-8 bg-white rounded-2xl border border-slate-200 shadow-sm print:shadow-none print:border-none print:p-0";
-
-  const handleConfirmSave = () => {
-    setShowConfirm(false);
-    if (onSave) onSave();
-  };
 
   return (
     <div className={containerClass}>
@@ -65,12 +58,12 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
               </span>}
             </div>
             
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <div className="flex flex-row flex-wrap gap-2 w-full sm:w-auto">
               {onRefresh && !hideRefresh && (
                 <button 
                   onClick={onRefresh} 
                   disabled={loading} 
-                  className="flex-1 sm:flex-none items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-gray-200 rounded-xl hover:bg-emerald-50 font-bold shadow-sm transition-all flex text-sm disabled:opacity-50 active:scale-95"
+                  className="flex-1 sm:flex-none flex flex-row items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-gray-200 rounded-xl hover:bg-emerald-50 border-emerald-100 font-bold shadow-sm transition-all text-sm disabled:opacity-50 active:scale-95 whitespace-nowrap"
                 >
                   <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
                   새로고침
@@ -81,10 +74,10 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
 
               {onSave && !hideSave && (
                 <button 
-                  onClick={() => setShowConfirm(true)} 
+                  onClick={onSave} 
                   disabled={loading || saveStatus === 'loading'} 
-                  className={`flex-1 sm:flex-none items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md shadow-blue-100 transition-all flex text-sm ${
-                    saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
+                  className={`flex-1 sm:flex-none flex flex-row items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md shadow-blue-100 transition-all text-sm whitespace-nowrap ${
+                    saveStatus === 'success' ? 'bg-green-600 text-white shadow-green-100' : 'bg-blue-600 text-white hover:bg-blue-700'
                   } disabled:bg-blue-400 active:scale-95`}
                 >
                   {saveStatus === 'loading' ? (
@@ -101,7 +94,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
               {!hidePrint && onPrint && (
                 <button 
                   onClick={onPrint} 
-                  className="flex-1 sm:flex-none items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all flex text-sm active:scale-95"
+                  className="flex-1 sm:flex-none flex flex-row items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95 whitespace-nowrap"
                 >
                   <Printer size={18} className="mr-2" />
                   미리보기
@@ -109,7 +102,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
               )}
 
               {onReset && !hideReset && (
-                <button onClick={onReset} className="flex-1 sm:flex-none items-center justify-center px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 font-bold shadow-sm transition-all flex text-sm active:scale-95">
+                <button onClick={onReset} className="flex-1 sm:flex-none flex flex-row items-center justify-center px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 font-bold shadow-sm transition-all text-sm active:scale-95 whitespace-nowrap">
                   <Trash2 size={18} className="mr-2" />
                   초기화
                 </button>
@@ -120,42 +113,6 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
 
         <div className="print:w-full">{children}</div>
       </div>
-
-      {showConfirm && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:hidden">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-up border border-slate-100">
-            <div className="p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 border-4 border-blue-100">
-                <Cloud className="text-blue-600" size={36} />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 mb-2">서버저장 확인</h3>
-              <p className="text-slate-500 mb-8 leading-relaxed font-medium">
-                작성하신 내용을 서버에 안전하게 기록하시겠습니까?
-              </p>
-              <div className="flex gap-3">
-                <button onClick={() => setShowConfirm(false)} className="flex-1 px-6 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold transition-colors flex items-center justify-center active:scale-95">
-                  <X size={20} className="mr-2" />
-                  취소
-                </button>
-                <button onClick={handleConfirmSave} className="flex-1 px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-blue-200 flex items-center justify-center active:scale-95">
-                  <CheckCircle size={20} className="mr-2" />
-                  확인
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes scale-up {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-          animation: scale-up 0.2s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 };

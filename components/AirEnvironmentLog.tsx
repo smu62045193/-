@@ -159,7 +159,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       const success = await saveAirEnvironmentLog(data);
       if (success) {
         setSaveStatus('success');
-        alert('저장이 완료되었습니다.');
+        // alert() 제거 (LogSheetLayout에서 모달로 처리)
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -282,7 +282,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             </table>
             <div class="section-title">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</div>
             <table class="main-table">
-              <thead><tr><th style="width:13%">배 출 구</th><th style="width:37%">배 출 시 설</th><th style="width:35%">가 동 시 간</th><th style="width:15%">비 고</th></tr></thead>
+              <thead><tr><th style="width:13%">배 출 구</th><th style="width:37%">배 출 시 설</th><th style="width:35%">가 동 시 한</th><th style="width:15%">비 고</th></tr></thead>
               <tbody>
                 ${data.emissions.map(item => `
                   <tr>
@@ -342,6 +342,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
         hideRefresh={true}
         hideSave={false}
         extraActions={refreshButton}
+        saveStatus={saveStatus}
       >
         <div id="air-env-log-content" className="bg-white p-4 text-black min-w-[850px] max-w-5xl mx-auto shadow-sm border border-gray-100 rounded-lg">
           

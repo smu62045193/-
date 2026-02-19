@@ -192,12 +192,11 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
     if (saveStatus === 'loading') return;
     setSaveStatus('loading');
     try {
-      // daily_reports 저장 로직 제거하고 hvac_boiler_logs에만 저장
       const success = await saveHvacBoilerCombined(data, boilerData);
       
       if (success) {
         setSaveStatus('success');
-        alert('데이터가 성공적으로 저장되었습니다.');
+        // alert() 제거 (LogSheetLayout에서 모달로 처리)
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -272,7 +271,7 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
               .no-print { display: none !important; }
               .print-wrap { margin: 0; padding: 10mm 10mm 20mm 10mm; box-shadow: none !important; }
               table { width: 100% !important; border-collapse: collapse !important; border: 1.2px solid black !important; table-layout: fixed !important; margin-bottom: 3px; }
-              th, td { border: 1.2px solid black !important; text-align: center !important; height: 26px !important; color: black !important; padding: 0px !important; line-height: 1.0 !important; }
+              th, td { border: 1px solid black !important; text-align: center !important; height: 26px !important; color: black !important; padding: 0px !important; line-height: 1.0 !important; }
               th { font-weight: bold !important; background-color: #f2f2f2 !important; font-size: 8.5pt !important; height: 25px !important; }
               td { font-size: 9.5pt !important; }
               input { border: none !important; width: 100% !important; text-align: center !important; font-size: 9.5pt !important; height: 100% !important; font-weight: bold !important; color: black !important; background: transparent !important; letter-spacing: -0.5px; }

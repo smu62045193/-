@@ -193,11 +193,10 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     if (saveStatus === 'loading') return;
     setSaveStatus('loading');
     try {
-      // daily_reports 저장 로직 제거하고 substation_logs에만 저장
       const success = await saveSubstationLog(data);
       if (success) {
         setSaveStatus('success');
-        alert('데이터가 성공적으로 저장되었습니다.');
+        // alert() 제거 (LogSheetLayout에서 모달로 처리)
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
