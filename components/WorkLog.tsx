@@ -24,7 +24,10 @@ import {
   apiFetchBatch,
   saveSubstationLog,
   saveHvacBoilerCombined,
-  supabase
+  supabase,
+  apiFetchRange,
+  getInitialHvacLog,
+  getInitialBoilerLog
 } from '../services/dataService';
 import { 
   DailyData, 
@@ -42,9 +45,11 @@ import {
   SepticLogData, 
   WeatherData,
   GasCheckItem,
-  SepticCheckItem
+  SepticCheckItem,
+  HvacLogData,
+  BoilerLogData
 } from '../types';
-import { format, addDays, subDays, parseISO } from 'date-fns';
+import { format, addDays, subDays, parseISO, startOfMonth } from 'date-fns';
 import { Plus, Trash2, LayoutList, RefreshCw, ArrowRightCircle, CheckCircle2, Save, Cloud, X, Printer, Car, Shield, Droplets, ClipboardCheck, Flame, Zap, Search, Calendar, History } from 'lucide-react';
 import SubstationLog from './SubstationLog';
 import HvacLog from './HvacLog';
@@ -259,24 +264,73 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
   const [gasLog, setGasLog] = useState<GasLogData>(getInitialGasLog(''));
   const [septicLog, setSepticLog] = useState<SepticLogData>(getInitialSepticLog(''));
+  
+  const [hvacGasReadings, setHvacGasReadings] = useState<HvacLogData>(getInitialHvacLog(''));
+  const [boilerGasReadings, setBoilerGasReadings] = useState<BoilerLogData>(getInitialBoilerLog(''));
+  const historySumsRef = useRef({ hvac: 0, boiler: 0 });
 
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   const tomorrowDateKey = format(addDays(currentDate, 1), 'yyyy-MM-dd');
   
   const isInitialLoad = useRef(true);
 
+  const safeParseFloat = (val: any): number => {
+    if (val === undefined || val === null || val === '') return 0;
+    const cleaned = val.toString().replace(/,/g, '').trim();
+    const parsed = parseFloat(cleaned);
+    return isNaN(parsed) ? 0 : parsed;
+  };
+
+  const calculateGasAnalysis = useCallback((hvac: HvacLogData, boiler: BoilerLogData, sums: {hvac: number, boiler: number}) => {
+    const nextHvac = JSON.parse(JSON.stringify(hvac)) as HvacLogData;
+    const nextBoiler = JSON.parse(JSON.stringify(boiler)) as BoilerLogData;
+
+    if (nextHvac.gas) {
+      const p = safeParseFloat(nextHvac.gas.prev);
+      const c = safeParseFloat(nextHvac.gas.curr);
+      
+      if (c > 0) {
+        const u = Math.max(0, c - p);
+        nextHvac.gas.usage = Math.round(u).toString();
+        nextHvac.gas.monthTotal = Math.round(sums.hvac + u).toString();
+      } else {
+        nextHvac.gas.usage = '';
+        nextHvac.gas.monthTotal = Math.round(sums.hvac).toString();
+      }
+    }
+
+    if (nextBoiler.gas) {
+      const p = safeParseFloat(nextBoiler.gas.prev);
+      const c = safeParseFloat(nextBoiler.gas.curr);
+      
+      if (c > 0) {
+        const u = Math.max(0, c - p);
+        nextBoiler.gas.usage = Math.round(u).toString();
+        nextBoiler.gas.monthTotal = Math.round(sums.boiler + u).toString();
+      } else {
+        nextBoiler.gas.usage = '';
+        nextBoiler.gas.monthTotal = Math.round(sums.boiler).toString();
+      }
+    }
+
+    return { nextHvac, nextBoiler };
+  }, []);
+
   const loadData = useCallback(async (isCancelled: () => boolean, force = false) => {
     setLoading(true);
     isInitialLoad.current = true;
     try {
-      const searchStart = format(subDays(currentDate, 14), 'yyyy-MM-dd');
+      const monthStartStr = format(startOfMonth(currentDate), 'yyyy-MM-dd');
       const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
 
       const batchResults = await apiFetchBatch([
         { type: 'get', key: `DAILY_${dateKey}` },
         { type: 'get', key: `GAS_LOG_${dateKey}` },
         { type: 'get', key: `SEPTIC_LOG_${dateKey}` },
-        { type: 'range', prefix: "DAILY_", start: searchStart, end: yesterdayStr }
+        { type: 'get', key: `DAILY_${yesterdayStr}` }, // 전일 데이터 직접 호출
+        { type: 'get', key: `HVAC_BOILER_${dateKey}` },
+        { type: 'range', prefix: "HVAC_LOG_", start: monthStartStr, end: yesterdayStr },
+        { type: 'range', prefix: "BOILER_LOG_", start: monthStartStr, end: yesterdayStr }
       ]);
 
       if (isCancelled()) return;
@@ -284,49 +338,88 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const serverDataResult = batchResults[0]?.data as DailyData;
       const gasData = batchResults[1]?.data as GasLogData;
       const septicData = batchResults[2]?.data as SepticLogData;
-      const recentLogs = batchResults[3]?.data || [];
+      const yesterdayFullLog = batchResults[3]?.data as DailyData; // 어제 전체 데이터
+      const hvacBoilerCombined = batchResults[4]?.data;
+      const hvacHistory = batchResults[5]?.data || [];
+      const boilerHistory = batchResults[6]?.data || [];
 
       setGasLog(gasData || getInitialGasLog(dateKey));
       setSepticLog(septicData || getInitialSepticLog(dateKey));
 
-      let lastWorkdayLog: DailyData | null = null;
-      if (recentLogs && recentLogs.length > 0) {
-        recentLogs.sort((a: any, b: any) => b.key.localeCompare(a.key));
-        lastWorkdayLog = recentLogs[0]?.data;
+      let hSum = 0; let bSum = 0;
+      let hLatestRecord = null; let bLatestRecord = null;
+
+      if (hvacHistory.length > 0) {
+        const filtered = hvacHistory.filter((row: any) => row.key.replace('HVAC_LOG_', '') < dateKey);
+        filtered.forEach((row: any) => {
+          const u = row.data?.gas?.usage || row.data?.hvac_data?.gas?.usage;
+          if (u) hSum += safeParseFloat(u);
+        });
+        const sorted = [...filtered].sort((a:any, b:any) => b.key.localeCompare(a.key));
+        if (sorted.length > 0) hLatestRecord = sorted[0].data;
+      }
+
+      if (boilerHistory.length > 0) {
+        const filtered = boilerHistory.filter((row: any) => row.key.replace('BOILER_LOG_', '') < dateKey);
+        filtered.forEach((row: any) => {
+          const u = row.data?.gas?.usage || row.data?.boiler_data?.gas?.usage;
+          if (u) bSum += safeParseFloat(u);
+        });
+        const sorted = [...filtered].sort((a:any, b:any) => b.key.localeCompare(a.key));
+        if (sorted.length > 0) bLatestRecord = sorted[0].data;
       }
       
+      historySumsRef.current = { hvac: hSum, boiler: bSum };
+
+      let initialH = hvacBoilerCombined?.hvac_data || getInitialHvacLog(dateKey);
+      let initialB = hvacBoilerCombined?.boiler_data || getInitialBoilerLog(dateKey);
+
+      if (hLatestRecord && (!initialH.gas?.prev || initialH.gas.prev === '0' || initialH.gas.prev === '')) {
+        const lastCurr = hLatestRecord.gas?.curr || hLatestRecord.hvac_data?.gas?.curr;
+        if (lastCurr) initialH.gas.prev = lastCurr;
+      }
+      if (bLatestRecord && (!initialB.gas?.prev || initialB.gas.prev === '0' || initialB.gas.prev === '')) {
+        const lastCurr = bLatestRecord.gas?.curr || bLatestRecord.boiler_data?.gas?.curr;
+        if (lastCurr) initialB.gas.prev = lastCurr;
+      }
+
+      const analyzedGas = calculateGasAnalysis(initialH, initialB, { hvac: hSum, boiler: bSum });
+      setHvacGasReadings(analyzedGas.nextHvac);
+      setBoilerGasReadings(analyzedGas.nextBoiler);
+      
       const rawWorkLog = serverDataResult?.workLog || INITIAL_WORKLOG;
-      const yesterdayFullLog = lastWorkdayLog?.workLog;
       const currentScheduled = Array.isArray(rawWorkLog?.scheduled) ? rawWorkLog.scheduled : [];
       
       let finalWorkLog: WorkLogData = deepMerge(INITIAL_WORKLOG, { ...rawWorkLog, scheduled: currentScheduled });
 
-      // 기계 탭 약품 재고 연동 로직 보강
-      if (yesterdayFullLog?.mechanicalChemicals) {
+      // [종균제/소독제 전일재고 연동 로직]
+      if (yesterdayFullLog && yesterdayFullLog.workLog && yesterdayFullLog.workLog.mechanicalChemicals) {
         if (!finalWorkLog.mechanicalChemicals) {
           finalWorkLog.mechanicalChemicals = JSON.parse(JSON.stringify(INITIAL_CHEMICALS));
         }
-        
         const chemKeys = ['seed', 'sterilizer'] as const;
         chemKeys.forEach(key => {
-          const chem = finalWorkLog.mechanicalChemicals![key];
-          const yesterdayChem = yesterdayFullLog.mechanicalChemicals![key];
+          const currentChem = finalWorkLog.mechanicalChemicals![key];
+          const yesterdayChem = yesterdayFullLog.workLog.mechanicalChemicals![key];
           
-          if (yesterdayChem && yesterdayChem.stock && (!chem.prev || chem.prev === '' || chem.prev === '0')) {
-            chem.prev = yesterdayChem.stock;
+          // 전일 재고가 어제 데이터의 최종 재고(stock)임
+          const yesterdayFinalStock = yesterdayChem.stock || '0';
+          
+          // 금일 데이터에 전일재고가 비어있다면 어제 재고를 가져와 채움
+          if (!currentChem.prev || currentChem.prev === '' || currentChem.prev === '0') {
+            currentChem.prev = String(yesterdayFinalStock);
           }
         });
       }
 
-      // 최종 재고 계산
+      // 재고 재계산 (P+I-U)
       if (finalWorkLog.mechanicalChemicals) {
         ['seed', 'sterilizer'].forEach((key) => {
           const chem = finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer'];
-          const p = parseFloat(String(chem.prev || '0').replace(/,/g, ''));
-          const i = parseFloat(String(chem.incoming || '0').replace(/,/g, ''));
-          const u = parseFloat(String(chem.used || '0').replace(/,/g, ''));
-          const s = p + i - u;
-          chem.stock = isNaN(s) ? (chem.prev || '0') : s.toString();
+          const p = safeParseFloat(chem.prev);
+          const i = safeParseFloat(chem.incoming); // 공백 시 safeParseFloat가 0 반환
+          const u = safeParseFloat(chem.used);     // 공백 시 safeParseFloat가 0 반환
+          chem.stock = (p + i - u).toString();
         });
       }
 
@@ -347,7 +440,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
       categories.forEach((key) => {
         let cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
-        
         if (!cat.today || cat.today.length === 0) {
           cat.today = automationMap[key] ? automationMap[key](dateKey) : [];
         }
@@ -355,21 +447,15 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
           cat.tomorrow = autoTasksTomorrow.map(t => ({ ...t, status: undefined }));
         }
-
-        if (yesterdayFullLog && (yesterdayFullLog as any)[key]?.tomorrow) {
-          const prevTomorrow = (yesterdayFullLog as any)[key].tomorrow as TaskItem[];
+        // 예정사항 연동
+        if (yesterdayFullLog && yesterdayFullLog.workLog && (yesterdayFullLog.workLog as any)[key]?.tomorrow) {
+          const prevTomorrow = (yesterdayFullLog.workLog as any)[key].tomorrow as TaskItem[];
           prevTomorrow.forEach(item => {
             if (item?.content?.trim()) {
               const normalizedPrev = normalizeContent(item.content);
               const isDuplicate = cat.today.some(t => normalizeContent(t.content) === normalizedPrev);
-              
               if (!isDuplicate) {
-                cat.today.push({ 
-                  id: `from_prev_${item.id}_${Date.now()}`, 
-                  content: item.content, 
-                  frequency: item.frequency || '일일', 
-                  status: '진행중' 
-                });
+                cat.today.push({ id: `from_prev_${item.id}_${Date.now()}`, content: item.content, frequency: item.frequency || '일일', status: '진행중' });
               }
             }
           });
@@ -383,10 +469,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       setUtility(serverDataResult?.utility || DEFAULT_UTILITY);
       
       fetchWeatherInfo(dateKey).then(w => { if (w) setWeather(w); });
-
       setTimeout(() => { if (!isCancelled()) isInitialLoad.current = false; }, 500);
     } catch (error) { console.error("WorkLog Load Error:", error); } finally { if (!isCancelled()) setLoading(false); }
-  }, [dateKey, currentDate, tomorrowDateKey]);
+  }, [dateKey, currentDate, tomorrowDateKey, calculateGasAnalysis]);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,11 +482,17 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const handleSaveAll = async () => {
     setSaveStatus('loading');
     try {
+      const updatedUtility = {
+        ...utility,
+        hvacGas: hvacGasReadings.gas?.usage || '',
+        boilerGas: boilerGasReadings.gas?.usage || ''
+      };
+
       const success = await saveDailyData({ 
         date: dateKey, 
         facilityDuty, 
         securityDuty, 
-        utility, 
+        utility: updatedUtility, 
         workLog: logData,
         lastUpdated: new Date().toISOString()
       });
@@ -409,7 +500,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       if (activeTab === 'mechanical') {
         await Promise.all([
           saveGasLog(gasLog),
-          saveSepticLog(septicLog)
+          saveSepticLog(septicLog),
+          saveHvacBoilerCombined(hvacGasReadings, boilerGasReadings)
         ]);
       }
 
@@ -470,7 +562,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     const formattedDay = format(currentDate, 'dd');
     const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
     const dayName = days[currentDate.getDay()];
-    
     const dutyInfo = `주간 : ${facilityDuty.day || ''} / 당직 : ${facilityDuty.night || ''}`;
 
     let bodyHtml = '';
@@ -484,30 +575,14 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
         bodyHtml = `
           <div class="print-page">
-            <style>
-              th, td { height: 30px !important; line-height: 30px !important; }
-              .remarks-cell { height: 110px !important; line-height: 1.5 !important; padding: 8px !important; vertical-align: middle !important; text-align: center !important; }
-              .text-left { text-align: left !important; padding-left: 10px !important; }
-            </style>
+            <style>th, td { height: 30px !important; line-height: 30px !important; } .remarks-cell { height: 110px !important; line-height: 1.5 !important; padding: 8px !important; vertical-align: middle !important; text-align: center !important; } .text-left { text-align: left !important; padding-left: 10px !important; }</style>
             <div class="section-header" style="margin-top:0;">1. 소방 시설 점검</div>
-            <table>
-              <thead><tr><th style="width:130px;">구 분</th><th>점 검 내 용</th><th style="width:80px;">결 과</th></tr></thead>
-              <tbody>
-                ${safeFire.items.map((item, idx, arr) => {
-                  const firstInCat = arr.findIndex(i => i.category === item.category) === idx;
-                  const catCount = arr.filter(i => i.category === item.category).length;
-                  return `<tr>${firstInCat ? `<td rowspan="${catCount}" style="font-weight:bold; background-color:#fafafa;">${item.category}</td>` : ''}<td class="text-left">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || '-'}</td></tr>`;
-                }).join('')}
-                <tr><td class="remarks-cell" style="font-weight:bold; background-color:#fafafa;">특이사항</td><td colspan="2" class="remarks-cell" style="white-space: pre-wrap; text-align: center !important;">${safeFire.remarks || ''}</td></tr>
-              </tbody>
+            <table><thead><tr><th style="width:130px;">구 분</th><th>점 검 내 용</th><th style="width:80px;">결 과</th></tr></thead>
+              <tbody>${safeFire.items.map((item, idx, arr) => { const firstInCat = arr.findIndex(i => i.category === item.category) === idx; const catCount = arr.filter(i => i.category === item.category).length; return `<tr>${firstInCat ? `<td rowspan="${catCount}" style="font-weight:bold; background-color:#fafafa;">${item.category}</td>` : ''}<td class="text-left">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || '-'}</td></tr>`; }).join('')}<tr><td class="remarks-cell" style="font-weight:bold; background-color:#fafafa;">특이사항</td><td colspan="2" class="remarks-cell" style="white-space: pre-wrap; text-align: center !important;">${safeFire.remarks || ''}</td></tr></tbody>
             </table>
             <div class="section-header">2. 승강기 일상 점검</div>
-            <table>
-              <thead><tr><th style="width:130px;">점 검 항 목</th>${elvLabels.map(l => `<th style="width:65px;">${l}</th>`).join('')}</tr></thead>
-              <tbody>
-                ${safeElv.items.map(item => `<tr><td style="font-weight:500; text-align:center !important;">${item.content}</td>${elvKeys.map(k => `<td class="${item.results[k] === '양호' ? 'result-ok' : 'result-bad'}">${item.results[k] || '-'}</td>`).join('')}</tr>`).join('')}
-                <tr><td class="remarks-cell" style="font-weight:bold; background-color:#fafafa;">특이사항</td><td colspan="5" class="remarks-cell" style="white-space: pre-wrap; text-align: center !important;">${safeElv.remarks || ''}</td></tr>
-              </tbody>
+            <table><thead><tr><th style="width:130px;">점 검 항 목</th>${elvLabels.map(l => `<th style="width:65px;">${l}</th>`).join('')}</tr></thead>
+              <tbody>${safeElv.items.map(item => `<tr><td style="font-weight:500; text-align:center !important;">${item.content}</td>${elvKeys.map(k => `<td class="${item.results[k] === '양호' ? 'result-ok' : 'result-bad'}">${item.results[k] || '-'}</td>`).join('')}</tr>`).join('')}<tr><td class="remarks-cell" style="font-weight:bold; background-color:#fafafa;">특이사항</td><td colspan="5" class="remarks-cell" style="white-space: pre-wrap; text-align: center !important;">${safeElv.remarks || ''}</td></tr></tbody>
             </table>
           </div>
         `;
@@ -521,32 +596,26 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
         bodyHtml = `
           <div class="print-page">
-            <style>
-              th, td { height: 19px !important; padding: 0 4px !important; }
-            </style>
+            <style>th, td { height: 19px !important; padding: 0 4px !important; }</style>
             <div class="flex-header"><div class="title-box"><div class="doc-title">기계실 업무일지</div></div>${approvalTableHtml()}</div>
             <div class="info-row"><div>${formattedYear}년 ${formattedMonth}월 ${formattedDay}일 (${dayName})</div><div>${dutyInfo}</div></div>
             <div class="section-header">1. 업무일지</div>
             <table><thead><tr><th style="width:50%;">작 &nbsp; 업 &nbsp; 사 &nbsp; 항</th><th>예 &nbsp; 정 &nbsp; 사 &nbsp; 항</th></tr></thead>
               <tbody><tr style="height:209px;"><td class="text-left" style="vertical-align:top; padding:0px !important;">${generateFixedRowsHtml('mechanical', 'today', 11, 19)}</td><td class="text-left" style="vertical-align:top; padding:0px !important;">${generateFixedRowsHtml('mechanical', 'tomorrow', 11, 19)}</td></tr></tbody>
             </table>
-            <div class="section-header">2. 소모품 사용 내역</div>
-            <table><thead><tr><th style="width:18%;">품 명</th><th style="width:22%;">모 델 명</th><th style="width:10%;">수량</th><th style="width:18%;">품 명</th><th style="width:22%;">모 델 명</th><th style="width:10%;">수량</th></tr></thead>
-              <tbody>${consumableRows.map(row => `<tr style="height:19px;"><td>${row.left?.itemName || ''}</td><td>${row.left?.modelName || ''}</td><td>${row.left?.outQty || ''}</td><td>${row.right?.itemName || ''}</td><td>${row.right?.modelName || ''}</td><td>${row.right?.outQty || ''}</td></tr>`).join('')}</tbody>
-            </table>
             <div style="display: flex; gap: 8mm; align-items: flex-start; margin-top: 8px;">
               <div style="flex: 1;">
-                <div class="section-header" style="margin-top:0;">3. 가스일일점검</div>
+                <div class="section-header" style="margin-top:0;">2. 가스일일점검</div>
                 <table><thead><tr><th style="width:60px;">구분</th><th>점검내용</th><th style="width:60px;">결과</th></tr></thead>
                   <tbody>${safeGas.items.map((item, idx, arr) => { const firstInCat = arr.findIndex(i => i.category === item.category) === idx; const catCount = arr.filter(i => i.category === item.category).length; return `<tr>${firstInCat ? `<td rowspan="${catCount}" style="background:#f9f9f9; font-weight:bold;">${item.category.replace(' ', '<br/>')}</td>` : ''}<td class="text-left" style="font-size:8pt;">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || ''}</td></tr>`; }).join('')}</tbody>
                 </table>
               </div>
               <div style="flex: 1;">
-                <div class="section-header" style="margin-top:0;">4. 정화조일일점검</div>
+                <div class="section-header" style="margin-top:0;">3. 정화조일일점검</div>
                 <table><thead><tr><th>점검내용</th><th style="width:60px;">결과</th></tr></thead>
                   <tbody>${safeSeptic.items.map(item => `<tr><td class="text-left" style="font-size:8pt;">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || ''}</td></tr>`).join('')}</tbody>
                 </table>
-                <div class="section-header">5. 종균제 / 소독제</div>
+                <div class="section-header">4. 종균제 / 소독제</div>
                 <table><thead><tr style="background:#f8f9fa;"><th>구 분</th><th>전일</th><th>입고</th><th>투입</th><th>재고</th></tr></thead>
                   <tbody>
                     <tr style="height:19px;"><td style="background:#f9f9f9; font-weight:bold;">종균제(l)</td><td>${chemicals.seed.prev}</td><td>${chemicals.seed.incoming}</td><td>${chemicals.seed.used}</td><td style="font-weight:bold; color:blue;">${chemicals.seed.stock}</td></tr>
@@ -641,13 +710,29 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     setLogData(prev => {
       const currentChem = prev.mechanicalChemicals || JSON.parse(JSON.stringify(INITIAL_CHEMICALS));
       const target = { ...currentChem[type], [field]: value };
-      const p = parseFloat(String(target.prev || '0').replace(/,/g, ''));
-      const i = parseFloat(String(target.incoming || '0').replace(/,/g, ''));
-      const u = parseFloat(String(target.used || '0').replace(/,/g, ''));
-      const s = p + i - u;
-      target.stock = isNaN(s) ? target.prev : s.toString();
+      
+      // 전일, 입고, 투입 값을 공백 시 0으로 처리하여 재고 계산
+      const p = safeParseFloat(target.prev);
+      const i = safeParseFloat(target.incoming);
+      const u = safeParseFloat(target.used);
+      
+      target.stock = (p + i - u).toString();
       return { ...prev, mechanicalChemicals: { ...currentChem, [type]: target } };
     });
+  };
+
+  const handleGasReadingUpdate = (type: 'hvac' | 'boiler', field: string, value: string) => {
+    if (type === 'hvac') {
+      setHvacGasReadings(prev => {
+        const next = { ...prev, gas: { ...prev.gas, [field]: value } } as HvacLogData;
+        return calculateGasAnalysis(next, boilerGasReadings, historySumsRef.current).nextHvac;
+      });
+    } else {
+      setBoilerGasReadings(prev => {
+        const next = { ...prev, gas: { ...prev.gas, [field]: value } } as BoilerLogData;
+        return calculateGasAnalysis(hvacGasReadings, next, historySumsRef.current).nextBoiler;
+      });
+    }
   };
 
   const toggleGasResult = (id: string) => {
@@ -686,7 +771,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           </div>
           <div className="p-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <FireFacilityCheck currentDate={currentDate} />
-            < ElevatorLog currentDate={currentDate} />
+            <ElevatorLog currentDate={currentDate} />
           </div>
         </div>
       </div>
@@ -719,6 +804,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             onPrint={() => handlePrintCategory('mechanical')}
             onRefresh={() => loadData(() => false, true)}
           />
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
               <div className="bg-gray-50/50 px-5 py-3 border-b border-gray-100 flex items-center gap-2">
@@ -737,7 +823,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                           <tr key={item.id} className="hover:bg-gray-50">
                             {idx === 0 && <td rowSpan={groupedGas[cat].length} className="border border-gray-200 p-2 text-center font-bold bg-gray-50/50 whitespace-pre-wrap">{cat.replace(' ', '\n')}</td>}
                             <td className="border border-gray-200 p-2 text-left">• {item.content}</td>
-                            <td className={`border border-gray-200 p-2 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleGasResult(item.id)}>{item.result || '-'}</td>
+                            <td className={`border border-gray-200 p-2 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleGasResult(item.id)}>{item.result || '-'}</td>
                           </tr>
                         ))}
                       </React.Fragment>
@@ -761,7 +847,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                       {septicLog.items.map(item => (
                         <tr key={item.id} className="hover:bg-gray-50">
                           <td className="border border-gray-200 p-2 text-left">• {item.content}</td>
-                          <td className={`border border-gray-200 p-2 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleSepticResult(item.id)}>{item.result || '-'}</td>
+                          <td className={`border border-gray-200 p-2 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleSepticResult(item.id)}>{item.result || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -780,13 +866,12 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                     </thead>
                     <tbody>
                       {['seed', 'sterilizer'].map(key => {
-                        const unit = key === 'seed' ? 'l' : 'kg';
                         return (
                           <tr key={key}>
                             <td className="border border-gray-300 p-2 font-bold bg-gray-50/30 whitespace-nowrap">{key === 'seed' ? '종균제' : '소독제'}</td>
-                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.prev || ''} onChange={e => handleChemicalUpdate(key as any, 'prev', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" placeholder="0" /></td>
-                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.incoming || ''} onChange={e => handleChemicalUpdate(key as any, 'incoming', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" placeholder="0" /></td>
-                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.used || ''} onChange={e => handleChemicalUpdate(key as any, 'used', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" placeholder="0" /></td>
+                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.prev || ''} readOnly className="w-full h-full text-center outline-none bg-gray-50/50 py-2 cursor-not-allowed" /></td>
+                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.incoming || ''} onChange={e => handleChemicalUpdate(key as any, 'incoming', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2 font-bold focus:bg-blue-50" placeholder="0" /></td>
+                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.used || ''} onChange={e => handleChemicalUpdate(key as any, 'used', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2 font-bold focus:bg-blue-50" placeholder="0" /></td>
                             <td className="border border-gray-300 p-0 bg-blue-50 font-bold text-blue-700">{logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.stock || '0'}</td>
                           </tr>
                         );
