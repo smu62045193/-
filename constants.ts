@@ -1,4 +1,3 @@
-
 import { MenuId, MenuItem, Holiday } from './types';
 
 // =================================================================================================
@@ -10,16 +9,16 @@ export const MENU_ITEMS: MenuItem[] = [
   { id: MenuId.DASHBOARD, label: '대시보드' },
   { id: MenuId.WORK_LOG, label: '업무일지' },
   { id: MenuId.WEEKLY_WORK, label: '주간업무' },
-  { id: MenuId.CONSTRUCTION, label: '공사/작업', subItems: ['공사/작업리스트', '외부업체', '시설직', '공사업체현황'] },
-  { id: MenuId.ELEC_CHECK, label: '전기점검', subItems: ['입주사현황', '월별검침기록', '검침사진첩', '입주사별연간보고서', '비상발전기', '밧데리', '부하전류', '전기설비점검', '전기자동차'] },
+  { id: MenuId.CONSTRUCTION, label: '공사/작업', subItems: ['외부업체', '시설직'] },
+  { id: MenuId.ELEC_CHECK, label: '전기점검', subItems: ['계량기검침', '비상발전기', '밧데리', '부하전류', '전기설비점검', '전기자동차'] },
   { id: MenuId.MECH_CHECK, label: '기계점검', subItems: ['저수조위생점검'] },
-  { id: MenuId.FIRE_CHECK, label: '소방점검', subItems: ['소방점검이력', '소화기관리'] },
+  { id: MenuId.FIRE_CHECK, label: '소방점검', subItems: ['소방점검이력', '소화기 관리대장'] },
   { id: MenuId.ELEVATOR_CHECK, label: '승강기점검', subItems: ['승강기점검이력'] },
-  { id: MenuId.PARKING_CHECK, label: '주차점검', subItems: ['지정주차변경이력', '지정주차차량현황', '지정주차차량위치'] },
-  { id: MenuId.CONSUMABLES, label: '소모품관리', subItems: ['소모품관리대장', '소모품사용내역', '소모품자재신청서'] },
+  { id: MenuId.PARKING_CHECK, label: '주차점검', subItems: ['지정주차차량현황', '지정주차변경이력', '지정주차차량위치'] },
+  { id: MenuId.CONSUMABLES, label: '소모품관리', subItems: ['관리대장', '자재신청서'] },
   { id: MenuId.APPOINTMENTS, label: '선임현황' },
-  { id: MenuId.STAFF, label: '직원관리', subItems: ['직원조직도', '직원현황', '로고/직인'] },
-  { id: MenuId.CONTRACTORS, label: '협력업체', subItems: ['협력업체현황'] },
+  { id: MenuId.STAFF, label: '직원관리' },
+  { id: MenuId.CONTRACTORS, label: '협력업체' },
 ];
 
 export const WORK_LOG_TABS = [
@@ -27,6 +26,7 @@ export const WORK_LOG_TABS = [
   { id: 'checklist', label: '점검표' },
   { id: 'substation', label: '수변전반' },
   { id: 'mechanical', label: '기계' },
+  { id: 'mech_facility', label: '기계설비' },
   { id: 'air_env', label: '대기환경' },
   { id: 'fire', label: '소방' },
   { id: 'elevator', label: '승강기' },
