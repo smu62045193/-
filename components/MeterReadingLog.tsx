@@ -382,23 +382,28 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     const tenantItems = data.items.filter(it => it.tenant === tenantName && it.floor === floor);
     const normalItem = tenantItems.find(it => it.note === '일반');
     const specialItem = tenantItems.find(it => it.note === '특수');
+    
+    // 특수계량기 데이터가 있는지 확인 (지침값이 있는 경우만 표시)
+    const hasSpecialData = specialItem && specialItem.currentReading && specialItem.currentReading.trim() !== '';
+    
     const [y, m] = currentMonth.split('-');
     const prevMonthDate = subMonths(parseISO(`${currentMonth}-01`), 1);
     const py = format(prevMonthDate, 'yyyy');
     const pm = format(prevMonthDate, 'MM');
     const periodStr = `${py}년 ${pm}월 17일 ~ ${y}년 ${m}월 16일`;
     
-    // data.creationDate가 있으면 그것을 표시하고, 없으면 오늘 날짜를 표시
     const reportDateObj = data.creationDate ? parseISO(data.creationDate) : new Date();
     const todayStr = format(reportDateObj, 'yyyy년 MM월 dd일');
     
     const unitPrice = data.unitPrice || '228';
     const normalCalc = normalItem ? getCalculations(normalItem) : { usage: 0, bill: 0 };
-    const specialCalc = specialItem ? getCalculations(specialItem) : { usage: 0, bill: 0 };
-    const totalBill = normalCalc.bill + specialCalc.bill;
+    const specialCalc = hasSpecialData ? getCalculations(specialItem) : { usage: 0, bill: 0 };
+    
+    // 총 요금 계산 (특수계량기 데이터가 있을 때만 합산)
+    const totalBill = normalCalc.bill + (hasSpecialData ? specialCalc.bill : 0);
 
     const normalPhoto = photos.find(p => p.tenant === tenantName && p.floor === floor && p.type === '일반');
-    const specialPhoto = photos.find(p => p.tenant === tenantName && p.floor === floor && p.type === '특수');
+    const specialPhoto = hasSpecialData ? photos.find(p => p.tenant === tenantName && p.floor === floor && p.type === '특수') : null;
 
     let photosHtml = '';
     if (normalPhoto || specialPhoto) {
@@ -413,7 +418,6 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     }
 
     const logoUrl = brandSettings?.logo || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABACAYAAABfv994AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAWElEQVR4nO3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4GMRAAAG34i8zAAAAAElFTkSuQmCC";
-
     const headerBgColor = '#bfdbfe';
 
     return `
@@ -454,6 +458,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
               <th class="label-cell">전기요금</th>
               <td colspan="2" class="formula-cell">(사용량 ${normalCalc.usage.toLocaleString()} - 기준 ${formatNumber(normalItem?.refPower) || '2,380'}) X ${parseInt(unitPrice).toLocaleString()} = <span class="bold-text" style="font-size:14pt; color:${normalCalc.bill < 0 ? 'red' : 'black'};">￦ ${normalCalc.bill.toLocaleString()} 원</span></td>
             </tr>
+            
+            ${hasSpecialData ? `
             <tr class="sub-header">
               <th colspan="3">특수 전력 사용요금(에어컨, 전열)</th>
             </tr>
@@ -478,6 +484,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
               <th class="label-cell">전기요금</th>
               <td colspan="2" class="formula-cell">${specialCalc.usage.toLocaleString()} X ${parseInt(unitPrice).toLocaleString()} = <span class="bold-text" style="font-size:14pt; color:${specialCalc.bill < 0 ? 'red' : 'black'};">￦ ${specialCalc.bill.toLocaleString()} 원</span></td>
             </tr>
+            ` : ''}
+
             <tr class="total-row">
               <th class="total-label">청구 요금</th>
               <td colspan="2" class="bold-text" style="font-size:24pt; color:${totalBill < 0 ? 'red' : 'black'};">￦ ${totalBill.toLocaleString()} 원</td>
