@@ -186,21 +186,66 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
     if (!printWindow) return;
+
     const tableRows = filteredList.map((item, idx) => `
-      <tr><td>${idx + 1}</td><td>${item.name}</td><td>${item.floor}</td><td>${item.area}</td><td>${item.refPower}</td><td>${item.note}</td></tr>
+      <tr>
+        <td style="width: 40px;">${idx + 1}</td>
+        <td style="width: 200px; font-weight: bold; text-align: center;">${item.name}</td>
+        <td style="width: 80px;">${item.floor}</td>
+        <td style="width: 90px;">${item.area}</td>
+        <td style="width: 90px; font-weight: bold; color: #059669;">${item.refPower}</td>
+        <td style="width: 120px; text-align: left; padding-left: 10px; color: #666;">${item.note || ''}</td>
+      </tr>
     `).join('');
+
     printWindow.document.write(`
-      <html><head><title>입주사 현황</title><style>
-        @page { size: A4 portrait; margin: 15mm; }
-        body { font-family: sans-serif; padding: 0; margin: 0; }
-        table { width: 100%; border-collapse: collapse; border: 1.5px solid black; }
-        th, td { border: 1px solid black; padding: 8px; text-align: center; font-size: 10pt; }
-        th { background: #f3f4f6; font-weight: bold; }
-        h1 { text-align: center; text-decoration: underline; margin-bottom: 30px; }
-      </style></head><body>
-        <h1>입주사 현황</h1>
-        <table><thead><tr><th>No</th><th>입주사명</th><th>층 별</th><th>전용면적</th><th>기준전력(월)</th><th>비 고</th></tr></thead><tbody>${tableRows}</tbody></table>
-      </body></html>`);
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>입주사 현황</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+            @page { size: A4 portrait; margin: 0; }
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; -webkit-print-color-adjust: exact; color: black; line-height: 1.4; }
+            .no-print { display: flex; justify-content: center; padding: 20px; }
+            @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
+            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 15mm 15mm 15mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
+            h1 { text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 30px; font-size: 26pt; font-weight: 900; margin-top: 0; letter-spacing: -1px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10pt; border: 1.5px solid black; table-layout: fixed; }
+            th, td { border: 1px solid black; padding: 4px 2px; text-align: center; word-break: break-all; height: 26px; }
+            th { background-color: #f3f4f6; font-weight: bold; font-size: 11pt; }
+            .meta-info { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; font-size: 11pt; padding: 0 5px; }
+            .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+            .no-print button:hover { background: #172554; transform: translateY(-1px); }
+          </style>
+        </head>
+        <body>
+          <div class="no-print">
+            <button onclick="window.print()">인쇄하기</button>
+          </div>
+          <div class="print-page">
+            <h1>입주사 현황 명단</h1>
+            <div class="meta-info">
+              <div>사업장명 : 새마을운동중앙회 대치동사옥</div>
+              <div>조회일자 : ${format(new Date(), 'yyyy년 MM월 dd일')}</div>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 40px;">No</th>
+                  <th style="width: 200px;">입주사명</th>
+                  <th style="width: 80px;">층 별</th>
+                  <th style="width: 90px;">전용면적</th>
+                  <th style="width: 90px;">기준전력(월)</th>
+                  <th style="width: 120px;">비 고</th>
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>
+          </div>
+        </body>
+      </html>
+    `);
     printWindow.document.close();
   };
 
@@ -208,7 +253,6 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
   const headerClass = "border border-gray-300 bg-gray-50 text-center font-bold text-[13px] p-2 text-gray-700";
   const cellClass = (isEditing: boolean) => `border border-gray-300 p-0 h-11 align-middle relative transition-colors ${isEditing ? 'bg-orange-50/50' : 'bg-white group-hover:bg-gray-50/30'}`;
 
-  // 팝업 모드 렌더링
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 animate-fade-in">
@@ -253,7 +297,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white text-black shadow-inner font-bold"
           />
-          <Search className="absolute left-3 top-3 text-gray-400 w-4 h-4" />
+          <Search className="absolute left-3 top-3 text-gray-400" size={18} />
         </div>
         <div className="flex items-center space-x-2 justify-end flex-1">
           <button onClick={loadData} className="flex items-center gap-2 px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm">
@@ -268,7 +312,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
             {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
             <span>서버저장</span>
           </button>
-          <button onClick={handlePrint} className="flex items-center gap-2 bg-slate-700 text-white px-5 py-2.5 rounded-xl hover:bg-slate-800 transition-all shadow-md text-sm font-bold active:scale-95">
+          <button onClick={handlePrint} className="flex items-center gap-2 bg-orange-600 text-white px-5 py-2.5 rounded-xl hover:bg-orange-700 transition-all shadow-md text-sm font-bold active:scale-95">
             <Printer size={18} />
             <span>미리보기</span>
           </button>
@@ -276,10 +320,6 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-300 overflow-hidden min-w-[850px]">
-        <div className="p-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
-            <h3 className="text-lg font-black text-gray-800 tracking-tight">입주사 현황 마스터 DB</h3>
-            <span className="text-xs text-gray-400 font-bold tracking-widest uppercase">작성일 : {format(new Date(), 'yyyy.MM.dd')}</span>
-        </div>
         <table className="w-full border-collapse text-center">
           <thead>
             <tr>
@@ -308,8 +348,8 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
                     <td className={cellClass(isEditing)}><input type="text" readOnly={!isEditing} className={`${inputClass(isEditing)} !text-left px-3 text-gray-500`} value={item.note} onChange={(e) => updateItem(item.id, 'note', e.target.value)} /></td>
                     <td className="border border-gray-300 p-0 print:hidden text-center bg-white relative">
                       <div className="flex items-center justify-center gap-1 p-1">
-                        <button onClick={() => handleToggleEdit(item.id)} className={`p-2 rounded-lg transition-all ${isEditing ? 'bg-blue-600 text-white shadow-md' : 'text-blue-500 hover:bg-blue-50'}`}>{isEditing ? <Check size={16} /> : <Edit2 size={16} />}</button>
-                        <button onClick={() => handleDeleteRequest(item.id)} className="p-2 text-red-400 hover:bg-red-50 hover:text-red-600 transition-all rounded-lg"><Trash2 size={16} /></button>
+                        <button onClick={() => handleToggleEdit(item.id)} className={`p-2 rounded-lg transition-all ${isEditing ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100'}`}>{isEditing ? <Check size={16} /> : <Edit2 size={16} />}</button>
+                        <button onClick={() => handleDeleteRequest(item.id)} className="p-2 bg-red-50 text-red-400 hover:bg-red-600 hover:text-white border border-red-100 transition-all rounded-lg"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>

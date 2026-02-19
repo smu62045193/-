@@ -37,9 +37,9 @@ const ElecCheckManager: React.FC<ElecCheckManagerProps> = ({ currentDate, onDate
   return (
     <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8">
       <div className="animate-fade-in space-y-8">
-        <div className="mb-2">
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight">전기 점검 및 관리</h2>
-          <p className="text-slate-500 mt-2 text-base font-medium">전기 설비 계통의 정기 점검 및 측정 일지를 통합 관리합니다.</p>
+        <div className="mb-2 flex flex-col md:flex-row md:items-baseline gap-2 md:gap-4">
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight whitespace-nowrap">전기 점검 및 관리</h2>
+          <p className="text-slate-500 text-base font-medium">전기 설비 계통의 정기 점검 및 측정 일지를 통합 관리합니다.</p>
         </div>
 
         {/* Tab Navigation - 디자인 표준화 */}

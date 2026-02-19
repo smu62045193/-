@@ -235,7 +235,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
         <style>
           @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
           @page { size: A4 portrait; margin: 0; }
-          body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; -webkit-print-color-adjust: exact; }
+          body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #ea580c !important; -webkit-print-color-adjust: exact; }
           .no-print { display: flex; justify-content: center; padding: 20px; }
           @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
           .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 15mm 12mm 15mm 12mm; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
@@ -243,10 +243,14 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
           table { width: 100%; border-collapse: collapse; font-size: 8.5pt; border: 1.5px solid black; table-layout: fixed; }
           th, td { border: 1px solid black; padding: 0; text-align: center; word-break: break-all; font-weight: normal; height: 28px; line-height: 28px; }
           th { background-color: #f3f4f6; font-weight: bold; }
+          .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+          .no-print button:hover { background: #172554; transform: translateY(-1px); }
         </style>
       </head>
       <body>
-        <div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button></div>
+        <div class="no-print">
+          <button onclick="window.print()">인쇄하기</button>
+        </div>
         <div class="print-page"><h1>중요 협력업체 현황</h1><table><thead><tr><th style="width: 30px;">No</th><th style="width: 40px;">업종</th><th style="width: 100px;">업체명</th><th style="width: 50px;">담당자</th><th style="width: 95px;">대표번호</th><th style="width: 95px;">핸드폰</th><th style="width: 95px;">팩스</th><th>비고</th></tr></thead><tbody>${tableRows}</tbody></table></div>
       </body>
       </html>`;
@@ -360,7 +364,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
             className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
               activeTab === tab.id 
                 ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                : 'bg-white text-slate-50 border-slate-200 hover:bg-slate-50'
+                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
             }`}
           >
             {tab.label}
@@ -400,7 +404,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
               </button>
               <button 
                 onClick={handlePrint} 
-                className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+                className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-orange-600 text-white rounded-xl hover:bg-orange-700 font-bold shadow-md text-sm transition-all active:scale-95"
               >
                 <Printer size={18} className="mr-2" />
                 미리보기
