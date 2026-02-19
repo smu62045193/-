@@ -50,7 +50,7 @@ import {
   BoilerLogData
 } from '../types';
 import { format, addDays, subDays, parseISO, startOfMonth } from 'date-fns';
-import { Plus, Trash2, LayoutList, RefreshCw, ArrowRightCircle, CheckCircle2, Save, Cloud, X, Printer, Car, Shield, Droplets, ClipboardCheck, Flame, Zap, Search, Calendar, History } from 'lucide-react';
+import { Plus, Trash2, LayoutList, RefreshCw, ArrowRightCircle, CheckCircle2, Save, Cloud, X, Printer, Car, Shield, Droplets, ClipboardCheck, Flame, Zap, Search, Calendar, History, ClipboardList } from 'lucide-react';
 import SubstationLog from './SubstationLog';
 import HvacLog from './HvacLog';
 import FireFacilityCheck from './FireFacilityCheck';
@@ -126,9 +126,10 @@ interface DetailedLogSectionProps {
   onUpdate: (newData: LogCategory) => void;
   onPrint?: () => void;
   onRefresh?: () => void;
+  onSave?: () => void;
 }
 
-const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, data, onUpdate, onPrint, onRefresh }) => {
+const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, data, onUpdate, onPrint, onRefresh, onSave }) => {
   const safeData: LogCategory = {
     today: data?.today || [],
     tomorrow: data?.tomorrow || []
@@ -166,16 +167,25 @@ const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, da
           {onRefresh && (
             <button 
               onClick={onRefresh}
-              className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-lg hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+              className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
             >
               <RefreshCw size={18} className="mr-2" />
               새로고침
             </button>
           )}
+          {onSave && (
+            <button 
+              onClick={onSave}
+              className="flex items-center justify-center px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-md transition-all text-sm active:scale-95"
+            >
+              <Save size={18} className="mr-2" />
+              서버저장
+            </button>
+          )}
           {onPrint && (
             <button 
               onClick={onPrint}
-              className="flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md transition-all text-sm active:scale-95"
+              className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all text-sm active:scale-95"
             >
               <Printer size={18} className="mr-2" />
               미리보기
@@ -347,7 +357,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const hvacHistory = batchResults[5]?.data || [];
       const boilerHistory = batchResults[6]?.data || [];
 
-      // [추가] 어제 리포트 직접 조회 (종균제/소독제 전일재고용)
+      // 어제 리포트 직접 조회 (종균제/소독제 전일재고용)
       const { data: yDailyRaw } = await supabase
         .from('daily_reports')
         .select('work_log')
@@ -410,7 +420,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       
       let finalWorkLog: WorkLogData = deepMerge(INITIAL_WORKLOG, { ...rawWorkLog, scheduled: currentScheduled });
 
-      // [수정] 기계 탭 약품 재고 연동 - 직접 호출한 yesterdayDirectReport 활용
+      // 기계 탭 약품 재고 연동 - 직접 호출한 yesterdayDirectReport 활용
       if (yesterdayDirectReport && yesterdayDirectReport.mechanicalChemicals) {
         if (!finalWorkLog.mechanicalChemicals) {
           finalWorkLog.mechanicalChemicals = JSON.parse(JSON.stringify(INITIAL_CHEMICALS));
@@ -548,7 +558,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
         @page { size: A4 portrait; margin: 0; }
-        body { font-family: "Noto Sans KR", sans-serif; background: #f1f5f9; margin: 0; padding: 0; color: black; line-height: 1.1; -webkit-print-color-adjust: exact; }
+        body { font-family: "Noto Sans KR", sans-serif; background: black; margin: 0; padding: 0; color: black; line-height: 1.1; -webkit-print-color-adjust: exact; }
         .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
         .print-page { width: 210mm; min-height: 297mm; padding: ${dynamicPadding}; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; box-sizing: border-box; display: flex; flex-direction: column; }
@@ -772,13 +782,29 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
               <ClipboardCheck className="text-blue-500" size={20} />
               <h4 className="font-bold text-gray-800">일일 점검 내역</h4>
             </div>
-            <button 
-              onClick={() => handlePrintCategory('checklist')}
-              className="flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md transition-all text-sm active:scale-95"
-            >
-              <Printer size={18} className="mr-2" />
-              미리보기
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => loadData(() => false, true)}
+                className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+              >
+                <RefreshCw size={18} className="mr-2" />
+                새로고침
+              </button>
+              <button 
+                onClick={handleSaveAll}
+                className="flex items-center justify-center px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-md transition-all text-sm active:scale-95"
+              >
+                <Save size={18} className="mr-2" />
+                서버저장
+              </button>
+              <button 
+                onClick={() => handlePrintCategory('checklist')}
+                className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all text-sm active:scale-95"
+              >
+                <Printer size={18} className="mr-2" />
+                미리보기
+              </button>
+            </div>
           </div>
           <div className="p-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <FireFacilityCheck currentDate={currentDate} />
@@ -789,9 +815,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     );
     if (activeTab === 'park_sec_clean') return (
       <div className="space-y-8">
-        <DetailedLogSection title="주차 관리" icon={<Car className="text-blue-500" size={20} />} data={logData?.parking} onUpdate={d => setLogData({...logData, parking: d})} onRefresh={() => loadData(() => false, true)} />
-        <DetailedLogSection title="경비 보안" icon={<Shield className="text-green-500" size={20} />} data={logData?.security} onUpdate={d => setLogData({...logData, security: d})} onRefresh={() => loadData(() => false, true)} />
-        <DetailedLogSection title="미화 위생" icon={<Droplets className="text-cyan-500" size={20} />} data={logData?.cleaning} onUpdate={d => setLogData({...logData, cleaning: d})} onRefresh={() => loadData(() => false, true)} />
+        <DetailedLogSection title="주차 관리" icon={<Car className="text-blue-500" size={20} />} data={logData?.parking} onUpdate={d => setLogData({...logData, parking: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
+        <DetailedLogSection title="경비 보안" icon={<Shield className="text-green-500" size={20} />} data={logData?.security} onUpdate={d => setLogData({...logData, security: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
+        <DetailedLogSection title="미화 위생" icon={<Droplets className="text-cyan-500" size={20} />} data={logData?.cleaning} onUpdate={d => setLogData({...logData, cleaning: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
       </div>
     );
 
@@ -814,6 +840,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             onUpdate={d => setLogData({...logData, mechanical: d})} 
             onPrint={() => handlePrintCategory('mechanical')}
             onRefresh={() => loadData(() => false, true)}
+            onSave={handleSaveAll}
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -905,19 +932,23 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           onUpdate={d => setLogData({...logData, [activeTab]: d})} 
           onPrint={canPrintThisTab ? () => handlePrintCategory(activeTab) : undefined}
           onRefresh={() => loadData(() => false, true)}
+          onSave={activeTab === 'substation' || activeTab === 'air_env' ? undefined : handleSaveAll}
         />
         {activeTab === 'electrical' && <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mt-4"><SubstationChecklistLog currentDate={currentDate} isEmbedded={true} /></div>}
       </div>
     );
   };
 
-  const isMeasurementTab = activeTab === 'substation' || activeTab === 'mech_facility';
-
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 pb-32">
       <div className="mb-6 print:hidden">
-        <h2 className="text-2xl font-bold text-gray-800">업무 일지</h2>
-        <p className="text-gray-500 mt-1">시설 관리 업무 기록 및 일일 점검 내역을 관리합니다.</p>
+        <div className="flex items-center gap-4">
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
+            <ClipboardList className="mr-3 text-blue-600" size={32} />
+            업무 일지
+          </h2>
+          <p className="text-gray-500 text-base font-medium">시설 관리 업무 기록 및 일일 점검 내역을 관리합니다.</p>
+        </div>
       </div>
 
       {loading ? (
@@ -925,19 +956,25 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       ) : (
         <>
           <div className="animate-fade-in space-y-6">
-            <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-2 border-b border-gray-100 items-center scrollbar-hide px-1">
+            <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center">
+              <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
+                <LayoutList size={22} />
+              </div>
               {WORK_LOG_TABS.map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-5 py-2.5 rounded-full text-[13px] font-bold transition-all border ${activeTab === tab.id ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>{tab.label}</button>
+                <button 
+                  key={tab.id} 
+                  onClick={() => setActiveTab(tab.id)} 
+                  className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
+                    activeTab === tab.id 
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
               ))}
             </div>
             <div className="min-h-[400px]">{renderTabContent()}</div>
-            {activeTab !== 'air_env' && !isMeasurementTab && (
-              <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40 print:hidden">
-                <button onClick={handleSaveAll} disabled={saveStatus === 'loading'} className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-                  {saveStatus === 'loading' ? (<><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>) : saveStatus === 'success' ? (<><CheckCircle2 size={24} /><span>저장 완료</span></>) : (<><Save size={24} /><span>업무일지 전체 저장</span></>)}
-                </button>
-              </div>
-            )}
           </div>
         </>
       )}

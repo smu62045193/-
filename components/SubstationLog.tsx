@@ -19,7 +19,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   
   const [data, setData] = useState<SubstationLogData>(getInitialSubstationLog(dateKey));
   
-  // 전일 기록된 금월누계값 (합산의 베이스)
   const historySumRef = useRef<number>(0);
   const isInitialLoad = useRef(true);
   const lastSyncedUsageRef = useRef<string>('');
@@ -44,9 +43,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     return result;
   };
 
-  /**
-   * 일 사용량 분석 및 금월 누계 계산
-   */
   const calculateDailyAnalysis = useCallback((currentData: SubstationLogData, hSum: number) => {
     if (!currentData) return getInitialSubstationLog(dateKey);
     
@@ -87,12 +83,8 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
 
     dailyStats.activePower = hasCurrentReadings ? totalActiveUsage.toString() : '0';
     dailyStats.reactivePower = hasCurrentReadings ? totalReactiveUsage.toString() : '0';
-    
-    // [금월누계 계산 로직] 
     dailyStats.monthTotal = Math.round(hSum + totalActiveUsage).toString();
 
-    // 기타 자동 계산 (역율 및 수용율 등)
-    // 수용율 계산을 위해 Peak 전력을 먼저 구함
     const vcbMain = newData.vcb?.time9?.main || newData.vcb?.time21?.main;
     if (vcbMain && (vcbMain.pf || vcbMain.a)) {
       const kVA_Const = 1.7321 * 22.9; 
@@ -116,7 +108,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
         dailyStats.loadFactor = '0';
       }
       
-      // 수용율 계산 (최대전력 / 설비용량 1600kW * 100)
       if (maxPowerNum > 0) {
         const demandFactorCalc = (maxPowerNum / 1600) * 100;
         dailyStats.demandFactor = isNaN(demandFactorCalc) ? '0' : demandFactorCalc.toFixed(1);
@@ -153,7 +144,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       let hSum = 0;
       let yesterdayDataForBase = null;
 
-      // 1. 매월 1일이 아니라면 무조건 '어제' 날짜의 기록을 호출하여 누계 베이스 추출
       if (dateKey !== monthStartStr) {
         const yesterdayLog = await fetchSubstationLog(yesterdayStr, true);
         if (yesterdayLog) {
@@ -165,11 +155,9 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       
       historySumRef.current = hSum;
 
-      // 2. 금일 데이터 로드
       const fetched = await fetchSubstationLog(dateKey, force);
       let finalData: SubstationLogData = fetched || getInitialSubstationLog(dateKey);
 
-      // 데이터 구조 정규화
       const rawPU = (finalData.powerUsage || (finalData as any).power_usage) || {};
       finalData.powerUsage = {
         prev: normalizePowerReadings(rawPU.prev || rawPU["이전"]),
@@ -177,7 +165,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
         usage: normalizePowerReadings(rawPU.usage || rawPU["사용량"])
       };
 
-      // 3. 지침 자동 연동 (오늘의 전일지침 = 어제의 금일지침)
       const currentPrevMid = finalData.powerUsage.prev.activeMid;
       const isPrevEmpty = !currentPrevMid || currentPrevMid.trim() === '' || currentPrevMid === '0';
       
@@ -189,7 +176,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
         }
       }
 
-      // 4. 분석 로직 실행
       const analyzedData = calculateDailyAnalysis(finalData, hSum);
       setData(analyzedData);
       setTimeout(() => { isInitialLoad.current = false; }, 300);
@@ -207,25 +193,15 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     if (saveStatus === 'loading') return;
     setSaveStatus('loading');
     try {
+      // daily_reports 저장 로직 제거하고 substation_logs에만 저장
       const success = await saveSubstationLog(data);
       if (success) {
-        let currentDaily = await fetchDailyData(dateKey, true);
-        if (!currentDaily) currentDaily = getInitialDailyData(dateKey);
-        
-        await saveDailyData({
-          ...currentDaily,
-          utility: { 
-            ...currentDaily.utility, 
-            electricity: data.dailyStats.activePower 
-          },
-          lastUpdated: new Date().toISOString()
-        });
-        
         setSaveStatus('success');
-        alert('저장이 완료되었습니다.');
+        alert('데이터가 성공적으로 저장되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
+        alert('저장에 실패했습니다.');
       }
     } catch (e) { 
       console.error(e);
@@ -295,10 +271,10 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
             @page { margin: 0; size: A4 portrait; }
-            body { font-family: sans-serif; background: white !important; margin: 0; padding: 0; }
+            body { font-family: sans-serif; background: black !important; margin: 0; padding: 0; }
             .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
             @media print { .no-print { display: none !important; } }
-            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 10mm 10mm 10mm; margin: 0 auto; box-sizing: border-box; }
+            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 10mm 10mm 10mm; margin: 0 auto; box-sizing: border-box; background: white !important; }
             table { width: 100% !important; border-collapse: collapse !important; border: 1.2px solid black !important; table-layout: fixed !important; margin-bottom: 12px; }
             th, td { border: 1px solid black !important; text-align: center !important; height: 42px !important; color: black !important; }
             th { font-weight: bold !important; font-size: 8.5pt !important; background-color: #f9fafb !important; }
@@ -542,22 +518,6 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
               </table>
             </div>
           </section>
-        </div>
-
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40 print:hidden">
-          <button 
-            onClick={handleSave} 
-            disabled={saveStatus === 'loading'} 
-            className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-          >
-            {saveStatus === 'loading' ? (
-              <><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>
-            ) : saveStatus === 'success' ? (
-              <><CheckCircle2 size={24} /><span>Update Complete</span></>
-            ) : (
-              <><Save size={24} /><span>수변전반 데이터 서버 저장</span></>
-            )}
-          </button>
         </div>
       </LogSheetLayout>
     </>

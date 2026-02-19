@@ -189,7 +189,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: "Noto Sans KR", sans-serif; margin: 0; padding: 0; background: #f1f5f9; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
+            body { font-family: "Noto Sans KR", sans-serif; margin: 0; padding: 0; background: black; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
             .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
             @media print { .no-print { display: none !important; } body { background: white !important; } }
             
@@ -321,14 +321,14 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
   const labelDivClass = "w-full h-full flex items-center justify-center text-sm font-bold text-slate-800 bg-white";
   const dataDivClass = "w-full h-full flex items-center justify-center text-sm font-black text-blue-700 bg-white";
 
-  const syncButton = (
+  const refreshButton = (
     <button 
       onClick={handleSyncData} 
       disabled={syncing || loading} 
-      className={`flex-1 sm:flex-none items-center justify-center px-4 py-2.5 rounded-xl font-bold shadow-sm transition-all active:scale-95 flex text-sm ${syncing ? 'bg-gray-100 text-gray-400' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}
+      className={`flex-1 sm:flex-none items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm transition-all active:scale-95 flex text-sm ${syncing ? 'bg-gray-100 text-gray-400' : 'hover:bg-emerald-50'}`}
     >
       <RefreshCw className={`mr-2 ${syncing ? 'animate-spin' : ''}`} size={18} />
-      <span>데이터 동기화</span>
+      <span>새로고침</span>
     </button>
   );
 
@@ -340,7 +340,8 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
         onSave={handleSave} 
         onPrint={handlePrint} 
         hideRefresh={true}
-        extraActions={syncButton}
+        hideSave={false}
+        extraActions={refreshButton}
       >
         <div id="air-env-log-content" className="bg-white p-4 text-black min-w-[850px] max-w-5xl mx-auto shadow-sm border border-gray-100 rounded-lg">
           
@@ -445,22 +446,6 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
           </div>
         </div>
       </LogSheetLayout>
-
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-gray-200 flex justify-center lg:static lg:bg-transparent lg:border-none lg:p-0 mt-12 z-40">
-        <button 
-          onClick={handleSave} 
-          disabled={saveStatus === 'loading'} 
-          className={`px-10 py-4 rounded-2xl shadow-xl transition-all duration-300 font-bold text-xl flex items-center justify-center space-x-3 w-full max-xl active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
-        >
-          {saveStatus === 'loading' ? (
-            <><RefreshCw size={24} className="animate-spin" /><span>데이터 동기화 중...</span></>
-          ) : saveStatus === 'success' ? (
-            <><CheckCircle2 size={24} /><span>Update Complete</span></>
-          ) : (
-            <><Save size={24} /><span>대기환경 데이터 서버 저장</span></>
-          )}
-        </button>
-      </div>
     </>
   );
 };

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Save, Printer, Trash2, RefreshCw, CheckCircle, X, Cloud, Info } from 'lucide-react';
 
@@ -69,19 +70,14 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
                 <button 
                   onClick={onRefresh} 
                   disabled={loading} 
-                  className="flex-1 sm:flex-none items-center justify-center px-4 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 font-bold shadow-sm transition-all flex text-sm disabled:opacity-50 active:scale-95"
+                  className="flex-1 sm:flex-none items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-gray-200 rounded-xl hover:bg-emerald-50 font-bold shadow-sm transition-all flex text-sm disabled:opacity-50 active:scale-95"
                 >
                   <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
                   새로고침
                 </button>
               )}
               
-              {onReset && !hideReset && (
-                <button onClick={onReset} className="flex-1 sm:flex-none items-center justify-center px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 font-bold shadow-sm transition-all flex text-sm active:scale-95">
-                  <Trash2 size={18} className="mr-2" />
-                  초기화
-                </button>
-              )}
+              {extraActions}
 
               {onSave && !hideSave && (
                 <button 
@@ -102,12 +98,20 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
                 </button>
               )}
 
-              {extraActions}
-
               {!hidePrint && onPrint && (
-                <button onClick={onPrint} className="flex-1 sm:flex-none items-center justify-center px-5 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-800 font-bold shadow-md transition-all flex text-sm active:scale-95">
+                <button 
+                  onClick={onPrint} 
+                  className="flex-1 sm:flex-none items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all flex text-sm active:scale-95"
+                >
                   <Printer size={18} className="mr-2" />
                   미리보기
+                </button>
+              )}
+
+              {onReset && !hideReset && (
+                <button onClick={onReset} className="flex-1 sm:flex-none items-center justify-center px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 font-bold shadow-sm transition-all flex text-sm active:scale-95">
+                  <Trash2 size={18} className="mr-2" />
+                  초기화
                 </button>
               )}
             </div>
