@@ -614,7 +614,21 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         const [gasData, septicData, consumables] = await Promise.all([fetchGasLog(dateKey), fetchSepticLog(dateKey), fetchConsumables()]);
         const safeGas = gasData || getInitialGasLog(dateKey);
         const safeSeptic = septicData || getInitialSepticLog(dateKey);
-        const usedConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && (c.category === '기계' || c.category === '공용'));
+        
+        // 소모품 합산 로직 추가
+        const dailyConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && (c.category === '기계' || c.category === '공용'));
+        const aggMap = new Map();
+        dailyConsumables.forEach(c => {
+          const key = `${c.itemName.trim()}_${(c.modelName || '').trim()}`;
+          if (aggMap.has(key)) {
+            const item = aggMap.get(key);
+            item.outQty = (parseFloat(item.outQty) + parseFloat(c.outQty)).toString();
+          } else {
+            aggMap.set(key, { ...c });
+          }
+        });
+        const usedConsumables = Array.from(aggMap.values());
+
         const consumableRows = []; for (let i = 0; i < 2; i++) consumableRows.push({ left: usedConsumables[i] || null, right: usedConsumables[i + 2] || null });
         const chemicals = logData.mechanicalChemicals || INITIAL_CHEMICALS;
 
@@ -627,19 +641,25 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             <table><thead><tr><th style="width:50%;">작 &nbsp; 업 &nbsp; 사 &nbsp; 항</th><th>예 &nbsp; 정 &nbsp; 사 &nbsp; 항</th></tr></thead>
               <tbody><tr style="height:209px;"><td class="text-left" style="vertical-align:top; padding:0px !important;">${generateFixedRowsHtml('mechanical', 'today', 11, 19)}</td><td class="text-left" style="vertical-align:top; padding:0px !important;">${generateFixedRowsHtml('mechanical', 'tomorrow', 11, 19)}</td></tr></tbody>
             </table>
+            
+            <div class="section-header">2. 소모품 사용 내역</div>
+            <table><thead><tr><th style="width:18%;">품 명</th><th style="width:22%;">모 델 명</th><th style="width:10%;">수량</th><th style="width:18%;">품 명</th><th style="width:22%;">모 델 명</th><th style="width:10%;">수량</th></tr></thead>
+              <tbody>${consumableRows.map(row => `<tr style="height:22px;"><td>${row.left?.itemName || ''}</td><td>${row.left?.modelName || ''}</td><td>${row.left?.outQty || ''}</td><td>${row.right?.itemName || ''}</td><td>${row.right?.modelName || ''}</td><td>${row.right?.outQty || ''}</td></tr>`).join('')}</tbody>
+            </table>
+
             <div style="display: flex; gap: 8mm; align-items: flex-start; margin-top: 8px;">
               <div style="flex: 1;">
-                <div class="section-header" style="margin-top:0;">2. 가스일일점검</div>
+                <div class="section-header" style="margin-top:0;">3. 가스일일점검</div>
                 <table><thead><tr><th style="width:60px;">구분</th><th>점검내용</th><th style="width:60px;">결과</th></tr></thead>
                   <tbody>${safeGas.items.map((item, idx, arr) => { const firstInCat = arr.findIndex(i => i.category === item.category) === idx; const catCount = arr.filter(i => i.category === item.category).length; return `<tr>${firstInCat ? `<td rowspan="${catCount}" style="background:#f9f9f9; font-weight:bold;">${item.category.replace(' ', '<br/>')}</td>` : ''}<td class="text-left" style="font-size:8pt;">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || ''}</td></tr>`; }).join('')}</tbody>
                 </table>
               </div>
               <div style="flex: 1;">
-                <div class="section-header" style="margin-top:0;">3. 정화조일일점검</div>
+                <div class="section-header" style="margin-top:0;">4. 정화조일일점검</div>
                 <table><thead><tr><th>점검내용</th><th style="width:60px;">결과</th></tr></thead>
                   <tbody>${safeSeptic.items.map(item => `<tr><td class="text-left" style="font-size:8pt;">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || ''}</td></tr>`).join('')}</tbody>
                 </table>
-                <div class="section-header">4. 종균제 / 소독제</div>
+                <div class="section-header">5. 종균제 / 소독제</div>
                 <table><thead><tr style="background:#f8f9fa;"><th>구 분</th><th>전일</th><th>입고</th><th>투입</th><th>재고</th></tr></thead>
                   <tbody>
                     <tr style="height:19px;"><td style="background:#f9f9f9; font-weight:bold;">종균제(l)</td><td>${chemicals.seed.prev}</td><td>${chemicals.seed.incoming}</td><td>${chemicals.seed.used}</td><td style="font-weight:bold; color:blue;">${chemicals.seed.stock}</td></tr>
@@ -652,7 +672,21 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         `;
     } else if (catId === 'electrical') {
         const [subCheckData, consumables] = await Promise.all([fetchSubstationChecklist(dateKey), fetchConsumables()]);
-        const usedConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && (c.category === '전기' || c.category === '소방'));
+        
+        // 소모품 합산 로직 추가
+        const dailyConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && (c.category === '전기' || c.category === '소방'));
+        const aggMap = new Map();
+        dailyConsumables.forEach(c => {
+          const key = `${c.itemName.trim()}_${(c.modelName || '').trim()}`;
+          if (aggMap.has(key)) {
+            const item = aggMap.get(key);
+            item.outQty = (parseFloat(item.outQty) + parseFloat(c.outQty)).toString();
+          } else {
+            aggMap.set(key, { ...c });
+          }
+        });
+        const usedConsumables = Array.from(aggMap.values());
+
         const consumableRows = []; for (let i = 0; i < 2; i++) consumableRows.push({ left: usedConsumables[i] || null, right: usedConsumables[i + 2] || null });
         const safeCheckItems = subCheckData?.items || getInitialSubstationChecklist(dateKey).items;
         const trItems = safeCheckItems.filter(i => i.category === '변압기');
