@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Save, Printer, Trash2, RefreshCw, CheckCircle, Info } from 'lucide-react';
 
 interface LogSheetLayoutProps {
@@ -39,6 +39,15 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
   hideRefresh = false,
   children 
 }) => {
+  const prevSaveStatus = useRef(saveStatus);
+
+  useEffect(() => {
+    if (prevSaveStatus.current !== 'success' && saveStatus === 'success') {
+      window.alert('저장이 완료되었습니다.');
+    }
+    prevSaveStatus.current = saveStatus;
+  }, [saveStatus]);
+
   const containerClass = isEmbedded 
     ? "p-4 sm:p-6 space-y-6 w-full bg-white" 
     : "p-4 sm:p-8 max-w-[1200px] mx-auto space-y-8 bg-white rounded-2xl border border-slate-200 shadow-sm print:shadow-none print:border-none print:p-0";
@@ -102,7 +111,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
               )}
 
               {onReset && !hideReset && (
-                <button onClick={onReset} className="flex-1 sm:flex-none flex flex-row items-center justify-center px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 font-bold shadow-sm transition-all text-sm active:scale-95 whitespace-nowrap">
+                <button onClick={onReset} className="flex-1 sm:flex-none flex flex-row items-center justify-center px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 font-bold shadow-sm transition-all flex text-sm active:scale-95 whitespace-nowrap">
                   <Trash2 size={18} className="mr-2" />
                   초기화
                 </button>
