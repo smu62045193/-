@@ -23,6 +23,7 @@ import ConstructionManager from './components/ConstructionManager';
 import ConstructionLog from './components/ConstructionLog';
 import ConstructionContractorManager from './components/ConstructionContractorManager';
 import AppointmentManager from './components/AppointmentManager';
+import MeterReadingPhotos from './components/MeterReadingPhotos';
 import { MenuId } from './types';
 import { Menu as MenuIcon, X } from 'lucide-react';
 
@@ -30,7 +31,7 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | 'parking_status' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | 'parking_status' | 'meter_photo' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -56,6 +57,8 @@ const App: React.FC = () => {
       setIsPopupMode('fire_extinguisher');
     } else if (popupType === 'parking_status') {
       setIsPopupMode('parking_status');
+    } else if (popupType === 'meter_photo') {
+      setIsPopupMode('meter_photo');
     }
   }, []);
 
@@ -105,15 +108,20 @@ const App: React.FC = () => {
     return <ParkingStatusList isPopupMode={true} />;
   }
 
+  if (isPopupMode === 'meter_photo') {
+    return <MeterReadingPhotos currentDate={currentDate} isPopupMode={true} />;
+  }
+
   const renderContent = () => {
     switch (activeMenu) {
       case MenuId.DASHBOARD:
         return <Dashboard currentDate={currentDate} />;
       case MenuId.WORK_LOG:
-      case MenuId.SCHEDULE: 
         return <WorkLog currentDate={currentDate} />;
       case MenuId.WEEKLY_WORK:
         return <WeeklyWork currentDate={currentDate} onDateChange={setCurrentDate} />;
+      case MenuId.CONSTRUCTION:
+        return <ConstructionManager />;
       case MenuId.ELEC_CHECK:
         return <ElecCheckManager currentDate={currentDate} onDateChange={setCurrentDate} />;
       case MenuId.MECH_CHECK:
@@ -126,8 +134,6 @@ const App: React.FC = () => {
         return <ParkingManager />;
       case MenuId.CONSUMABLES:
         return <ConsumablesManager />;
-      case MenuId.CONSTRUCTION:
-        return <ConstructionManager />;
       case MenuId.APPOINTMENTS:
         return <AppointmentManager />;
       case MenuId.STAFF:

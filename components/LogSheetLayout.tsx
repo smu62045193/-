@@ -56,7 +56,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
     <div className={containerClass}>
       <div className="animate-fade-in space-y-6">
         {!hideHeader && (
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-6 mb-2 print:hidden">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6 mb-2 print:hidden">
             <div className="flex flex-col gap-1">
               <div className="text-2xl font-black text-slate-800 flex items-center leading-none tracking-tight">
                 {title}
@@ -67,12 +67,13 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
               </span>}
             </div>
             
-            <div className="flex flex-row flex-wrap gap-2 w-full sm:w-auto">
+            {/* 버튼 그룹: flex-nowrap으로 한 행 고정 및 모바일에서 가로 스크롤 */}
+            <div className="flex flex-row items-center gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide pb-1">
               {onRefresh && !hideRefresh && (
                 <button 
                   onClick={onRefresh} 
                   disabled={loading} 
-                  className="flex-1 sm:flex-none flex flex-row items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-gray-200 rounded-xl hover:bg-emerald-50 border-emerald-100 font-bold shadow-sm transition-all text-sm disabled:opacity-50 active:scale-95 whitespace-nowrap"
+                  className="flex-none flex flex-row items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-gray-200 rounded-xl hover:bg-emerald-50 border-emerald-100 font-bold shadow-sm transition-all text-sm disabled:opacity-50 active:scale-95 whitespace-nowrap"
                 >
                   <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
                   새로고침
@@ -85,7 +86,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
                 <button 
                   onClick={onSave} 
                   disabled={loading || saveStatus === 'loading'} 
-                  className={`flex-1 sm:flex-none flex flex-row items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md shadow-blue-100 transition-all text-sm whitespace-nowrap ${
+                  className={`flex-none flex flex-row items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md shadow-blue-100 transition-all text-sm whitespace-nowrap ${
                     saveStatus === 'success' ? 'bg-green-600 text-white shadow-green-100' : 'bg-blue-600 text-white hover:bg-blue-700'
                   } disabled:bg-blue-400 active:scale-95`}
                 >
@@ -103,7 +104,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
               {!hidePrint && onPrint && (
                 <button 
                   onClick={onPrint} 
-                  className="flex-1 sm:flex-none flex flex-row items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95 whitespace-nowrap"
+                  className="flex-none flex flex-row items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95 whitespace-nowrap"
                 >
                   <Printer size={18} className="mr-2" />
                   미리보기
@@ -111,7 +112,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
               )}
 
               {onReset && !hideReset && (
-                <button onClick={onReset} className="flex-1 sm:flex-none flex flex-row items-center justify-center px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 font-bold shadow-sm transition-all flex text-sm active:scale-95 whitespace-nowrap">
+                <button onClick={onReset} className="flex-none flex flex-row items-center justify-center px-4 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-100 font-bold shadow-sm transition-all flex text-sm active:scale-95 whitespace-nowrap">
                   <Trash2 size={18} className="mr-2" />
                   초기화
                 </button>
