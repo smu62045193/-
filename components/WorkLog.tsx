@@ -586,7 +586,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     const formattedDay = format(currentDate, 'dd');
     const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
     const dayName = days[currentDate.getDay()];
-    const dutyInfo = `주간 : ${facilityDuty.day || ''} / 당직 : ${facilityDuty.night || ''}`;
+    
+    // 주간 근무자가 없을 경우 "주간 :" 문구 숨김 처리
+    const dutyInfo = `${facilityDuty.day ? `주간 : ${facilityDuty.day} / ` : ''}당직 : ${facilityDuty.night || ''}`;
 
     let bodyHtml = '';
 

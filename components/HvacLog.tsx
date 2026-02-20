@@ -275,6 +275,7 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
               th { font-weight: bold !important; background-color: #f2f2f2 !important; font-size: 8.5pt !important; height: 25px !important; }
               td { font-size: 9.5pt !important; }
               input { border: none !important; width: 100% !important; text-align: center !important; font-size: 9.5pt !important; height: 100% !important; font-weight: bold !important; color: black !important; background: transparent !important; letter-spacing: -0.5px; }
+              input::placeholder { color: transparent !important; -webkit-text-fill-color: transparent !important; }
               h3 { font-size: 14pt !important; margin-bottom: 6px !important; font-weight: 900 !important; border-left: 7px solid black !important; padding-left: 12px !important; margin-top: 15px !important; color: black !important; line-height: 1.2 !important; }
               .unit-span { font-size: 7.5pt !important; font-weight: bold !important; margin-left: 1px !important; }
               select { appearance: none !important; border: none !important; background: transparent !important; text-align: center !important; width: auto !important; font-weight: 900 !important; font-size: 13pt !important; color: black !important; padding: 0 !important; margin: 0 !important; }
