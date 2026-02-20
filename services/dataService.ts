@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { 
   DailyData, 
@@ -583,7 +584,7 @@ export const getInitialSafetyCheck = (date: string, type: 'general' | 'ev'): Saf
 
 export const getInitialHvacLog = (date: string): HvacLogData => ({
   date,
-  unitNo: '1',
+  unitNo: '',
   inletTempColdHot: { time10: '', time15: '' },
   outletTempColdHot: { time10: '', time15: '' },
   outletPressColdHot: { time10: '', time15: '' },
@@ -1043,7 +1044,7 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
       location: p.location, 
       company: p.company, 
       prevPlate: p.prev_plate, 
-      plate_num: p.plate_num,   
+      plateNum: p.plate_num,   
       note: p.note 
     }));
   } catch (e) {}

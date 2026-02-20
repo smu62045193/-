@@ -96,6 +96,9 @@ const INITIAL_WORKLOG: WorkLogData = {
   handover: { ...EMPTY_LOG_CATEGORY },
 };
 
+// 딥카피 헬퍼
+const getFreshInitialWorkLog = (): WorkLogData => JSON.parse(JSON.stringify(INITIAL_WORKLOG));
+
 interface TaskRowProps {
   item: TaskItem;
   isToday: boolean;
@@ -268,7 +271,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const [facilityDuty, setFacilityDuty] = useState<DutyStatus>(DEFAULT_DUTY);
   const [securityDuty, setSecurityDuty] = useState<DutyStatus>(DEFAULT_DUTY);
   const [utility, setUtility] = useState<UtilityUsage>(DEFAULT_UTILITY);
-  const [logData, setLogData] = useState<WorkLogData>(INITIAL_WORKLOG);
+  const [logData, setLogData] = useState<WorkLogData>(getFreshInitialWorkLog());
   const [activeTab, setActiveTab] = useState('electrical');
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
@@ -295,11 +298,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     const nextHvac = JSON.parse(JSON.stringify(hvac)) as HvacLogData;
     const nextBoiler = JSON.parse(JSON.stringify(boiler)) as BoilerLogData;
 
-    // 냉온수기 가스 계산
     if (nextHvac.gas) {
       const p = safeParseFloat(nextHvac.gas.prev);
       const c = safeParseFloat(nextHvac.gas.curr);
-      
       if (c > 0) {
         const u = Math.max(0, c - p);
         nextHvac.gas.usage = Math.round(u).toString();
@@ -310,11 +311,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       }
     }
 
-    // 보일러 가스 계산
     if (nextBoiler.gas) {
       const p = safeParseFloat(nextBoiler.gas.prev);
       const c = safeParseFloat(nextBoiler.gas.curr);
-      
       if (c > 0) {
         const u = Math.max(0, c - p);
         nextBoiler.gas.usage = Math.round(u).toString();
@@ -357,7 +356,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const hvacHistory = batchResults[5]?.data || [];
       const boilerHistory = batchResults[6]?.data || [];
 
-      // 어제 리포트 직접 조회 (종균제/소독제 전일재고용)
       const { data: yDailyRaw } = await supabase
         .from('daily_reports')
         .select('work_log')
@@ -409,18 +407,15 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       setHvacGasReadings(analyzedGas.nextHvac);
       setBoilerGasReadings(analyzedGas.nextBoiler);
 
-      let lastWorkdayLog: DailyData | null = null;
-      if (recentLogs && recentLogs.length > 0) {
-        const sortedRecent = [...recentLogs].sort((a: any, b: any) => b.key.localeCompare(a.key));
-        lastWorkdayLog = sortedRecent[0]?.data;
-      }
+      // 어제 날짜 데이터만 정확히 추출 (무조건 어제 날짜로 변경 요청 사항 적용)
+      const yesterdayLogEntry = recentLogs.find((l: any) => l.key === `DAILY_${yesterdayStr}`);
+      const lastWorkdayLog = yesterdayLogEntry ? yesterdayLogEntry.data : null;
       
-      const rawWorkLog = serverDataResult?.workLog || INITIAL_WORKLOG;
+      const rawWorkLog = serverDataResult?.workLog || getFreshInitialWorkLog();
       const currentScheduled = Array.isArray(rawWorkLog?.scheduled) ? rawWorkLog.scheduled : [];
       
-      let finalWorkLog: WorkLogData = deepMerge(INITIAL_WORKLOG, { ...rawWorkLog, scheduled: currentScheduled });
+      let finalWorkLog: WorkLogData = deepMerge(getFreshInitialWorkLog(), { ...rawWorkLog, scheduled: currentScheduled });
 
-      // 기계 탭 약품 재고 연동 - 직접 호출한 yesterdayDirectReport 활용
       if (yesterdayDirectReport && yesterdayDirectReport.mechanicalChemicals) {
         if (!finalWorkLog.mechanicalChemicals) {
           finalWorkLog.mechanicalChemicals = JSON.parse(JSON.stringify(INITIAL_CHEMICALS));
@@ -430,14 +425,12 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           const currentChem = finalWorkLog.mechanicalChemicals![key];
           const yesterdayChem = yesterdayDirectReport.mechanicalChemicals![key];
           const yesterdayStock = yesterdayChem.stock || (yesterdayChem as any).currentStock || '0';
-          // 오늘의 전일재고가 비어있다면 어제의 최종재고를 할당
           if (yesterdayStock && (!currentChem.prev || currentChem.prev === '' || currentChem.prev === '0')) {
             currentChem.prev = String(yesterdayStock);
           }
         });
       }
 
-      // 합산 재계산 (비어있는 입력은 safeParseFloat에 의해 0으로 처리됨)
       if (finalWorkLog.mechanicalChemicals) {
         ['seed', 'sterilizer'].forEach((key) => {
           const chem = finalWorkLog.mechanicalChemicals![key as 'seed' | 'sterilizer'];
@@ -448,7 +441,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         });
       }
 
-      const categories = ['electrical', 'substation', 'mechanical', 'fire', 'elevator', 'parking', 'security', 'cleaning', 'handover'];
+      const categories = ['electrical', 'substation', 'mechanical', 'hvac', 'boiler', 'fire', 'elevator', 'parking', 'security', 'cleaning', 'handover'];
       const automationMap: Record<string, (d: string) => TaskItem[]> = {
         electrical: getAutomatedElectricalTasks,
         mechanical: getAutomatedMechanicalTasks,
@@ -458,13 +451,17 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         security: getAutomatedSecurityTasks,
         cleaning: getAutomatedCleaningTasks,
         substation: () => [],
-        handover: () => []
+        handover: () => [],
+        hvac: () => [],
+        boiler: () => []
       };
 
       const normalizeContent = (text: string) => (text || '').replace(/\s+/g, '').trim();
 
       categories.forEach((key) => {
         let cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
+        
+        // 1. 자동화 작업 로드 (내용이 하나도 없을 때만)
         if (!cat.today || cat.today.length === 0) {
           cat.today = automationMap[key] ? automationMap[key](dateKey) : [];
         }
@@ -472,14 +469,22 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
           cat.tomorrow = autoTasksTomorrow.map(t => ({ ...t, status: undefined }));
         }
+
+        // 2. 어제 날짜의 "익일 예정사항" 병합 (핵심 로직 - 무조건 어제로 고정됨)
         if (lastWorkdayLog?.workLog && (lastWorkdayLog.workLog as any)[key]?.tomorrow) {
           const prevTomorrow = (lastWorkdayLog.workLog as any)[key].tomorrow as TaskItem[];
           prevTomorrow.forEach(item => {
             if (item?.content?.trim()) {
               const normalizedPrev = normalizeContent(item.content);
+              // 현재 'today'에 이미 같은 내용이 있는지 체크
               const isDuplicate = cat.today.some(t => normalizeContent(t.content) === normalizedPrev);
               if (!isDuplicate) {
-                cat.today.push({ id: `from_prev_${item.id}_${Date.now()}`, content: item.content, frequency: item.frequency || '일일', status: '진행중' });
+                cat.today.push({ 
+                  id: `from_prev_${item.id}_${Date.now()}_${Math.random().toString(36).substr(2,4)}`, 
+                  content: item.content, 
+                  frequency: item.frequency || '일일', 
+                  status: '진행중' 
+                });
               }
             }
           });
@@ -521,7 +526,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         lastUpdated: new Date().toISOString()
       });
 
-      if (activeTab === 'mechanical') {
+      if (activeTab === 'mechanical' || activeTab === 'mech_facility') {
         await Promise.all([
           saveGasLog(gasLog),
           saveSepticLog(septicLog),
@@ -587,7 +592,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     const days = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
     const dayName = days[currentDate.getDay()];
     
-    // 주간 근무자가 없을 경우 "주간 :" 문구 숨김 처리
     const dutyInfo = `${facilityDuty.day ? `주간 : ${facilityDuty.day} / ` : ''}당직 : ${facilityDuty.night || ''}`;
 
     let bodyHtml = '';
@@ -617,7 +621,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         const safeGas = gasData || getInitialGasLog(dateKey);
         const safeSeptic = septicData || getInitialSepticLog(dateKey);
         
-        // 소모품 합산 로직 추가
         const dailyConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && (c.category === '기계' || c.category === '공용'));
         const aggMap = new Map();
         dailyConsumables.forEach(c => {
@@ -675,7 +678,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     } else if (catId === 'electrical') {
         const [subCheckData, consumables] = await Promise.all([fetchSubstationChecklist(dateKey), fetchConsumables()]);
         
-        // 소모품 합산 로직 추가
         const dailyConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && (c.category === '전기' || c.category === '소방'));
         const aggMap = new Map();
         dailyConsumables.forEach(c => {
@@ -857,8 +859,6 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       </div>
     );
 
-    const canPrintThisTab = activeTab === 'electrical' || activeTab === 'mechanical';
-
     if (activeTab === 'mechanical') {
       const groupedGas: Record<string, GasCheckItem[]> = {};
       gasLog.items.forEach(item => {
@@ -982,9 +982,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
           icon={getTabIcon()}
           data={(logData as any)?.[activeTab]} 
           onUpdate={d => setLogData({...logData, [activeTab]: d})} 
-          onPrint={canPrintThisTab ? () => handlePrintCategory(activeTab) : undefined}
+          onPrint={(activeTab === 'electrical' || activeTab === 'mechanical') ? () => handlePrintCategory(activeTab) : undefined}
           onRefresh={() => loadData(() => false, true)}
-          onSave={activeTab === 'substation' || activeTab === 'air_env' ? undefined : handleSaveAll}
+          onSave={handleSaveAll}
         />
         {activeTab === 'electrical' && <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mt-2"><SubstationChecklistLog currentDate={currentDate} isEmbedded={true} /></div>}
       </div>

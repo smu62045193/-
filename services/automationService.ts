@@ -1,3 +1,4 @@
+
 import { TaskItem, ElevatorLogData, FireInspectionLogData, DutyStatus, StaffMember } from '../types';
 import { HOLIDAYS } from '../constants';
 import { parseISO, getDay, format, addDays, getMonth, differenceInDays } from 'date-fns';
@@ -80,12 +81,12 @@ export const getAutomatedMechanicalTasks = (dateStr: string): TaskItem[] => {
   const tasks: TaskItem[] = [];
   const generateId = (prefix: string) => `auto-mech-${prefix}-${dateStr}`;
 
-  // 기계실 일상 점검은 당직 업무이므로 매일 등록
+  // 상시 업무: 기계실 점검 및 각층 순찰 점검은 매일 등록
   tasks.push({ id: generateId('daily-clean'), content: '기계실 일상 점검 및 정리정돈', frequency: '일일', status: '완료' });
+  tasks.push({ id: generateId('patrol'), content: '각층 기계 설비 순찰 점검', frequency: '일일', status: '완료' });
 
-  // 평일에만 등록되는 항목
+  // 평일에만 추가로 등록되는 항목
   if (!isNonWorking) {
-    tasks.push({ id: generateId('patrol'), content: '각층 기계 설비 순찰 점검', frequency: '일일', status: '완료' });
     tasks.push({ id: generateId('hvac-monitor'), content: '냉,난방기 가동 및 감시', frequency: '일일', status: '완료' });
     tasks.push({ id: generateId('tank-check'), content: '물탱크,집수정,정화조 일상점검', frequency: '일일', status: '완료' });
     
