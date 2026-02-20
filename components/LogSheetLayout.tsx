@@ -48,32 +48,37 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
     prevSaveStatus.current = saveStatus;
   }, [saveStatus]);
 
+  // 임베디드 모드이면서 헤더가 표시되는 경우, 테두리 밀착을 위해 컨테이너 p-0 설정
   const containerClass = isEmbedded 
-    ? "p-4 sm:p-6 space-y-6 w-full bg-white" 
-    : "p-4 sm:p-8 max-w-[1200px] mx-auto space-y-8 bg-white rounded-2xl border border-slate-200 shadow-sm print:shadow-none print:border-none print:p-0";
+    ? `w-full bg-white ${!hideHeader ? 'rounded-2xl border border-slate-200 shadow-sm overflow-hidden' : 'p-4 sm:p-6'}` 
+    : "p-4 sm:p-8 max-w-[1200px] mx-auto space-y-6 bg-white rounded-2xl border border-slate-200 shadow-sm print:shadow-none print:border-none print:p-0";
 
   return (
     <div className={containerClass}>
-      <div className="animate-fade-in space-y-6">
+      <div className="animate-fade-in">
         {!hideHeader && (
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6 mb-2 print:hidden">
+          <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print:hidden ${
+            isEmbedded 
+              ? 'bg-slate-50/50 border-b border-slate-100 px-5 py-3' 
+              : 'pb-2'
+          }`}>
             <div className="flex flex-col gap-1">
-              <div className="text-2xl font-black text-slate-800 flex items-center leading-none tracking-tight">
+              <h4 className="font-bold text-gray-800 flex items-center leading-none">
                 {title}
-              </div>
-              {date && <span className="text-sm text-slate-400 font-medium flex items-center gap-1.5">
-                <Info size={14} className="text-slate-300" />
+              </h4>
+              {date && <span className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                <Info size={12} className="text-slate-300" />
                 {date} 기준 데이터
               </span>}
             </div>
             
-            {/* 버튼 그룹: flex-nowrap으로 한 행 고정 및 모바일에서 가로 스크롤 */}
+            {/* 버튼 그룹 */}
             <div className="flex flex-row items-center gap-2 w-full md:w-auto overflow-x-auto scrollbar-hide pb-1">
               {onRefresh && !hideRefresh && (
                 <button 
                   onClick={onRefresh} 
                   disabled={loading} 
-                  className="flex-none flex flex-row items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-gray-200 rounded-xl hover:bg-emerald-50 border-emerald-100 font-bold shadow-sm transition-all text-sm disabled:opacity-50 active:scale-95 whitespace-nowrap"
+                  className="flex-none flex flex-row items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl hover:bg-emerald-50 border-emerald-100 font-bold shadow-sm transition-all text-sm disabled:opacity-50 active:scale-95 whitespace-nowrap"
                 >
                   <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
                   새로고침
@@ -121,7 +126,9 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
           </div>
         )}
 
-        <div className="print:w-full">{children}</div>
+        <div className={`print:w-full ${isEmbedded && !hideHeader ? 'p-4 sm:p-6 space-y-4' : 'space-y-4'}`}>
+          {children}
+        </div>
       </div>
     </div>
   );

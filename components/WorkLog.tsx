@@ -50,7 +50,7 @@ import {
   BoilerLogData
 } from '../types';
 import { format, addDays, subDays, parseISO, startOfMonth } from 'date-fns';
-import { Plus, Trash2, LayoutList, RefreshCw, ArrowRightCircle, CheckCircle2, Save, Cloud, X, Printer, Car, Shield, Droplets, ClipboardCheck, Flame, Zap, Search, Calendar, History, ClipboardList } from 'lucide-react';
+import { Plus, Trash2, LayoutList, RefreshCw, ArrowRightCircle, CheckCircle2, Save, Cloud, X, Printer, Car, Shield, Droplets, ClipboardCheck, Flame, Zap, Search, Calendar, History, ClipboardList, ArrowUpDown, Edit3 } from 'lucide-react';
 import SubstationLog from './SubstationLog';
 import HvacLog from './HvacLog';
 import FireFacilityCheck from './FireFacilityCheck';
@@ -809,7 +809,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     if (activeTab === 'mech_facility') return <HvacLog currentDate={currentDate} isEmbedded={true} onUsageChange={(h, b) => setUtility(p => ({...p, hvacGas: h, boilerGas: b}))} />;
     if (activeTab === 'air_env') return <AirEnvironmentLog currentDate={currentDate} />;
     if (activeTab === 'checklist') return (
-      <div className="space-y-6">
+      <div className="space-y-2">
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
           <div className="bg-gray-50/50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -848,7 +848,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       </div>
     );
     if (activeTab === 'park_sec_clean') return (
-      <div className="space-y-8">
+      <div className="space-y-2">
         <DetailedLogSection title="주차 관리" icon={<Car className="text-blue-500" size={20} />} data={logData?.parking} onUpdate={d => setLogData({...logData, parking: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
         <DetailedLogSection title="경비 보안" icon={<Shield className="text-green-500" size={20} />} data={logData?.security} onUpdate={d => setLogData({...logData, security: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
         <DetailedLogSection title="미화 위생" icon={<Droplets className="text-cyan-500" size={20} />} data={logData?.cleaning} onUpdate={d => setLogData({...logData, cleaning: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
@@ -866,7 +866,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const gasCategories = ['정압실', '배관 계통', '연소 장치', '경보 장치'];
 
       return (
-        <div className="space-y-6">
+        <div className="space-y-2">
           <DetailedLogSection 
             title="기계 업무일지" 
             icon={<LayoutList className="text-blue-600" size={20} />}
@@ -958,24 +958,40 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       );
     }
 
+    const getTabIcon = () => {
+      switch(activeTab) {
+        case 'electrical': return <Zap className="text-blue-600" size={20} />;
+        case 'fire': return <Flame className="text-red-600" size={20} />;
+        case 'elevator': return <ArrowUpDown className="text-blue-600" size={20} />;
+        case 'handover': return <Edit3 className="text-slate-600" size={20} />;
+        default: return null;
+      }
+    };
+
+    const getTabLabel = () => {
+      if (activeTab === 'electrical') return "전기 업무일지";
+      return WORK_LOG_TABS.find(t => t.id === activeTab)?.label || '';
+    };
+
     return (
-      <div className="space-y-6">
+      <div className="space-y-2">
         <DetailedLogSection 
-          title={WORK_LOG_TABS.find(t => t.id === activeTab)?.label || ''} 
+          title={getTabLabel()} 
+          icon={getTabIcon()}
           data={(logData as any)?.[activeTab]} 
           onUpdate={d => setLogData({...logData, [activeTab]: d})} 
           onPrint={canPrintThisTab ? () => handlePrintCategory(activeTab) : undefined}
           onRefresh={() => loadData(() => false, true)}
           onSave={activeTab === 'substation' || activeTab === 'air_env' ? undefined : handleSaveAll}
         />
-        {activeTab === 'electrical' && <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mt-4"><SubstationChecklistLog currentDate={currentDate} isEmbedded={true} /></div>}
+        {activeTab === 'electrical' && <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mt-2"><SubstationChecklistLog currentDate={currentDate} isEmbedded={true} /></div>}
       </div>
     );
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 pb-32">
-      <div className="mb-6 print:hidden">
+    <div className="p-6 max-w-7xl mx-auto space-y-2 pb-32">
+      <div className="mb-2 print:hidden">
         <div className="flex items-center gap-4">
           <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
             <ClipboardList className="mr-3 text-blue-600" size={32} />
@@ -989,8 +1005,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         <div className="flex flex-col items-center justify-center py-32 bg-white rounded-2xl border border-gray-200 shadow-sm"><RefreshCw size={48} className="animate-spin text-blue-500 mb-4" /><p className="text-gray-500 font-bold text-lg">데이터 동기화 중...</p></div>
       ) : (
         <>
-          <div className="animate-fade-in space-y-6">
-            <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center">
+          <div className="animate-fade-in space-y-2">
+            <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-2 scrollbar-hide items-center">
               <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
                 <LayoutList size={22} />
               </div>

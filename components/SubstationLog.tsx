@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchDailyData, fetchSubstationLog, getInitialSubstationLog, saveDailyData, saveSubstationLog, getInitialDailyData } from '../services/dataService';
 import { AcbReadings, PowerUsageReadings, SubstationLogData, VcbReadings, DailyData } from '../types';
 import LogSheetLayout from './LogSheetLayout';
-import { Save, RefreshCw, CheckCircle2, Cloud, X } from 'lucide-react';
+import { Save, RefreshCw, CheckCircle2, Cloud, X, Zap } from 'lucide-react';
 
 interface SubstationLogProps {
   currentDate: Date;
@@ -317,7 +317,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   return (
     <>
       <LogSheetLayout 
-        title="수변전반 일지" 
+        title={<div className="flex items-center gap-2"><Zap className="text-blue-600" size={20} />수변전반 일지</div>} 
         loading={loading} 
         saveStatus={saveStatus} 
         onRefresh={() => loadData(true)} 

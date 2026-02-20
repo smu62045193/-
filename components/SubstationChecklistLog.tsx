@@ -55,10 +55,10 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
   // Right Column: ATS (9 items)
   const rightColItems = safeItems.filter(i => i.category === 'ATS');
 
-  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-[13px] text-slate-700 h-11 uppercase tracking-tight";
-  const tdClass = "border border-slate-300 p-2 text-left bg-white text-slate-900 h-11 text-[13px] font-medium pl-4";
-  const labelClass = "border border-slate-300 p-2 font-bold text-center bg-white text-slate-700 align-middle w-20 text-[13px]";
-  const resultClass = (res: string) => `border border-slate-300 p-1 text-center font-black text-[13px] w-28 cursor-pointer select-none transition-colors h-11 ${res === '양호' ? 'text-blue-600' : 'text-red-600 bg-red-50'}`;
+  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-[13px] text-slate-700 h-9 uppercase tracking-tight";
+  const tdClass = "border border-slate-300 p-1 text-left bg-white text-slate-900 h-9 text-[13px] font-medium pl-4";
+  const labelClass = "border border-slate-300 p-1 font-bold text-center bg-white text-slate-700 align-middle w-20 text-[13px]";
+  const resultClass = (res: string) => `border border-slate-300 p-1 text-center font-black text-[13px] w-28 cursor-pointer select-none transition-colors h-9 ${res === '양호' ? 'text-blue-600' : 'text-red-600 bg-red-50'}`;
 
   const renderRow = (item: SubstationCheckItem, idx: number, arr: SubstationCheckItem[]) => {
     const isFirstInCategory = idx === 0 || arr[idx - 1].category !== item.category;
@@ -84,14 +84,17 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
 
   return (
     <LogSheetLayout
-      title={<div className="flex items-center gap-2"><h2 className="text-2xl font-black text-slate-800">수변전반 점검표</h2></div>}
       loading={loading}
       hidePrint={true}
-      hideRefresh={isEmbedded}
-      hideSave={isEmbedded}
+      hideRefresh={true}
+      hideSave={true}
       isEmbedded={isEmbedded}
+      hideHeader={true}
     >
       <div id="substation-checklist-print-area" className="bg-white">
+        <div className="mb-2 px-1">
+          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">수변전반 점검표</h3>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-0 border-t border-l border-slate-300 overflow-hidden shadow-sm">
           {/* Left Side Section */}
           <div className="border-r border-slate-300">
@@ -121,8 +124,7 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
               </thead>
               <tbody>
                 {rightColItems.map((item, idx) => renderRow(item, idx, rightColItems))}
-                {/* 우측 하단 높이 밸런스를 위한 빈 행 (필요시) */}
-                <tr className="h-11">
+                <tr className="h-9">
                   <td className="border border-slate-300 bg-white"></td>
                   <td className="border border-slate-300 bg-white"></td>
                   <td className="border border-slate-300 bg-white"></td>

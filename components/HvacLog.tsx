@@ -13,7 +13,7 @@ import {
 } from '../services/dataService';
 import { format, subDays, parseISO, startOfMonth } from 'date-fns';
 import LogSheetLayout from './LogSheetLayout';
-import { Save, RefreshCw, CheckCircle2, Cloud, X } from 'lucide-react';
+import { Save, RefreshCw, CheckCircle2, Cloud, X, Wind } from 'lucide-react';
 
 interface HvacLogProps {
   currentDate: Date;
@@ -320,7 +320,7 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
   return (
     <>
       <LogSheetLayout 
-          title="기계설비 운전일지" 
+          title={<div className="flex items-center gap-2"><Wind className="text-blue-500" size={20} />기계설비 운전일지</div>} 
           loading={loading} 
           saveStatus={saveStatus} 
           onPrint={handlePrint} 

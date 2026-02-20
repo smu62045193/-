@@ -335,18 +335,19 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
   return (
     <>
       <LogSheetLayout 
-        title="대기배출시설 및 방지시설 운영기록부" 
+        title={<div className="flex items-center gap-2"><Cloud className="text-sky-500" size={20} />대기배출시설 및 방지시설 운영기록부</div>} 
         loading={loading} 
         onSave={handleSave} 
         onPrint={handlePrint} 
         hideRefresh={true}
         hideSave={false}
+        isEmbedded={true}
         extraActions={refreshButton}
         saveStatus={saveStatus}
       >
-        <div id="air-env-log-content" className="bg-white p-4 text-black min-w-[850px] max-w-5xl mx-auto shadow-sm border border-gray-100 rounded-lg">
+        <div className="bg-transparent text-black w-full">
           
-          <div className="flex items-center justify-between mb-8 px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200">
+          <div className="flex items-center justify-between mb-6 px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200">
             <div className="flex items-center gap-4 font-bold text-slate-700 text-base">
               {isWeatherEditing ? (
                 <div className="flex items-center gap-3 animate-fade-in">
@@ -407,7 +408,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             </button>
           </div>
 
-          <div className="mb-10">
+          <div className="mb-8">
             <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</h3>
             <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
               <table className="w-full border-collapse text-center">
@@ -427,7 +428,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             <p className="text-xs mt-2 font-medium text-gray-500">* 비고란은 정상 여부 기재합니다.</p>
           </div>
           
-          <div className="mt-12">
+          <div className="mt-8">
             <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">2. 방지시설 운영사항</h3>
             <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
               <table className="w-full border-collapse text-center">
