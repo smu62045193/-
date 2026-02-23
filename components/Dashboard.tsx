@@ -494,9 +494,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Calendar className="text-emerald-600" size={20} />
-              <h3 className="font-black text-slate-800">금일 시설 근무 현황</h3>
+              <h3 className="font-black text-xl text-slate-800 tracking-tight">금일 시설 근무 현황</h3>
             </div>
-            <span className={`px-4 py-1.5 rounded-full text-[12px] font-black uppercase tracking-widest shadow-md transition-colors ${isHolidayMode ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}>
+            <span className={`px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md transition-colors ${isHolidayMode ? 'bg-rose-600 text-white' : 'bg-blue-600 text-white'}`}>
               {isHolidayMode ? '휴일 근무' : '평일 근무'}
             </span>
           </div>
@@ -586,7 +586,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex flex-col lg:flex-row items-center gap-6">
+      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col lg:flex-row items-center gap-6">
         <div className="flex items-center gap-3 shrink-0">
           <div className="p-3 bg-blue-600 rounded-2xl shadow-lg text-white"><Search size={24} /></div>
           <div>
@@ -597,9 +597,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
         <div className="flex flex-1 w-full gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input type="text" placeholder="전체 기간 기록에서 검색어 입력..." className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-base outline-none font-bold focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+            <input type="text" placeholder="전체 기간 기록에서 검색어 입력..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-base outline-none font-bold focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
           </div>
-          <button onClick={() => handleSearch()} disabled={isSearching} className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black shadow-xl hover:bg-blue-700 transition-all flex items-center gap-2 whitespace-nowrap active:scale-95 disabled:bg-slate-400">
+          <button onClick={() => handleSearch()} disabled={isSearching} className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-xl hover:bg-blue-700 transition-all flex items-center gap-2 whitespace-nowrap active:scale-95 disabled:bg-slate-400">
             {isSearching ? <RefreshCw size={20} className="animate-spin" /> : <Search size={20} />}
             {isSearching ? "검색 중" : "검색하기"}
           </button>
@@ -610,7 +610,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ClipboardList className="text-indigo-600" size={20} />
-            <h3 className="font-black text-slate-800">금일 중요 업무 요약</h3>
+            <h3 className="font-black text-xl text-slate-800 tracking-tight">금일 중요 업무 요약</h3>
           </div>
           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operational Summary</div>
         </div>
