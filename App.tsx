@@ -32,7 +32,7 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | 'parking_status' | 'meter_photo' | 'tenant' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | 'parking_status' | 'meter_photo' | 'tenant' | 'search' | null>(null);
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -62,6 +62,8 @@ const App: React.FC = () => {
       setIsPopupMode('meter_photo');
     } else if (popupType === 'tenant') {
       setIsPopupMode('tenant');
+    } else if (popupType === 'search') {
+      setIsPopupMode('search');
     }
   }, []);
 
@@ -117,6 +119,10 @@ const App: React.FC = () => {
 
   if (isPopupMode === 'tenant') {
     return <TenantStatus isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'search') {
+    return <Dashboard currentDate={currentDate} isSearchPopupMode={true} />;
   }
 
   const renderContent = () => {

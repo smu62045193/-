@@ -60,19 +60,17 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
     end: addDays(today, 3)
   });
 
-  if (!isNearToday) return getSeasonalMockWeather(dateStr);
+  if (!isNearToday || !force) return getSeasonalMockWeather(dateStr);
 
-  if (!force) {
-    if (weatherCache.has(storageKey)) return weatherCache.get(storageKey) || null;
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        weatherCache.set(storageKey, parsed);
-        return parsed;
-      }
-    } catch (e) {}
-  }
+  if (weatherCache.has(storageKey)) return weatherCache.get(storageKey) || null;
+  try {
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      weatherCache.set(storageKey, parsed);
+      return parsed;
+    }
+  } catch (e) {}
 
   if (pendingRequests.has(storageKey)) return pendingRequests.get(storageKey)!;
 
