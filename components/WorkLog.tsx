@@ -391,8 +391,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       
       historySumsRef.current = { hvac: hSum, boiler: bSum };
 
-      let initialH = hvacBoilerCombined?.hvac_data || getInitialHvacLog(dateKey);
-      let initialB = hvacBoilerCombined?.boiler_data || getInitialBoilerLog(dateKey);
+      const initialH = hvacBoilerCombined?.hvac_data || getInitialHvacLog(dateKey);
+      const initialB = hvacBoilerCombined?.boiler_data || getInitialBoilerLog(dateKey);
 
       if (hLatestRecord && (!initialH.gas?.prev || initialH.gas.prev === '0' || initialH.gas.prev === '')) {
         const lastCurr = hLatestRecord.gas?.curr || hLatestRecord.hvac_data?.gas?.curr;
@@ -408,13 +408,10 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       setBoilerGasReadings(analyzedGas.nextBoiler);
 
       // 어제 날짜 데이터만 정확히 추출 (무조건 어제 날짜로 변경 요청 사항 적용)
-      const yesterdayLogEntry = recentLogs.find((l: any) => l.key === `DAILY_${yesterdayStr}`);
-      const lastWorkdayLog = yesterdayLogEntry ? yesterdayLogEntry.data : null;
-      
       const rawWorkLog = serverDataResult?.workLog || getFreshInitialWorkLog();
       const currentScheduled = Array.isArray(rawWorkLog?.scheduled) ? rawWorkLog.scheduled : [];
       
-      let finalWorkLog: WorkLogData = deepMerge(getFreshInitialWorkLog(), { ...rawWorkLog, scheduled: currentScheduled });
+      const finalWorkLog: WorkLogData = deepMerge(getFreshInitialWorkLog(), { ...rawWorkLog, scheduled: currentScheduled });
 
       if (yesterdayDirectReport && yesterdayDirectReport.mechanicalChemicals) {
         if (!finalWorkLog.mechanicalChemicals) {
@@ -459,7 +456,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const normalizeContent = (text: string) => (text || '').replace(/\s+/g, '').trim();
 
       categories.forEach((key) => {
-        let cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
+        const cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
         
         // 1. 자동화 작업 로드 (내용이 하나도 없을 때만)
         if (!cat.today || cat.today.length === 0) {
@@ -471,8 +468,9 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         }
 
         // 2. 어제 날짜의 "익일 예정사항" 병합 (핵심 로직 - 무조건 어제로 고정됨)
-        if (lastWorkdayLog?.workLog && (lastWorkdayLog.workLog as any)[key]?.tomorrow) {
-          const prevTomorrow = (lastWorkdayLog.workLog as any)[key].tomorrow as TaskItem[];
+        const yesterdayWorkLog = yesterdayDirectReport;
+        if (yesterdayWorkLog && (yesterdayWorkLog as any)[key]?.tomorrow) {
+          const prevTomorrow = (yesterdayWorkLog as any)[key].tomorrow as TaskItem[];
           prevTomorrow.forEach(item => {
             if (item?.content?.trim()) {
               const normalizedPrev = normalizeContent(item.content);
@@ -594,7 +592,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     
     const dutyInfo = `${facilityDuty.day ? `주간 : ${facilityDuty.day} / ` : ''}당직 : ${facilityDuty.night || ''}`;
 
-    let bodyHtml = '';
+    let bodyHtml: string;
 
     if (catId === 'checklist') {
         const [fireData, elvData] = await Promise.all([fetchFireFacilityLog(dateKey), fetchElevatorLog(dateKey)]);

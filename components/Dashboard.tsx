@@ -487,7 +487,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 pb-20">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-3 pb-20">
       
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -496,7 +496,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
               <Calendar className="text-emerald-600" size={20} />
               <h3 className="font-black text-xl text-slate-800 tracking-tight">금일 시설 근무 현황</h3>
             </div>
-            <span className={`px-4 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-md transition-colors ${isHolidayMode ? 'bg-rose-600 text-white' : 'bg-blue-600 text-white'}`}>
+            <span className={`px-6 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest shadow-md transition-colors ${isHolidayMode ? 'bg-rose-600 text-white' : 'bg-blue-600 text-white'}`}>
               {isHolidayMode ? '휴일 근무' : '평일 근무'}
             </span>
           </div>
@@ -504,17 +504,17 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
           <div className="flex flex-wrap items-center gap-2">
             <button 
               onClick={() => loadData('2-shift')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('2-shift') ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-slate-600 border-slate-200'}`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('2-shift') ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-slate-600 border-slate-200'}`}
             >
-              <Power size={14} />
+              <Power size={16} />
               2교대 자동 {isAutoActiveOnCurrentDate('2-shift') ? '[ON]' : '[OFF]'}
             </button>
 
             <button 
               onClick={() => loadData('3-shift')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('3-shift') ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-slate-600 border-slate-200'}`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('3-shift') ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-slate-600 border-slate-200'}`}
             >
-              <Power size={14} />
+              <Power size={16} />
               3교대 자동 {isAutoActiveOnCurrentDate('3-shift') ? '[ON]' : '[OFF]'}
             </button>
 
@@ -522,20 +522,19 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
 
             {isDutyEditing ? (
               <div className="flex gap-2">
-                <button onClick={handleCancelEdit} className="flex items-center px-4 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl font-bold text-xs active:scale-95"><X size={16} className="mr-1" />취소</button>
-                <button onClick={handleLocalConfirm} className="flex items-center px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-bold shadow-md text-xs active:scale-95">
-                  <CheckCircle size={16} className="mr-1" />수동확정
+                <button onClick={handleLocalConfirm} className="flex items-center px-6 py-2.5 bg-orange-600 text-white rounded-xl font-bold shadow-md text-sm active:scale-95">
+                  <CheckCircle size={18} className="mr-2" />편집완료
                 </button>
               </div>
             ) : (
               <div className="flex gap-2">
-                <button onClick={startManualEdit} className="flex items-center px-4 py-2.5 bg-slate-800 text-white rounded-xl font-bold shadow-md text-xs hover:bg-slate-900 active:scale-95"><Edit2 size={16} className="mr-1" />편집</button>
+                <button onClick={startManualEdit} className="flex items-center px-6 py-2.5 bg-gray-100 text-slate-600 border border-slate-200 rounded-xl font-bold shadow-sm text-sm hover:bg-gray-200 active:scale-95"><Edit2 size={18} className="mr-2" />편집</button>
                 <button 
                   onClick={() => handleSave(dutyWasEdited)} 
                   disabled={saveStatus === 'loading'} 
-                  className={`flex items-center px-4 py-2.5 rounded-xl font-bold text-xs transition-all shadow-md active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                  className={`flex items-center px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                 >
-                  {saveStatus === 'loading' ? <RefreshCw size={14} className="animate-spin mr-1" /> : saveStatus === 'success' ? <CheckCircle size={14} className="mr-1" /> : <Save size={14} className="mr-1" />}
+                  {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin mr-2" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-2" /> : <Save size={18} className="mr-2" />}
                   {saveStatus === 'loading' ? '저장 중...' : saveStatus === 'success' ? '저장 완료' : '서버저장'}
                 </button>
               </div>
@@ -556,9 +555,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
             <div className="space-y-3">
               <label className="text-[11px] font-black text-slate-400 uppercase tracking-tighter">당직</label>
               {isDutyEditing ? (
-                <input type="text" value={dutyStatus.night || ''} onChange={(e) => updateDutyField('night', e.target.value)} className="w-full bg-orange-50/30 border-2 border-orange-200 rounded-2xl px-5 py-4 text-orange-700 text-lg font-black outline-none focus:ring-2 focus:ring-orange-400" placeholder="성명" />
+                <input type="text" value={dutyStatus.night || ''} onChange={(e) => updateDutyField('night', e.target.value)} className="w-full bg-orange-50/30 border-2 border-orange-200 rounded-2xl px-5 py-4 text-blue-600 text-lg font-black outline-none focus:ring-2 focus:ring-orange-400" placeholder="성명" />
               ) : (
-                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl px-5 py-4 min-h-[70px] flex items-center justify-center shadow-sm"><span className="text-orange-700 font-black text-xl tracking-tight">{dutyStatus.night || '-'}</span></div>
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl px-5 py-4 min-h-[70px] flex items-center justify-center shadow-sm"><span className="text-blue-600 font-black text-xl tracking-tight">{dutyStatus.night || '-'}</span></div>
               )}
             </div>
             <div className="space-y-3">
@@ -579,7 +578,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
             </div>
           </div>
           
-          <div className="mt-6 flex items-center gap-2 text-[10px] font-bold text-slate-400 bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-inner">
+          <div className="mt-6 flex items-center gap-2 text-xs font-bold text-slate-400 bg-slate-50 p-3 rounded-xl border border-slate-100 shadow-inner">
             <AlertCircle size={14} className="text-blue-400" />
             <span className="uppercase tracking-widest">기준 로테이션 일자: <span className="text-blue-600">{globalShift?.baseDate || 'N/A'}</span> | 모드: <span className="text-slate-800">{globalShift?.mode === 'manual' ? '수동' : globalShift?.mode === '2-shift' ? '2교대 자동' : '3교대 자동'}</span></span>
           </div>

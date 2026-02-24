@@ -4,7 +4,7 @@ import { startOfWeek, addDays, format, subDays, parseISO, isWithinInterval } fro
 import { HOLIDAYS } from '../constants';
 import { fetchWeeklyReport, saveWeeklyReport, fetchDateRangeData, fetchExternalWorkList, fetchInternalWorkList } from '../services/dataService';
 import { WeeklyReportData, WeeklyWorkPhoto, TaskItem, ConstructionWorkItem, WorkPhoto, LogCategory, WorkLogData } from '../types';
-import { Printer, Save, Upload, X, RefreshCw, Plus, CheckSquare, Square, CheckCircle2, Calendar, Image as ImageIcon, Sparkles, LayoutList, ClipboardEdit, Cloud, CheckCircle } from 'lucide-react';
+import { Printer, Save, Upload, X, RefreshCw, Plus, CheckSquare, Square, CheckCircle2, Calendar, Image as ImageIcon, Sparkles, LayoutList, ClipboardEdit, Cloud, CheckCircle, ClipboardList } from 'lucide-react';
 import WeeklyReportList from './WeeklyReportList';
 import { 
   getAutomatedElectricalTasks, 
@@ -109,6 +109,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [selectablePhotos, setSelectablePhotos] = useState<SelectablePhoto[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [isEditMode, setIsEditMode] = useState(false);
   
   const startOfCurrentWeek = startOfWeek(currentDate, { weekStartsOn: 1 });
   const startDateStr = format(startOfCurrentWeek, 'yyyy-MM-dd');
@@ -165,6 +166,21 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     setLoading(false);
   };
 
+  const handleReportingDateChange = (newDateStr: string) => {
+    const newDate = parseISO(newDateStr);
+    const newStart = startOfWeek(newDate, { weekStartsOn: 1 });
+    const newStartStr = format(newStart, 'yyyy-MM-dd');
+    
+    setReport(prev => ({
+      ...prev,
+      reportingDate: newDateStr,
+      startDate: newStartStr
+    }));
+    
+    // 날짜가 변경되면 해당 주차의 데이터를 새로 불러옵니다.
+    loadReport(newStartStr);
+  };
+
   const handleOpenImportModal = async () => {
     setLoading(true);
     try {
@@ -201,9 +217,38 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             let tomorrowTasks: TaskItem[] = [];
 
             if (dayData?.data?.workLog) {
-              const logCat = (dayData.data.workLog[field.id as keyof WorkLogData] || { today: [], tomorrow: [] }) as LogCategory;
-              todayTasks = (logCat.today || []) as TaskItem[];
-              tomorrowTasks = (logCat.tomorrow || []) as TaskItem[];
+              const workLog = dayData.data.workLog as WorkLogData;
+              
+              // 카테고리 병합 로직
+              const getTasks = (catId: string) => {
+                const cat = (workLog[catId as keyof WorkLogData] || { today: [], tomorrow: [] }) as LogCategory;
+                return {
+                  today: (cat.today || []) as TaskItem[],
+                  tomorrow: (cat.tomorrow || []) as TaskItem[]
+                };
+              };
+
+              if (field.id === 'electrical') {
+                const elec = getTasks('electrical');
+                const sub = getTasks('substation');
+                todayTasks = [...elec.today, ...sub.today];
+                tomorrowTasks = [...elec.tomorrow, ...sub.tomorrow];
+              } else if (field.id === 'mechanical') {
+                const mech = getTasks('mechanical');
+                const hvac = getTasks('hvac');
+                const boiler = getTasks('boiler');
+                todayTasks = [...mech.today, ...hvac.today, ...boiler.today];
+                tomorrowTasks = [...mech.tomorrow, ...hvac.tomorrow, ...boiler.tomorrow];
+              } else {
+                const cat = getTasks(field.id);
+                todayTasks = cat.today;
+                tomorrowTasks = cat.tomorrow;
+              }
+
+              // 만약 저장된 데이터가 아예 없다면 자동화 데이터라도 가져옴
+              if (todayTasks.length === 0 && automationMap[field.id]) {
+                todayTasks = automationMap[field.id](dateKey);
+              }
             } else if (automationMap[field.id]) {
               todayTasks = automationMap[field.id](dateKey);
             }
@@ -417,7 +462,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #f1f5f9; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #000000; -webkit-print-color-adjust: exact; }
             .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
             @media print { 
               .no-print { display: none !important; } 
@@ -486,24 +531,76 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   const sortedDates = Object.keys(groupedPhotosByDate).sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className="p-2 sm:p-4 max-w-[1000px] mx-auto bg-white min-h-screen text-black relative">
-      <div className="mb-6 print:hidden"><h2 className="text-2xl font-bold text-gray-800">주간 업무</h2><p className="text-gray-500 mt-1">주간 업무 실적 및 차주 계획을 관리합니다.</p></div>
-      <div className="flex gap-2 pb-2 mb-6 border-b print:hidden"><button onClick={() => setActiveTab('list')} className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${activeTab === 'list' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'}`}><LayoutList size={16} className="inline mr-2" />보고서이력</button><button onClick={() => setActiveTab('form')} className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${activeTab === 'form' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-600 hover:bg-gray-50'}`}><ClipboardEdit size={16} className="inline mr-2" />작성/수정</button></div>
+    <div className="p-2 sm:p-4 max-w-7xl mx-auto bg-white min-h-screen text-black relative">
+      <div className="mb-2 print:hidden">
+        <div className="flex items-center gap-4">
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
+            <ClipboardList className="mr-3 text-blue-600" size={32} />
+            주간 업무
+          </h2>
+          <p className="text-gray-500 text-base font-medium">주간 업무 실적 및 차주 계획을 관리합니다.</p>
+        </div>
+      </div>
+
+      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-2 scrollbar-hide items-center print:hidden">
+        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
+          <LayoutList size={22} />
+        </div>
+        <button 
+          onClick={() => setActiveTab('list')} 
+          className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
+            activeTab === 'list' 
+              ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+          }`}
+        >
+          보고서이력
+        </button>
+        <button 
+          onClick={() => setActiveTab('form')} 
+          className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
+            activeTab === 'form' 
+              ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
+              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+          }`}
+        >
+          작성/수정
+        </button>
+      </div>
       {activeTab === 'list' ? <WeeklyReportList onSelectReport={(s) => { if(onDateChange) onDateChange(parseISO(s)); setActiveTab('form'); }} /> : (
         <>
         <div className="border-b-2 border-black mb-6 pb-3 flex items-center justify-between">
-          <div className="flex-1"></div>
-          <h1 className="text-3xl font-bold tracking-widest text-center flex-shrink-0">주간업무보고</h1>
-          <div className="flex-1 flex justify-end gap-2 print:hidden">
-            <button onClick={handleOpenImportModal} disabled={loading} className="bg-emerald-600 text-white px-3 py-1.5 rounded font-bold text-xs hover:bg-emerald-700 transition-colors shadow-sm flex items-center">
-              <RefreshCw size={18} className={`mr-1 ${loading?'animate-spin':''}`} />가져오기
+          <h1 className="text-3xl font-bold tracking-widest flex-shrink-0">주간업무보고</h1>
+          <div className="flex justify-end gap-2 print:hidden">
+            <button 
+              onClick={handleOpenImportModal} 
+              disabled={loading} 
+              className="flex items-center justify-center px-6 py-2.5 bg-white text-emerald-600 border border-gray-200 rounded-xl hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
+            >
+              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              가져오기
             </button>
-            <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`px-3 py-1.5 rounded font-bold text-xs transition-colors shadow-sm flex items-center text-white ${saveStatus === 'success' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin mr-1" /> : <Save size={18} className="mr-1" />}
+            <button 
+              onClick={() => setIsEditMode(!isEditMode)} 
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'}`}
+            >
+              <ClipboardEdit size={18} className="mr-2" />
+              {isEditMode ? '수정완료' : '수정'}
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={saveStatus === 'loading'} 
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 text-white ${saveStatus === 'success' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+            >
+              {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin mr-2" /> : <Save size={18} className="mr-2" />}
               {saveStatus === 'success' ? '저장완료' : '서버저장'}
             </button>
-            <button onClick={handlePrint} className="bg-gray-700 text-white px-3 py-1.5 rounded font-bold text-xs hover:bg-emerald-800 transition-colors shadow-sm flex items-center">
-              <Printer size={18} className="mr-1" />미리보기
+            <button 
+              onClick={handlePrint} 
+              className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all text-sm active:scale-95"
+            >
+              <Printer size={18} className="mr-2" />
+              미리보기
             </button>
           </div>
         </div>
@@ -519,12 +616,22 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               type="text" 
               value={report.author} 
               onChange={e => setReport({...report, author: e.target.value})} 
-              className="border-b-2 border-gray-100 w-28 outline-none font-bold text-gray-800 py-1 text-center focus:border-blue-500 transition-all bg-transparent" 
+              disabled={!isEditMode}
+              className={`border-b-2 ${isEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-gray-100 bg-transparent'} w-28 outline-none font-bold text-gray-800 py-1 text-center transition-all`} 
             />
           </div>
           <div className="flex items-center gap-3 whitespace-nowrap">
             <span className="text-[12px] font-black text-gray-400 uppercase tracking-tight">작성일자</span>
-            <span className="font-bold text-gray-800">{format(parseISO(report.reportingDate), 'yyyy년 MM월 dd일')}</span>
+            {isEditMode ? (
+              <input 
+                type="date" 
+                value={report.reportingDate} 
+                onChange={e => handleReportingDateChange(e.target.value)}
+                className="border-b-2 border-blue-500 bg-blue-50/30 outline-none font-bold text-gray-800 py-1 px-2 text-sm transition-all rounded"
+              />
+            ) : (
+              <span className="font-bold text-gray-800">{format(parseISO(report.reportingDate), 'yyyy년 MM월 dd일')}</span>
+            )}
           </div>
         </div>
         
@@ -543,7 +650,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                   <textarea 
                     value={report.fields[f.id as keyof typeof report.fields].thisWeek} 
                     onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...report.fields[f.id as keyof typeof report.fields], thisWeek: e.target.value}}})} 
-                    className="auto-expand-textarea w-full h-full p-3 text-[13px] focus:bg-blue-50/50 outline-none resize-none bg-transparent max-h-[200px] overflow-y-auto scrollbar-hide !text-left"
+                    disabled={!isEditMode}
+                    className={`auto-expand-textarea w-full h-full p-3 text-[13px] outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide !text-left transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
                     placeholder="내용 입력..."
                   />
                 </div>
@@ -551,7 +659,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                   <textarea 
                     value={report.fields[f.id as keyof typeof report.fields].results} 
                     onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...report.fields[f.id as keyof typeof report.fields], results: e.target.value}}})} 
-                    className="auto-expand-textarea w-full h-full p-3 text-[13px] text-center focus:bg-blue-50/50 outline-none resize-none bg-transparent max-h-[200px] overflow-y-auto scrollbar-hide"
+                    disabled={!isEditMode}
+                    className={`auto-expand-textarea w-full h-full p-3 text-[13px] text-center outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
                     placeholder="결과..."
                   />
                 </div>
@@ -559,7 +668,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                   <textarea 
                     value={report.fields[f.id as keyof typeof report.fields].nextWeek} 
                     onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...report.fields[f.id as keyof typeof report.fields], nextWeek: e.target.value}}})} 
-                    className="auto-expand-textarea w-full h-full p-3 text-[13px] focus:bg-blue-50/50 outline-none resize-none bg-transparent max-h-[200px] overflow-y-auto scrollbar-hide !text-left"
+                    disabled={!isEditMode}
+                    className={`auto-expand-textarea w-full h-full p-3 text-[13px] outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide !text-left transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
                     placeholder="계획 입력..."
                   />
                 </div>
@@ -568,8 +678,54 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           </div>
         </div>
         <div className="mt-8 border border-gray-300 rounded-xl p-4 bg-white shadow-sm">
-          <div className="flex justify-between items-center mb-4 pb-2 border-b border-100"><h3 className="font-bold text-gray-800 flex items-center"><ImageIcon size={18} className="mr-2 text-blue-500" />작업 사진</h3><button onClick={handleOpenPhotoImportModal} className="text-xs bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg font-bold border border-blue-100 hover:bg-blue-100 transition-all print:hidden">사진 불러오기</button></div>
-          <div className="grid grid-cols-3 gap-4">{(report.photos || []).map((p, i) => (<div key={p.id} className="border border-gray-200 p-1.5 rounded-xl relative group bg-gray-50"><div className="aspect-[4/3] bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 shadow-inner">{p.dataUrl ? <img src={p.dataUrl} className="w-full h-full object-cover" /> : <div className="text-center p-4"><label className="cursor-pointer text-blue-600 text-xs font-bold bg-blue-50 px-3 py-2 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1.5"><Upload size={14}/> 사진 업로드<input type="file" accept="image/*" className="hidden" onChange={async e => { const f=e.target.files?.[0]; if(f){const u=await resizeImage(f); const n=[...(report.photos || [])]; n[i]={...n[i],dataUrl:u}; setReport({...report,photos:n});} }} /></label></div>}</div><input type="text" value={p.title} onChange={e => {const n=[...(report.photos || [])]; n[i]={...n[i],title:e.target.value}; setReport({...report,photos:n});}} placeholder="사진 제목 (예: 1층 전등 교체)" className="w-full mt-2 border-b border-gray-200 outline-none px-1 text-[11px] font-normal text-center bg-transparent focus:border-blue-400" /></div>))}</div>
+          <div className="flex justify-between items-center mb-4 pb-2 border-b border-100">
+            <h3 className="font-bold text-gray-800 flex items-center">
+              <ImageIcon size={18} className="mr-2 text-blue-500" />작업 사진
+            </h3>
+            <button 
+              onClick={handleOpenPhotoImportModal} 
+              disabled={!isEditMode}
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 print:hidden ${isEditMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+            >
+              사진 불러오기
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-4">{(report.photos || []).map((p, i) => (
+            <div key={p.id} className="border border-gray-200 p-1.5 rounded-xl relative group bg-gray-50">
+              <div className="aspect-[4/3] bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 shadow-inner">
+                {p.dataUrl ? <img src={p.dataUrl} className="w-full h-full object-cover" /> : (
+                  <div className="text-center p-4">
+                    <label className={`cursor-pointer text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${isEditMode ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-400 bg-gray-50 cursor-not-allowed'}`}>
+                      <Upload size={14}/> 사진 업로드
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        disabled={!isEditMode}
+                        onChange={async e => { 
+                          const f=e.target.files?.[0]; 
+                          if(f && isEditMode){
+                            const u=await resizeImage(f); 
+                            const n=[...(report.photos || [])]; 
+                            n[i]={...n[i],dataUrl:u}; 
+                            setReport({...report,photos:n});
+                          } 
+                        }} 
+                      />
+                    </label>
+                  </div>
+                )}
+              </div>
+              <input 
+                type="text" 
+                value={p.title} 
+                onChange={e => {const n=[...(report.photos || [])]; n[i]={...n[i],title:e.target.value}; setReport({...report,photos:n});}} 
+                disabled={!isEditMode}
+                placeholder="사진 제목 (예: 1층 전등 교체)" 
+                className={`w-full mt-2 border-b outline-none px-1 text-[11px] font-normal text-center bg-transparent transition-all ${isEditMode ? 'border-blue-400 focus:border-blue-600' : 'border-gray-200'}`} 
+              />
+            </div>
+          ))}</div>
         </div></>
       )}
       {isModalOpen && (
@@ -660,7 +816,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             </div>
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
               <button onClick={() => setIsPhotoModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-100 transition-all">취소</button>
-              <button handleApplyPhotoSelection onClick={handleApplyPhotoSelection} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">선택한 사진 추가 ({selectablePhotos.filter(p=>p.selected).length}장)</button>
+              <button onClick={handleApplyPhotoSelection} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">선택한 사진 추가 ({selectablePhotos.filter(p=>p.selected).length}장)</button>
             </div>
           </div>
         </div>

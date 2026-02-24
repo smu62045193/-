@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { WeeklyReportData } from '../types';
-import { fetchWeeklyReportList } from '../services/dataService';
+import { fetchWeeklyReportList, deleteWeeklyReport } from '../services/dataService';
 import { format, parseISO, addDays } from 'date-fns';
-import { FileText, Search, RefreshCw, Printer, Calendar, User, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FileText, Search, RefreshCw, Printer, Calendar, User, ChevronLeft, ChevronRight, Trash2, Edit3 } from 'lucide-react';
 
 interface WeeklyReportListProps {
   onSelectReport: (startDate: string) => void;
@@ -100,7 +100,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #f1f5f9; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #000000; -webkit-print-color-adjust: exact; }
             .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
             @media print { 
               .no-print { display: none !important; } 
@@ -174,6 +174,23 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleDeleteReport = async (startDate: string) => {
+    if (!confirm('정말로 이 보고서를 삭제하시겠습니까?')) return;
+    
+    try {
+      const success = await deleteWeeklyReport(startDate);
+      if (success) {
+        alert('삭제되었습니다.');
+        loadData();
+      } else {
+        alert('삭제에 실패했습니다.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('오류가 발생했습니다.');
+    }
+  };
+
   return (
     <div className="space-y-4 animate-fade-in pb-10">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
@@ -187,7 +204,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
           </div>
         </div>
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:w-72">
+          <div className="relative flex-1 md:w-80">
             <input 
               type="text" 
               placeholder="작성자 또는 날짜(YYYY-MM) 검색" 
@@ -199,10 +216,11 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
           </div>
           <button 
             onClick={loadData}
-            className="p-2.5 hover:bg-gray-100 rounded-xl transition-all text-gray-500 border border-gray-200 bg-white shadow-sm active:scale-95"
+            className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
             title="새로고침"
           >
-            <RefreshCw size={20} className={loading ? 'animate-spin text-blue-600' : ''} />
+            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
           </button>
         </div>
       </div>
@@ -258,20 +276,30 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-center flex gap-2 justify-center">
-                        <button 
-                          onClick={() => handleViewDetail(report.data)}
-                          className="flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
-                        >
-                          상세보기
-                          <Printer size={12} />
-                        </button>
-                        <button 
-                          onClick={() => onSelectReport(report.data.startDate)}
-                          className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all active:scale-95"
-                        >
-                          편집
-                        </button>
+                      <td className="px-6 py-5 text-center print:hidden">
+                        <div className="flex items-center justify-center gap-1">
+                          <button 
+                            onClick={() => handleViewDetail(report.data)}
+                            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
+                            title="상세보기"
+                          >
+                            <Search size={16} />
+                          </button>
+                          <button 
+                            onClick={() => onSelectReport(report.data.startDate)}
+                            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
+                            title="편집"
+                          >
+                            <Edit3 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteReport(report.data.startDate)}
+                            className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all"
+                            title="삭제"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

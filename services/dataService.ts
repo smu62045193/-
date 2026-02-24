@@ -931,6 +931,11 @@ export const fetchWeeklyReportList = async (): Promise<any[]> => {
   return [];
 };
 
+export const deleteWeeklyReport = async (startDate: string): Promise<boolean> => {
+  const { error } = await supabase.from('weekly_reports').delete().eq('id', `WEEKLY_${startDate}`);
+  return !error;
+};
+
 export const fetchDateRangeData = async (start: string, days: number): Promise<any[]> => {
   const end = format(addDays(parseISO(start), days), 'yyyy-MM-dd');
   return await apiFetchRange("DAILY_", start, end);
