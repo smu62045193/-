@@ -210,152 +210,105 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     loadReport(newStartStr);
   };
 
-  const handleOpenImportModal = async () => {
-    setLoading(true);
-    try {
-      const thisWeekStart = parseISO(report.startDate);
-      const nextWeekStart = addDays(thisWeekStart, 7);
-      
-      const [thisWeekLogs, nextWeekLogs] = await Promise.all([
-        fetchDateRangeData(report.startDate, 7),
-        fetchDateRangeData(format(nextWeekStart, 'yyyy-MM-dd'), 7)
-      ]);
-
-      const automationMap: Record<string, (d: string) => TaskItem[]> = {
-        electrical: getAutomatedElectricalTasks,
-        mechanical: getAutomatedMechanicalTasks,
-        fire: getAutomatedFireTasks,
-        elevator: getAutomatedElevatorTasks,
-        parking: getAutomatedParkingTasks,
-        security: getAutomatedSecurityTasks,
-        cleaning: getAutomatedCleaningTasks,
-        handover: () => []
-      };
-
-      const groupedItems: Record<string, { content: string, fieldKey: string, weekType: 'this' | 'next', days: number[] }> = {};
-
-      const processWeek = (logs: any[], weekType: 'this' | 'next', weekStartDate: Date) => {
-        for (let i = 0; i < 7; i++) {
-          const date = addDays(weekStartDate, i);
-          const dateKey = format(date, 'yyyy-MM-dd');
-          const dayNum = date.getDate();
-          const dayData = logs.find(l => l.key === dateKey || l.key === `DAILY_${dateKey}`);
-          
-          FIELDS.forEach(field => {
-            let todayTasks: TaskItem[] = [];
-            let tomorrowTasks: TaskItem[] = [];
-
-            let autoTasks: TaskItem[] = [];
-            if (automationMap[field.id]) {
-              autoTasks = automationMap[field.id](dateKey);
-            }
-
-            if (dayData?.data?.workLog) {
-              let workLog = dayData.data.workLog;
-              if (typeof workLog === 'string') {
-                try {
-                  workLog = JSON.parse(workLog);
-                } catch (e) {
-                  workLog = {};
-                }
-              }
-              if (!workLog || typeof workLog !== 'object') {
-                workLog = {};
-              }
-              
-              const getTasks = (catId: string) => {
-                const cat = (workLog[catId as keyof WorkLogData] || { today: [], tomorrow: [] }) as LogCategory;
-                return {
-                  today: Array.isArray(cat.today) ? [...cat.today] : [],
-                  tomorrow: Array.isArray(cat.tomorrow) ? [...cat.tomorrow] : []
-                };
-              };
-
-              if (field.id === 'electrical') {
-                const elec = getTasks('electrical');
-                const sub = getTasks('substation');
-                todayTasks = [...elec.today, ...sub.today];
-                tomorrowTasks = [...elec.tomorrow, ...sub.tomorrow];
-              } else if (field.id === 'mechanical') {
-                const mech = getTasks('mechanical');
-                const hvac = getTasks('hvac');
-                const boiler = getTasks('boiler');
-                todayTasks = [...mech.today, ...hvac.today, ...boiler.today];
-                tomorrowTasks = [...mech.tomorrow, ...hvac.tomorrow, ...boiler.tomorrow];
-              } else {
-                const cat = getTasks(field.id);
-                todayTasks = cat.today;
-                tomorrowTasks = cat.tomorrow;
-              }
-
-              const existingContents = new Set(todayTasks.map(t => t.content.trim()));
-              autoTasks.forEach(at => {
-                if (!existingContents.has(at.content.trim())) {
-                  todayTasks.push(at);
-                }
-              });
-            } else {
-              todayTasks = autoTasks;
-            }
-
-            if (weekType === 'this') {
-              todayTasks.forEach(task => {
-                if (task?.content?.trim()) {
-                  const baseContent = task.content.trim();
-                  const key = `this_${field.id}_${baseContent}`;
-                  if (!groupedItems[key]) {
-                    groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'this', days: [] };
-                  }
-                  if (!groupedItems[key].days.includes(dayNum)) groupedItems[key].days.push(dayNum);
-                }
-              });
-              
-              tomorrowTasks.forEach(task => {
-                if (task?.content?.trim()) {
-                  const baseContent = task.content.trim();
-                  const key = `next_${field.id}_${baseContent}`;
-                  if (!groupedItems[key]) {
-                    groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', days: [] };
-                  }
-                  if (!groupedItems[key].days.includes(dayNum)) groupedItems[key].days.push(dayNum);
-                }
-              });
-            } else {
-              todayTasks.forEach(task => {
-                if (task?.content?.trim()) {
-                  const baseContent = task.content.trim();
-                  const key = `next_${field.id}_${baseContent}`;
-                  if (!groupedItems[key]) {
-                    groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', days: [] };
-                  }
-                  if (!groupedItems[key].days.includes(dayNum)) groupedItems[key].days.push(dayNum);
-                }
-              });
-            }
-          });
-        }
-      };
-
-      processWeek(thisWeekLogs, 'this', thisWeekStart);
-      processWeek(nextWeekLogs, 'next', nextWeekStart);
-
-      const items: SelectableItem[] = Object.values(groupedItems).map(g => ({
-        id: `group_${g.weekType}_${g.fieldKey}_${g.content}`,
-        content: g.content,
-        fieldKey: g.fieldKey,
-        weekType: g.weekType,
-        selected: true,
-        dayName: formatRanges(g.days)
-      }));
-
-      setSelectableItems(items);
-      setIsModalOpen(true);
-    } catch (e) { 
-      alert('데이터 로드 오류'); 
-    } finally { 
-      setLoading(false); 
-    }
+  const handleOpenImportModal = () => {
+    const w = 800;
+    const h = 800;
+    const left = (window.screen.width / 2) - (w / 2);
+    const top = (window.screen.height / 2) - (h / 2);
+    // Use _blank and timestamp to force a fresh load of the popup with the latest code
+    window.open(`/?popup=weekly_import&date=${report.startDate}&t=${Date.now()}`, '_blank', `width=${w},height=${h},top=${top},left=${left}`);
   };
+
+  useEffect(() => {
+    const handleData = (items: SelectableItem[]) => {
+      setReport(prev => {
+        const newFields = { ...prev.fields };
+        
+        FIELDS.forEach(field => {
+          const selThis = items.filter(i => i.fieldKey === field.id && i.weekType === 'this' && i.selected);
+          const selNext = items.filter(i => i.fieldKey === field.id && i.weekType === 'next' && i.selected);
+          
+          const formatGroup = (items: SelectableItem[], isThis: boolean) => {
+            return items.map(it => {
+              const dateSuffix = (isThis && it.dayName) ? `(${it.dayName})` : '';
+              return `- ${it.content}${dateSuffix}`;
+            }).join('\n');
+          };
+
+          const resultsList: string[] = selThis.map(it => {
+            const text = it.content;
+            let res = '완료 / 이상없음';
+            if (text.includes('입고')) res = '입고완료';
+            else if (text.includes('신청')) res = '신청완료';
+            else if (text.includes('재활용')) res = '배출완료';
+            else if (text.includes('소독')) res = '소독완료';
+            else if (text.includes('청소')) res = '청소완료';
+            else if (text.includes('제거')) res = '제거완료';
+            else if (text.includes('교체')) res = '교체완료';
+            else if (text.includes('불량')) res = '조치중';
+            return `- ${res}`;
+          });
+
+          const thisStr = formatGroup(selThis, true);
+          const nextStr = formatGroup(selNext, false);
+          const resStr = resultsList.join('\n');
+
+          if (thisStr) {
+            newFields[field.id] = {
+              ...newFields[field.id],
+              thisWeek: newFields[field.id]?.thisWeek ? newFields[field.id].thisWeek + '\n' + thisStr : thisStr,
+              results: newFields[field.id]?.results ? newFields[field.id].results + '\n' + resStr : resStr
+            };
+          }
+          if (nextStr) {
+            newFields[field.id] = {
+              ...newFields[field.id],
+              nextWeek: newFields[field.id]?.nextWeek ? newFields[field.id].nextWeek + '\n' + nextStr : nextStr
+            };
+          }
+        });
+
+        return { ...prev, fields: newFields };
+      });
+    };
+
+    // 1. Listen via BroadcastChannel
+    const channel = new BroadcastChannel('weekly_import_channel');
+    channel.onmessage = (event: MessageEvent) => {
+      if (event.data?.type === 'IMPORT_WEEKLY_WORK') {
+        handleData(event.data.payload as SelectableItem[]);
+      }
+    };
+
+    // 2. Listen via localStorage (more robust across iframes/popups)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'weekly_import_data' && e.newValue) {
+        try {
+          const data = JSON.parse(e.newValue);
+          if (data && data.payload) {
+            handleData(data.payload);
+          }
+        } catch (err) {
+          console.error('Failed to parse storage data', err);
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // 3. Listen via postMessage (fallback for older popup instances)
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'IMPORT_WEEKLY_WORK') {
+        handleData(event.data.payload as SelectableItem[]);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      channel.close();
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
 
   const handleOpenPhotoImportModal = async () => {
     setLoading(true);
@@ -601,7 +554,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   const sortedDates = Object.keys(groupedPhotosByDate).sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className="p-2 sm:p-4 max-w-7xl mx-auto min-h-screen text-black relative">
+    <div className="p-6 max-w-7xl mx-auto space-y-2 pb-32 text-black relative">
       <div className="mb-2 print:hidden">
         <div className="flex items-center gap-4">
           <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
@@ -639,7 +592,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       </div>
       {activeTab === 'list' ? <WeeklyReportList onSelectReport={(s) => { if(onDateChange) onDateChange(parseISO(s)); setActiveTab('form'); }} /> : (
         <>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm p-5 animate-fade-in-down">
         <div className="border-b-2 border-black mb-6 pb-3 flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-widest flex-shrink-0">주간업무보고</h1>
           <div className="flex justify-end gap-2 print:hidden">
@@ -799,47 +752,6 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           ))}</div>
         </div>
         </div></>
-      )}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="font-bold text-gray-800 flex items-center gap-2"><Sparkles size={18} className="text-blue-500" />업무일지 항목 선택</h3>
-              <button onClick={() => setIsModalOpen(false)} className="p-1 hover:bg-gray-200 rounded-full transition-colors"><X size={20} /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/30">
-              {['this', 'next'].map(wt => (
-                <div key={wt}>
-                  <h4 className="font-black text-gray-800 border-b-2 border-blue-500 inline-block px-2 pb-1 mb-4">{wt === 'this' ? '금주 실적 후보' : '차주 계획 후보'}</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {FIELDS.map(f => { 
-                      const its = selectableItems.filter(i => i.weekType === wt && i.fieldKey === f.id); 
-                      return (
-                        <div key={f.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                          <strong className="text-slate-700">{f.label}</strong>
-                          <div className="mt-3 space-y-1.5">
-                            {its.length > 0 ? its.map(it => (
-                              <div key={it.id} onClick={() => toggleSelectItem(it.id)} className="flex gap-2 cursor-pointer text-[13px] group hover:text-blue-600 transition-colors">
-                                {it.selected ? <CheckSquare size={16} className="text-blue-600 shrink-0" /> : <Square size={16} className="text-gray-300 shrink-0 group-hover:text-blue-400" />} 
-                                <span className={it.selected ? 'font-bold' : 'text-gray-600'}>{it.content} {it.dayName ? `(${it.dayName}일)` : ''}</span>
-                              </div>
-                            )) : (
-                              <div className="text-xs text-gray-400">조회된 내역이 없습니다.</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-              <button onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-100 transition-all">취소</button>
-              <button onClick={handleApplySelection} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 active:scale-95 transition-all">보고서에 반영하기</button>
-            </div>
-          </div>
-        </div>
       )}
       {isPhotoModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">

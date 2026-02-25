@@ -176,15 +176,13 @@ export const getAutomatedElevatorTasks = (dateStr: string, logData?: ElevatorLog
  */
 export const getAutomatedParkingTasks = (dateStr: string): TaskItem[] => {
   const date = parseISO(dateStr);
-  const isNonWorking = isNonWorkingDay(date);
   const tasks: TaskItem[] = [];
   const generateId = (prefix: string) => `auto-park-${prefix}-${dateStr}`;
 
-  // 주차 관련 점검은 평일에만 등록
-  if (!isNonWorking) {
-    tasks.push({ id: generateId('designated'), content: '지정 주차 구역 차량 현황 점검', frequency: '일일', status: '완료' });
-    tasks.push({ id: generateId('facility'), content: '주차 관제 설비 및 차단기 점검', frequency: '일일', status: '완료' });
-  }
+  // 주차 관련 점검은 매일 등록
+  tasks.push({ id: generateId('designated'), content: '지정 주차 구역 차량 현황 점검', frequency: '일일', status: '완료' });
+  tasks.push({ id: generateId('facility'), content: '주차 관제 설비 및 차단기 점검', frequency: '일일', status: '완료' });
+
   return tasks;
 };
 

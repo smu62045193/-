@@ -216,7 +216,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
 
   return (
     <div className="space-y-4 animate-fade-in pb-10">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm p-5 animate-fade-in-down">
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">

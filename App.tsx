@@ -25,6 +25,7 @@ import ConstructionContractorManager from './components/ConstructionContractorMa
 import AppointmentManager from './components/AppointmentManager';
 import MeterReadingPhotos from './components/MeterReadingPhotos';
 import TenantStatus from './components/TenantStatus';
+import WeeklyWorkImportPopup from './components/WeeklyWorkImportPopup';
 import { MenuId } from './types';
 import { Menu as MenuIcon, X } from 'lucide-react';
 
@@ -32,7 +33,8 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | 'parking_status' | 'meter_photo' | 'tenant' | 'search' | null>(null);
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | 'parking_status' | 'meter_photo' | 'tenant' | 'search' | 'weekly_import' | null>(null);
+  const [importDateStr, setImportDateStr] = useState<string>('');
 
   // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
   useEffect(() => {
@@ -64,6 +66,9 @@ const App: React.FC = () => {
       setIsPopupMode('tenant');
     } else if (popupType === 'search') {
       setIsPopupMode('search');
+    } else if (popupType === 'weekly_import') {
+      setIsPopupMode('weekly_import');
+      setImportDateStr(params.get('date') || '');
     }
   }, []);
 
@@ -73,6 +78,10 @@ const App: React.FC = () => {
   };
 
   // 팝업 모드일 경우 레이아웃 없이 해당 컴포넌트만 반환
+  if (isPopupMode === 'weekly_import') {
+    return <WeeklyWorkImportPopup startDateStr={importDateStr} />;
+  }
+
   if (isPopupMode === 'appointment') {
     return <AppointmentManager isPopupMode={true} />;
   }
