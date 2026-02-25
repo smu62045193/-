@@ -110,15 +110,20 @@ const mapFromDB = (prefix: string, item: any): any => {
   if (!item) return null;
   
   switch(prefix) {
-    case "DAILY_":
+    case "DAILY_": {
+      let parsedWorkLog = item.work_log;
+      if (typeof parsedWorkLog === 'string') {
+        try { parsedWorkLog = JSON.parse(parsedWorkLog); } catch (e) { parsedWorkLog = {}; }
+      }
       return {
         date: item.id,
         facilityDuty: item.facility_duty,
         securityDuty: item.security_duty,
         utility: item.utility,
-        workLog: item.work_log,
+        workLog: parsedWorkLog,
         lastUpdated: item.last_updated
       };
+    }
     case "SUB_LOG_":
       return {
         date: item.date,
@@ -345,7 +350,7 @@ export const apiFetchRange = async (prefix: string, start: string, end: string):
       query = query.gte("id", startKey).lte("id", endKey);
     }
 
-    const { data, error } = query.order('id', { ascending: true });
+    const { data, error } = await query.order('id', { ascending: true });
     
     if (error) throw error;
     if (!data) return [];

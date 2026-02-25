@@ -198,7 +198,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
   const visiblePageNumbers = useMemo(() => {
     const halfWindow = 2;
     let startPage = Math.max(1, currentPage - halfWindow);
-    let endPage = Math.min(totalPages, startPage + 4);
+    const endPage = Math.min(totalPages, startPage + 4);
     if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
     const pages = [];
     for (let i = startPage; i <= endPage; i++) pages.push(i);

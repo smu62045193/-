@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { HOLIDAYS } from '../constants';
 import { format, addDays, subDays, getDay } from 'date-fns';
@@ -10,6 +10,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ currentDate, onChangeDate }) => {
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const [holidayName, setHolidayName] = useState<string | null>(null);
 
   const handlePrevDay = () => onChangeDate(subDays(currentDate, 1));
   const handleNextDay = () => onChangeDate(addDays(currentDate, 1));
@@ -22,7 +23,7 @@ const Header: React.FC<HeaderProps> = ({ currentDate, onChangeDate }) => {
   const formattedDate = format(currentDate, 'yyyy년 MM월 dd일');
   const dayName = getDayName(currentDate);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
-  const monthDay = format(currentDate, 'MM-md');
+  const monthDay = format(currentDate, 'MM-dd'); // 오타 수정: MM-md -> MM-dd
 
   // Fixed Solar Holidays (Every year)
   const FIXED_SOLAR_HOLIDAYS: Record<string, string> = {
@@ -37,9 +38,58 @@ const Header: React.FC<HeaderProps> = ({ currentDate, onChangeDate }) => {
     '12-25': '성탄절'
   };
 
-  const recurringHolidayName = FIXED_SOLAR_HOLIDAYS[monthDay];
-  const specificHoliday = HOLIDAYS.find(h => h.date === dateKey);
-  const holidayName = recurringHolidayName || specificHoliday?.name;
+  useEffect(() => {
+    const fetchHoliday = async () => {
+      // 1. 고정 양력 휴일 확인
+      const recurringHolidayName = FIXED_SOLAR_HOLIDAYS[monthDay];
+      if (recurringHolidayName) {
+        setHolidayName(recurringHolidayName);
+        return;
+      }
+
+      // 2. 정부 공공데이터 API 호출 (한국천문연구원 특일정보)
+      try {
+        // 사용자가 제공한 일반인증키 적용 (환경 변수가 있으면 우선 사용)
+        const apiKey = import.meta.env.VITE_GOV_HOLIDAY_API_KEY || 'ee091b24333b8a98fef62d62d6208aff0713004c9702eeee542de1c4b3618138';
+        if (apiKey) {
+          const year = format(currentDate, 'yyyy');
+          const month = format(currentDate, 'MM');
+          // 공공데이터포털 API 엔드포인트
+          const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?solYear=${year}&solMonth=${month}&ServiceKey=${apiKey}&_type=json`;
+          
+          const res = await fetch(url);
+          if (!res.ok) {
+            throw new Error(`HTTP error! status: ${res.status}`);
+          }
+          const text = await res.text();
+          if (text.includes('Forbidden') || text.trim().startsWith('<')) {
+            throw new Error('Invalid response from API');
+          }
+          const data = JSON.parse(text);
+          const items = data?.response?.body?.items?.item;
+          
+          if (items) {
+            const itemList = Array.isArray(items) ? items : [items];
+            const targetDateStr = format(currentDate, 'yyyyMMdd');
+            const found = itemList.find((item: any) => String(item.locdate) === targetDateStr && item.isHoliday === 'Y');
+            
+            if (found) {
+              setHolidayName(found.dateName);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('공공데이터 API 호출 실패, 기본 데이터로 대체합니다.', e);
+      }
+
+      // 3. API 키가 없거나 호출에 실패한 경우, 기존 하드코딩된 HOLIDAYS 배열에서 확인 (Fallback)
+      const specificHoliday = HOLIDAYS.find(h => h.date === dateKey);
+      setHolidayName(specificHoliday?.name || null);
+    };
+
+    fetchHoliday();
+  }, [currentDate, monthDay, dateKey]);
 
   const isHoliday = !!holidayName;
   const isWeekend = getDay(currentDate) === 0; 

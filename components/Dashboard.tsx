@@ -126,7 +126,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
       }
     }
 
-    let duty: DutyStatus = {
+    const duty: DutyStatus = {
       day: '', night: '', off: '', vacation: '',
       deputy: deputyName, chief: chiefName,
       shiftMode: settings.mode,

@@ -253,7 +253,7 @@ const SafetyCheckLog: React.FC<SafetyCheckLogProps> = ({ currentDate, viewType }
   const updateResult = (category: string, content: string, result: '적합' | '부적합' | '요주의' | '해당없음') => {
     if (!data) return;
     const existingIdx = (data.items || []).findIndex(i => i.category === category && i.content === content);
-    let newItems = [...(data.items || [])];
+    const newItems = [...(data.items || [])];
     if (existingIdx >= 0) newItems[existingIdx] = { ...newItems[existingIdx], result };
     else newItems.push({ id: Math.random().toString(), category, content, result, measure: '' });
     setData({ ...data, items: newItems });
@@ -489,7 +489,7 @@ const SafetyCheckLog: React.FC<SafetyCheckLogProps> = ({ currentDate, viewType }
                         value={data?.items?.find(i => i.category === 'ev' && i.content === itemText)?.measure || ''} 
                         onChange={(e) => { 
                           const existingIdx = (data.items || []).findIndex(i => i.category === 'ev' && i.content === itemText); 
-                          let newItems = [...(data.items || [])]; 
+                          const newItems = [...(data.items || [])]; 
                           if (existingIdx >= 0) newItems[existingIdx].measure = e.target.value; 
                           else newItems.push({ id: Math.random().toString(), category: 'ev', content: itemText, result: '적합', measure: e.target.value }); 
                           setData({ ...data, items: newItems }); 

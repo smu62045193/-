@@ -80,7 +80,7 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
       const logs = await apiFetchRange("DAILY_", `${year}-01-01`, `${year}-12-31`);
       const normalizedKeywords = keywords.map(normalize);
       
-      let newEntries: FireHistoryItem[] = [];
+      const newEntries: FireHistoryItem[] = [];
       logs.forEach((entry: any) => {
         const dateKey = entry.key.replace("DAILY_", "");
         const fireLog = entry.data?.workLog?.fire as LogCategory;
@@ -185,7 +185,7 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
   const visiblePageNumbers = useMemo(() => {
     const halfWindow = 2;
     let startPage = Math.max(1, currentPage - halfWindow);
-    let endPage = Math.min(totalPages, startPage + 4);
+    const endPage = Math.min(totalPages, startPage + 4);
     if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
     const pages = [];
     for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);

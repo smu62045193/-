@@ -58,7 +58,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
     ];
 
     const fieldsTableHtml = fields.map(field => {
-      const f = report.fields[field.id as keyof typeof report.fields];
+      const f = report.fields[field.id as keyof typeof report.fields] || { thisWeek: '', results: '', nextWeek: '' };
       
       const thisWeekLines = (f.thisWeek || '').split('\n').filter(l => l.trim() !== '');
       const resultLines = (f.results || '').split('\n').map(l => l.trim());
@@ -84,14 +84,43 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
       return categoryRows;
     }).join('');
 
-    const photosHtml = (report.photos || []).filter(p => p.dataUrl).map(photo => `
-      <div style="width:32%; border:1px solid #000; padding:6px; box-sizing:border-box; display:inline-block; vertical-align:top; margin-bottom:15px; margin-right:1%;">
-        <div style="width:100%; aspect-ratio:4/3; overflow:hidden; border:1px solid #000; margin-bottom:5px; display:flex; align-items:center; justify-content:center; background:#f9f9f9;">
-          <img src="${photo.dataUrl}" style="width:100%; height:100%; object-fit:cover;" />
+    const validPhotos = (report.photos || []).filter(p => p.dataUrl);
+    const photoChunks = [];
+    for (let i = 0; i < validPhotos.length; i += 12) {
+      photoChunks.push(validPhotos.slice(i, i + 12));
+    }
+
+    let photosPagesHtml = '';
+    if (photoChunks.length === 0) {
+      photosPagesHtml = `
+        <div class="print-page page-break">
+          <div class="section-header">2. 작업사진</div>
+          <div style="width:100%; min-height: 200px;">
+            <div style="text-align:center; padding:50px; color:#999; font-weight:bold;">등록된 작업 사진이 없습니다.</div>
+          </div>
         </div>
-        <div style="font-weight:bold; font-size:8.5pt; border-bottom:1.5px solid #000; padding-bottom:2px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${photo.title || '작업 사진'}</div>
-      </div>
-    `).join('');
+      `;
+    } else {
+      photosPagesHtml = photoChunks.map((chunk, index) => {
+        const chunkHtml = chunk.map(photo => `
+          <div style="width:32%; border:1px solid #000; padding:6px; box-sizing:border-box; display:inline-block; vertical-align:top; margin-bottom:15px; margin-right:1%;">
+            <div style="width:100%; aspect-ratio:4/3; overflow:hidden; border:1px solid #000; margin-bottom:5px; display:flex; align-items:center; justify-content:center; background:#f9f9f9;">
+              <img src="${photo.dataUrl}" style="width:100%; height:100%; object-fit:cover;" />
+            </div>
+            <div style="font-weight:bold; font-size:8.5pt; border-bottom:1.5px solid #000; padding-bottom:2px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${photo.title || '작업 사진'}</div>
+          </div>
+        `).join('');
+        
+        return `
+          <div class="print-page page-break">
+            <div class="section-header">2. 작업사진 ${photoChunks.length > 1 ? `(${index + 1}/${photoChunks.length})` : ''}</div>
+            <div style="width:100%; min-height: 200px;">
+              ${chunkHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
 
     printWindow.document.write(`
       <html>
@@ -140,13 +169,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
             </table>
           </div>
 
-          <!-- 2페이지: 작업 사진 -->
-          <div class="print-page page-break">
-            <div class="section-header">2. 작업사진</div>
-            <div style="width:100%; min-height: 200px;">
-              ${photosHtml || '<div style="text-align:center; padding:50px; color:#999; font-weight:bold;">등록된 작업 사진이 없습니다.</div>'}
-            </div>
-          </div>
+          ${photosPagesHtml}
         </body>
       </html>
     `);
@@ -193,40 +216,41 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
 
   return (
     <div className="space-y-4 animate-fade-in pb-10">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-            <FileText size={24} />
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+              <FileText size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">주간업무보고 저장 이력</h2>
+              <p className="text-xs text-gray-400 mt-0.5">서버에 저장된 모든 주간보고서 목록입니다.</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">주간업무보고 저장 이력</h2>
-            <p className="text-xs text-gray-400 mt-0.5">서버에 저장된 모든 주간보고서 목록입니다.</p>
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="relative w-full md:w-[320px]">
+              <input 
+                type="text" 
+                placeholder="작성자 또는 날짜(YYYY-MM) 검색" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white text-black outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+              />
+              <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+            </div>
+            <button 
+              onClick={loadData}
+              className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+              title="새로고침"
+            >
+              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="relative flex-1 md:w-80">
-            <input 
-              type="text" 
-              placeholder="작성자 또는 날짜(YYYY-MM) 검색" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 text-black outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner"
-            />
-            <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-          </div>
-          <button 
-            onClick={loadData}
-            className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
-            title="새로고침"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto scrollbar-hide">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[850px] border-collapse">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200">
@@ -353,6 +377,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
             </button>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

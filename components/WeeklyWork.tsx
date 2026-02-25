@@ -4,7 +4,7 @@ import { startOfWeek, addDays, format, subDays, parseISO, isWithinInterval } fro
 import { HOLIDAYS } from '../constants';
 import { fetchWeeklyReport, saveWeeklyReport, fetchDateRangeData, fetchExternalWorkList, fetchInternalWorkList } from '../services/dataService';
 import { WeeklyReportData, WeeklyWorkPhoto, TaskItem, ConstructionWorkItem, WorkPhoto, LogCategory, WorkLogData } from '../types';
-import { Printer, Save, Upload, X, RefreshCw, Plus, CheckSquare, Square, CheckCircle2, Calendar, Image as ImageIcon, Sparkles, LayoutList, ClipboardEdit, Cloud, CheckCircle, ClipboardList } from 'lucide-react';
+import { Printer, Save, Upload, X, RefreshCw, Plus, CheckSquare, Square, CheckCircle2, Calendar, Image as ImageIcon, Sparkles, LayoutList, ClipboardEdit, Cloud, CheckCircle, ClipboardList, Lock, Edit2 } from 'lucide-react';
 import WeeklyReportList from './WeeklyReportList';
 import { 
   getAutomatedElectricalTasks, 
@@ -129,9 +129,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       mechanical: { thisWeek: '', results: '', nextWeek: '' },
       fire: { thisWeek: '', results: '', nextWeek: '' },
       elevator: { thisWeek: '', results: '', nextWeek: '' },
-      parking: { thisWeek: '', results: '', nextWeek: '' },
-      security: { thisWeek: '', results: '', nextWeek: '' },
-      cleaning: { thisWeek: '', results: '', nextWeek: '' },
+      park_sec_clean: { thisWeek: '', results: '', nextWeek: '' },
       handover: { thisWeek: '', results: '', nextWeek: '' },
     },
     photos: createDefaultPhotos()
@@ -161,7 +159,38 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     const saved = await fetchWeeklyReport(dateKey);
     if (saved) {
       if (!saved.photos || !Array.isArray(saved.photos)) saved.photos = createDefaultPhotos();
+      if (!saved.fields) saved.fields = {} as any;
+      if (saved.fields.park_sec_clean) {
+        if (!saved.fields.parking) saved.fields.parking = { thisWeek: '', results: '', nextWeek: '' };
+        if (!saved.fields.parking.thisWeek && !saved.fields.parking.results && !saved.fields.parking.nextWeek) {
+          saved.fields.parking = { ...saved.fields.park_sec_clean };
+        }
+        delete saved.fields.park_sec_clean;
+      }
+      if (!saved.fields.parking) saved.fields.parking = { thisWeek: '', results: '', nextWeek: '' };
+      if (!saved.fields.security) saved.fields.security = { thisWeek: '', results: '', nextWeek: '' };
+      if (!saved.fields.cleaning) saved.fields.cleaning = { thisWeek: '', results: '', nextWeek: '' };
       setReport(saved);
+    } else {
+      const newStart = parseISO(dateKey);
+      let d = addDays(newStart, 4);
+      while (HOLIDAYS.some(h => h.date === format(d, 'yyyy-MM-dd'))) { d = subDays(d, 1); }
+      setReport({
+        startDate: dateKey,
+        reportingDate: format(d, 'yyyy-MM-dd'),
+        author: '김용만',
+        fields: {
+          electrical: { thisWeek: '', results: '', nextWeek: '' },
+          mechanical: { thisWeek: '', results: '', nextWeek: '' },
+          fire: { thisWeek: '', results: '', nextWeek: '' },
+          elevator: { thisWeek: '', results: '', nextWeek: '' },
+          parking: { thisWeek: '', results: '', nextWeek: '' },
+          security: { thisWeek: '', results: '', nextWeek: '' },
+          cleaning: { thisWeek: '', results: '', nextWeek: '' },
+          handover: { thisWeek: '', results: '', nextWeek: '' },
+        },
+        photos: createDefaultPhotos()
+      });
     }
     setLoading(false);
   };
@@ -216,15 +245,29 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             let todayTasks: TaskItem[] = [];
             let tomorrowTasks: TaskItem[] = [];
 
+            let autoTasks: TaskItem[] = [];
+            if (automationMap[field.id]) {
+              autoTasks = automationMap[field.id](dateKey);
+            }
+
             if (dayData?.data?.workLog) {
-              const workLog = dayData.data.workLog as WorkLogData;
+              let workLog = dayData.data.workLog;
+              if (typeof workLog === 'string') {
+                try {
+                  workLog = JSON.parse(workLog);
+                } catch (e) {
+                  workLog = {};
+                }
+              }
+              if (!workLog || typeof workLog !== 'object') {
+                workLog = {};
+              }
               
-              // 카테고리 병합 로직
               const getTasks = (catId: string) => {
                 const cat = (workLog[catId as keyof WorkLogData] || { today: [], tomorrow: [] }) as LogCategory;
                 return {
-                  today: (cat.today || []) as TaskItem[],
-                  tomorrow: (cat.tomorrow || []) as TaskItem[]
+                  today: Array.isArray(cat.today) ? [...cat.today] : [],
+                  tomorrow: Array.isArray(cat.tomorrow) ? [...cat.tomorrow] : []
                 };
               };
 
@@ -245,12 +288,14 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                 tomorrowTasks = cat.tomorrow;
               }
 
-              // 만약 저장된 데이터가 아예 없다면 자동화 데이터라도 가져옴
-              if (todayTasks.length === 0 && automationMap[field.id]) {
-                todayTasks = automationMap[field.id](dateKey);
-              }
-            } else if (automationMap[field.id]) {
-              todayTasks = automationMap[field.id](dateKey);
+              const existingContents = new Set(todayTasks.map(t => t.content.trim()));
+              autoTasks.forEach(at => {
+                if (!existingContents.has(at.content.trim())) {
+                  todayTasks.push(at);
+                }
+              });
+            } else {
+              todayTasks = autoTasks;
             }
 
             if (weekType === 'this') {
@@ -272,6 +317,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                   if (!groupedItems[key]) {
                     groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', days: [] };
                   }
+                  if (!groupedItems[key].days.includes(dayNum)) groupedItems[key].days.push(dayNum);
                 }
               });
             } else {
@@ -282,6 +328,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                   if (!groupedItems[key]) {
                     groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', days: [] };
                   }
+                  if (!groupedItems[key].days.includes(dayNum)) groupedItems[key].days.push(dayNum);
                 }
               });
             }
@@ -421,7 +468,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     const reportingDateStr = format(parseISO(report.reportingDate), 'yyyy년 MM월 dd일');
 
     const fieldsHtml = FIELDS.map(field => {
-      const f = report.fields[field.id as keyof typeof report.fields];
+      const f = report.fields[field.id as keyof typeof report.fields] || { thisWeek: '', results: '', nextWeek: '' };
       const displayLabel = field.id === 'handover' ? '특이<br/>사항' : field.label;
       
       const thisWeekLines = (f.thisWeek || '').split('\n').filter(l => l.trim() !== '');
@@ -448,12 +495,41 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       return categoryRows;
     }).join('');
 
-    const photosHtml = (report.photos || []).filter(p => p.dataUrl).map(photo => `
-      <div class="photo-card">
-        <div class="photo-img-wrap"><img src="${photo.dataUrl}" /></div>
-        <div class="photo-title">${photo.title || '작업 사진'}</div>
-      </div>
-    `).join('');
+    const validPhotos = (report.photos || []).filter(p => p.dataUrl);
+    const photoChunks = [];
+    for (let i = 0; i < validPhotos.length; i += 12) {
+      photoChunks.push(validPhotos.slice(i, i + 12));
+    }
+
+    let photosPagesHtml = '';
+    if (photoChunks.length === 0) {
+      photosPagesHtml = `
+        <div class="print-page page-break">
+          <div class="section-header">2. 작업사진</div>
+          <div class="photo-grid">
+            <div style="width:100%; text-align:center; padding:50px; color:#999; font-weight:bold;">등록된 작업 사진이 없습니다.</div>
+          </div>
+        </div>
+      `;
+    } else {
+      photosPagesHtml = photoChunks.map((chunk, index) => {
+        const chunkHtml = chunk.map(photo => `
+          <div class="photo-card">
+            <div class="photo-img-wrap"><img src="${photo.dataUrl}" /></div>
+            <div class="photo-title">${photo.title || '작업 사진'}</div>
+          </div>
+        `).join('');
+        
+        return `
+          <div class="print-page page-break">
+            <div class="section-header">2. 작업사진 ${photoChunks.length > 1 ? `(${index + 1}/${photoChunks.length})` : ''}</div>
+            <div class="photo-grid">
+              ${chunkHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
 
     printWindow.document.write(`
       <html>
@@ -508,13 +584,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             </table>
           </div>
 
-          <!-- 2페이지: 작업 사진 -->
-          <div class="print-page page-break">
-            <div class="section-header">2.작업사진</div>
-            <div class="photo-grid">
-              ${photosHtml || '<div style="width:100%; text-align:center; padding:50px; color:#999; font-weight:bold;">등록된 작업 사진이 없습니다.</div>'}
-            </div>
-          </div>
+          ${photosPagesHtml}
         </body>
       </html>
     `);
@@ -531,7 +601,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   const sortedDates = Object.keys(groupedPhotosByDate).sort((a, b) => a.localeCompare(b));
 
   return (
-    <div className="p-2 sm:p-4 max-w-7xl mx-auto bg-white min-h-screen text-black relative">
+    <div className="p-2 sm:p-4 max-w-7xl mx-auto min-h-screen text-black relative">
       <div className="mb-2 print:hidden">
         <div className="flex items-center gap-4">
           <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
@@ -569,6 +639,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       </div>
       {activeTab === 'list' ? <WeeklyReportList onSelectReport={(s) => { if(onDateChange) onDateChange(parseISO(s)); setActiveTab('form'); }} /> : (
         <>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
         <div className="border-b-2 border-black mb-6 pb-3 flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-widest flex-shrink-0">주간업무보고</h1>
           <div className="flex justify-end gap-2 print:hidden">
@@ -582,9 +653,9 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             </button>
             <button 
               onClick={() => setIsEditMode(!isEditMode)} 
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50'}`}
+              className={`flex items-center justify-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
             >
-              <ClipboardEdit size={18} className="mr-2" />
+              {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
               {isEditMode ? '수정완료' : '수정'}
             </button>
             <button 
@@ -648,8 +719,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                 <div className="w-[80px] flex items-center justify-center font-bold bg-gray-50 text-[13px] text-gray-700">{f.label}</div>
                 <div className="flex-1 min-h-[50px]">
                   <textarea 
-                    value={report.fields[f.id as keyof typeof report.fields].thisWeek} 
-                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...report.fields[f.id as keyof typeof report.fields], thisWeek: e.target.value}}})} 
+                    value={report.fields[f.id as keyof typeof report.fields]?.thisWeek || ''} 
+                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), thisWeek: e.target.value}}})} 
                     disabled={!isEditMode}
                     className={`auto-expand-textarea w-full h-full p-3 text-[13px] outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide !text-left transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
                     placeholder="내용 입력..."
@@ -657,8 +728,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                 </div>
                 <div className="w-[120px] min-h-[50px]">
                   <textarea 
-                    value={report.fields[f.id as keyof typeof report.fields].results} 
-                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...report.fields[f.id as keyof typeof report.fields], results: e.target.value}}})} 
+                    value={report.fields[f.id as keyof typeof report.fields]?.results || ''} 
+                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), results: e.target.value}}})} 
                     disabled={!isEditMode}
                     className={`auto-expand-textarea w-full h-full p-3 text-[13px] text-center outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
                     placeholder="결과..."
@@ -666,8 +737,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                 </div>
                 <div className="flex-1 min-h-[50px]">
                   <textarea 
-                    value={report.fields[f.id as keyof typeof report.fields].nextWeek} 
-                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...report.fields[f.id as keyof typeof report.fields], nextWeek: e.target.value}}})} 
+                    value={report.fields[f.id as keyof typeof report.fields]?.nextWeek || ''} 
+                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), nextWeek: e.target.value}}})} 
                     disabled={!isEditMode}
                     className={`auto-expand-textarea w-full h-full p-3 text-[13px] outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide !text-left transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
                     placeholder="계획 입력..."
@@ -726,6 +797,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               />
             </div>
           ))}</div>
+        </div>
         </div></>
       )}
       {isModalOpen && (
@@ -742,17 +814,18 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {FIELDS.map(f => { 
                       const its = selectableItems.filter(i => i.weekType === wt && i.fieldKey === f.id); 
-                      if(its.length===0) return null; 
                       return (
                         <div key={f.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                           <strong className="text-slate-700">{f.label}</strong>
                           <div className="mt-3 space-y-1.5">
-                            {its.map(it => (
+                            {its.length > 0 ? its.map(it => (
                               <div key={it.id} onClick={() => toggleSelectItem(it.id)} className="flex gap-2 cursor-pointer text-[13px] group hover:text-blue-600 transition-colors">
                                 {it.selected ? <CheckSquare size={16} className="text-blue-600 shrink-0" /> : <Square size={16} className="text-gray-300 shrink-0 group-hover:text-blue-400" />} 
                                 <span className={it.selected ? 'font-bold' : 'text-gray-600'}>{it.content} {it.dayName ? `(${it.dayName}일)` : ''}</span>
                               </div>
-                            ))}
+                            )) : (
+                              <div className="text-xs text-gray-400">조회된 내역이 없습니다.</div>
+                            )}
                           </div>
                         </div>
                       );

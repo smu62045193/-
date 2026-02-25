@@ -81,7 +81,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
       const logs = await apiFetchRange("DAILY_", `${year}-01-01`, `${year}-12-31`);
       const normalizedKeywords = keywords.map(normalize);
       
-      let newEntries: ElevatorInspectionItem[] = [];
+      const newEntries: ElevatorInspectionItem[] = [];
       logs.forEach((entry: any) => {
         const dateKey = entry.key.replace("DAILY_", "");
         const elevatorLog = entry.data?.workLog?.elevator as LogCategory;
@@ -188,7 +188,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
   const visiblePageNumbers = useMemo(() => {
     const halfWindow = 2;
     let startPage = Math.max(1, currentPage - halfWindow);
-    let endPage = Math.min(totalPages, startPage + 4);
+    const endPage = Math.min(totalPages, startPage + 4);
     if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
     const pages = [];
     for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);

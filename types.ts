@@ -161,10 +161,11 @@ export interface WeeklyReportData {
     mechanical: WeeklyFieldReport;
     fire: WeeklyFieldReport;
     elevator: WeeklyFieldReport;
-    parking: WeeklyFieldReport;
-    security: WeeklyFieldReport;
-    cleaning: WeeklyFieldReport;
+    parking?: WeeklyFieldReport;
+    security?: WeeklyFieldReport;
+    cleaning?: WeeklyFieldReport;
     handover: WeeklyFieldReport; // 특이사항
+    [key: string]: WeeklyFieldReport | undefined;
   };
   photos: WeeklyWorkPhoto[];
   lastUpdated?: string;

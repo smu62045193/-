@@ -116,7 +116,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
       const mode = searchParams.get('mode');
 
       const currentList = await fetchParkingStatusList();
-      let updatedList = [...(currentList || [])];
+      const updatedList = [...(currentList || [])];
       
       const targetId = editId || generateUUID();
       const itemToSave = { ...newItem, id: targetId };
@@ -330,7 +330,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
   const visiblePageNumbers = useMemo(() => {
     const halfWindow = 2;
     let startPage = Math.max(1, currentPage - halfWindow);
-    let endPage = Math.min(totalPages, startPage + 4);
+    const endPage = Math.min(totalPages, startPage + 4);
     if (endPage === totalPages) startPage = Math.max(1, endPage - 4);
     const pages = [];
     for (let i = startPage; i <= endPage; i++) if (i > 0) pages.push(i);

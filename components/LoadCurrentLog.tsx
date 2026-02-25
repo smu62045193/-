@@ -305,7 +305,7 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
   const visiblePageNumbers = useMemo(() => {
     const halfWindow = 2;
     let startPage = Math.max(1, currentPage - halfWindow);
-    let endPage = Math.min(totalPages, startPage + 4);
+    const endPage = Math.min(totalPages, startPage + 4);
     
     // 만약 마지막 페이지 근처라면 시작 페이지를 앞으로 당김
     if (endPage === totalPages) {

@@ -78,7 +78,7 @@ const ParkingChangeLog: React.FC = () => {
     if (successChange) {
        try {
         const currentStatusList = await fetchParkingStatusList();
-        let updatedStatusList = [...(currentStatusList || [])];
+        const updatedStatusList = [...(currentStatusList || [])];
         const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
         const targetLocation = normalize(newItem.location);
         const targetPrevPlate = normalize(newItem.prevPlate);
@@ -142,7 +142,7 @@ const ParkingChangeLog: React.FC = () => {
     if (successChange) {
       try {
         const currentStatusList = await fetchParkingStatusList();
-        let updatedStatusList = [...(currentStatusList || [])];
+        const updatedStatusList = [...(currentStatusList || [])];
         const normalize = (val: string) => (val || '').toString().replace(/\s+/g, '').toUpperCase();
         const targetLocation = normalize(newItem.location);
         const targetPrevPlate = normalize(newItem.prevPlate);

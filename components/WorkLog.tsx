@@ -411,6 +411,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const rawWorkLog = serverDataResult?.workLog || getFreshInitialWorkLog();
       const currentScheduled = Array.isArray(rawWorkLog?.scheduled) ? rawWorkLog.scheduled : [];
       
+      const hasSavedData = !!serverDataResult?.workLog;
+
       const finalWorkLog: WorkLogData = deepMerge(getFreshInitialWorkLog(), { ...rawWorkLog, scheduled: currentScheduled });
 
       if (yesterdayDirectReport && yesterdayDirectReport.mechanicalChemicals) {
@@ -458,18 +460,18 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       categories.forEach((key) => {
         const cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
         
-        // 1. 자동화 작업 로드 (내용이 하나도 없을 때만)
-        if (!cat.today || cat.today.length === 0) {
+        // 1. 자동화 작업 로드 (저장된 데이터가 없고, 내용이 하나도 없을 때만)
+        if (!hasSavedData && (!cat.today || cat.today.length === 0)) {
           cat.today = automationMap[key] ? automationMap[key](dateKey) : [];
         }
-        if (!cat.tomorrow || cat.tomorrow.length === 0) {
+        if (!hasSavedData && (!cat.tomorrow || cat.tomorrow.length === 0)) {
           const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
           cat.tomorrow = autoTasksTomorrow.map(t => ({ ...t, status: undefined }));
         }
 
         // 2. 어제 날짜의 "익일 예정사항" 병합 (핵심 로직 - 무조건 어제로 고정됨)
         const yesterdayWorkLog = yesterdayDirectReport;
-        if (yesterdayWorkLog && (yesterdayWorkLog as any)[key]?.tomorrow) {
+        if (!hasSavedData && yesterdayWorkLog && (yesterdayWorkLog as any)[key]?.tomorrow) {
           const prevTomorrow = (yesterdayWorkLog as any)[key].tomorrow as TaskItem[];
           prevTomorrow.forEach(item => {
             if (item?.content?.trim()) {

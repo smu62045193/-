@@ -153,8 +153,8 @@ const HvacLog: React.FC<HvacLogProps> = ({ currentDate, isEmbedded = false, onUs
         .eq('id', `HVAC_BOILER_${dateKey}`)
         .maybeSingle();
 
-      let finalHvac = todayCombined?.hvac_data || getInitialHvacLog(dateKey);
-      let finalBoiler = todayCombined?.boiler_data || getInitialBoilerLog(dateKey);
+      const finalHvac = todayCombined?.hvac_data || getInitialHvacLog(dateKey);
+      const finalBoiler = todayCombined?.boiler_data || getInitialBoilerLog(dateKey);
 
       if (!finalHvac.gas?.prev || finalHvac.gas.prev === '0' || finalHvac.gas.prev === '') {
         if (yesterdayHvac?.gas?.curr) finalHvac.gas.prev = yesterdayHvac.gas.curr;

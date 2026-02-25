@@ -156,7 +156,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       historySumRef.current = hSum;
 
       const fetched = await fetchSubstationLog(dateKey, force);
-      let finalData: SubstationLogData = fetched || getInitialSubstationLog(dateKey);
+      const finalData: SubstationLogData = fetched || getInitialSubstationLog(dateKey);
 
       const rawPU = (finalData.powerUsage || (finalData as any).power_usage) || {};
       finalData.powerUsage = {
