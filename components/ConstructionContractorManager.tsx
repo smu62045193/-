@@ -208,13 +208,13 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
 
             <div>
               <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고</label>
-              <textarea value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-48" placeholder="공사 내역 및 특이사항 입력" />
+              <textarea value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24" placeholder="공사 내역 및 특이사항 입력" />
             </div>
           </div>
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
             <button onClick={() => window.close()} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-600 rounded-2xl font-black text-sm transition-all hover:bg-slate-100 active:scale-95">닫기</button>
-            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-50 hover:bg-orange-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
+            <button onClick={handleRegister} disabled={loading} className={`flex-[2] py-3.5 ${editId ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-2xl font-black text-base shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2`}>
               {loading ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
               서버에 데이터 저장
             </button>
@@ -225,39 +225,40 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-200 print:hidden">
-        <div className="relative flex-1 md:w-80 w-full">
-          <input 
-            type="text" 
-            placeholder="업체명, 날짜, 담당자 검색" 
-            value={searchTerm} 
-            onChange={e => setSearchTerm(e.target.value)} 
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
-          />
-          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] animate-fade-in">
+      <div className="p-6 space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 shadow-sm print:hidden">
+          <div className="relative flex-1 md:w-80 w-full">
+            <input 
+              type="text" 
+              placeholder="업체명, 날짜, 담당자 검색" 
+              value={searchTerm} 
+              onChange={e => setSearchTerm(e.target.value)} 
+              className="w-[320px] pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
+            />
+            <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <button 
+              onClick={loadData} 
+              disabled={loading}
+              className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+            >
+              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </button>
+            <button 
+              onClick={() => openIndependentWindow()} 
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
+            >
+              <UserPlus size={18} /> 신규 공사업체 등록
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button 
-            onClick={loadData} 
-            disabled={loading}
-            className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-          <button 
-            onClick={() => openIndependentWindow()} 
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
-          >
-            <UserPlus size={18} /> 신규 공사업체 등록
-          </button>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
-        <div className="overflow-x-auto scrollbar-hide">
+        <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
+          <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[1000px] border-collapse">
             <thead>
               <tr>
@@ -286,8 +287,8 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                     <td className={`${tdClass} text-left px-4 font-medium text-gray-600`}>{item.note}</td>
                     <td className={tdClass}>
                       <div className="flex justify-center gap-1">
-                        <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="수정"><Edit2 size={16}/></button>
-                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="삭제"><Trash2 size={16}/></button>
+                        <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded transition-colors shadow-sm" title="수정"><Edit2 size={16}/></button>
+                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 rounded transition-colors shadow-sm" title="삭제"><Trash2 size={16}/></button>
                       </div>
                     </td>
                   </tr>
@@ -296,52 +297,17 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
             </tbody>
           </table>
         </div>
-
-        {/* 페이지네이션 UI - 번호형으로 개선 */}
-        {!loading && totalPages > 1 && (
-          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-lg border transition-all ${
-                currentPage === 1 
-                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
-              }`}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            
-            <div className="flex items-center gap-1 px-4">
-              {visiblePageNumbers.map(pageNum => (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-lg border transition-all ${
-                currentPage === totalPages 
-                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
-              }`}
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* 페이지네이션 UI - 번호형으로 개선 */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronLeft size={18} /></button>
+          <div className="flex items-center gap-1 px-4">{visiblePageNumbers.map(pageNum => (<button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>{pageNum}</button>))}</div>
+          <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className={`p-2 rounded-lg border transition-all ${currentPage === totalPages ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronRight size={18} /></button>
+        </div>
+      )}
+    </div>
     </div>
   );
 };

@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchExternalWorkList, fetchInternalWorkList } from '../services/dataService';
+import { fetchExternalWorkList, fetchInternalWorkList, deleteConstructionWorkItem } from '../services/dataService';
 import { ConstructionWorkItem, WorkPhoto } from '../types';
-import { RefreshCw, Search, History, Image as ImageIcon, Printer, ChevronLeft, ChevronRight, HardHat } from 'lucide-react';
+import { RefreshCw, Search, History, Image as ImageIcon, Printer, ChevronLeft, ChevronRight, HardHat, Edit2, Trash2 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -89,7 +89,7 @@ const ConstructionHistory: React.FC = () => {
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; color: #333; line-height: 1.2; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; color: #333; line-height: 1.2; background: #000000; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { 
               .no-print { display: none !important; } 
@@ -133,6 +133,22 @@ const ConstructionHistory: React.FC = () => {
     printWindow.document.close();
   };
 
+  const handleEdit = (item: ConstructionWorkItem) => {
+    const width = 1000;
+    const height = 800;
+    const left = (window.screen.width / 2) - (width / 2);
+    const top = (window.screen.height / 2) - (height / 2);
+    const mode = item.type === '시설작업' ? 'internal' : 'external';
+    window.open(`/?popup=construction_log&mode=${mode}&id=${item.id}`, 'ConstructionEditWin', `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+  };
+
+  const handleDelete = async (item: ConstructionWorkItem) => {
+    if (window.confirm('해당 내역을 삭제하시겠습니까?')) {
+      await deleteConstructionWorkItem(item.id);
+      loadAllHistory();
+    }
+  };
+
   const filteredHistory = useMemo(() => {
     return history.filter(item => 
       (item.content || '').includes(searchTerm) || 
@@ -165,40 +181,41 @@ const ConstructionHistory: React.FC = () => {
   }, [currentPage, totalPages]);
 
   return (
-    <div className="p-6 space-y-4 animate-fade-in pb-10">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <History size={24} />
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] animate-fade-in">
+      <div className="p-6 space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 shadow-sm">
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                <History size={24} />
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 whitespace-nowrap">공사 및 작업 통합 이력</h2>
             </div>
-            <h2 className="text-xl font-bold text-gray-800 whitespace-nowrap">공사 및 작업 통합 이력</h2>
+            <div className="relative flex-1 md:w-[320px] lg:w-[320px]">
+              <input 
+                type="text" 
+                placeholder="내용, 업체, 날짜 검색" 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white text-black outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+              />
+              <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+            </div>
           </div>
-          <div className="relative flex-1 md:w-72 lg:w-80">
-            <input 
-              type="text" 
-              placeholder="내용, 업체, 날짜 검색" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 text-black outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner"
-            />
-            <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <button 
+              onClick={loadAllHistory}
+              disabled={loading}
+              className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <span>새로고침</span>
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <button 
-            onClick={loadAllHistory}
-            disabled={loading}
-            className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            <span>새로고침</span>
-          </button>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto scrollbar-hide">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[950px] border-collapse">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200">
@@ -207,7 +224,7 @@ const ConstructionHistory: React.FC = () => {
                 <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">구분</th>
                 <th className="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-44">업체 (외부업체)</th>
                 <th className="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">내용</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">관리</th>
+                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-64">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -233,7 +250,11 @@ const ConstructionHistory: React.FC = () => {
                         <div className="flex items-center gap-2"><span className="text-sm text-gray-600 truncate max-w-[300px]" title={item.content}>{item.content}</span>{item.photos && item.photos.length > 0 && (<div className="flex items-center gap-0.5 text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded text-[10px] font-bold"><ImageIcon size={10} />{item.photos.length}</div>)}</div>
                       </td>
                       <td className="px-4 py-4 text-center">
-                        <button onClick={() => handleOpenDetail(item)} className="flex items-center gap-1 mx-auto bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100">상세보기<Printer size={12} /></button>
+                        <div className="flex justify-center gap-2">
+                          <button onClick={() => handleOpenDetail(item)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors" title="상세보기"><Printer size={18} /></button>
+                          <button onClick={() => handleEdit(item)} className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors" title="편집"><Edit2 size={18} /></button>
+                          <button onClick={() => handleDelete(item)} className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors" title="삭제"><Trash2 size={18} /></button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -242,15 +263,16 @@ const ConstructionHistory: React.FC = () => {
             </tbody>
           </table>
         </div>
-
-        {!loading && totalPages > 1 && (
-          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-            <button onClick={() => handlePageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronLeft size={18} /></button>
-            <div className="flex items-center gap-1 px-4">{visiblePageNumbers.map(pageNum => (<button key={pageNum} onClick={() => handlePageChange(pageNum)} className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>{pageNum}</button>))}</div>
-            <button onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className={`p-2 rounded-lg border transition-all ${currentPage === totalPages ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronRight size={18} /></button>
-          </div>
-        )}
       </div>
+
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button onClick={() => handlePageChange(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronLeft size={18} /></button>
+          <div className="flex items-center gap-1 px-4">{visiblePageNumbers.map(pageNum => (<button key={pageNum} onClick={() => handlePageChange(pageNum)} className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>{pageNum}</button>))}</div>
+          <button onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className={`p-2 rounded-lg border transition-all ${currentPage === totalPages ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronRight size={18} /></button>
+        </div>
+      )}
+    </div>
     </div>
   );
 };
