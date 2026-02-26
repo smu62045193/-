@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { parseISO, addDays, format, differenceInDays } from 'date-fns';
 import { X, CheckSquare, Square, Sparkles, Check } from 'lucide-react';
-import { fetchDateRangeData } from '../services/dataService';
+import { fetchDateRangeData, fetchLinkedKeywords } from '../services/dataService';
 import { TaskItem, WorkLogData, LogCategory } from '../types';
 import {
   getAutomatedElectricalTasks,
@@ -56,7 +56,7 @@ const formatRanges = (dateStrs: string[]) => {
       }
     }
   }
-  return ranges.join(', ');
+  return ranges.join(',');
 };
 
 interface WeeklyWorkImportPopupProps {
@@ -74,10 +74,34 @@ const WeeklyWorkImportPopup: React.FC<WeeklyWorkImportPopupProps> = ({ startDate
         const thisWeekStart = parseISO(startDateStr);
         const nextWeekStart = addDays(thisWeekStart, 7);
         
-        const [thisWeekLogs, nextWeekLogs] = await Promise.all([
+        const [thisWeekLogs, nextWeekLogs, fireKeywords, elevatorKeywords] = await Promise.all([
           fetchDateRangeData(startDateStr, 7),
-          fetchDateRangeData(format(nextWeekStart, 'yyyy-MM-dd'), 7)
+          fetchDateRangeData(format(nextWeekStart, 'yyyy-MM-dd'), 7),
+          fetchLinkedKeywords('fire'),
+          fetchLinkedKeywords('elevator')
         ]);
+
+        const allKeywords = [...(fireKeywords || []), ...(elevatorKeywords || [])].filter(Boolean);
+
+        const getBaseContent = (content: string) => {
+          let base = content.trim();
+          
+          const hyphenIndex = base.indexOf('-');
+          if (hyphenIndex !== -1) {
+            const suffix = base.substring(hyphenIndex + 1).trim();
+            const isKeyword = allKeywords.some(k => suffix.includes(k));
+            if (!isKeyword) {
+              base = base.substring(0, hyphenIndex).trim();
+            }
+          }
+          
+          base = base.replace(/\(([^)]+)\)/g, (match, inner) => {
+            const isKeyword = allKeywords.some(k => inner.includes(k));
+            return isKeyword ? match : '';
+          }).trim();
+          
+          return base;
+        };
 
         const automationMap: Record<string, (d: string) => TaskItem[]> = {
           electrical: getAutomatedElectricalTasks,
@@ -139,6 +163,10 @@ const WeeklyWorkImportPopup: React.FC<WeeklyWorkImportPopupProps> = ({ startDate
                   const boiler = getTasks('boiler');
                   todayTasks = [...mech.today, ...hvac.today, ...boiler.today];
                   tomorrowTasks = [...mech.tomorrow, ...hvac.tomorrow, ...boiler.tomorrow];
+                } else if (field.id === 'handover') {
+                  const handover = getTasks('handover');
+                  todayTasks = [...handover.today];
+                  tomorrowTasks = [...handover.tomorrow];
                 } else {
                   const cat = getTasks(field.id);
                   todayTasks = cat.today;
@@ -158,7 +186,7 @@ const WeeklyWorkImportPopup: React.FC<WeeklyWorkImportPopupProps> = ({ startDate
               if (weekType === 'this') {
                 todayTasks.forEach(task => {
                   if (task?.content?.trim()) {
-                    const baseContent = task.content.trim();
+                    const baseContent = getBaseContent(task.content);
                     const key = `this_${field.id}_${baseContent}`;
                     if (!groupedItems[key]) {
                       groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'this', dates: [] };
@@ -169,7 +197,7 @@ const WeeklyWorkImportPopup: React.FC<WeeklyWorkImportPopupProps> = ({ startDate
               } else {
                 todayTasks.forEach(task => {
                   if (task?.content?.trim()) {
-                    const baseContent = task.content.trim();
+                    const baseContent = getBaseContent(task.content);
                     const key = `next_${field.id}_${baseContent}`;
                     if (!groupedItems[key]) {
                       groupedItems[key] = { content: baseContent, fieldKey: field.id, weekType: 'next', dates: [] };

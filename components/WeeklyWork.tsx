@@ -75,7 +75,7 @@ const formatRanges = (nums: number[]) => {
       }
     }
   }
-  return ranges.join(', ');
+  return ranges.join(',');
 };
 
 const resizeImage = (file: File): Promise<string> => {
@@ -246,7 +246,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             else if (text.includes('제거')) res = '제거완료';
             else if (text.includes('교체')) res = '교체완료';
             else if (text.includes('불량')) res = '조치중';
-            return `- ${res}`;
+            return res;
           });
 
           const thisStr = formatGroup(selThis, true);
@@ -499,7 +499,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               .print-page { box-shadow: none !important; margin: 0 !important; }
               .page-break { page-break-before: always; }
             }
-            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
+            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 5mm 10mm 5mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
             .doc-title { margin: 0 auto 15px auto; text-align: center; font-size: 30pt; font-weight: 900; letter-spacing: 12px; text-decoration: underline; text-underline-offset: 8px; }
             .info-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt; margin-bottom: 15px; border-bottom: 1.5px solid black; padding-bottom: 5px; }
             .section-header { font-size: 13pt; font-weight: bold; margin-top: 10px; margin-bottom: 15px; border-left: 8px solid black; padding-left: 15px; text-align: left; }
