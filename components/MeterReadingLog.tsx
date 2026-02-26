@@ -399,8 +399,10 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     const normalCalc = normalItem ? getCalculations(normalItem) : { usage: 0, bill: 0 };
     const specialCalc = hasSpecialData ? getCalculations(specialItem) : { usage: 0, bill: 0 };
     
-    // 총 요금 계산 (특수계량기 데이터가 있을 때만 합산)
-    const totalBill = normalCalc.bill + (hasSpecialData ? specialCalc.bill : 0);
+    // 총 요금 계산 (특수계량기 데이터가 있을 때만 합산, 음수 요금은 0으로 처리하여 청구 요금에 더하지 않음)
+    const normalBillForTotal = normalCalc.bill > 0 ? normalCalc.bill : 0;
+    const specialBillForTotal = (hasSpecialData && specialCalc.bill > 0) ? specialCalc.bill : 0;
+    const totalBill = normalBillForTotal + specialBillForTotal;
 
     const normalPhoto = photos.find(p => p.tenant === tenantName && p.floor === floor && p.type === '일반');
     const specialPhoto = hasSpecialData ? photos.find(p => p.tenant === tenantName && p.floor === floor && p.type === '특수') : null;
