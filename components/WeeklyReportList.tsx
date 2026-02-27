@@ -251,21 +251,21 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[850px] border-collapse">
+          <table className="w-full min-w-[850px] border-collapse border border-gray-200">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200">
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20">No</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-56">대상 주간 (월~일)</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">최종 보고일자</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">작성자</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-40">관리</th>
+                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20 border border-gray-200">No</th>
+                <th className="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-56 border border-gray-200">대상 주간 (월~일)</th>
+                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36 border border-gray-200">최종 보고일자</th>
+                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36 border border-gray-200">작성자</th>
+                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-40 border border-gray-200">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && reports.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
+                <tr><td colSpan={5} className="py-24 text-center border border-gray-200"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
               ) : filteredReports.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center text-gray-400 italic">저장된 보고서 이력이 없습니다.</td></tr>
+                <tr><td colSpan={5} className="py-24 text-center text-gray-400 italic border border-gray-200">저장된 보고서 이력이 없습니다.</td></tr>
               ) : (
                 paginatedReports.map((report, idx) => {
                   const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
@@ -275,8 +275,8 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
                   
                   return (
                     <tr key={report.key} className="hover:bg-blue-50/40 transition-colors group">
-                      <td className="px-6 py-5 text-center text-gray-400 font-mono text-xs">{globalIdx}</td>
-                      <td className="px-6 py-5">
+                      <td className="px-6 py-5 text-center text-gray-400 font-mono text-xs border border-gray-200">{globalIdx}</td>
+                      <td className="px-6 py-5 border border-gray-200">
                         <div className="flex items-center gap-3">
                           <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
                             <Calendar size={20} />
@@ -287,12 +287,12 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-center">
+                      <td className="px-6 py-5 text-center border border-gray-200">
                         <span className="px-3 py-1 bg-gray-50 text-gray-600 rounded-md border border-gray-100 text-sm font-medium">
                           {report.data.reportingDate}
                         </span>
                       </td>
-                      <td className="px-6 py-5 text-center">
+                      <td className="px-6 py-5 text-center border border-gray-200">
                         <div className="flex items-center justify-center gap-1.5">
                           <User size={14} className="text-gray-400" />
                           <span className="text-gray-800 font-bold text-sm">
@@ -300,7 +300,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-center print:hidden">
+                      <td className="px-6 py-5 text-center border border-gray-200 print:hidden">
                         <div className="flex items-center justify-center gap-1">
                           <button 
                             onClick={() => handleViewDetail(report.data)}

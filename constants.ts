@@ -24,15 +24,15 @@ export const MENU_ITEMS: MenuItem[] = [
 
 export const WORK_LOG_TABS = [
   { id: 'electrical', label: '전기' },
-  { id: 'fire', label: '소방' },
+  { id: 'fire_elevator', label: '소방/승강기' },
   { id: 'checklist', label: '점검표' },
   { id: 'substation', label: '수변전반' },
   { id: 'mechanical', label: '기계' },
+  { id: 'chemicals', label: '종균제/소독제' },
   { id: 'mech_facility', label: '기계설비' },
   { id: 'air_env', label: '대기환경' },
-  { id: 'elevator', label: '승강기' },
-  { id: 'park_sec_clean', label: '주차/경비/미화' },
   { id: 'handover', label: '특이사항' },
+  { id: 'park_sec_clean', label: '주차/경비/미화' },
 ];
 
 // Variable Holidays (Lunar New Year, Chuseok, Buddha's Birthday and Substitutes) 2024-2033

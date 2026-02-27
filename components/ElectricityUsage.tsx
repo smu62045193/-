@@ -16,18 +16,18 @@ const ElectricityUsage: React.FC<ElectricityUsageProps> = ({ currentDate }) => {
   // Initialize with default data immediately to prevent "Loading..." screen
   const [data, setData] = useState<SubstationLogData>(getInitialSubstationLog(dateKey));
 
-  useEffect(() => {
-    // Reset to defaults for new date immediately while fetching
-    setData(getInitialSubstationLog(dateKey));
-    loadData();
-  }, [dateKey]);
-
   const loadData = async () => {
     setLoading(true);
     const fetched = await fetchSubstationLog(dateKey);
     setData(fetched);
     setLoading(false);
   };
+
+  useEffect(() => {
+    // Reset to defaults for new date immediately while fetching
+    setData(getInitialSubstationLog(dateKey));
+    loadData();
+  }, [dateKey]);
 
   const handleSave = async () => {
     const success = await saveSubstationLog(data);

@@ -759,6 +759,23 @@ export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   return !error;
 };
 
+export const saveMechanicalChemicals = async (date: string, chemicals: MechanicalChemicals): Promise<boolean> => {
+  try {
+    const { data: existing } = await supabase.from('daily_reports').select('work_log').eq('id', date).single();
+    const workLog = existing?.work_log || {};
+    workLog.mechanicalChemicals = chemicals;
+    const { error } = await supabase.from('daily_reports').upsert({
+      id: date,
+      work_log: workLog,
+      last_updated: new Date().toISOString()
+    });
+    return !error;
+  } catch (e) {
+    console.error('Failed to save mechanical chemicals', e);
+    return false;
+  }
+};
+
 export const fetchStaffList = async (): Promise<StaffMember[]> => {
   try {
     const { data } = await supabase.from('staff_members').select('*');

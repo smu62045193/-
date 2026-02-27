@@ -27,16 +27,16 @@ const ParkingChangeLog: React.FC = () => {
     note: ''
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
   const loadData = async () => {
     setLoading(true);
     const data = await fetchParkingChangeList();
     setItems(data || []);
     setLoading(false);
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   const handleEdit = (item: ParkingChangeItem) => {
     setNewItem({ ...item });

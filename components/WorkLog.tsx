@@ -27,7 +27,8 @@ import {
   supabase,
   apiFetchRange,
   getInitialHvacLog,
-  getInitialBoilerLog
+  getInitialBoilerLog,
+  saveMechanicalChemicals
 } from '../services/dataService';
 import { 
   DailyData, 
@@ -273,6 +274,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const [utility, setUtility] = useState<UtilityUsage>(DEFAULT_UTILITY);
   const [logData, setLogData] = useState<WorkLogData>(getFreshInitialWorkLog());
   const [activeTab, setActiveTab] = useState('electrical');
+  const [activeChecklistTab, setActiveChecklistTab] = useState<'substation' | 'fire' | 'elevator' | 'gas' | 'septic'>('substation');
+  const [activeParkSecCleanTab, setActiveParkSecCleanTab] = useState<'parking' | 'security' | 'cleaning'>('parking');
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
   const [gasLog, setGasLog] = useState<GasLogData>(getInitialGasLog(''));
@@ -508,6 +511,24 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     return () => { cancelled = true; };
   }, [dateKey, loadData]);
 
+  const handleSaveChemicals = async () => {
+    setSaveStatus('loading');
+    try {
+      const success = await saveMechanicalChemicals(dateKey, logData.mechanicalChemicals || INITIAL_CHEMICALS);
+      if (success) {
+        setSaveStatus('success');
+        alert('저장이 완료되었습니다.');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } else {
+        setSaveStatus('error');
+        alert('데이터 저장에 실패했습니다.');
+      }
+    } catch (err) {
+      setSaveStatus('error');
+      alert('저장 중 오류가 발생했습니다.');
+    }
+  };
+
   const handleSaveAll = async () => {
     setSaveStatus('loading');
     try {
@@ -526,7 +547,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         lastUpdated: new Date().toISOString()
       });
 
-      if (activeTab === 'mechanical' || activeTab === 'mech_facility') {
+      if (activeTab === 'mechanical' || activeTab === 'mech_facility' || activeTab === 'checklist') {
         await Promise.all([
           saveGasLog(gasLog),
           saveSepticLog(septicLog),
@@ -812,15 +833,127 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     if (activeTab === 'substation') return <SubstationLog currentDate={currentDate} isEmbedded={true} onUsageChange={val => setUtility(p => ({...p, electricity: val}))} />;
     if (activeTab === 'mech_facility') return <HvacLog currentDate={currentDate} isEmbedded={true} onUsageChange={(h, b) => setUtility(p => ({...p, hvacGas: h, boilerGas: b}))} />;
     if (activeTab === 'air_env') return <AirEnvironmentLog currentDate={currentDate} />;
-    if (activeTab === 'checklist') return (
+    if (activeTab === 'checklist') {
+      const groupedGas: Record<string, GasCheckItem[]> = {};
+      gasLog.items.forEach(item => {
+        if (!groupedGas[item.category]) groupedGas[item.category] = [];
+        groupedGas[item.category].push(item);
+      });
+      const gasCategories = ['정압실', '배관 계통', '연소 장치', '경보 장치'];
+
+      return (
+        <div className="space-y-2">
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-gray-50/50 px-5 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2 py-3">
+                  <ClipboardCheck className="text-blue-500" size={20} />
+                  <h4 className="font-bold text-gray-800">일일 점검 내역</h4>
+                  <span className="text-gray-300 mx-2">|</span>
+                </div>
+                <div className="flex">
+                  <button onClick={() => setActiveChecklistTab('substation')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeChecklistTab === 'substation' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>수변전반</button>
+                  <button onClick={() => setActiveChecklistTab('fire')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeChecklistTab === 'fire' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>소방</button>
+                  <button onClick={() => setActiveChecklistTab('elevator')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeChecklistTab === 'elevator' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>승강기</button>
+                  <button onClick={() => setActiveChecklistTab('gas')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeChecklistTab === 'gas' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>가스</button>
+                  <button onClick={() => setActiveChecklistTab('septic')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeChecklistTab === 'septic' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>정화조</button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 py-2">
+                <button 
+                  onClick={() => loadData(() => false, true)}
+                  className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+                >
+                  <RefreshCw size={18} className="mr-2" />
+                  새로고침
+                </button>
+                <button 
+                  onClick={handleSaveAll}
+                  className="flex items-center justify-center px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-md transition-all text-sm active:scale-95"
+                >
+                  <Save size={18} className="mr-2" />
+                  서버저장
+                </button>
+                <button 
+                  onClick={() => handlePrintCategory('checklist')}
+                  className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all text-sm active:scale-95"
+                >
+                  <Printer size={18} className="mr-2" />
+                  미리보기
+                </button>
+              </div>
+            </div>
+            <div className="p-4">
+              {activeChecklistTab === 'substation' && <SubstationChecklistLog currentDate={currentDate} isEmbedded={true} />}
+              {activeChecklistTab === 'fire' && <FireFacilityCheck currentDate={currentDate} />}
+              {activeChecklistTab === 'elevator' && <ElevatorLog currentDate={currentDate} />}
+              {activeChecklistTab === 'gas' && (
+                <div className="overflow-x-auto max-w-5xl mx-auto shadow-sm p-1">
+                  <div className="mb-2 px-1">
+                    <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">가스일일점검</h3>
+                  </div>
+                  <table className="w-full border-collapse border border-slate-300 text-sm">
+                    <thead className="bg-slate-50">
+                      <tr><th className="border border-slate-300 p-3 w-24">구분</th><th className="border border-slate-300 p-3">점검내용</th><th className="border border-slate-300 p-3 w-24 text-center">결과</th></tr>
+                    </thead>
+                    <tbody>
+                      {gasCategories.map(cat => (
+                        <React.Fragment key={cat}>
+                          {groupedGas[cat]?.map((item, idx) => (
+                            <tr key={item.id} className="hover:bg-slate-50">
+                              {idx === 0 && <td rowSpan={groupedGas[cat].length} className="border border-slate-300 p-3 text-center font-bold bg-slate-50/50 whitespace-pre-wrap">{cat.replace(' ', '\n')}</td>}
+                              <td className="border border-slate-300 p-3 text-left">• {item.content}</td>
+                              <td className={`border border-slate-300 p-3 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleGasResult(item.id)}>{item.result || '-'}</td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {activeChecklistTab === 'septic' && (
+                <div className="overflow-x-auto max-w-5xl mx-auto shadow-sm p-1">
+                  <div className="mb-2 px-1">
+                    <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">정화조 일일점검</h3>
+                  </div>
+                  <table className="w-full border-collapse border border-slate-300 text-sm">
+                    <thead className="bg-slate-50">
+                      <tr><th className="border border-slate-300 p-3">점검내용</th><th className="border border-slate-300 p-3 w-24 text-center">결과</th></tr>
+                    </thead>
+                    <tbody>
+                      {septicLog.items.map(item => (
+                        <tr key={item.id} className="hover:bg-slate-50">
+                          <td className="border border-slate-300 p-3 text-left">• {item.content}</td>
+                          <td className={`border border-slate-300 p-3 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleSepticResult(item.id)}>{item.result || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    if (activeTab === 'park_sec_clean') return (
       <div className="space-y-2">
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="bg-gray-50/50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ClipboardCheck className="text-blue-500" size={20} />
-              <h4 className="font-bold text-gray-800">일일 점검 내역</h4>
+          <div className="bg-gray-50/50 px-5 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 py-3">
+                <ClipboardList className="text-blue-500" size={20} />
+                <h4 className="font-bold text-gray-800">일반 관리 현황</h4>
+                <span className="text-gray-300 mx-2">|</span>
+              </div>
+              <div className="flex">
+                <button onClick={() => setActiveParkSecCleanTab('parking')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeParkSecCleanTab === 'parking' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>주차관리</button>
+                <button onClick={() => setActiveParkSecCleanTab('security')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeParkSecCleanTab === 'security' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>경비보안</button>
+                <button onClick={() => setActiveParkSecCleanTab('cleaning')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeParkSecCleanTab === 'cleaning' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>미화위생</button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 py-2">
               <button 
                 onClick={() => loadData(() => false, true)}
                 className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
@@ -835,38 +968,39 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                 <Save size={18} className="mr-2" />
                 서버저장
               </button>
-              <button 
-                onClick={() => handlePrintCategory('checklist')}
-                className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all text-sm active:scale-95"
-              >
-                <Printer size={18} className="mr-2" />
-                미리보기
-              </button>
             </div>
           </div>
-          <div className="p-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-            <FireFacilityCheck currentDate={currentDate} />
-            < ElevatorLog currentDate={currentDate} />
+          <div className="p-4">
+            {activeParkSecCleanTab === 'parking' && (
+              <DetailedLogSection 
+                title="주차 관리" 
+                icon={<Car className="text-blue-500" size={20} />} 
+                data={logData?.parking} 
+                onUpdate={d => setLogData({...logData, parking: d})} 
+              />
+            )}
+            {activeParkSecCleanTab === 'security' && (
+              <DetailedLogSection 
+                title="경비 보안" 
+                icon={<Shield className="text-green-500" size={20} />} 
+                data={logData?.security} 
+                onUpdate={d => setLogData({...logData, security: d})} 
+              />
+            )}
+            {activeParkSecCleanTab === 'cleaning' && (
+              <DetailedLogSection 
+                title="미화 위생" 
+                icon={<Droplets className="text-cyan-500" size={20} />} 
+                data={logData?.cleaning} 
+                onUpdate={d => setLogData({...logData, cleaning: d})} 
+              />
+            )}
           </div>
         </div>
       </div>
     );
-    if (activeTab === 'park_sec_clean') return (
-      <div className="space-y-2">
-        <DetailedLogSection title="주차 관리" icon={<Car className="text-blue-500" size={20} />} data={logData?.parking} onUpdate={d => setLogData({...logData, parking: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
-        <DetailedLogSection title="경비 보안" icon={<Shield className="text-green-500" size={20} />} data={logData?.security} onUpdate={d => setLogData({...logData, security: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
-        <DetailedLogSection title="미화 위생" icon={<Droplets className="text-cyan-500" size={20} />} data={logData?.cleaning} onUpdate={d => setLogData({...logData, cleaning: d})} onRefresh={() => loadData(() => false, true)} onSave={handleSaveAll} />
-      </div>
-    );
 
     if (activeTab === 'mechanical') {
-      const groupedGas: Record<string, GasCheckItem[]> = {};
-      gasLog.items.forEach(item => {
-        if (!groupedGas[item.category]) groupedGas[item.category] = [];
-        groupedGas[item.category].push(item);
-      });
-      const gasCategories = ['정압실', '배관 계통', '연소 장치', '경보 장치'];
-
       return (
         <div className="space-y-2">
           <DetailedLogSection 
@@ -878,93 +1012,106 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             onRefresh={() => loadData(() => false, true)}
             onSave={handleSaveAll}
           />
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="bg-gray-50/50 px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-                <Flame className="text-orange-500" size={20} />
-                <h4 className="font-bold text-gray-800">가스일일점검</h4>
-              </div>
-              <div className="p-4 overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-200 text-xs">
-                  <thead className="bg-gray-50">
-                    <tr><th className="border border-gray-200 p-2 w-16">구분</th><th className="border border-gray-200 p-2">점검내용</th><th className="border border-gray-200 p-2 w-16 text-center">결과</th></tr>
-                  </thead>
-                  <tbody>
-                    {gasCategories.map(cat => (
-                      <React.Fragment key={cat}>
-                        {groupedGas[cat]?.map((item, idx) => (
-                          <tr key={item.id} className="hover:bg-gray-50">
-                            {idx === 0 && <td rowSpan={groupedGas[cat].length} className="border border-gray-200 p-2 text-center font-bold bg-gray-50/50 whitespace-pre-wrap">{cat.replace(' ', '\n')}</td>}
-                            <td className="border border-gray-200 p-2 text-left">• {item.content}</td>
-                            <td className={`border border-gray-200 p-2 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleGasResult(item.id)}>{item.result || '-'}</td>
-                          </tr>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="bg-gray-50/50 px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-                  <Droplets className="text-blue-500" size={20} />
-                  <h4 className="font-bold text-gray-800">정화조일일점검</h4>
-                </div>
-                <div className="p-4">
-                  <table className="w-full border-collapse border border-gray-200 text-xs">
-                    <thead className="bg-gray-50">
-                      <tr><th className="border border-gray-200 p-2">점검내용</th><th className="border border-gray-200 p-2 w-16 text-center">결과</th></tr>
-                    </thead>
-                    <tbody>
-                      {septicLog.items.map(item => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="border border-gray-200 p-2 text-left">• {item.content}</td>
-                          <td className={`border border-gray-200 p-2 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleSepticResult(item.id)}>{item.result || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                <div className="bg-gray-50/50 px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-                  <Droplets className="text-cyan-600" size={20} />
-                  <h4 className="font-bold text-gray-800">종균제 / 소독제 수불 현황</h4>
-                </div>
-                <div className="p-4">
-                  <table className="w-full border-collapse border border-gray-200 text-center text-xs table-fixed">
-                    <thead className="bg-gray-50">
-                      <tr><th className="border border-gray-200 p-2 w-20">구분</th><th className="border border-gray-200 p-2">전일</th><th className="border border-gray-200 p-2">입고</th><th className="border border-gray-200 p-2">투입</th><th className="border border-gray-200 p-2 text-blue-600">재고</th></tr>
-                    </thead>
-                    <tbody>
-                      {['seed', 'sterilizer'].map(key => {
-                        return (
-                          <tr key={key}>
-                            <td className="border border-gray-300 p-2 font-bold bg-gray-50/30 whitespace-nowrap">{key === 'seed' ? '종균제' : '소독제'}</td>
-                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.prev || ''} onChange={e => handleChemicalUpdate(key as any, 'prev', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" placeholder="0" /></td>
-                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.incoming || ''} onChange={e => handleChemicalUpdate(key as any, 'incoming', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" placeholder="0" /></td>
-                            <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.used || ''} onChange={e => handleChemicalUpdate(key as any, 'used', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-2" placeholder="0" /></td>
-                            <td className="border border-gray-300 p-0 bg-blue-50 font-bold text-blue-700">{logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.stock || '0'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       );
     }
 
+    if (activeTab === 'fire_elevator') return (
+      <div className="space-y-2">
+        <DetailedLogSection 
+          title="소방 업무일지" 
+          icon={<Flame className="text-red-600" size={20} />}
+          data={logData?.fire} 
+          onUpdate={d => setLogData({...logData, fire: d})} 
+          onRefresh={() => loadData(() => false, true)}
+          onSave={handleSaveAll}
+        />
+        <DetailedLogSection 
+          title="승강기 업무일지" 
+          icon={<ArrowUpDown className="text-blue-600" size={20} />}
+          data={logData?.elevator} 
+          onUpdate={d => setLogData({...logData, elevator: d})} 
+          onRefresh={() => loadData(() => false, true)}
+          onSave={handleSaveAll}
+        />
+      </div>
+    );
+
+    if (activeTab === 'chemicals') return (
+      <div className="space-y-2">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-gray-50/50 px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Droplets className="text-cyan-600" size={20} />
+              <h4 className="font-bold text-gray-800">종균제 / 소독제 수불 현황</h4>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => loadData(() => false, true)}
+                className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+              >
+                <RefreshCw size={18} className="mr-2" />
+                새로고침
+              </button>
+              <button 
+                onClick={handleSaveChemicals}
+                className="flex items-center justify-center px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-md transition-all text-sm active:scale-95"
+              >
+                <Save size={18} className="mr-2" />
+                서버저장
+              </button>
+            </div>
+          </div>
+          <div className="p-4">
+            <table className="w-full border-collapse border border-gray-200 text-center text-sm table-fixed">
+              <thead className="bg-gray-50">
+                <tr><th className="border border-gray-200 p-3 w-32">구분</th><th className="border border-gray-200 p-3">전일</th><th className="border border-gray-200 p-3">입고</th><th className="border border-gray-200 p-3">투입</th><th className="border border-gray-200 p-3 text-blue-600">재고</th></tr>
+              </thead>
+              <tbody>
+                {['seed', 'sterilizer'].map(key => {
+                  return (
+                    <tr key={key}>
+                      <td className="border border-gray-300 p-3 font-bold bg-gray-50/30 whitespace-nowrap">{key === 'seed' ? '종균제' : '소독제'}</td>
+                      <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.prev || ''} onChange={e => handleChemicalUpdate(key as any, 'prev', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-3" placeholder="0" /></td>
+                      <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.incoming || ''} onChange={e => handleChemicalUpdate(key as any, 'incoming', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-3" placeholder="0" /></td>
+                      <td className="border border-gray-300 p-0"><input type="text" value={logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.used || ''} onChange={e => handleChemicalUpdate(key as any, 'used', e.target.value)} className="w-full h-full text-center outline-none bg-transparent py-3" placeholder="0" /></td>
+                      <td className="border border-gray-300 p-3 bg-blue-50 font-bold text-blue-700">{logData.mechanicalChemicals?.[key as 'seed'|'sterilizer']?.stock || '0'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+
+    if (activeTab === 'electrical') return (
+      <DetailedLogSection 
+        title="전기 업무일지" 
+        icon={<Zap className="text-blue-600" size={20} />}
+        data={logData?.electrical} 
+        onUpdate={d => setLogData({...logData, electrical: d})} 
+        onPrint={() => handlePrintCategory('electrical')}
+        onRefresh={() => loadData(() => false, true)}
+        onSave={handleSaveAll}
+      />
+    );
+
+    if (activeTab === 'handover') return (
+      <DetailedLogSection 
+        title="특이사항" 
+        icon={<Edit3 className="text-slate-600" size={20} />}
+        data={logData?.handover} 
+        onUpdate={d => setLogData({...logData, handover: d})} 
+        onRefresh={() => loadData(() => false, true)}
+        onSave={handleSaveAll}
+      />
+    );
+
     const getTabIcon = () => {
       switch(activeTab) {
         case 'electrical': return <Zap className="text-blue-600" size={20} />;
-        case 'fire': return <Flame className="text-red-600" size={20} />;
-        case 'elevator': return <ArrowUpDown className="text-blue-600" size={20} />;
         case 'handover': return <Edit3 className="text-slate-600" size={20} />;
         default: return null;
       }
@@ -972,22 +1119,20 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
     const getTabLabel = () => {
       if (activeTab === 'electrical') return "전기 업무일지";
+      if (activeTab === 'handover') return "특이사항";
       return WORK_LOG_TABS.find(t => t.id === activeTab)?.label || '';
     };
 
     return (
-      <div className="space-y-2">
-        <DetailedLogSection 
-          title={getTabLabel()} 
-          icon={getTabIcon()}
-          data={(logData as any)?.[activeTab]} 
-          onUpdate={d => setLogData({...logData, [activeTab]: d})} 
-          onPrint={(activeTab === 'electrical' || activeTab === 'mechanical') ? () => handlePrintCategory(activeTab) : undefined}
-          onRefresh={() => loadData(() => false, true)}
-          onSave={handleSaveAll}
-        />
-        {activeTab === 'electrical' && <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mt-2"><SubstationChecklistLog currentDate={currentDate} isEmbedded={true} /></div>}
-      </div>
+      <DetailedLogSection 
+        title={getTabLabel()} 
+        icon={getTabIcon()}
+        data={(logData as any)?.[activeTab]} 
+        onUpdate={d => setLogData({...logData, [activeTab]: d})} 
+        onPrint={(activeTab === 'electrical' || activeTab === 'mechanical') ? () => handlePrintCategory(activeTab) : undefined}
+        onRefresh={() => loadData(() => false, true)}
+        onSave={handleSaveAll}
+      />
     );
   };
 
@@ -1026,7 +1171,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                 </button>
               ))}
             </div>
-            <div className="min-h-[400px]">{renderTabContent()}</div>
+            <div className="min-h-[400px]" key={activeTab}>{renderTabContent()}</div>
           </div>
         </>
       )}

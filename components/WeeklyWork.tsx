@@ -272,11 +272,27 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       });
     };
 
+    // To prevent duplicate imports from multiple channels (BroadcastChannel, localStorage, postMessage)
+    let lastProcessedTimestamp = 0;
+
+    const processImportData = (data: any) => {
+      if (!data || !data.payload) return;
+      
+      // If the data has a timestamp and we've already processed it, skip
+      if (data.timestamp && data.timestamp <= lastProcessedTimestamp) return;
+      
+      if (data.timestamp) {
+        lastProcessedTimestamp = data.timestamp;
+      }
+      
+      handleData(data.payload as SelectableItem[]);
+    };
+
     // 1. Listen via BroadcastChannel
     const channel = new BroadcastChannel('weekly_import_channel');
     channel.onmessage = (event: MessageEvent) => {
       if (event.data?.type === 'IMPORT_WEEKLY_WORK') {
-        handleData(event.data.payload as SelectableItem[]);
+        processImportData(event.data);
       }
     };
 
@@ -285,9 +301,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       if (e.key === 'weekly_import_data' && e.newValue) {
         try {
           const data = JSON.parse(e.newValue);
-          if (data && data.payload) {
-            handleData(data.payload);
-          }
+          processImportData(data);
         } catch (err) {
           console.error('Failed to parse storage data', err);
         }
@@ -298,7 +312,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     // 3. Listen via postMessage (fallback for older popup instances)
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'IMPORT_WEEKLY_WORK') {
-        handleData(event.data.payload as SelectableItem[]);
+        processImportData(event.data);
       }
     };
     window.addEventListener('message', handleMessage);

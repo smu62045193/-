@@ -91,7 +91,7 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
       isEmbedded={isEmbedded}
       hideHeader={true}
     >
-      <div id="substation-checklist-print-area" className="bg-white">
+      <div id="substation-checklist-print-area" className="bg-white max-w-5xl mx-auto shadow-sm p-1">
         <div className="mb-2 px-1">
           <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">수변전반 점검표</h3>
         </div>

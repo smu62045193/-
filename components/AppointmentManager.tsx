@@ -38,6 +38,13 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   };
   const [newItem, setNewItem] = useState<AppointmentItem>(initialNewItem);
 
+  const loadData = async () => { 
+    setLoading(true); 
+    const data = await fetchAppointmentList(); 
+    setItems(data || []); 
+    setLoading(false); 
+  };
+
   useEffect(() => { 
     loadData();
 
@@ -62,13 +69,6 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
       if (item) setNewItem({ ...item });
     }
   }, [editId, items]);
-
-  const loadData = async () => { 
-    setLoading(true); 
-    const data = await fetchAppointmentList(); 
-    setItems(data || []); 
-    setLoading(false); 
-  };
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 750;

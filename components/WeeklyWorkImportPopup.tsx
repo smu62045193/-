@@ -245,20 +245,24 @@ const WeeklyWorkImportPopup: React.FC<WeeklyWorkImportPopupProps> = ({ startDate
 
   const handleApplySelection = () => {
     try {
-      // 1. Use localStorage for robust cross-window communication
-      localStorage.setItem('weekly_import_data', JSON.stringify({
-        timestamp: Date.now(),
+      const timestamp = Date.now();
+      const payloadData = {
+        type: 'IMPORT_WEEKLY_WORK',
+        timestamp,
         payload: selectableItems
-      }));
+      };
+
+      // 1. Use localStorage for robust cross-window communication
+      localStorage.setItem('weekly_import_data', JSON.stringify(payloadData));
       
       // 2. BroadcastChannel as fallback
       const channel = new BroadcastChannel('weekly_import_channel');
-      channel.postMessage({ type: 'IMPORT_WEEKLY_WORK', payload: selectableItems });
+      channel.postMessage(payloadData);
       channel.close();
 
       // 3. Direct postMessage to opener (most reliable for popups)
       if (window.opener) {
-        window.opener.postMessage({ type: 'IMPORT_WEEKLY_WORK', payload: selectableItems }, '*');
+        window.opener.postMessage(payloadData, '*');
       }
       
       alert('주간업무보고에 반영되었습니다. 창을 닫으셔도 됩니다.');
