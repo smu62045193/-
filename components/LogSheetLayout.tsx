@@ -50,7 +50,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
 
   // 임베디드 모드이면서 헤더가 표시되는 경우, 테두리 밀착을 위해 컨테이너 p-0 설정
   const containerClass = isEmbedded 
-    ? `w-full bg-white ${!hideHeader ? 'rounded-2xl border border-slate-200 shadow-sm overflow-hidden' : 'p-4 sm:p-6'}` 
+    ? `w-full bg-white ${!hideHeader ? 'rounded-2xl border border-slate-200 shadow-sm overflow-hidden' : ''}` 
     : "p-4 sm:p-8 max-w-[1200px] mx-auto space-y-6 bg-white rounded-2xl border border-slate-200 shadow-sm print:shadow-none print:border-none print:p-0";
 
   return (

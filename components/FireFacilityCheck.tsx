@@ -77,7 +77,7 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
     });
   }
 
-  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-sm text-slate-700 h-9";
+  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-[13px] text-slate-700 h-9";
   const tdClass = "border border-slate-300 p-0 h-9 relative bg-white";
   const labelClass = "border border-slate-300 p-1 font-bold text-center bg-white text-slate-700 align-middle w-28 text-[13px]";
   const resultCellClass = (res: string) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-black text-[13px] transition-colors ${res === '양호' ? 'text-blue-600' : res === '불량' ? 'text-red-600 bg-red-50' : 'text-slate-300'}`;
@@ -137,7 +137,7 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
                 </React.Fragment>
               ))}
               <tr className="h-20">
-                <td className={`${labelClass} font-black text-xs`}>
+                <td className={`${labelClass} font-black text-[13px]`}>
                   특 이 사 항
                 </td>
                 <td colSpan={2} className="border border-slate-300 p-0 h-20">

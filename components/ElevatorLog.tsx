@@ -71,7 +71,7 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate }) => {
   const elevators = ['ev1', 'ev2', 'ev3', 'ev4', 'ev5'] as const;
   const elevatorLabels = ['1호기', '2호기', '3호기', '4호기', '5호기'];
 
-  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-sm text-slate-700 h-9";
+  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-[13px] text-slate-700 h-9";
   const tdClass = "border border-slate-300 p-0 h-9 relative bg-white";
   const labelClass = "border border-slate-300 p-1 font-bold text-center bg-white text-slate-700 align-middle w-28 text-[13px]";
   const resultCellClass = (res: ElevatorResult) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-black text-[13px] transition-colors ${res === '양호' ? 'text-blue-600' : res === '불량' ? 'text-red-600 bg-red-50' : 'text-slate-300'}`;
@@ -126,7 +126,7 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate }) => {
                 </tr>
               ))}
               <tr className="h-20">
-                <td className={`${labelClass} font-black text-xs`}>
+                <td className={`${labelClass} font-black text-[13px]`}>
                   특 이 사 항
                 </td>
                 <td colSpan={5} className="border border-slate-300 p-0 h-20">

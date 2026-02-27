@@ -892,18 +892,18 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                   <div className="mb-2 px-1">
                     <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">가스일일점검</h3>
                   </div>
-                  <table className="w-full border-collapse border border-slate-300 text-sm">
+                  <table className="w-full border-collapse border border-slate-300 text-[13px]">
                     <thead className="bg-slate-50">
-                      <tr><th className="border border-slate-300 p-3 w-24">구분</th><th className="border border-slate-300 p-3">점검내용</th><th className="border border-slate-300 p-3 w-24 text-center">결과</th></tr>
+                      <tr className="h-9"><th className="border border-slate-300 p-2 w-24 font-bold text-slate-700">구분</th><th className="border border-slate-300 p-2 font-bold text-slate-700">점검내용</th><th className="border border-slate-300 p-2 w-24 text-center font-bold text-slate-700">결과</th></tr>
                     </thead>
                     <tbody>
                       {gasCategories.map(cat => (
                         <React.Fragment key={cat}>
                           {groupedGas[cat]?.map((item, idx) => (
-                            <tr key={item.id} className="hover:bg-slate-50">
-                              {idx === 0 && <td rowSpan={groupedGas[cat].length} className="border border-slate-300 p-3 text-center font-bold bg-slate-50/50 whitespace-pre-wrap">{cat.replace(' ', '\n')}</td>}
-                              <td className="border border-slate-300 p-3 text-left">• {item.content}</td>
-                              <td className={`border border-slate-300 p-3 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleGasResult(item.id)}>{item.result || '-'}</td>
+                            <tr key={item.id} className="hover:bg-slate-50 h-9">
+                              {idx === 0 && <td rowSpan={groupedGas[cat].length} className="border border-slate-300 p-1 text-center font-bold bg-slate-50/50 whitespace-pre-wrap w-24">{cat.replace(' ', '\n')}</td>}
+                              <td className="border border-slate-300 p-1 text-left pl-4 font-medium text-slate-900">• {item.content}</td>
+                              <td className={`border border-slate-300 p-1 text-center font-black cursor-pointer transition-colors w-24 ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleGasResult(item.id)}>{item.result || '-'}</td>
                             </tr>
                           ))}
                         </React.Fragment>
@@ -917,15 +917,15 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                   <div className="mb-2 px-1">
                     <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">정화조 일일점검</h3>
                   </div>
-                  <table className="w-full border-collapse border border-slate-300 text-sm">
+                  <table className="w-full border-collapse border border-slate-300 text-[13px]">
                     <thead className="bg-slate-50">
-                      <tr><th className="border border-slate-300 p-3">점검내용</th><th className="border border-slate-300 p-3 w-24 text-center">결과</th></tr>
+                      <tr className="h-9"><th className="border border-slate-300 p-2 font-bold text-slate-700">점검내용</th><th className="border border-slate-300 p-2 w-24 text-center font-bold text-slate-700">결과</th></tr>
                     </thead>
                     <tbody>
                       {septicLog.items.map(item => (
-                        <tr key={item.id} className="hover:bg-slate-50">
-                          <td className="border border-slate-300 p-3 text-left">• {item.content}</td>
-                          <td className={`border border-slate-300 p-3 text-center font-bold cursor-pointer transition-colors ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleSepticResult(item.id)}>{item.result || '-'}</td>
+                        <tr key={item.id} className="hover:bg-slate-50 h-9">
+                          <td className="border border-slate-300 p-1 text-left pl-4 font-medium text-slate-900">• {item.content}</td>
+                          <td className={`border border-slate-300 p-1 text-center font-black cursor-pointer transition-colors w-24 ${item.result === '양호' ? 'text-blue-600 hover:bg-blue-50' : 'text-red-600 hover:bg-red-50'}`} onClick={() => toggleSepticResult(item.id)}>{item.result || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
