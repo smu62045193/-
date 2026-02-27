@@ -32,7 +32,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
 
   // 팝업 모드용 입력 폼 상태
   const [formItem, setFormItem] = useState<Tenant>({
-    id: '', floor: '', name: '', area: '', refPower: '2380', contact: '', note: '일반'
+    id: '', floor: '', name: '', area: '', refPower: '2380', contact: '', note: ''
   });
 
   useEffect(() => {

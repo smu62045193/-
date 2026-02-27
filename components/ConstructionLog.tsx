@@ -301,10 +301,32 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
           </div>
 
           <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">날짜 *</label>
-                <input type="date" value={currentItem.date} onChange={e => setCurrentItem({...currentItem, date: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">시작일 *</label>
+                <input 
+                  type="date" 
+                  value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[0] : currentItem.date} 
+                  onChange={e => {
+                    const parts = currentItem.date.split(' ~ ');
+                    const end = parts[1] || e.target.value;
+                    setCurrentItem({...currentItem, date: `${e.target.value} ~ ${end}`});
+                  }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">종료일 *</label>
+                <input 
+                  type="date" 
+                  value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[1] : currentItem.date} 
+                  onChange={e => {
+                    const parts = currentItem.date.split(' ~ ');
+                    const start = parts[0] || e.target.value;
+                    setCurrentItem({...currentItem, date: `${start} ~ ${e.target.value}`});
+                  }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                />
               </div>
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">구분</label>
@@ -409,22 +431,22 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition-all">
           <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[1000px] border-collapse">
+          <table className="w-full min-w-[1000px] border-collapse border border-gray-300">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16">No</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">날짜</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">구분</th>
-                {mode === 'external' && <th className="px-4 py-3 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-48">업체명</th>}
-                <th className="px-4 py-3 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">작업내용</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20">사진</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">관리</th>
+                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16 border border-gray-300">No</th>
+                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-300">일자</th>
+                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-300">구분</th>
+                {mode === 'external' && <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-48 border border-gray-300">업체명</th>}
+                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider border border-gray-300">작업내용</th>
+                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20 border border-gray-300">사진</th>
+                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-300">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {paginatedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={mode === 'external' ? 7 : 6} className="px-4 py-20 text-center text-gray-400 italic text-sm">
+                  <td colSpan={mode === 'external' ? 7 : 6} className="px-4 py-20 text-center text-gray-400 italic text-sm border border-gray-300">
                     등록된 {mode === 'external' ? '외부업체' : '시설직'} 내역이 없습니다.
                   </td>
                 </tr>
@@ -433,20 +455,20 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
                   const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
                   return (
                     <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-center text-gray-400 font-mono text-xs">{globalIdx}</td>
-                      <td className="px-4 py-3 text-center text-sm text-gray-700">{item.date}</td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs border border-gray-300">{globalIdx}</td>
+                      <td className="px-4 py-2 text-center text-sm text-gray-700 border border-gray-300">{item.date}</td>
+                      <td className="px-4 py-2 text-center border border-gray-300">
                          <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px]">{item.category}</span>
                       </td>
-                      {mode === 'external' && <td className="px-4 py-3 text-sm font-bold text-gray-800">{item.company || '-'}</td>}
-                      <td className="px-4 py-3 text-sm text-gray-700 whitespace-pre-wrap">{item.content}</td>
-                      <td className="px-4 py-3 text-center">
+                      {mode === 'external' && <td className="px-4 py-2 text-center text-sm font-bold text-gray-800 border border-gray-300">{item.company || '-'}</td>}
+                      <td className="px-4 py-2 text-center text-sm text-gray-700 whitespace-pre-wrap border border-gray-300">{item.content}</td>
+                      <td className="px-4 py-2 text-center border border-gray-300">
                         <div className="flex items-center justify-center gap-1 text-blue-500 font-bold text-xs">
                           <ImageIcon size={14} />
                           {item.photos.length}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-2 text-center border border-gray-300">
                         <div className="flex items-center justify-center space-x-2">
                           <button onClick={() => openIndependentWindow(String(item.id))} className="text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 p-1.5 rounded-lg transition-colors shadow-sm" title="수정"><Edit2 size={16} /></button>
                           <button onClick={(e) => handleDelete(e, item)} className="text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 p-1.5 rounded-lg transition-colors shadow-sm" title="삭제"><Trash2 size={16} /></button>

@@ -216,40 +216,40 @@ const ConstructionHistory: React.FC = () => {
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[950px] border-collapse">
+          <table className="w-full min-w-[950px] border-collapse border border-gray-300">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200">
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20">No</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">날짜</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">구분</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-44">업체 (외부업체)</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">내용</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-64">관리</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20 border border-gray-300">No</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-300">일자</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-300">구분</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-56 border border-gray-300">업체 (외부업체)</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider border border-gray-300">작업내용</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-64 border border-gray-300">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {loading && history.length === 0 ? (
-                <tr><td colSpan={6} className="py-24 text-center"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
+                <tr><td colSpan={6} className="py-24 text-center border border-gray-300"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
               ) : filteredHistory.length === 0 ? (
-                <tr><td colSpan={6} className="py-24 text-center text-gray-400 italic">저장된 기록이 없습니다.</td></tr>
+                <tr><td colSpan={6} className="py-24 text-center text-gray-400 italic border border-gray-300">저장된 기록이 없습니다.</td></tr>
               ) : (
                 paginatedHistory.map((item, idx) => {
                   const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
                   return (
                     <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group">
-                      <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{globalIdx}</td>
-                      <td className="px-4 py-4 text-center"><span className="px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-100 text-xs font-bold">{item.date}</span></td>
-                      <td className="px-4 py-4 text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '외부공사' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{item.category}</span></td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
+                      <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs border border-gray-300">{globalIdx}</td>
+                      <td className="px-4 py-2 text-center border border-gray-300"><span className="px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-100 text-xs font-bold">{item.date}</span></td>
+                      <td className="px-4 py-2 text-center border border-gray-300"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '외부공사' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{item.category}</span></td>
+                      <td className="px-4 py-2 border border-gray-300">
+                        <div className="flex items-center justify-center gap-2">
                           <div className="p-1.5 bg-white border border-gray-100 rounded-lg shadow-sm"><HardHat size={14} className={item.type === '외부공사' ? 'text-orange-500' : 'text-green-500'} /></div>
                           <span className="font-bold text-gray-900 text-sm">{item.type === '시설작업' ? (item.company || '시설팀 (자체)') : (item.company || '(업체명 미입력)')}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2"><span className="text-sm text-gray-600 truncate max-w-[300px]" title={item.content}>{item.content}</span>{item.photos && item.photos.length > 0 && (<div className="flex items-center gap-0.5 text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded text-[10px] font-bold"><ImageIcon size={10} />{item.photos.length}</div>)}</div>
+                      <td className="px-4 py-2 border border-gray-300">
+                        <div className="flex items-center justify-center gap-2"><span className="text-sm text-gray-600 truncate max-w-[300px]" title={item.content}>{item.content}</span>{item.photos && item.photos.length > 0 && (<div className="flex items-center gap-0.5 text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded text-[10px] font-bold"><ImageIcon size={10} />{item.photos.length}</div>)}</div>
                       </td>
-                      <td className="px-4 py-4 text-center">
+                      <td className="px-4 py-2 text-center border border-gray-300">
                         <div className="flex justify-center gap-2">
                           <button onClick={() => handleOpenDetail(item)} className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors" title="상세보기"><Printer size={18} /></button>
                           <button onClick={() => handleEdit(item)} className="p-1.5 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors" title="편집"><Edit2 size={18} /></button>

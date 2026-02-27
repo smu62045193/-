@@ -305,7 +305,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
                 <tr>
                   <th style="width:130px;">입주사명</th><th style="width:40px;">층</th><th style="width:65px;">기준전력</th>
                   <th style="width:75px;">전기요금</th><th style="width:80px;">당월지침</th><th style="width:80px;">전월지침</th>
-                  <th style="width:50px;">지침차</th><th style="width:65px;">사용량</th><th style="width:65px;">초과전력</th><th style="width:40px;">비고</th>
+                  <th style="width:65px;">사용량</th><th style="width:65px;">초과전력</th><th style="width:40px;">비고</th>
                 </tr>
               </thead>
               <tbody>
@@ -313,7 +313,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
                 <tr style="background:#f9fafb; font-weight:bold; height:20px;">
                   <td colspan="2">합 계</td><td></td>
                   <td style="text-align:right; padding-right:8px; color:blue;">${totalCalculatedBill.toLocaleString()}</td>
-                  <td colspan="3"></td>
+                  <td colspan="2"></td>
                   <td style="color:#f97316;">${totalCalculatedUsage.toLocaleString()}</td>
                   <td colspan="2"></td>
                 </tr>
@@ -661,7 +661,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
         <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden w-full">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse table-fixed min-w-full">
-              <thead><tr className="bg-gray-50"><th className={`${thClass} w-36`}>입주사명</th><th className={`${thClass} w-14`}>층 별</th><th className={`${thClass} w-18`}>기준전력(월)</th><th className={`${thClass} w-18`}>전기요금</th><th className={`${thClass} w-18`}>당월지침</th><th className={`${thClass} w-18`}>전월지침</th><th className={`${thClass} w-14`}>지침차</th><th className={`${thClass} w-18`}>사용량(kwh)</th><th className={`${thClass} w-20`}>초과전력량</th><th className={`${thClass} w-14`}>비 고</th></tr></thead>
+              <thead><tr className="bg-gray-50"><th className={`${thClass} w-36`}>입주사명</th><th className={`${thClass} w-14`}>층 별</th><th className={`${thClass} w-18`}>기준전력(월)</th><th className={`${thClass} w-18`}>전기요금</th><th className={`${thClass} w-18`}>당월지침</th><th className={`${thClass} w-18`}>전월지침</th><th className={`${thClass} w-18`}>사용량(kwh)</th><th className={`${thClass} w-20`}>초과전력량</th><th className={`${thClass} w-14`}>비 고</th></tr></thead>
               <tbody className="divide-y divide-gray-200">
                 {Object.keys(groupedItems).map(groupKey => {
                   const items = groupedItems[groupKey];
@@ -691,12 +691,12 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
                             onChange={e => updateItemField(item.id, 'prevReading', e.target.value)}
                           />
                         </td>
-                        <td className={`${tdClass} border-r border-gray-200 text-gray-500`}>{diff.toLocaleString()}</td><td className={`${tdClass} border-r border-gray-200 font-normal`}>{usage.toLocaleString()}</td><td className={`${tdClass} border-r border-gray-200 font-normal ${excess !== null && (excess as number) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>{excess !== null ? (excess as number).toLocaleString() : ''}</td><td className={`${tdClass} border-r border-gray-200`}><select disabled className="w-full h-full text-center outline-none bg-transparent appearance-none font-normal text-gray-600 text-[12px]" value={item.note}><option value="일반">일반</option><option value="특수">특수</option></select></td>
+                        <td className={`${tdClass} border-r border-gray-200 font-normal`}>{usage.toLocaleString()}</td><td className={`${tdClass} border-r border-gray-200 font-normal ${excess !== null && (excess as number) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>{excess !== null ? (excess as number).toLocaleString() : ''}</td><td className={`${tdClass} border-r border-gray-200`}><select disabled className="w-full h-full text-center outline-none bg-transparent appearance-none font-normal text-gray-600 text-[12px]" value={item.note}><option value="일반">일반</option><option value="특수">특수</option></select></td>
                       </tr>
                     );
                   });
                 })}
-                <tr className="bg-blue-50/50 font-normal border-t-2 border-gray-400"><td colSpan={2} className={`${tdClass} border-r border-gray-300 bg-gray-100`}>합 계</td><td className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} text-right pr-2 border-r border-gray-200 text-blue-700`}>{totalCalculatedBill.toLocaleString()}</td><td colSpan={3} className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} border-r border-gray-200 text-orange-600`}>{totalCalculatedUsage.toLocaleString()}</td><td colSpan={2} className={`${tdClass}`}></td></tr>
+                <tr className="bg-blue-50/50 font-normal border-t-2 border-gray-400"><td colSpan={2} className={`${tdClass} border-r border-gray-300 bg-gray-100`}>합 계</td><td className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} text-right pr-2 border-r border-gray-200 text-blue-700`}>{totalCalculatedBill.toLocaleString()}</td><td colSpan={2} className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} border-r border-gray-200 text-orange-600`}>{totalCalculatedUsage.toLocaleString()}</td><td colSpan={2} className={`${tdClass}`}></td></tr>
               </tbody>
             </table>
           </div>

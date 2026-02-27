@@ -254,11 +254,11 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
           <table className="w-full min-w-[850px] border-collapse border border-gray-200">
             <thead>
               <tr className="bg-gray-50/80 border-b border-gray-200">
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20 border border-gray-200">No</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-56 border border-gray-200">대상 주간 (월~일)</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36 border border-gray-200">최종 보고일자</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36 border border-gray-200">작성자</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-40 border border-gray-200">관리</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20 border border-gray-200">No</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-56 border border-gray-200">대상 주간 (월~일)</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36 border border-gray-200">최종 보고일자</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36 border border-gray-200">작성자</th>
+                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-40 border border-gray-200">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -275,24 +275,23 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
                   
                   return (
                     <tr key={report.key} className="hover:bg-blue-50/40 transition-colors group">
-                      <td className="px-6 py-5 text-center text-gray-400 font-mono text-xs border border-gray-200">{globalIdx}</td>
-                      <td className="px-6 py-5 border border-gray-200">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                            <Calendar size={20} />
+                      <td className="px-6 py-2 text-center text-gray-400 font-mono text-xs border border-gray-200">{globalIdx}</td>
+                      <td className="px-6 py-2 border border-gray-200">
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
+                            <Calendar size={18} />
                           </div>
                           <div>
                             <span className="font-bold text-gray-900 block">{weekRange}</span>
-                            <span className="text-[10px] text-gray-400">Monday Start Basis</span>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-center border border-gray-200">
-                        <span className="px-3 py-1 bg-gray-50 text-gray-600 rounded-md border border-gray-100 text-sm font-medium">
+                      <td className="px-6 py-2 text-center border border-gray-200">
+                        <span className="px-3 py-0.5 bg-gray-50 text-gray-600 rounded-md border border-gray-100 text-sm font-medium">
                           {report.data.reportingDate}
                         </span>
                       </td>
-                      <td className="px-6 py-5 text-center border border-gray-200">
+                      <td className="px-6 py-2 text-center border border-gray-200">
                         <div className="flex items-center justify-center gap-1.5">
                           <User size={14} className="text-gray-400" />
                           <span className="text-gray-800 font-bold text-sm">
@@ -300,28 +299,28 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-5 text-center border border-gray-200 print:hidden">
+                      <td className="px-6 py-2 text-center border border-gray-200 print:hidden">
                         <div className="flex items-center justify-center gap-1">
                           <button 
                             onClick={() => handleViewDetail(report.data)}
-                            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
+                            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
                             title="상세보기"
                           >
-                            <Search size={16} />
+                            <Search size={14} />
                           </button>
                           <button 
                             onClick={() => onSelectReport(report.data.startDate)}
-                            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
+                            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
                             title="편집"
                           >
-                            <Edit3 size={16} />
+                            <Edit3 size={14} />
                           </button>
                           <button 
                             onClick={() => handleDeleteReport(report.data.startDate)}
-                            className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all"
+                            className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all"
                             title="삭제"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>

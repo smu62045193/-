@@ -504,7 +504,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
           <div className="flex flex-wrap items-center gap-2">
             <button 
               onClick={() => loadData('2-shift')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('2-shift') ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-white text-slate-600 border-slate-200'}`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('2-shift') ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-slate-100 text-slate-500 border-slate-200'}`}
             >
               <Power size={16} />
               2교대 자동 {isAutoActiveOnCurrentDate('2-shift') ? '[ON]' : '[OFF]'}
@@ -512,7 +512,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
 
             <button 
               onClick={() => loadData('3-shift')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('3-shift') ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-slate-600 border-slate-200'}`}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('3-shift') ? 'bg-violet-600 text-white border-violet-700' : 'bg-slate-100 text-slate-500 border-slate-200'}`}
             >
               <Power size={16} />
               3교대 자동 {isAutoActiveOnCurrentDate('3-shift') ? '[ON]' : '[OFF]'}

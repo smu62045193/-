@@ -177,14 +177,39 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
           </div>
 
           <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명 *</label>
                 <input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="업체명" />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">날짜</label>
-                <input type="date" value={newItem.type} onChange={e => setNewItem({...newItem, type: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" />
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">시작일 *</label>
+                <input 
+                  type="date" 
+                  value={newItem.type.includes(' ~ ') ? newItem.type.split(' ~ ')[0] : newItem.type} 
+                  onChange={e => {
+                    const parts = newItem.type.split(' ~ ');
+                    const end = parts[1] || e.target.value;
+                    setNewItem({...newItem, type: `${e.target.value} ~ ${end}`});
+                  }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">종료일 *</label>
+                <input 
+                  type="date" 
+                  value={newItem.type.includes(' ~ ') ? newItem.type.split(' ~ ')[1] : newItem.type} 
+                  onChange={e => {
+                    const parts = newItem.type.split(' ~ ');
+                    const start = parts[0] || e.target.value;
+                    setNewItem({...newItem, type: `${start} ~ ${e.target.value}`});
+                  }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                />
               </div>
             </div>
 
@@ -208,7 +233,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
 
             <div>
               <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고</label>
-              <textarea value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24" placeholder="공사 내역 및 특이사항 입력" />
+              <textarea value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-16" placeholder="공사 내역 및 특이사항 입력" />
             </div>
           </div>
 
