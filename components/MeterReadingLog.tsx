@@ -27,6 +27,18 @@ const formatNumber = (val: string | number | undefined) => {
 
 const unformatNumber = (val: string) => val.replace(/,/g, '');
 
+const getFloorWeight = (floor: string) => {
+  const f = floor.trim().toUpperCase();
+  if (!f) return 9999;
+  if (f.startsWith('B') || f.includes('지하')) {
+    const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+    return 1000 + num;
+  }
+  if (f === 'RF' || f === '옥상' || f.includes('옥탑')) return 999;
+  const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+  return num;
+};
+
 const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -40,6 +52,14 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
 
   useEffect(() => {
     loadData(currentMonth);
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'METER_PHOTO_SAVED') {
+        loadData(currentMonth);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, [currentMonth]);
 
   const loadData = async (monthStr: string) => {
@@ -57,18 +77,61 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
 
       if (fetched) {
         // 이미 서버에 데이터가 있는 경우
-        const updatedItems = (fetched.items || []).map(item => {
-          if (!item.currentReading || item.currentReading === '') {
-            const matchedPhoto = photos.find(p => 
-              p.tenant.trim() === item.tenant.trim() && 
-              p.floor.trim() === item.floor.trim() && 
-              p.type === item.note
-            );
-            if (matchedPhoto && matchedPhoto.reading) {
-              return { ...item, currentReading: matchedPhoto.reading };
-            }
+        const normalize = (str: string) => (str || '').replace(/\s+/g, '');
+        let updatedItems = (fetched.items || []).map(item => {
+          const matchedPhoto = photos.find(p => 
+            normalize(p.tenant) === normalize(item.tenant) && 
+            normalize(p.floor) === normalize(item.floor) && 
+            normalize(p.type) === normalize(item.note)
+          );
+          if (matchedPhoto && matchedPhoto.reading) {
+            return { ...item, currentReading: matchedPhoto.reading };
           }
           return item;
+        });
+
+        // 마스터 DB(tenants)와 비교하여 새로 추가된 입주사가 있으면 병합
+        const masterTenants = await fetchTenants();
+        if (masterTenants && masterTenants.length > 0) {
+          masterTenants.forEach(t => {
+            const existsNormal = updatedItems.find(it => normalize(it.tenant) === normalize(t.name) && normalize(it.floor) === normalize(t.floor) && normalize(it.note) === '일반');
+            if (!existsNormal) {
+              updatedItems.push({
+                id: generateId(),
+                floor: t.floor,
+                tenant: t.name,
+                area: t.area || '0',
+                refPower: t.refPower || '2380',
+                multiplier: '1',
+                note: '일반',
+                prevReading: '',
+                currentReading: ''
+              });
+            }
+            const existsSpecial = updatedItems.find(it => normalize(it.tenant) === normalize(t.name) && normalize(it.floor) === normalize(t.floor) && normalize(it.note) === '특수');
+            if (!existsSpecial) {
+              updatedItems.push({
+                id: generateId(),
+                floor: t.floor,
+                tenant: t.name,
+                area: t.area || '0',
+                refPower: '0',
+                multiplier: '1',
+                note: '특수',
+                prevReading: '',
+                currentReading: ''
+              });
+            }
+          });
+        }
+
+        // 층별 정렬
+        updatedItems.sort((a, b) => {
+          const weightA = getFloorWeight(a.floor);
+          const weightB = getFloorWeight(b.floor);
+          if (weightA !== weightB) return weightA - weightB;
+          if (a.tenant !== b.tenant) return a.tenant.localeCompare(b.tenant);
+          return a.note === '일반' ? -1 : 1;
         });
 
         setData({
@@ -98,6 +161,41 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
             prevReading: item.currentReading,
             currentReading: ''
           }));
+
+          // 마스터 DB(tenants)와 비교하여 새로 추가된 입주사가 있으면 병합
+          const masterTenants = await fetchTenants();
+          if (masterTenants && masterTenants.length > 0) {
+            masterTenants.forEach(t => {
+              const existsNormal = initialItems.find(it => it.tenant === t.name && it.floor === t.floor && it.note === '일반');
+              if (!existsNormal) {
+                initialItems.push({
+                  id: generateId(),
+                  floor: t.floor,
+                  tenant: t.name,
+                  area: t.area || '0',
+                  refPower: t.refPower || '2380',
+                  multiplier: '1',
+                  note: '일반',
+                  prevReading: '',
+                  currentReading: ''
+                });
+              }
+              const existsSpecial = initialItems.find(it => it.tenant === t.name && it.floor === t.floor && it.note === '특수');
+              if (!existsSpecial) {
+                initialItems.push({
+                  id: generateId(),
+                  floor: t.floor,
+                  tenant: t.name,
+                  area: t.area || '0',
+                  refPower: '0',
+                  multiplier: '1',
+                  note: '특수',
+                  prevReading: '',
+                  currentReading: ''
+                });
+              }
+            });
+          }
         } else {
           // 마스터 DB에서 생성
           const masterTenants = await fetchTenants();
@@ -130,16 +228,26 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
         }
 
         // 초기 생성된 리스트에 사진첩 데이터가 있다면 즉시 반영
+        const normalize = (str: string) => (str || '').replace(/\s+/g, '');
         const syncedItems = initialItems.map(item => {
           const matchedPhoto = photos.find(p => 
-            p.tenant.trim() === item.tenant.trim() && 
-            p.floor.trim() === item.floor.trim() && 
-            p.type === item.note
+            normalize(p.tenant) === normalize(item.tenant) && 
+            normalize(p.floor) === normalize(item.floor) && 
+            normalize(p.type) === normalize(item.note)
           );
           if (matchedPhoto && matchedPhoto.reading) {
             return { ...item, currentReading: matchedPhoto.reading };
           }
           return item;
+        });
+
+        // 층별 정렬
+        syncedItems.sort((a, b) => {
+          const weightA = getFloorWeight(a.floor);
+          const weightB = getFloorWeight(b.floor);
+          if (weightA !== weightB) return weightA - weightB;
+          if (a.tenant !== b.tenant) return a.tenant.localeCompare(b.tenant);
+          return a.note === '일반' ? -1 : 1;
         });
 
         setData({ 
@@ -193,6 +301,13 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     setData(prev => ({
       ...prev,
       items: prev.items.map(it => it.id === id ? { ...it, [field]: unformatted } : it)
+    }));
+  };
+
+  const toggleExcludeFromInvoice = (id: string) => {
+    setData(prev => ({
+      ...prev,
+      items: prev.items.map(it => it.id === id ? { ...it, excludeFromInvoice: !it.excludeFromInvoice } : it)
     }));
   };
 
@@ -265,7 +380,6 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
             <td style="text-align:right; padding-right:8px; color:blue;">${bill.toLocaleString()}</td>
             <td style="color:#f97316; font-weight:bold;">${formatNumber(item.currentReading)}</td>
             <td>${formatNumber(item.prevReading)}</td>
-            <td style="color:#64748b;">${diff.toLocaleString()}</td>
             <td style="font-weight:bold;">${usage.toLocaleString()}</td>
             <td style="color:${excess !== null && excess > 0 ? 'red' : '#059669'}; font-weight:bold;">${excess !== null ? excess.toLocaleString() : ''}</td>
             <td style="font-size:7pt;">${item.note}</td>
@@ -281,7 +395,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } }
             .print-page { width: 210mm; min-height: 297mm; padding: 25mm 10mm 10mm 10mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
@@ -292,10 +406,12 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
             table.main-table { width: 100%; border-collapse: collapse; border: 1.5px solid black; }
             table.main-table th, table.main-table td { border: 1px solid black; padding: 0 2px; text-align: center; font-size: 8.5pt; height: 20px; }
             table.main-table th { background: #f3f4f6; font-weight: bold; }
+            .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+            .no-print button:hover { background: #172554; transform: translateY(-1px); }
           </style>
         </head>
         <body>
-          <div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button></div>
+          <div class="no-print"><button onclick="window.print()">인쇄하기</button></div>
           <div class="print-page">
             <div class="flex-header">
               <div class="title-area"><h1 class="doc-title">${y}년 ${parseInt(m)}월 계량기 검침내역</h1></div>
@@ -345,6 +461,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     const invoiceData = Object.keys(groupedItems).map((key, idx) => {
       const items = groupedItems[key];
       const subtotal = items.reduce((sum, it) => {
+        if (it.excludeFromInvoice) return sum;
         const b = getCalculations(it).bill;
         return sum + (b > 0 ? b : 0);
       }, 0);
@@ -360,8 +477,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     printWindow.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
       @page { size: A4 portrait; margin: 0; }
-      body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
-      .no-print { display: flex; justify-content: center; padding: 20px; background: #f1f5f9; border-bottom: 1px solid #ddd; }
+      body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
+      .no-print { display: flex; justify-content: center; padding: 20px; }
       @media print { .no-print { display: none !important; } body { background: white !important; } .container { box-shadow: none !important; margin: 0 !important; width: 100% !important; padding: 15mm !important; } }
       .container { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; padding: 20mm 15mm; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); box-sizing: border-box; }
       h1 { text-align: center; font-size: 20px; font-weight: 900; margin-bottom: 5px; }
@@ -374,7 +491,10 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
       .footer { margin-top: 50px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 14pt; gap: 10px; }
       .seal-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 65px; height: 65px; margin: 0 5px; }
       .seal-img { width: 100%; height: 100%; object-fit: contain; }
-    </style></head><body><div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">인쇄하기</button></div><div class="container"><h1>${title}</h1><div class="unit-label">(단위 : 원)</div><table><thead><tr><th rowspan="2" style="width:7%;">연번</th><th rowspan="2" style="width:10%;">층</th><th rowspan="2" style="width:25%;">업 체 명</th><th colspan="3">추가전기요금</th><th rowspan="2" style="width:15%;">비고</th></tr><tr><th style="width:15%;">소 계</th><th style="width:15%;">공급가액</th><th style="width:13%;">세 액</th></tr></thead><tbody><tr class="font-bold"><td colspan="3">계</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSubtotal)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSupply)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandTax)}</td><td></td></tr><tr class="bg-purple font-bold"><td colspan="3">소계[세금계산서 청구]</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSubtotal)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSupply)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandTax)}</td><td></td></tr>${tableRows}</tbody></table><div class="footer"><span>관리소장 : ${managerName}</span>${sealImg ? `<div class="seal-wrapper"><img src="${sealImg}" class="seal-img" /></div>` : ''}<span>(인)</span></div></div></body></html>`);
+      .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+      .no-print button:hover { background: #172554; transform: translateY(-1px); }
+    </style></head><body><div class="no-print"><button onclick="window.print()">인쇄하기</button></div>
+<div class="container"><h1>${title}</h1><div class="unit-label">(단위 : 원)</div><table><thead><tr><th rowspan="2" style="width:7%;">연번</th><th rowspan="2" style="width:10%;">층</th><th rowspan="2" style="width:25%;">업 체 명</th><th colspan="3">추가전기요금</th><th rowspan="2" style="width:15%;">비고</th></tr><tr><th style="width:15%;">소 계</th><th style="width:15%;">공급가액</th><th style="width:13%;">세 액</th></tr></thead><tbody><tr class="font-bold"><td colspan="3">계</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSubtotal)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSupply)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandTax)}</td><td></td></tr><tr class="bg-purple font-bold"><td colspan="3">소계[세금계산서 청구]</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSubtotal)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSupply)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandTax)}</td><td></td></tr>${tableRows}</tbody></table><div class="footer"><span>관리소장 : ${managerName}</span>${sealImg ? `<div class="seal-wrapper"><img src="${sealImg}" class="seal-img" /></div>` : ''}<span>(인)</span></div></div></body></html>`);
     printWindow.document.close();
   };
 
@@ -505,8 +625,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
   const billStyles = `<style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
     @page { size: A4 portrait; margin: 0; }
-    body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.4; -webkit-print-color-adjust: exact; }
-    .no-print { display: flex; justify-content: center; padding: 20px; background: #f1f5f9; border-bottom: 1px solid #ddd; }
+    body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.4; -webkit-print-color-adjust: exact; }
+    .no-print { display: flex; justify-content: center; padding: 20px; }
     @media print { .no-print { display: none !important; } body { background: white !important; } .page-break { page-break-after: always; } }
     .bill-page { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; padding: 15mm 15mm; }
     @media print { .bill-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; padding: 10mm 15mm; } }
@@ -529,6 +649,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     .footer-info { margin-top: 20px; font-weight: bold; font-size: 12pt; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
     .footer-logo { margin-top: 30px; display: flex; justify-content: center; align-items: center; width: 100%; }
     .footer-logo img { height: 90px; width: auto; object-fit: contain; }
+    .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+    .no-print button:hover { background: #172554; transform: translateY(-1px); }
   </style>`;
 
   const handlePrintTenantBill = async (tenantName: string, floor: string) => {
@@ -539,7 +661,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     const photos = photosData?.items || [];
     const printWindow = window.open('', '_blank', 'width=900,height=950');
     if (!printWindow) return;
-    printWindow.document.write(`<html><head><title>전기요금 사용내역서 - ${tenantName}</title>${billStyles}</head><body><div class="no-print"><button onClick="window.print()" style="padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt;">인쇄하기</button></div>${generateTenantBillHtml(tenantName, floor, true, photos, brandSettings)}</body></html>`);
+    printWindow.document.write(`<html><head><title>전기요금 사용내역서 - ${tenantName}</title>${billStyles}</head><body><div class="no-print"><button onclick="window.print()">인쇄하기</button></div>${generateTenantBillHtml(tenantName, floor, true, photos, brandSettings)}</body></html>`);
     printWindow.document.close();
   };
 
@@ -577,24 +699,26 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
             <button 
               onClick={() => loadData(currentMonth)} 
               disabled={loading} 
-              className="flex items-center gap-2 px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition-all active:scale-95 text-sm"
             >
               <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
               <span>새로고침</span>
             </button>
             
-            {/* 상단 수정 버튼 - 요약 전용 (저수조위생점검 스타일 적용 및 크기 통일) */}
             <button 
               onClick={() => setIsSummaryEditMode(!isSummaryEditMode)} 
-              className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isSummaryEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
+              className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isSummaryEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
             >
               {isSummaryEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
               {isSummaryEditMode ? '수정완료' : '요약 정보 수정'}
             </button>
 
-            <button onClick={handleSave} disabled={saveStatus === 'loading'} className="flex items-center px-5 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-all text-sm shadow-md active:scale-95"><Save size={18} className="mr-2" />서버 저장</button>
+            <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw size={18} className="mr-2 animate-spin" /> : <Save size={18} className="mr-2" />}서버저장</button>
             
-            <button onClick={handlePrintMain} className="flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all text-sm shadow-md active:scale-95"><Printer size={18} className="mr-2" />미리보기</button>
+            <button onClick={handlePrintMain} className="flex items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-all shadow-md text-sm font-bold active:scale-95">
+              <Printer size={18} />
+              <span>미리보기</span>
+            </button>
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
@@ -654,14 +778,14 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
               {isTableEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
               {isTableEditMode ? '수정완료' : '지침수정'}
             </button>
-            <button onClick={handlePrintAllTenantBills} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-emerald-700 active:scale-95 transition-all"><Printer size={16} className="mr-1.5" />전체 출력</button>
-            <button onClick={handlePrintInvoiceSummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center shadow-sm hover:bg-blue-700 active:scale-95 transition-all"><Calculator size={16} className="mr-1.5" />계산서발행</button>
+            <button onClick={handlePrintAllTenantBills} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center shadow-sm hover:bg-emerald-700 active:scale-95 transition-all"><Printer size={16} className="mr-1.5" />전체 출력</button>
+            <button onClick={handlePrintInvoiceSummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center shadow-sm hover:bg-blue-700 active:scale-95 transition-all"><Calculator size={16} className="mr-1.5" />계산서발행</button>
           </div>
         </div>
         <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden w-full">
           <div className="overflow-x-auto">
             <table className="w-full border-collapse table-fixed min-w-full">
-              <thead><tr className="bg-gray-50"><th className={`${thClass} w-36`}>입주사명</th><th className={`${thClass} w-14`}>층 별</th><th className={`${thClass} w-18`}>기준전력(월)</th><th className={`${thClass} w-18`}>전기요금</th><th className={`${thClass} w-18`}>당월지침</th><th className={`${thClass} w-18`}>전월지침</th><th className={`${thClass} w-18`}>사용량(kwh)</th><th className={`${thClass} w-20`}>초과전력량</th><th className={`${thClass} w-14`}>비 고</th></tr></thead>
+              <thead><tr className="bg-gray-50"><th className={`${thClass} w-60`}>입주사명</th><th className={`${thClass} w-16`}>층 별</th><th className={`${thClass} w-20`}>기준전력(월)</th><th className={`${thClass} w-20`}>전기요금</th><th className={`${thClass} w-20`}>당월지침</th><th className={`${thClass} w-20`}>전월지침</th><th className={`${thClass} w-20`}>사용량(kwh)</th><th className={`${thClass} w-20`}>초과전력량</th><th className={`${thClass} w-14`}>비 고</th><th className={`${thClass} w-14`}>계산서제외</th></tr></thead>
               <tbody className="divide-y divide-gray-200">
                 {Object.keys(groupedItems).map(groupKey => {
                   const items = groupedItems[groupKey];
@@ -670,7 +794,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
                     return (
                       <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
                         {idx === 0 && (
-                          <><td rowSpan={items.length} className={`${tdClass} px-2 text-left border-r border-gray-300`}><div className="flex items-center justify-between"><input type="text" readOnly className="w-full h-full text-left outline-none bg-transparent font-normal text-blue-800 text-[12px] truncate" value={item.tenant} /><FileText size={14} className="text-blue-500 shrink-0 ml-1 cursor-pointer hover:text-blue-700 transition-colors" onClick={() => handlePrintTenantBill(item.tenant, item.floor)} /></div></td><td rowSpan={items.length} className={`${tdClass} border-r border-gray-300 font-normal`}><input type="text" readOnly className="w-full h-full text-center outline-none bg-transparent font-normal text-[12px]" value={item.floor} /></td><td rowSpan={items.length} className={`${tdClass} border-r border-gray-300`}><input type="text" readOnly className="w-full h-full text-center outline-none bg-transparent font-normal text-emerald-600 text-[12px]" value={formatNumber(item.refPower)} /></td></>
+                          <><td rowSpan={items.length} className={`${tdClass} px-2 text-left border-r border-gray-300`}><div className="flex items-center justify-between"><input type="text" readOnly className="w-full h-full text-left outline-none bg-transparent font-normal text-blue-800 text-[12px] truncate" value={item.tenant} /><FileText size={18} className="text-blue-500 shrink-0 ml-1 cursor-pointer hover:text-blue-700 transition-colors" onClick={() => handlePrintTenantBill(item.tenant, item.floor)} /></div></td><td rowSpan={items.length} className={`${tdClass} border-r border-gray-300 font-normal`}><input type="text" readOnly className="w-full h-full text-center outline-none bg-transparent font-normal text-[12px]" value={item.floor} /></td><td rowSpan={items.length} className={`${tdClass} border-r border-gray-300`}><input type="text" readOnly className="w-full h-full text-center outline-none bg-transparent font-normal text-emerald-600 text-[12px]" value={formatNumber(item.refPower)} /></td></>
                         )}
                         <td className={`${tdClass} text-right pr-2 border-r border-gray-200`}><span className={`font-normal ${bill < 0 ? 'text-red-600' : 'text-blue-600'}`}>{bill.toLocaleString()}</span></td>
                         <td className={`${tdClass} border-r border-gray-200`}>
@@ -692,11 +816,19 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
                           />
                         </td>
                         <td className={`${tdClass} border-r border-gray-200 font-normal`}>{usage.toLocaleString()}</td><td className={`${tdClass} border-r border-gray-200 font-normal ${excess !== null && (excess as number) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>{excess !== null ? (excess as number).toLocaleString() : ''}</td><td className={`${tdClass} border-r border-gray-200`}><select disabled className="w-full h-full text-center outline-none bg-transparent appearance-none font-normal text-gray-600 text-[12px]" value={item.note}><option value="일반">일반</option><option value="특수">특수</option></select></td>
+                        <td className={`${tdClass} border-r border-gray-200`}>
+                          <input 
+                            type="checkbox" 
+                            checked={!!item.excludeFromInvoice} 
+                            onChange={() => toggleExcludeFromInvoice(item.id)}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                        </td>
                       </tr>
                     );
                   });
                 })}
-                <tr className="bg-blue-50/50 font-normal border-t-2 border-gray-400"><td colSpan={2} className={`${tdClass} border-r border-gray-300 bg-gray-100`}>합 계</td><td className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} text-right pr-2 border-r border-gray-200 text-blue-700`}>{totalCalculatedBill.toLocaleString()}</td><td colSpan={2} className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} border-r border-gray-200 text-orange-600`}>{totalCalculatedUsage.toLocaleString()}</td><td colSpan={2} className={`${tdClass}`}></td></tr>
+                <tr className="bg-blue-50/50 font-normal border-t-2 border-gray-400"><td colSpan={2} className={`${tdClass} border-r border-gray-300 bg-gray-100`}>합 계</td><td className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} text-right pr-2 border-r border-gray-200 text-blue-700`}>{totalCalculatedBill.toLocaleString()}</td><td colSpan={2} className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} border-r border-gray-200 text-orange-600`}>{totalCalculatedUsage.toLocaleString()}</td><td colSpan={3} className={`${tdClass}`}></td></tr>
               </tbody>
             </table>
           </div>

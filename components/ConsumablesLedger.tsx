@@ -510,11 +510,11 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               {viewMode === 'ledger' ? (
                 <tr>
                   <th className={`${thClass} w-16`}>No</th>
-                  <th className={`${thClass} w-32`}>구분</th>
+                  <th className={`${thClass} w-20`}>구분</th>
                   <th className={`${thClass} text-left pl-6`}>품명</th>
-                  <th className={`${thClass} w-48`}>모델명</th>
-                  <th className={`${thClass} w-32`}>현재재고</th>
-                  <th className={`${thClass} w-24`}>적정재고</th>
+                  <th className={`${thClass} w-64`}>모델명</th>
+                  <th className={`${thClass} w-24`}>현재재고</th>
+                  <th className={`${thClass} w-20`}>적정재고</th>
                   <th className={`${thClass} w-20`}>단위</th>
                   <th className={`${thClass}`}>비고</th>
                   <th className={`${thClass} w-28 print:hidden`}>관리</th>
@@ -523,9 +523,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                 <tr>
                   <th className={`${thClass} w-16`}>No</th>
                   <th className={`${thClass} w-36`}>날짜</th>
-                  <th className={`${thClass} w-24`}>구분</th>
+                  <th className={`${thClass} w-20`}>구분</th>
                   <th className={`${thClass} text-left pl-6`}>품명</th>
-                  <th className={`${thClass} w-40`}>모델명</th>
+                  <th className={`${thClass} w-56`}>모델명</th>
                   <th className={`${thClass} w-20`}>입고</th>
                   <th className={`${thClass} w-20`}>사용</th>
                   <th className={`${thClass} w-24`}>재고</th>
@@ -550,8 +550,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                   return (
                     <tr key={`summary-${item.id}`} className="hover:bg-gray-50/50 transition-colors">
                       <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{globalIdx}</td>
-                      <td className={`${tdClass} font-bold text-blue-600`}>{item.category}</td>
-                      <td className={`${tdClass} text-left pl-6 font-bold text-gray-800`}>{item.itemName}</td>
+                      <td className={`${tdClass} font-normal text-blue-600`}>{item.category}</td>
+                      <td className={`${tdClass} text-left pl-6 font-normal text-gray-800`}>{item.itemName}</td>
                       <td className={`${tdClass} text-gray-600`}>{item.modelName || '-'}</td>
                       <td className={tdClass}>
                         <span className={`inline-block px-3 py-1 font-black rounded-lg text-sm ${isLowStock ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -577,8 +577,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                     <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                       <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{globalIdx}</td>
                       <td className={`${tdClass} font-bold text-gray-700`}>{item.date}</td>
-                      <td className={`${tdClass} font-bold text-blue-600`}>{item.category}</td>
-                      <td className={`${tdClass} text-left pl-6 font-bold text-gray-800`}>{item.itemName}</td>
+                      <td className={`${tdClass} font-normal text-blue-600`}>{item.category}</td>
+                      <td className={`${tdClass} text-left pl-6 font-normal text-gray-800`}>{item.itemName}</td>
                       <td className={tdClass}>{item.modelName}</td>
                       <td className={`${tdClass} text-blue-600 font-bold`}>{item.inQty !== '0' && item.inQty !== '' ? item.inQty : ''}</td>
                       <td className={`${tdClass} text-red-600 font-bold`}>{item.outQty !== '0' && item.outQty !== '' ? item.outQty : ''}</td>

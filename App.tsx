@@ -168,7 +168,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden relative print:h-auto print:overflow-visible print:block">
+    <div className="flex h-screen bg-white text-black overflow-hidden relative print:h-auto print:overflow-visible print:block">
       
       {/* Mobile Menu Button */}
       <button 
@@ -205,7 +205,7 @@ const App: React.FC = () => {
           />
         </div>
 
-        <main className="flex-1 overflow-y-auto p-2 sm:p-4 bg-gray-50 relative w-full print:overflow-visible print:h-auto print:bg-white print:p-0">
+        <main className="flex-1 overflow-y-auto p-2 sm:p-4 bg-white relative w-full print:overflow-visible print:h-auto print:bg-white print:p-0">
           {renderContent()}
         </main>
       </div>

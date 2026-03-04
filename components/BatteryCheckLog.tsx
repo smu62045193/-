@@ -42,7 +42,14 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
       const initial = getInitialBatteryCheck(monthStr);
       
       if (fetched) {
-        setData(fetched);
+        // Fix corrupted section data for bat-gen-2 (label '11')
+        const fixedItems = fetched.items.map(item => {
+          if (item.id === 'bat-gen-2' || item.label === '11') {
+            return { ...item, section: 'generator' as const };
+          }
+          return item;
+        });
+        setData({ ...fetched, items: fixedItems });
       } else {
         // 데이터가 없는 경우 전월 데이터 찾기
         const prevMonthDate = subMonths(parseISO(`${monthStr}-01`), 1);
@@ -50,16 +57,14 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
         const prevFetched = await fetchBatteryCheck(prevMonthStr);
 
         if (prevFetched && prevFetched.items) {
-          // 전월의 모든 항목(제조사, 년월일, 규격, 전압, 비고)을 현재로 복사
+          // 전월의 항목 중 구분(label), 제조사(manufacturer), 년월일(manufDate), 규격(spec)만 현재로 복사
           const carriedItems = initial.items.map(initItem => {
-            const prevItem = prevFetched.items.find(pi => pi.label === initItem.label && pi.section === initItem.section);
+            const prevItem = prevFetched.items.find(pi => pi.label === initItem.label);
             return prevItem ? {
               ...initItem,
               manufacturer: prevItem.manufacturer || '',
               manufDate: prevItem.manufDate || '',
-              spec: prevItem.spec || '',
-              voltage: prevItem.voltage || '',
-              remarks: prevItem.remarks || ''
+              spec: prevItem.spec || ''
             } : initItem;
           });
           
@@ -89,6 +94,39 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
 
   const handleNextMonth = () => {
     setCurrentMonth(prev => format(addMonths(parseISO(`${prev}-01`), 1), 'yyyy-MM'));
+  };
+
+  const handleLoadPreviousData = async () => {
+    if (!window.confirm('전월 데이터를 불러오시겠습니까? 현재 입력된 내용(전압, 비고 제외)이 덮어씌워집니다.')) return;
+    
+    setLoading(true);
+    try {
+      const prevMonthDate = subMonths(parseISO(`${currentMonth}-01`), 1);
+      const prevMonthStr = format(prevMonthDate, 'yyyy-MM');
+      const prevFetched = await fetchBatteryCheck(prevMonthStr);
+
+      if (prevFetched && prevFetched.items) {
+        const carriedItems = data.items.map(currentItem => {
+          const prevItem = prevFetched.items.find(pi => pi.label === currentItem.label);
+          return prevItem ? {
+            ...currentItem,
+            manufacturer: prevItem.manufacturer || '',
+            manufDate: prevItem.manufDate || '',
+            spec: prevItem.spec || ''
+          } : currentItem;
+        });
+        
+        setData({ ...data, items: carriedItems });
+        alert('전월 데이터를 성공적으로 불러왔습니다.');
+      } else {
+        alert('전월 데이터가 없습니다.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('전월 데이터를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -130,12 +168,12 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
           <script src="https://cdn.tailwindcss.com"></script>
           <style>
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
+            body { font-family: sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
             table { table-layout: fixed !important; width: 100% !important; border-collapse: collapse !important; border: 1px solid black !important; }
             th, td { border: 1px solid black !important; height: 40px !important; font-size: 9pt !important; text-align: center; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
-            .print-page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 25mm 10mm 10mm 10mm; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
+            .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 25mm 10mm 10mm 10mm; background: white !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
             .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; min-height: 100px; }
             .title-area { flex: 1; text-align: center; }
             .doc-title { font-size: 25pt; font-weight: 900; line-height: 1.1; }
@@ -278,10 +316,16 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
           <button onClick={handleNextMonth} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><ChevronRight /></button>
         </div>
         <div className="flex gap-2">
+          {isEditMode && (
+            <button onClick={handleLoadPreviousData} disabled={loading} className="flex items-center px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-bold hover:bg-emerald-200 transition-all text-sm active:scale-95 disabled:opacity-50">
+              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              전월 데이터 불러오기
+            </button>
+          )}
           <button onClick={() => loadData(currentMonth)} disabled={loading} className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"><RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침</button>
-          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}>{isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}{isEditMode ? '수정 취소' : '수정'}</button>
-          <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw size={18} className="mr-2 animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-2" /> : <Save size={18} className="mr-2" />}{saveStatus === 'success' ? '저장완료' : '서버 저장'}</button>
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-sm text-sm transition-all"><Printer size={18} className="mr-2" />미리보기</button>
+          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}>{isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}{isEditMode ? '수정 취소' : '수정'}</button>
+          <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all active:scale-95 ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw size={18} className="mr-2 animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-2" /> : <Save size={18} className="mr-2" />}{saveStatus === 'success' ? '저장완료' : '서버 저장'}</button>
+          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-sm text-sm transition-all active:scale-95"><Printer size={18} className="mr-2" />미리보기</button>
         </div>
       </div>
 

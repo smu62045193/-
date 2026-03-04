@@ -1,12 +1,10 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MeterPhotoData, MeterPhotoItem, Tenant, MeterReadingData } from '../types';
-import { fetchMeterPhotos, saveMeterPhotos, fetchTenants, fetchMeterReading, saveMeterReading, uploadFile } from '../services/dataService';
+import { fetchMeterPhotos, saveMeterPhotos, fetchTenants, fetchMeterReading, saveMeterReading, uploadFile, generateUUID } from '../services/dataService';
 import { analyzeMeterPhoto } from '../services/geminiService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
 import { Camera, Plus, Trash2, Save, RefreshCw, X, Image as ImageIcon, Search, ChevronLeft, ChevronRight, Upload, Zap, ZapOff, Edit2, FileText, Calendar, RotateCcw, AlertTriangle, CheckCircle, Sparkles, Bot, Maximize2 } from 'lucide-react';
-
-const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const getFloorWeight = (floor: string) => {
   const f = floor.trim().toUpperCase();
@@ -54,13 +52,30 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
   const [analyzing, setAnalyzing] = useState(false);
   const [isAiEnabled, setIsAiEnabled] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [currentMonth, setCurrentMonth] = useState(format(currentDate, 'yyyy-MM'));
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const month = params.get('month');
+      if (month) return month;
+    }
+    return format(currentDate, 'yyyy-MM');
+  });
   const [data, setData] = useState<MeterPhotoData>({ month: currentMonth, items: [] });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   
-  const [newItem, setNewItem] = useState<Partial<MeterPhotoItem>>({
-    floor: '', tenant: '', reading: '', date: format(new Date(), 'yyyy-MM-dd'), type: '일반', photo: ''
+  const [newItem, setNewItem] = useState<Partial<MeterPhotoItem>>(() => {
+    let initialDate = format(new Date(), 'yyyy-MM-dd');
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const month = params.get('month');
+      if (month && month !== format(new Date(), 'yyyy-MM')) {
+        initialDate = `${month}-01`;
+      }
+    }
+    return {
+      floor: '', tenant: '', reading: '', date: initialDate, type: '일반', photo: ''
+    };
   });
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -98,7 +113,17 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
 
   const loadTenants = async () => {
     const fetched = await fetchTenants();
-    setTenants(fetched || []);
+    if (fetched) {
+      fetched.sort((a, b) => {
+        const weightA = getFloorWeight(a.floor);
+        const weightB = getFloorWeight(b.floor);
+        if (weightA !== weightB) return weightA - weightB;
+        return a.name.localeCompare(b.name);
+      });
+      setTenants(fetched);
+    } else {
+      setTenants([]);
+    }
   };
 
   const openIndependentWindow = (id: string = 'new') => {
@@ -109,6 +134,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
     const url = new URL(window.location.href);
     url.searchParams.set('popup', 'meter_photo');
     url.searchParams.set('id', id);
+    url.searchParams.set('month', currentMonth);
     window.open(url.toString(), `MeterPhotoWin_${id}`, `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`);
   };
 
@@ -129,9 +155,12 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
       try {
         const monthlyReadingData = await fetchMeterReading(currentMonth);
         if (monthlyReadingData && monthlyReadingData.items) {
+          const normalize = (str: string) => (str || '').replace(/\s+/g, '');
           const updatedMonthlyItems = monthlyReadingData.items.map(mItem => {
             const matchedPhoto = updatedData.items.find(pItem => 
-              pItem.tenant.trim() === mItem.tenant.trim() && pItem.floor.trim() === mItem.floor.trim() && pItem.type === mItem.note
+              normalize(pItem.tenant) === normalize(mItem.tenant) && 
+              normalize(pItem.floor) === normalize(mItem.floor) && 
+              normalize(pItem.type) === normalize(mItem.note)
             );
             return matchedPhoto && matchedPhoto.reading ? { ...mItem, currentReading: matchedPhoto.reading } : mItem;
           });
@@ -164,23 +193,101 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
     if (!newItem.photo || !newItem.tenant) { window.alert('사진과 입주사명은 필수입니다.'); return; }
     setLoading(true);
     try {
-      const latestData = await fetchMeterPhotos(currentMonth);
+      const targetMonth = newItem.date ? newItem.date.substring(0, 7) : currentMonth;
+      
+      let finalPhotoUrl = newItem.photo;
+      if (finalPhotoUrl.startsWith('data:image')) {
+        const fileName = `meter_${editingId || generateUUID()}_${Date.now()}.jpg`;
+        const publicUrl = await uploadFile('facility', 'meters', fileName, finalPhotoUrl);
+        if (publicUrl) finalPhotoUrl = publicUrl;
+      }
+
+      const latestData = await fetchMeterPhotos(targetMonth);
       let updatedItems = Array.isArray(latestData?.items) ? [...latestData.items] : [];
-      const itemToSave: MeterPhotoItem = { id: editingId || generateId(), floor: newItem.floor || '', tenant: newItem.tenant || '', reading: newItem.reading || '', date: newItem.date || format(new Date(), 'yyyy-MM-dd'), type: (newItem.type as '일반' | '특수') || '일반', photo: newItem.photo || '' };
-      if (editingId) updatedItems = updatedItems.map(item => item.id === editingId ? itemToSave : item);
-      else updatedItems = [itemToSave, ...updatedItems];
-      if (await saveMeterPhotos({ month: currentMonth, items: updatedItems })) {
+      const itemToSave: MeterPhotoItem = { id: editingId || generateUUID(), floor: newItem.floor || '', tenant: newItem.tenant || '', reading: newItem.reading || '', date: newItem.date || format(new Date(), 'yyyy-MM-dd'), type: (newItem.type as '일반' | '특수') || '일반', photo: finalPhotoUrl };
+      
+      if (editingId) {
+        const existingIndex = updatedItems.findIndex(item => item.id === editingId);
+        if (existingIndex >= 0) {
+          updatedItems[existingIndex] = itemToSave;
+        } else {
+          updatedItems = [itemToSave, ...updatedItems];
+        }
+      } else {
+        updatedItems = [itemToSave, ...updatedItems];
+      }
+
+      const success = await saveMeterPhotos({ month: targetMonth, items: updatedItems });
+      if (success) {
+        // 월별검침기록(MeterReadingLog)에도 당월지침 반영
+        try {
+          const monthlyReadingData = await fetchMeterReading(targetMonth);
+          if (monthlyReadingData && monthlyReadingData.items) {
+            const normalize = (str: string) => (str || '').replace(/\s+/g, '');
+            const updatedMonthlyItems = monthlyReadingData.items.map(mItem => {
+              if (normalize(mItem.tenant) === normalize(itemToSave.tenant) && 
+                  normalize(mItem.floor) === normalize(itemToSave.floor) && 
+                  normalize(mItem.note) === normalize(itemToSave.type)) {
+                return { ...mItem, currentReading: itemToSave.reading };
+              }
+              return mItem;
+            });
+            await saveMeterReading({ ...monthlyReadingData, items: updatedMonthlyItems });
+          }
+        } catch (syncError) { console.error('Sync error:', syncError); }
+
+        if (editingId && targetMonth !== currentMonth) {
+          const oldData = await fetchMeterPhotos(currentMonth);
+          if (oldData && oldData.items) {
+            const filteredOld = oldData.items.filter(item => item.id !== editingId);
+            await saveMeterPhotos({ month: currentMonth, items: filteredOld });
+          }
+        }
         if (window.opener) window.opener.postMessage({ type: 'METER_PHOTO_SAVED' }, '*');
         window.alert('저장되었습니다.'); window.close();
+      } else {
+        window.alert('저장에 실패했습니다.');
       }
-    } catch (e) {} finally { setLoading(false); }
+    } catch (e) {
+      window.alert('오류가 발생했습니다.');
+    } finally { setLoading(false); }
   };
 
-  const handleDeleteRequest = (id: string) => {
+  const handleDeleteRequest = async (id: string) => {
     if (!window.confirm('삭제하시겠습니까?')) return;
+    
+    const itemToDelete = data.items.find(i => i.id === id);
     const newItems = data.items.filter(i => i.id !== id);
+    
+    // UI 즉시 반영
     setData({ ...data, items: newItems });
-    saveMeterPhotos({ ...data, items: newItems }).then(() => { window.alert('삭제되었습니다.'); });
+    
+    const success = await saveMeterPhotos({ ...data, items: newItems });
+    if (success) {
+      // 월별검침기록(MeterReadingLog)에서 당월지침 삭제
+      if (itemToDelete) {
+        try {
+          const monthlyReadingData = await fetchMeterReading(data.month);
+          if (monthlyReadingData && monthlyReadingData.items) {
+            const normalize = (str: string) => (str || '').replace(/\s+/g, '');
+            const updatedMonthlyItems = monthlyReadingData.items.map(mItem => {
+              if (normalize(mItem.tenant) === normalize(itemToDelete.tenant) && 
+                  normalize(mItem.floor) === normalize(itemToDelete.floor) && 
+                  normalize(mItem.note) === normalize(itemToDelete.type)) {
+                return { ...mItem, currentReading: '' };
+              }
+              return mItem;
+            });
+            await saveMeterReading({ ...monthlyReadingData, items: updatedMonthlyItems });
+          }
+        } catch (syncError) { console.error('Sync error:', syncError); }
+      }
+      window.alert('삭제되었습니다.');
+    } else {
+      // 실패 시 롤백
+      setData(data);
+      window.alert('삭제에 실패했습니다.');
+    }
   };
 
   const filteredItems = useMemo(() => {
@@ -253,8 +360,8 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
           </div>
         </div>
         <div className="flex gap-2 w-full md:w-auto justify-end">
-          <button onClick={() => openIndependentWindow()} className="flex items-center gap-2 px-4 py-2.5 bg-amber-600 text-white rounded-xl font-bold shadow-md hover:bg-amber-700 transition-all active:scale-95 whitespace-nowrap"><Plus size={18} /> 사진 추가 등록</button>
-          <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold shadow-md transition-all active:scale-95 whitespace-nowrap ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}{saveStatus === 'success' ? '저장/연동완료' : '서버저장 및 기록연동'}</button>
+          <button onClick={() => openIndependentWindow()} className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg font-bold shadow-md hover:bg-amber-700 transition-all active:scale-95 whitespace-nowrap text-sm"><Plus size={18} /> 사진 추가 등록</button>
+          <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold shadow-md transition-all active:scale-95 whitespace-nowrap text-sm ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}{saveStatus === 'success' ? '저장/연동완료' : '서버저장'}</button>
         </div>
       </div>
 

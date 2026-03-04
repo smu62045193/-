@@ -134,10 +134,10 @@ const GeneratorCheck: React.FC<GeneratorCheckProps> = ({ currentDate }) => {
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: #f1f5f9; color: black; line-height: 1.1; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.1; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
-            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 10mm 10mm 10mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
+            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 10mm 10mm 10mm; margin: 20px auto; background: white !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
             table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
             th, td { border: 1px solid black !important; padding: 0; text-align: center; font-size: 11px; height: 35px !important; background: white; }
             input { border: none !important; width: 100%; height: 100%; text-align: center; outline: none; background: white; font-weight: 500; font-size: 11px; }
@@ -185,11 +185,11 @@ const GeneratorCheck: React.FC<GeneratorCheckProps> = ({ currentDate }) => {
           <button onClick={() => setCurrentMonth(prev => format(addMonths(parseISO(`${prev}-01`), 1), 'yyyy-MM'))} className="p-1 hover:bg-gray-100 rounded-full"><ChevronRight /></button>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => loadData(currentMonth)} disabled={loading} className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold h-10 hover:bg-gray-200 transition-colors"><RefreshCw size={18} className={loading?'animate-spin':''} />새로고침</button>
+          <button onClick={() => loadData(currentMonth)} disabled={loading} className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold h-10 hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"><RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침</button>
           
           <button 
             onClick={() => setIsEditMode(!isEditMode)} 
-            className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
+            className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
           >
             {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
             {isEditMode ? '수정 취소' : '수정'}
@@ -198,7 +198,7 @@ const GeneratorCheck: React.FC<GeneratorCheckProps> = ({ currentDate }) => {
           <button 
             onClick={handleSave} 
             disabled={saveStatus==='loading'} 
-            className={`flex items-center px-4 py-2 rounded-lg font-bold text-white h-10 shadow-sm ${
+            className={`flex items-center px-4 py-2 rounded-lg font-bold text-white h-10 shadow-sm transition-all text-sm active:scale-95 ${
               saveStatus === 'loading' ? 'bg-blue-400' : saveStatus === 'success' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
@@ -206,7 +206,7 @@ const GeneratorCheck: React.FC<GeneratorCheckProps> = ({ currentDate }) => {
             서버저장
           </button>
           
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg font-bold h-10 shadow-sm hover:bg-gray-800 transition-colors"><Printer size={18} className="mr-2" />미리보기</button>
+          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg font-bold h-10 shadow-sm hover:bg-gray-800 transition-all text-sm active:scale-95"><Printer size={18} className="mr-2" />미리보기</button>
         </div>
       </div>
 

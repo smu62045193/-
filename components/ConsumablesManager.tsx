@@ -14,17 +14,19 @@ const ConsumablesManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState('ledger');
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
+    <div className="p-6 max-w-7xl mx-auto space-y-2 animate-fade-in">
       <div className="mb-2">
-        <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
-          <Package className="mr-2 text-blue-600" size={32} />
-          소모품 관리
-        </h2>
-        <p className="text-slate-500 mt-2 text-base font-medium">소모품 재고 현황 및 구매 신청을 통합 관리합니다.</p>
+        <div className="flex items-center gap-4">
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
+            <Package className="mr-3 text-blue-600" size={32} />
+            소모품 관리
+          </h2>
+          <p className="text-gray-500 text-base font-medium">소모품 재고 현황 및 구매 신청을 통합 관리합니다.</p>
+        </div>
       </div>
 
       {/* Tab Navigation - 협력업체 스타일과 동일하게 수정 */}
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center">
+      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-2 scrollbar-hide items-center">
         <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
            <LayoutList size={22} />
         </div>

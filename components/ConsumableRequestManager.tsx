@@ -210,6 +210,27 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     setActiveRequest({ ...activeRequest, items: ni });
   };
 
+  const handleAddRow = (category: string) => {
+    if (!activeRequest) return;
+    const newItem: ConsumableRequestItem = {
+      id: generateId(),
+      category,
+      itemName: '',
+      spec: '',
+      unit: '',
+      qty: '',
+      price: '',
+      amount: 0,
+      stock: '',
+      remarks: '',
+      receivedDate: ''
+    };
+    setActiveRequest({
+      ...activeRequest,
+      items: [...activeRequest.items, newItem]
+    });
+  };
+
   const handlePrint = () => {
     if (!activeRequest) return;
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
@@ -521,6 +542,19 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                         </td>
                       </tr>
                     ))}
+                    {isEditMode && (
+                      <tr>
+                        <td colSpan={7} className="p-2 bg-gray-50/50 border border-gray-300">
+                          <button
+                            onClick={() => handleAddRow(sec.key)}
+                            className="flex items-center justify-center w-full gap-2 py-2 text-sm font-bold text-blue-600 bg-white border border-blue-200 border-dashed rounded-lg hover:bg-blue-50 hover:border-blue-400 transition-all"
+                          >
+                            <Plus size={16} />
+                            {sec.label} 항목 추가
+                          </button>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

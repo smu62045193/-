@@ -1,15 +1,13 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../types';
-import { fetchTenants, saveTenants } from '../services/dataService';
+import { fetchTenants, saveTenants, generateUUID } from '../services/dataService';
 import { Save, Plus, Trash2, Search, Printer, RefreshCw, Cloud, X, CheckCircle2, AlertTriangle, Edit2, Check, Building2, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface TenantStatusProps {
   isPopupMode?: boolean;
 }
-
-const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const getFloorWeight = (floor: string) => {
   const f = floor.trim().toUpperCase();
@@ -112,7 +110,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
       const latestTenants = await fetchTenants();
       let newList = [...(latestTenants || [])];
       
-      const targetId = editingId || generateId();
+      const targetId = editingId || generateUUID();
       const itemToSave = { ...formItem, id: targetId };
 
       if (editingId) {
@@ -129,7 +127,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
         alert('성공적으로 저장되었습니다.');
         window.close();
       } else {
-        alert('저장 실패');
+        alert('저장 실패. 입력값을 확인해주세요.');
       }
     } catch (e) {
       alert('오류 발생');
@@ -209,7 +207,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
             body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; -webkit-print-color-adjust: exact; color: black; line-height: 1.4; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
-            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 15mm 15mm 15mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
+            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 15mm 15mm 15mm; margin: 20px auto; background: white !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
             h1 { text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 30px; font-size: 26pt; font-weight: 900; margin-top: 0; letter-spacing: -1px; }
             table { width: 100%; border-collapse: collapse; font-size: 10pt; border: 1.5px solid black; table-layout: fixed; }
             th, td { border: 1px solid black; padding: 4px 2px; text-align: center; word-break: break-all; height: 26px; }
@@ -300,19 +298,19 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
           <Search className="absolute left-3 top-3 text-gray-400" size={18} />
         </div>
         <div className="flex items-center space-x-2 justify-end flex-1">
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm">
+          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition-all active:scale-95 text-sm">
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
             <span>새로고침</span>
           </button>
-          <button onClick={() => openIndependentWindow()} className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-all shadow-md text-sm font-black active:scale-95">
+          <button onClick={() => openIndependentWindow()} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-all shadow-md text-sm font-black active:scale-95">
             <UserPlus size={18} />
             <span>입주사등록</span>
           </button>
-          <button onClick={handleExecuteSave} disabled={saveStatus === 'loading'} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black shadow-md transition-all text-sm active:scale-95 ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+          <button onClick={handleExecuteSave} disabled={saveStatus === 'loading'} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-black shadow-md transition-all text-sm active:scale-95 ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
             {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
             <span>서버저장</span>
           </button>
-          <button onClick={handlePrint} className="flex items-center gap-2 bg-orange-600 text-white px-5 py-2.5 rounded-xl hover:bg-orange-700 transition-all shadow-md text-sm font-bold active:scale-95">
+          <button onClick={handlePrint} className="flex items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-all shadow-md text-sm font-bold active:scale-95">
             <Printer size={18} />
             <span>미리보기</span>
           </button>

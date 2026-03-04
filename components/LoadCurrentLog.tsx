@@ -196,7 +196,7 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
           <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
           <style>
             @page { size: A4 portrait; margin: 25mm 12mm 10mm 12mm; }
-            html, body { margin: 0 !important; padding: 0 !important; background: #f1f5f9; color: black; font-family: 'Noto Sans KR', sans-serif; line-height: 1.2; -webkit-print-color-adjust: exact; }
+            html, body { margin: 0 !important; padding: 0 !important; background: black; color: black; font-family: 'Noto Sans KR', sans-serif; line-height: 1.2; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .page-break { page-break-after: always; } }
             .print-page { width: 100%; background: white; box-sizing: border-box; }
@@ -337,14 +337,14 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
           <button 
             onClick={() => loadData(currentMonth)} 
             disabled={loading}
-            className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-xl font-bold hover:bg-gray-200 transition-all text-sm disabled:opacity-50"
+            className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"
           >
             <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
             새로고침
           </button>
           <button 
             onClick={() => setIsEditMode(!isEditMode)} 
-            className={`flex items-center px-4 py-2 rounded-xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-50 text-white hover:bg-orange-600' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
+            className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
           >
             {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
             {isEditMode ? '수정 취소' : '수정'}
@@ -352,7 +352,7 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
           <button 
             onClick={handleSave} 
             disabled={saveStatus === 'loading'}
-            className={`flex items-center px-4 py-2 rounded-xl font-bold shadow-sm transition-all ${
+            className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${
               saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
             }`}
           >
@@ -365,7 +365,7 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
             )}
             {saveStatus === 'success' ? '저장완료' : '서버 저장'}
           </button>
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-xl hover:bg-gray-800 font-bold shadow-sm">
+          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-sm transition-all text-sm active:scale-95">
             <Printer size={18} className="mr-2" />미리보기
           </button>
         </div>

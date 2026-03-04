@@ -74,8 +74,8 @@ export const generateUUID = () => {
 /**
  * ID가 존재하면 유지하고 없으면 생성하는 헬퍼
  */
-const ensureID = (id: string | undefined) => {
-  if (id && id.trim() !== '') return id;
+const ensureID = (id: any) => {
+  if (id !== undefined && id !== null && String(id).trim() !== '') return id;
   return generateUUID();
 };
 
@@ -569,7 +569,7 @@ export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
     { id: 'bat-ind-8', label: '8', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
     { id: 'bat-ind-9', label: '9', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' },
     { id: 'bat-gen-1', label: '10', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' },
-    { id: 'bat-gen-2', label: '11', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'battery' }
+    { id: 'bat-gen-2', label: '11', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' }
   ],
   approvers: { staff: '', assistant: '', manager: '', director: '' }
 });
@@ -1265,24 +1265,67 @@ export const saveSubstationLog = async (data: SubstationLogData): Promise<boolea
   return !error;
 };
 
+const getFloorWeight = (floor: string) => {
+  const f = floor.trim().toUpperCase();
+  if (!f) return 9999;
+  if (f.startsWith('B') || f.includes('지하')) {
+    const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+    return 1000 + num;
+  }
+  if (f === 'RF' || f === '옥상' || f.includes('옥탑')) return 999;
+  const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+  return num;
+};
+
 export const fetchTenants = async (): Promise<Tenant[]> => {
   try {
     const { data } = await supabase.from('tenants').select('*');
-    if (data && data.length > 0) return data.map(t => ({ id: t.id, floor: t.floor, name: t.name, area: t.area?.toString(), contact: t.contact, refPower: t.ref_power?.toString(), note: t.note }));
+    if (data && data.length > 0) {
+      const mapped = data.map(t => ({ id: t.id, floor: t.floor, name: t.name, area: t.area?.toString(), contact: t.contact, refPower: t.ref_power?.toString(), note: t.note }));
+      return mapped.sort((a, b) => {
+        const weightA = getFloorWeight(a.floor);
+        const weightB = getFloorWeight(b.floor);
+        if (weightA !== weightB) return weightA - weightB;
+        return a.name.localeCompare(b.name);
+      });
+    }
   } catch (e) {}
   return [];
 };
 
 export const saveTenants = async (list: Tenant[]): Promise<boolean> => {
-  const dbData = list.map(t => ({ id: ensureID(t.id), floor: t.floor, name: t.name, area: parseFloat(t.area?.replace(/,/g, '') || '0'), contact: t.contact, ref_power: parseFloat(t.refPower?.replace(/,/g, '') || '0'), note: t.note }));
-  const { error = null } = await supabase.from('tenants').upsert(dbData);
-  return !error;
+  const parseNum = (val: any) => {
+    if (val === undefined || val === null || val === '') return 0;
+    const n = parseFloat(String(val).replace(/,/g, ''));
+    return isNaN(n) ? 0 : n;
+  };
+  const dbData = list.map(t => ({ 
+    id: t.id ? String(t.id) : generateUUID(), 
+    floor: t.floor || '', 
+    name: t.name || '', 
+    area: parseNum(t.area), 
+    contact: t.contact || '', 
+    ref_power: parseNum(t.refPower), 
+    note: t.note || '' 
+  }));
+  const { error } = await supabase.from('tenants').upsert(dbData);
+  if (error) {
+    console.error('saveTenants error:', error);
+    return false;
+  }
+  return true;
 };
 
 export const fetchMeterPhotos = async (month: string): Promise<MeterPhotoData | null> => {
   try {
     const { data } = await supabase.from('meter_photo_records').select('*').eq('id', `METER_PHOTOS_${month}`).maybeSingle();
-    if (data) return { month: data.month, items: data.items };
+    if (data) {
+      const items = (data.items || []).map((item: any) => ({
+        ...item,
+        id: item.id || generateUUID()
+      }));
+      return { month: data.month, items };
+    }
   } catch (e) {}
   return null;
 };

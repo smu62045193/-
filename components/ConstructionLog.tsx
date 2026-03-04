@@ -171,7 +171,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
 
       const itemToSave: ConstructionWorkItem = { 
         id: currentItem.id, 
-        date: currentItem.date, 
+        date: currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[0] : currentItem.date, 
         category: currentItem.category, 
         company: currentItem.company, 
         content: currentItem.content, 
@@ -303,27 +303,12 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
           <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">시작일 *</label>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">작업일 *</label>
                 <input 
                   type="date" 
                   value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[0] : currentItem.date} 
                   onChange={e => {
-                    const parts = currentItem.date.split(' ~ ');
-                    const end = parts[1] || e.target.value;
-                    setCurrentItem({...currentItem, date: `${e.target.value} ~ ${end}`});
-                  }} 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">종료일 *</label>
-                <input 
-                  type="date" 
-                  value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[1] : currentItem.date} 
-                  onChange={e => {
-                    const parts = currentItem.date.split(' ~ ');
-                    const start = parts[0] || e.target.value;
-                    setCurrentItem({...currentItem, date: `${start} ~ ${e.target.value}`});
+                    setCurrentItem({...currentItem, date: e.target.value});
                   }} 
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
                 />

@@ -613,14 +613,14 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             <button 
               onClick={handleOpenImportModal} 
               disabled={loading} 
-              className="flex items-center justify-center px-6 py-2.5 bg-white text-emerald-600 border border-gray-200 rounded-xl hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
+              className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"
             >
               <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
               가져오기
             </button>
             <button 
               onClick={() => setIsEditMode(!isEditMode)} 
-              className={`flex items-center justify-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
+              className={`flex items-center justify-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
             >
               {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
               {isEditMode ? '수정완료' : '수정'}
@@ -628,14 +628,14 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             <button 
               onClick={handleSave} 
               disabled={saveStatus === 'loading'} 
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 text-white ${saveStatus === 'success' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}`}
+              className={`flex items-center justify-center px-4 py-2 rounded-lg font-bold shadow-md transition-all text-sm active:scale-95 text-white ${saveStatus === 'success' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
               {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin mr-2" /> : <Save size={18} className="mr-2" />}
               {saveStatus === 'success' ? '저장완료' : '서버저장'}
             </button>
             <button 
               onClick={handlePrint} 
-              className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all text-sm active:scale-95"
+              className="flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md transition-all text-sm active:scale-95"
             >
               <Printer size={18} className="mr-2" />
               미리보기

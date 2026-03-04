@@ -392,6 +392,7 @@ export interface MeterReadingItem {
   prevReading: string;
   multiplier: string;
   note: string;
+  excludeFromInvoice?: boolean;
 }
 
 export interface MeterReadingData {
