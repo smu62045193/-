@@ -58,6 +58,9 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
   const [currentItem, setCurrentItem] = useState<WorkItemWithSource>({
     id: generateUUID(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
   });
+  const [isManualCategory, setIsManualCategory] = useState(false);
+
+  const PREDEFINED_CATEGORIES = ['전기', '기계', '소방', '승강기', '영선', '미화', '주차', '인테리어', '복구'];
 
   const PHOTO_LIMIT = currentMode === 'external' ? 20 : 10;
 
@@ -83,6 +86,9 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
           if (matched) {
             setCurrentItem({ ...matched, source: urlMode || mode });
             setEditId(urlId);
+            if (!PREDEFINED_CATEGORIES.includes(matched.category)) {
+              setIsManualCategory(true);
+            }
           }
         } else {
           setCurrentItem(prev => ({ ...prev, source: urlMode || mode }));
@@ -315,15 +321,33 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
               </div>
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">구분</label>
-                <select value={currentItem.category} onChange={e => setCurrentItem({...currentItem, category: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="전기">전기</option>
-                  <option value="기계">기계</option>
-                  <option value="소방">소방</option>
-                  <option value="승강기">승강기</option>
-                  <option value="영선">영선</option>
-                  <option value="미화">미화</option>
-                  <option value="주차">주차</option>
+                <select 
+                  value={isManualCategory ? '수동입력' : currentItem.category} 
+                  onChange={e => {
+                    if (e.target.value === '수동입력') {
+                      setIsManualCategory(true);
+                      setCurrentItem({...currentItem, category: ''});
+                    } else {
+                      setIsManualCategory(false);
+                      setCurrentItem({...currentItem, category: e.target.value});
+                    }
+                  }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                >
+                  {PREDEFINED_CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                  <option value="수동입력">수동입력</option>
                 </select>
+                {isManualCategory && (
+                  <input 
+                    type="text" 
+                    value={currentItem.category} 
+                    onChange={e => setCurrentItem({...currentItem, category: e.target.value})} 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                    placeholder="구분 직접 입력" 
+                  />
+                )}
               </div>
               {currentMode === 'external' && (
                 <div>
