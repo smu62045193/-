@@ -131,9 +131,10 @@ interface DetailedLogSectionProps {
   onPrint?: () => void;
   onRefresh?: () => void;
   onSave?: () => void;
+  hideBox?: boolean;
 }
 
-const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, data, onUpdate, onPrint, onRefresh, onSave }) => {
+const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, data, onUpdate, onPrint, onRefresh, onSave, hideBox }) => {
   const safeData: LogCategory = {
     today: data?.today || [],
     tomorrow: data?.tomorrow || []
@@ -159,6 +160,72 @@ const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, da
     const newList = safeData[type].filter((_, i) => i !== index);
     onUpdate({ ...safeData, [type]: newList });
   };
+
+  const content = (
+    <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
+      <div className="p-5">
+        <div className="flex justify-between items-center mb-4 pb-2 border-b border-blue-50">
+          <h4 className="text-sm font-bold text-blue-700 flex items-center">
+            <CheckCircle2 size={16} className="mr-2 text-blue-500" />
+            금일 작업내용
+          </h4>
+          <button 
+            onClick={() => handleAddItem('today')} 
+            className="text-xs flex items-center bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors font-bold border border-blue-100"
+          >
+            <Plus size={14} className="mr-1" /> 추가
+          </button>
+        </div>
+        <div className="space-y-1 min-h-[100px]">
+          {safeData.today.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-6 italic">등록된 작업이 없습니다.</p>
+          ) : (
+            safeData.today.map((item, idx) => (
+              <TaskRow 
+                key={item?.id || idx} 
+                item={item} 
+                isToday={true} 
+                onUpdate={(u) => handleUpdateItem('today', idx, u)} 
+                onDelete={() => handleDeleteItem('today', idx)} 
+              />
+            ))
+          )}
+        </div>
+      </div>
+
+      <div className="p-5 bg-indigo-50/10">
+        <div className="flex justify-between items-center mb-4 pb-2 border-b border-indigo-50">
+          <h4 className="text-sm font-bold text-indigo-700 flex items-center">
+            <ArrowRightCircle size={16} className="mr-2 text-indigo-500" />
+            익일 예정사항
+          </h4>
+          <button 
+            onClick={() => handleAddItem('tomorrow')} 
+            className="text-xs flex items-center bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors font-bold border border-blue-100"
+          >
+            <Plus size={14} className="mr-1" /> 추가
+          </button>
+        </div>
+        <div className="space-y-1 min-h-[100px]">
+           {safeData.tomorrow.length === 0 ? (
+             <p className="text-xs text-gray-400 text-center py-6 italic">등록된 예정사항이 없습니다.</p>
+           ) : (
+            safeData.tomorrow.map((item, idx) => (
+              <TaskRow 
+                key={item?.id || idx} 
+                item={item} 
+                isToday={false} 
+                onUpdate={(u) => handleUpdateItem('tomorrow', idx, u)} 
+                onDelete={() => handleDeleteItem('tomorrow', idx)} 
+              />
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (hideBox) return content;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm animate-fade-in-down">
@@ -197,67 +264,7 @@ const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, da
           )}
         </div>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-200">
-        <div className="p-5">
-          <div className="flex justify-between items-center mb-4 pb-2 border-b border-blue-50">
-            <h4 className="text-sm font-bold text-blue-700 flex items-center">
-              <CheckCircle2 size={16} className="mr-2 text-blue-500" />
-              금일 작업내용
-            </h4>
-            <button 
-              onClick={() => handleAddItem('today')} 
-              className="text-xs flex items-center bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors font-bold border border-blue-100"
-            >
-              <Plus size={14} className="mr-1" /> 추가
-            </button>
-          </div>
-          <div className="space-y-1 min-h-[100px]">
-            {safeData.today.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-6 italic">등록된 작업이 없습니다.</p>
-            ) : (
-              safeData.today.map((item, idx) => (
-                <TaskRow 
-                  key={item?.id || idx} 
-                  item={item} 
-                  isToday={true} 
-                  onUpdate={(u) => handleUpdateItem('today', idx, u)} 
-                  onDelete={() => handleDeleteItem('today', idx)} 
-                />
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="p-5 bg-indigo-50/10">
-          <div className="flex justify-between items-center mb-4 pb-2 border-b border-indigo-50">
-            <h4 className="text-sm font-bold text-indigo-700 flex items-center">
-              <ArrowRightCircle size={16} className="mr-2 text-indigo-500" />
-              익일 예정사항
-            </h4>
-            <button 
-              onClick={() => handleAddItem('tomorrow')} 
-              className="text-xs flex items-center bg-blue-50 text-blue-600 px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors font-bold border border-blue-100"
-            >
-              <Plus size={14} className="mr-1" /> 추가
-            </button>
-          </div>
-          <div className="space-y-1 min-h-[100px]">
-             {safeData.tomorrow.length === 0 ? (
-               <p className="text-xs text-gray-400 text-center py-6 italic">등록된 예정사항이 없습니다.</p>
-             ) : (
-              safeData.tomorrow.map((item, idx) => (
-                <TaskRow 
-                  key={item?.id || idx} 
-                  item={item} 
-                  isToday={false} 
-                  onUpdate={(u) => handleUpdateItem('tomorrow', idx, u)} 
-                  onDelete={() => handleDeleteItem('tomorrow', idx)} 
-                />
-              ))
-            )}
-          </div>
-        </div>
-      </div>
+      {content}
     </div>
   );
 };
@@ -276,6 +283,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const [activeTab, setActiveTab] = useState('electrical');
   const [activeChecklistTab, setActiveChecklistTab] = useState<'substation' | 'fire' | 'elevator' | 'gas' | 'septic'>('substation');
   const [activeParkSecCleanTab, setActiveParkSecCleanTab] = useState<'parking' | 'security' | 'cleaning'>('parking');
+  const [activeFireElevatorTab, setActiveFireElevatorTab] = useState<'fire' | 'elevator'>('fire');
   const [weather, setWeather] = useState<WeatherData | null>(null);
 
   const [gasLog, setGasLog] = useState<GasLogData>(getInitialGasLog(''));
@@ -474,24 +482,45 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
         // 2. 어제 날짜의 "익일 예정사항" 병합 (핵심 로직 - 무조건 어제로 고정됨)
         const yesterdayWorkLog = yesterdayDirectReport;
-        if (!hasSavedData && yesterdayWorkLog && (yesterdayWorkLog as any)[key]?.tomorrow) {
-          const prevTomorrow = (yesterdayWorkLog as any)[key].tomorrow as TaskItem[];
-          prevTomorrow.forEach(item => {
-            if (item?.content?.trim()) {
+        const prevTomorrow = (yesterdayWorkLog && (yesterdayWorkLog as any)[key]?.tomorrow) ? ((yesterdayWorkLog as any)[key].tomorrow as TaskItem[]) : [];
+        
+        // 2-1. 오늘 데이터 중 '어제에서 가져온 항목(from_prev_)'인데 어제 익일예정사항에 없는 경우 삭제 (동기화)
+        cat.today = cat.today.filter(todayItem => {
+          if (todayItem.id.startsWith('from_prev_')) {
+            const existsInYesterday = prevTomorrow.some(prev => 
+              todayItem.id === `from_prev_${prev.id}` || 
+              todayItem.id.startsWith(`from_prev_${prev.id}_`)
+            );
+            if (!existsInYesterday) {
+              const normalizedToday = normalizeContent(todayItem.content);
+              return prevTomorrow.some(prev => normalizeContent(prev.content) === normalizedToday);
+            }
+            return true;
+          }
+          return true;
+        });
+
+        // 2-2. 어제 익일예정사항에 있는 항목을 오늘 금일예정사항에 추가 (중복 제외)
+        prevTomorrow.forEach(item => {
+          if (item?.content?.trim()) {
+            const isDuplicateById = cat.today.some(t => 
+              t.id === `from_prev_${item.id}` || 
+              t.id.startsWith(`from_prev_${item.id}_`)
+            );
+            if (!isDuplicateById) {
               const normalizedPrev = normalizeContent(item.content);
-              // 현재 'today'에 이미 같은 내용이 있는지 체크
-              const isDuplicate = cat.today.some(t => normalizeContent(t.content) === normalizedPrev);
-              if (!isDuplicate) {
+              const isDuplicateByContent = cat.today.some(t => normalizeContent(t.content) === normalizedPrev);
+              if (!isDuplicateByContent) {
                 cat.today.push({ 
-                  id: `from_prev_${item.id}_${Date.now()}_${Math.random().toString(36).substr(2,4)}`, 
+                  id: `from_prev_${item.id}`, 
                   content: item.content, 
                   frequency: item.frequency || '일일', 
                   status: '진행중' 
                 });
               }
             }
-          });
-        }
+          }
+        });
         (finalWorkLog as any)[key] = cat;
       });
 
@@ -970,13 +999,14 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
               </button>
             </div>
           </div>
-          <div className="p-4">
+          <div className="p-0">
             {activeParkSecCleanTab === 'parking' && (
               <DetailedLogSection 
                 title="주차 관리" 
                 icon={<Car className="text-blue-500" size={20} />} 
                 data={logData?.parking} 
                 onUpdate={d => setLogData({...logData, parking: d})} 
+                hideBox={true}
               />
             )}
             {activeParkSecCleanTab === 'security' && (
@@ -985,6 +1015,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                 icon={<Shield className="text-green-500" size={20} />} 
                 data={logData?.security} 
                 onUpdate={d => setLogData({...logData, security: d})} 
+                hideBox={true}
               />
             )}
             {activeParkSecCleanTab === 'cleaning' && (
@@ -993,6 +1024,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                 icon={<Droplets className="text-cyan-500" size={20} />} 
                 data={logData?.cleaning} 
                 onUpdate={d => setLogData({...logData, cleaning: d})} 
+                hideBox={true}
               />
             )}
           </div>
@@ -1018,22 +1050,57 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
     if (activeTab === 'fire_elevator') return (
       <div className="space-y-2">
-        <DetailedLogSection 
-          title="소방 업무일지" 
-          icon={<Flame className="text-red-600" size={20} />}
-          data={logData?.fire} 
-          onUpdate={d => setLogData({...logData, fire: d})} 
-          onRefresh={() => loadData(() => false, true)}
-          onSave={handleSaveAll}
-        />
-        <DetailedLogSection 
-          title="승강기 업무일지" 
-          icon={<ArrowUpDown className="text-blue-600" size={20} />}
-          data={logData?.elevator} 
-          onUpdate={d => setLogData({...logData, elevator: d})} 
-          onRefresh={() => loadData(() => false, true)}
-          onSave={handleSaveAll}
-        />
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="bg-gray-50/50 px-5 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2 py-3">
+                <Flame className="text-red-600" size={20} />
+                <h4 className="font-bold text-gray-800">소방/승강기 업무일지</h4>
+                <span className="text-gray-300 mx-2">|</span>
+              </div>
+              <div className="flex">
+                <button onClick={() => setActiveFireElevatorTab('fire')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeFireElevatorTab === 'fire' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>소방</button>
+                <button onClick={() => setActiveFireElevatorTab('elevator')} className={`px-4 py-3 font-bold text-sm transition-colors ${activeFireElevatorTab === 'elevator' ? 'text-blue-600 border-b-4 border-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>승강기</button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 py-2">
+              <button 
+                onClick={() => loadData(() => false, true)}
+                className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+              >
+                <RefreshCw size={18} className="mr-2" />
+                새로고침
+              </button>
+              <button 
+                onClick={handleSaveAll}
+                className="flex items-center justify-center px-6 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-md transition-all text-sm active:scale-95"
+              >
+                <Save size={18} className="mr-2" />
+                서버저장
+              </button>
+            </div>
+          </div>
+          <div className="p-0">
+            {activeFireElevatorTab === 'fire' && (
+              <DetailedLogSection 
+                title="소방 업무일지" 
+                icon={<Flame className="text-red-600" size={20} />}
+                data={logData?.fire} 
+                onUpdate={d => setLogData({...logData, fire: d})} 
+                hideBox={true}
+              />
+            )}
+            {activeFireElevatorTab === 'elevator' && (
+              <DetailedLogSection 
+                title="승강기 업무일지" 
+                icon={<ArrowUpDown className="text-blue-600" size={20} />}
+                data={logData?.elevator} 
+                onUpdate={d => setLogData({...logData, elevator: d})} 
+                hideBox={true}
+              />
+            )}
+          </div>
+        </div>
       </div>
     );
 
