@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 
 interface AppointmentManagerProps {
   isPopupMode?: boolean;
+  isEmbedded?: boolean;
 }
 
 const TABS = [
@@ -16,7 +17,7 @@ const TABS = [
 const CATEGORIES = ['전기', '기계', '소방', '승강기'];
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
-const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = false }) => {
+const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = false, isEmbedded = false }) => {
   const [activeTab, setActiveTab] = useState('status');
   const [items, setItems] = useState<AppointmentItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -345,39 +346,10 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-8 space-y-8 animate-fade-in relative min-h-screen">
-      {/* 제목 영역 (협력업체 관리 수준으로 글자 크기 상향) */}
-      <div className="mb-2 print:hidden">
-        <h2 className="text-3xl font-black text-slate-800 flex items-center tracking-tight">
-          <UserCheck className="mr-2 text-blue-600" size={32} />
-          안전관리자
-        </h2>
-        <p className="text-slate-500 mt-2 text-base font-medium">안전관리자 선임 현황을 관리합니다.</p>
-      </div>
-
-      {/* 탭 네비게이션 추가 (직원관리/협력업체 스타일 통일) */}
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center print:hidden">
-        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-           <LayoutList size={22} />
-        </div>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
-              activeTab === tab.id 
-                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
+    <div className={isEmbedded ? "animate-fade-in" : "max-w-7xl mx-auto p-4 sm:p-8 space-y-8 animate-fade-in relative min-h-screen"}>
       {/* 메인 컨테이너 (협력업체 스타일의 큰 박스) */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
-        <div className="p-6 space-y-6">
+      <div className={isEmbedded ? "" : "bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]"}>
+        <div className={isEmbedded ? "space-y-4" : "p-6 space-y-6"}>
           {/* 작은박스 1: 툴바 영역 */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
             <div className="flex-1"></div>
@@ -427,7 +399,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                   <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic border border-gray-200">등록된 정보가 없습니다.</td></tr>
                 ) : sortedItems.map((it, idx) => (
                   <tr key={it.id} className="text-center hover:bg-gray-50/50 transition-colors group">
-                    <td className="p-4 border border-gray-200">
+                    <td className="px-4 py-1 border border-gray-200">
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         it.category === '전기' ? 'bg-blue-100 text-blue-700' :
                         it.category === '소방' ? 'bg-red-100 text-red-700' :
@@ -437,13 +409,13 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                         {it.category}
                       </span>
                     </td>
-                    <td className="p-4 text-sm font-bold text-gray-700 text-center border border-gray-200">{it.title}</td>
-                    <td className="p-4 text-sm font-black text-gray-900 border border-gray-200">{it.name}</td>
-                    <td className="p-4 text-sm text-gray-600 text-center border border-gray-200">{it.agency}</td>
-                    <td className="p-4 text-sm text-gray-600 border border-gray-200">{it.phone}</td>
-                    <td className="p-4 text-sm text-gray-500 font-mono border border-gray-200">{it.appointmentDate}</td>
-                    <td className="p-4 text-sm text-gray-600 text-center border border-gray-200">{it.license}</td>
-                    <td className="p-4 print:hidden border border-gray-200">
+                    <td className="px-4 py-1 text-sm font-bold text-gray-700 text-center border border-gray-200">{it.title}</td>
+                    <td className="px-4 py-1 text-sm font-black text-gray-900 border border-gray-200">{it.name}</td>
+                    <td className="px-4 py-1 text-sm text-gray-600 text-center border border-gray-200">{it.agency}</td>
+                    <td className="px-4 py-1 text-sm text-gray-600 border border-gray-200">{it.phone}</td>
+                    <td className="px-4 py-1 text-sm text-gray-500 font-mono border border-gray-200">{it.appointmentDate}</td>
+                    <td className="px-4 py-1 text-sm text-gray-600 text-center border border-gray-200">{it.license}</td>
+                    <td className="px-4 py-1 print:hidden border border-gray-200">
                       <div className="flex justify-center gap-1">
                         <button onClick={() => openIndependentWindow(it.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="편집">
                           <Edit2 size={16} />

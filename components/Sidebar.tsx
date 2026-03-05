@@ -40,9 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuSelect, isOpen, tog
       case MenuId.PARKING_CHECK: return <Car size={20} />;
       case MenuId.CONSUMABLES: return <Package size={20} />;
       case MenuId.CONSTRUCTION: return <HardHat size={20} />;
-      case MenuId.APPOINTMENTS: return <UserCheck size={20} />;
       case MenuId.STAFF: return <Users size={20} />;
-      case MenuId.CONTRACTORS: return <Briefcase size={20} />;
       default: return <ClipboardList size={20} />;
     }
   };

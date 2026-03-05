@@ -3,7 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { fetchLogoSealSettings, saveLogoSealSettings, uploadFile } from '../services/dataService';
 import { Camera, Save, RefreshCw, CheckCircle, Cloud, X, Image as ImageIcon, Sparkles } from 'lucide-react';
 
-const LogoSealManager: React.FC = () => {
+interface LogoSealManagerProps {
+  isEmbedded?: boolean;
+}
+
+const LogoSealManager: React.FC<LogoSealManagerProps> = ({ isEmbedded = false }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [settings, setSettings] = useState<{ logo?: string; seal?: string }>({ logo: '', seal: '' });
@@ -77,8 +81,8 @@ const LogoSealManager: React.FC = () => {
   };
 
   return (
-    <div className="animate-fade-in space-y-6">
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+    <div className={`${isEmbedded ? "" : "bg-white p-8 rounded-2xl shadow-sm border border-slate-200"} animate-fade-in space-y-6`}>
+      <div className={isEmbedded ? "bg-white p-6 rounded-3xl shadow-sm border border-slate-200" : ""}>
         <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100">

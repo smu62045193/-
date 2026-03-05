@@ -156,12 +156,8 @@ const App: React.FC = () => {
         return <ParkingManager />;
       case MenuId.CONSUMABLES:
         return <ConsumablesManager />;
-      case MenuId.APPOINTMENTS:
-        return <AppointmentManager />;
       case MenuId.STAFF:
         return <StaffManager />;
-      case MenuId.CONTRACTORS:
-        return <ContractorManager />;
       default:
         return <Dashboard currentDate={currentDate} />;
     }

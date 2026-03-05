@@ -260,7 +260,7 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
   };
 
   const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-10 whitespace-nowrap";
-  const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700 h-10 align-middle bg-white text-center";
+  const tdClass = "border border-gray-300 px-3 py-0.5 text-sm text-gray-700 align-middle bg-white text-center";
 
   if (isPopupMode) {
     return (
@@ -346,37 +346,6 @@ const ContractorManager: React.FC<ContractorManagerProps> = ({ isPopupMode = fal
 
   return (
     <div className={isEmbedded ? "animate-fade-in" : "p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in print:p-0"}>
-      {!isEmbedded && (
-        <>
-          <div className="mb-2 print:hidden">
-            <h2 className="text-3xl font-black text-slate-800 flex items-center tracking-tight">
-              <Briefcase className="mr-2 text-blue-600" size={32} />
-              협력업체 관리
-            </h2>
-            <p className="text-slate-500 mt-2 text-base font-medium">협력업체 정보 및 연락처를 통합 관리합니다.</p>
-          </div>
-
-          <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center print:hidden">
-            <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-               <LayoutList size={22} />
-            </div>
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
-                  activeTab === tab.id 
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                    : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
       <div className={isEmbedded ? "" : "bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]"}>
         <div className={isEmbedded ? "space-y-6" : "p-6 space-y-6"}>
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import StaffStatus from './StaffStatus';
 import LogoSealManager from './LogoSealManager';
+import AppointmentManager from './AppointmentManager';
+import ContractorManager from './ContractorManager';
 import { LayoutList, User, Camera, Printer, RefreshCw, CalendarDays, UserPlus, Image as ImageIcon, Users } from 'lucide-react';
 import { fetchStaffList, saveStaffList } from '../services/dataService';
 import { StaffMember } from '../types';
@@ -12,6 +14,8 @@ interface StaffManagerProps {
 const TABS = [
   { id: 'chart', label: '직원 조직도' },
   { id: 'status', label: '직원 현황' },
+  { id: 'appointments', label: '선임현황' },
+  { id: 'contractors', label: '협력업체현황' },
   { id: 'logoseal', label: '로고/직인' },
 ];
 
@@ -364,18 +368,17 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
   const cleaningTeam = activeStaff.filter(m => m.category === '미화' && m.id !== manager?.id);
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in print:p-0">
-      <div className="mb-2 print:hidden flex justify-between items-center">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-3 animate-fade-in print:p-0">
+      <div className="mb-0 print:hidden flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
             <Users className="mr-2 text-blue-600" size={32} />
-            직원 관리
+            직원/선임/협력업체 관리
           </h2>
-          <p className="text-slate-500 mt-2 text-base font-medium">조직 구성 및 직원 현황을 관리합니다.</p>
         </div>
       </div>
 
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center print:hidden">
+      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-0 mb-0 scrollbar-hide items-center print:hidden">
         <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
            <CalendarDays size={22} />
         </div>
@@ -432,9 +435,13 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
           </div>
         </div>
       ) : activeTab === 'status' ? (
-        <StaffStatus staffList={staffList} setStaffList={setStaffList} />
+        <StaffStatus staffList={staffList} setStaffList={setStaffList} isEmbedded={true} />
+      ) : activeTab === 'appointments' ? (
+        <AppointmentManager isEmbedded={true} />
+      ) : activeTab === 'contractors' ? (
+        <ContractorManager isEmbedded={true} />
       ) : (
-        <LogoSealManager />
+        <LogoSealManager isEmbedded={true} />
       )}
     </div>
   );

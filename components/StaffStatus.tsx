@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { StaffMember } from '../types';
 import { fetchStaffList, saveStaffList, uploadFile, deleteStaffMember } from '../services/dataService';
 import { Save, Plus, Trash2, Search, Printer, Edit2, RotateCcw, UserPlus, Check, RefreshCw, Camera, X, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -9,12 +9,13 @@ interface StaffStatusProps {
   setStaffList: React.Dispatch<React.SetStateAction<StaffMember[]>>;
   onBack?: () => void;
   isPopupMode?: boolean;
+  isEmbedded?: boolean;
 }
 
 const ITEMS_PER_PAGE = 10;
 const generateId = () => `staff_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
-const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBack, isPopupMode = false }) => {
+const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBack, isPopupMode = false, isEmbedded = false }) => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
@@ -24,28 +25,7 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
   const initialFormState: StaffMember = { id: '', category: '시설', jobTitle: '', birthDate: '', joinDate: '', resignDate: '', name: '', phone: '', area: '', note: '', photo: '' };
   const [formItem, setFormItem] = useState<StaffMember>(initialFormState);
 
-  useEffect(() => {
-    if (isPopupMode) {
-      loadDataForPopup();
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get('id');
-      if (id && id !== 'new') setEditId(id);
-    } else {
-      loadDataForPopup();
-    }
-  }, [isPopupMode]);
-
-  useEffect(() => {
-    const handleMessage = (e: MessageEvent) => {
-      if (e.data?.type === 'STAFF_SAVED') {
-        loadDataForPopup(); 
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  const loadDataForPopup = async () => {
+  const loadDataForPopup = useCallback(async () => {
     setLoading(true);
     const data = await fetchStaffList();
     if (isPopupMode) {
@@ -58,7 +38,28 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
     }
     setStaffList(data || []);
     setLoading(false);
-  };
+  }, [isPopupMode, setStaffList]);
+
+  useEffect(() => {
+    if (isPopupMode) {
+      loadDataForPopup();
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      if (id && id !== 'new') setEditId(id);
+    } else {
+      loadDataForPopup();
+    }
+  }, [isPopupMode, loadDataForPopup]);
+
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'STAFF_SAVED') {
+        loadDataForPopup(); 
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [loadDataForPopup]);
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 750;
@@ -346,8 +347,8 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
   }
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] animate-fade-in">
-      <div className="p-6 space-y-6">
+    <div className={`${isEmbedded ? "" : "bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]"} animate-fade-in`}>
+      <div className={isEmbedded ? "space-y-4" : "p-6 space-y-6"}>
         {/* 작은박스 1: 툴바 영역 */}
         <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-200 gap-4 print:hidden">
           <div className="flex items-center gap-3 w-full md:w-auto">
@@ -407,16 +408,16 @@ const StaffStatus: React.FC<StaffStatusProps> = ({ staffList, setStaffList, onBa
                   const globalIdx = filteredAndSortedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
                   return (
                     <tr key={m.id} className="hover:bg-blue-50/30 transition-colors group text-center">
-                      <td className="px-4 py-4 text-xs text-gray-400 font-mono border border-gray-200">{globalIdx}</td>
-                      <td className="px-4 py-4 font-black text-blue-600 text-sm border border-gray-200">{m.category}</td>
-                      <td className="px-4 py-4 text-sm font-medium text-slate-600 border border-gray-200">{m.jobTitle}</td>
-                      <td className="px-4 py-4 text-sm font-black text-slate-900 border border-gray-200">{m.name}</td>
-                      <td className="px-4 py-4 text-sm text-slate-500 font-mono border border-gray-200">{m.birthDate || '-'}</td>
-                      <td className="px-4 py-4 text-sm text-slate-500 font-mono border border-gray-200">{m.phone}</td>
-                      <td className="px-4 py-4 text-sm text-slate-500 font-mono border border-gray-200">{m.joinDate || '-'}</td>
-                      <td className="px-4 py-4 text-sm text-rose-500 font-bold border border-gray-200">{m.resignDate || '-'}</td>
-                      <td className="px-4 py-4 text-sm text-center text-slate-600 border border-gray-200">{m.area}</td>
-                      <td className="px-4 py-4 print:hidden text-center border border-gray-200">
+                      <td className="px-4 py-1 text-xs text-gray-400 font-mono border border-gray-200">{globalIdx}</td>
+                      <td className="px-4 py-1 font-black text-blue-600 text-sm border border-gray-200">{m.category}</td>
+                      <td className="px-4 py-1 text-sm font-medium text-slate-600 border border-gray-200">{m.jobTitle}</td>
+                      <td className="px-4 py-1 text-sm font-black text-slate-900 border border-gray-200">{m.name}</td>
+                      <td className="px-4 py-1 text-sm text-slate-500 font-mono border border-gray-200">{m.birthDate || '-'}</td>
+                      <td className="px-4 py-1 text-sm text-slate-500 font-mono border border-gray-200">{m.phone}</td>
+                      <td className="px-4 py-1 text-sm text-slate-500 font-mono border border-gray-200">{m.joinDate || '-'}</td>
+                      <td className="px-4 py-1 text-sm text-rose-500 font-bold border border-gray-200">{m.resignDate || '-'}</td>
+                      <td className="px-4 py-1 text-sm text-center text-slate-600 border border-gray-200">{m.area}</td>
+                      <td className="px-4 py-1 print:hidden text-center border border-gray-200">
                         <div className="flex justify-center gap-1">
                           <button onClick={() => openIndependentWindow(m.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
                           <button onClick={() => handleDeleteDirect(m.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
