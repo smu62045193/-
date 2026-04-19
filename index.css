@@ -1,2 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
 
-/* 404 Error Prevention */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 1cm;
+  }
+  body {
+    background: white !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+
+.hidden-in-ui {
+  display: none !important;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Scoped styles for GeneratorCheck main screen to avoid affecting print preview */
+.main-screen-generator #generator-print-area > div:nth-child(1) {
+  margin-bottom: 0.5rem !important; /* space-y-2 equivalent */
+}
+
+.main-screen-generator #generator-print-area h3 {
+  font-size: 18px !important;
+}

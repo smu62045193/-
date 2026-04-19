@@ -7,16 +7,24 @@ import LogSheetLayout from './LogSheetLayout';
 
 interface SepticLogProps {
   currentDate: Date;
+  data?: SepticLogData;
+  onDataChange?: (data: SepticLogData) => void;
+  isEmbedded?: boolean;
 }
 
-const SepticLog: React.FC<SepticLogProps> = ({ currentDate }) => {
+const SepticLog: React.FC<SepticLogProps> = ({ currentDate, data: externalData, onDataChange, isEmbedded = false }) => {
   const [loading, setLoading] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
-  const [data, setData] = useState<SepticLogData>(getInitialSepticLog(dateKey));
+  const [internalData, setInternalData] = useState<SepticLogData>(getInitialSepticLog(dateKey));
+
+  const data = externalData || internalData;
+  const setData = onDataChange || setInternalData;
 
   useEffect(() => {
-    loadData();
-  }, [dateKey]);
+    if (!externalData) {
+      loadData();
+    }
+  }, [dateKey, externalData]);
 
   const loadData = async () => {
     setLoading(true);
@@ -45,9 +53,9 @@ const SepticLog: React.FC<SepticLogProps> = ({ currentDate }) => {
     updateItemResult(item.id, next);
   };
 
-  const thClass = "border border-gray-300 bg-slate-100 p-2 font-bold text-center align-middle text-[13px] h-11 text-slate-700 uppercase tracking-tight";
-  const tdClass = "border border-gray-300 p-2 align-middle text-[13px] h-11 text-slate-800 font-medium";
-  const resultClass = (res: string) => `border border-gray-300 p-1 text-center font-black text-[14px] w-28 cursor-pointer select-none transition-colors h-11 ${res === '양호' ? 'text-blue-600' : 'text-red-600 bg-red-50'}`;
+  const thClass = "border border-black bg-white font-normal text-center text-[13px] text-black h-[32px]";
+  const tdClass = "border border-black p-0 h-[32px] relative bg-white text-center text-black";
+  const resultClass = (res: string) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-normal text-[13px] transition-colors px-2 ${res === '양호' ? 'text-blue-600' : 'text-red-600'}`;
 
   return (
     <LogSheetLayout
@@ -55,27 +63,32 @@ const SepticLog: React.FC<SepticLogProps> = ({ currentDate }) => {
       date={dateKey}
       loading={loading}
       hidePrint={true}
-      hideRefresh={true}
-      hideSave={true}
-      isEmbedded={true}
+      hideRefresh={isEmbedded}
+      hideSave={isEmbedded}
+      hideHeader={isEmbedded}
+      isEmbedded={isEmbedded}
     >
-      <div id="septic-log-print-area" className="bg-white max-w-4xl mx-auto shadow-sm">
-        <table className="w-full border-collapse border border-gray-300">
+      <div id="septic-log-print-area" className={`bg-white ${isEmbedded ? 'w-full' : 'max-w-7xl mx-auto'}`}>
+        <table className="w-full border-collapse border border-black">
           <thead>
-            <tr className="bg-slate-100">
-              <th className={thClass}>점 검 내 용</th>
-              <th className={`${thClass} w-28`}>결 과</th>
+            <tr className="bg-white border-b border-black h-[32px]">
+              <th className={thClass}><div className="flex items-center justify-center h-full px-2">점 검 내 용</div></th>
+              <th className={`${thClass} w-28`}><div className="flex items-center justify-center h-full px-2">결 과</div></th>
             </tr>
           </thead>
           <tbody>
             {data?.items?.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                <td className={`${tdClass} pl-6`}>• {item.content}</td>
+              <tr key={item.id} className="h-[32px] bg-white border-b border-black">
+                <td className={tdClass}>
+                  <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">• {item.content}</div>
+                </td>
                 <td 
-                  className={resultClass(item.result as string)}
+                  className={tdClass}
                   onClick={() => toggleResult(item)}
                 >
-                  {item.result || '양호'}
+                  <div className={resultClass(item.result as string)}>
+                    {item.result || '양호'}
+                  </div>
                 </td>
               </tr>
             ))}

@@ -7,9 +7,10 @@ import LogSheetLayout from './LogSheetLayout';
 
 interface FireFacilityCheckProps {
   currentDate?: Date;
+  isEmbedded?: boolean;
 }
 
-const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new Date() }) => {
+const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new Date(), isEmbedded = false }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const dateKey = format(currentDate, 'yyyy-MM-dd');
@@ -77,10 +78,10 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
     });
   }
 
-  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-[13px] text-slate-700 h-9";
-  const tdClass = "border border-slate-300 p-0 h-9 relative bg-white";
-  const labelClass = "border border-slate-300 p-1 font-bold text-center bg-white text-slate-700 align-middle w-28 text-[13px]";
-  const resultCellClass = (res: string) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-black text-[13px] transition-colors ${res === '양호' ? 'text-blue-600' : res === '불량' ? 'text-red-600 bg-red-50' : 'text-slate-300'}`;
+  const thClass = "border border-black bg-white font-normal text-center text-[13px] text-black h-[32px]";
+  const tdClass = "border border-black p-0 h-[32px] relative bg-white text-center text-black";
+  const labelClass = "border border-black p-0 font-normal text-center bg-white text-black align-middle w-28 text-[13px] h-[32px]";
+  const resultCellClass = (res: string) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-normal text-[13px] transition-colors px-2 ${res === '양호' ? 'text-blue-600' : res === '불량' ? 'text-red-600' : 'text-slate-300'}`;
 
   return (
     <LogSheetLayout
@@ -95,34 +96,31 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
       isEmbedded={true}
       hideHeader={true}
     >
-      <div id="fire-facility-log-print-area" className="bg-white max-w-5xl mx-auto shadow-sm p-1">
-        <div className="mb-2 px-1">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">소방 시설 점검 일지</h3>
-        </div>
-        <div className="bg-white border border-slate-300 overflow-hidden">
-          <table className="w-full border-collapse">
+      <div id="fire-facility-log-print-area" className={`bg-white ${isEmbedded ? 'w-full' : 'max-w-7xl mx-auto'}`}>
+        <div className="bg-white overflow-hidden">
+          <table className="w-full border-collapse border border-black">
             <thead>
-              <tr className="bg-slate-100">
-                <th className={`${thClass} w-28`}>구 분</th>
-                <th className={thClass}>점 검 내 용</th>
-                <th className={`${thClass} w-24`}>결 과</th>
+              <tr className="bg-white border-b border-black h-[32px]">
+                <th className={`${thClass} w-28`}><div className="flex items-center justify-center h-full px-2">구 분</div></th>
+                <th className={thClass}><div className="flex items-center justify-center h-full px-2">점 검 내 용</div></th>
+                <th className={`${thClass} w-24`}><div className="flex items-center justify-center h-full px-2">결 과</div></th>
               </tr>
             </thead>
             <tbody>
               {categories.map((category) => (
                 <React.Fragment key={category}>
                   {(groupedItems[category] || []).map((item, idx) => (
-                    <tr key={item.id} className="h-9 hover:bg-slate-50/50 transition-colors">
+                    <tr key={item.id} className="h-[32px] bg-white border-b border-black">
                       {idx === 0 && (
                         <td 
                           rowSpan={groupedItems[category].length} 
                           className={labelClass}
                         >
-                          {category}
+                          <div className="flex items-center justify-center h-full px-2">{category}</div>
                         </td>
                       )}
-                      <td className="border border-slate-300 p-1 text-left text-[13px] font-medium text-slate-700 pl-4">
-                        • {item.content}
+                      <td className="border border-black p-0 h-[32px] text-center text-[13px] font-normal text-black">
+                        <div className="flex items-center justify-center h-full px-2">• {item.content}</div>
                       </td>
                       <td 
                         className={tdClass}
@@ -136,16 +134,16 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
                   ))}
                 </React.Fragment>
               ))}
-              <tr className="h-20">
-                <td className={`${labelClass} font-black text-[13px]`}>
-                  특 이 사 항
+              <tr className="h-20 border-b border-black last:border-0">
+                <td className={`${labelClass} font-normal text-[13px] h-20`}>
+                  <div className="flex items-center justify-center h-full px-2">특 이 사 항</div>
                 </td>
-                <td colSpan={2} className="border border-slate-300 p-0 h-20">
+                <td colSpan={2} className="p-0 h-20 border border-black">
                   <textarea 
                     value={data.remarks || ''} 
                     onChange={(e) => handleRemarksChange(e.target.value)}
                     placeholder="특이사항 입력"
-                    className="w-full h-full p-2 resize-none outline-none text-slate-700 text-[13px] leading-relaxed font-medium bg-transparent !text-left scrollbar-hide"
+                    className="w-full h-full p-2 resize-none outline-none text-black text-[13px] leading-relaxed font-normal bg-transparent !text-center scrollbar-hide border-none shadow-none appearance-none"
                   />
                 </td>
               </tr>

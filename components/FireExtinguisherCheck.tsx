@@ -8,7 +8,7 @@ interface FireExtinguisherCheckProps {
   isPopupMode?: boolean;
 }
 
-const ITEMS_PER_PAGE = 15;
+const ITEMS_PER_PAGE = 10;
 
 const EXTINGUISHER_TYPES = [
   "ABC분말(3.3kg)",
@@ -208,14 +208,11 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
       );
     }
 
-    if (activeFloor === '지하1~6층') filtered = filtered.filter(item => isUndergroundFloor(item.floor));
-    else if (activeFloor === '옥탑') filtered = filtered.filter(item => isRooftopFloor(item.floor));
+    if (activeFloor === '옥탑') filtered = filtered.filter(item => isRooftopFloor(item.floor));
     else if (activeFloor === '창고') filtered = filtered.filter(item => isStorageFloor(item.floor));
     else if (activeFloor !== '전체') filtered = filtered.filter(item => item.floor === activeFloor);
 
     return filtered.sort((a, b) => {
-      const scoreDiff = getFloorScore(b.floor) - getFloorScore(a.floor);
-      if (scoreDiff !== 0) return scoreDiff;
       return (String(a.manageNo || '')).localeCompare(String(b.manageNo || ''), 'en', { numeric: true });
     });
   }, [items, activeFloor, searchTerm]);
@@ -252,7 +249,14 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
     const btns = ['전체'];
     if (hasRooftop) btns.push('옥탑');
     btns.push(...aboveGround);
-    if (hasUnderground) btns.push('지하1~6층');
+    
+    if (hasUnderground) {
+      const undergroundFloors = uniqueFloors
+        .filter((f: string) => isUndergroundFloor(f))
+        .sort((a, b) => getFloorScore(String(b)) - getFloorScore(String(a)));
+      btns.push(...undergroundFloors);
+    }
+    
     if (hasStorage) btns.push('창고');
     
     return btns;
@@ -279,7 +283,6 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
     });
     const sortedKeys = Object.keys(fullGroups).sort((a: string, b: string) => getFloorScore(b) - getFloorScore(a));
     sortedKeys.forEach((floor: string) => {
-      flatRows.push({ isHeader: true, floor: floor });
       const currentGroup = fullGroups[floor];
       if (currentGroup) {
         currentGroup.forEach((item: FireExtinguisherItem) => {
@@ -316,8 +319,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
     chunks.forEach((chunk, index) => {
       const isFirstPage = index === 0;
       const rowsHtml = chunk.map(row => {
-        if (row.isHeader) return `<tr><td colspan="9" style="background-color: #f3f4f6 !important; font-weight: bold; text-align: left; padding: 8px 10px; border-top: 1.5px solid black; font-size: 10pt;">[ ${row.floor} ]</td></tr>`;
-        return `<tr><td>${row.globalIndex}</td><td>${row.manageNo || ''}</td><td>${row.type || ''}</td><td>${row.floor || ''}</td><td>${row.company || ''}</td><td style="font-weight:bold;">${row.serialNo || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${row.certNo || ''}</td><td>${formatToYYMM(row.date || '')}</td></tr>`;
+        return `<tr><td>${row.globalIndex}</td><td>${row.manageNo || ''}</td><td>${row.type || ''}</td><td>${row.floor || ''}</td><td>${row.company || ''}</td><td>${row.serialNo || ''}</td><td>${row.phone || ''}</td><td>${row.certNo || ''}</td><td>${formatToYYMM(row.date || '')}</td></tr>`;
       }).join('');
       pagesContent += `<div class="print-page ${index < chunks.length - 1 ? 'page-break' : ''}">${isFirstPage ? `<div class="header-flex"><div class="title-area"><div class="doc-title">소화기 관리대장</div></div></div>` : ''}<table class="main-print-table">${tableHeader}<tbody>${rowsHtml}</tbody></table></div>`;
     });
@@ -335,7 +337,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
         .doc-title { font-size: 28pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; }
         table.main-print-table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
         th, td { border: 1px solid black; padding: 4px 2px; text-align: center; font-size: 8.5pt; height: 28px; }
-        th { background-color: #f3f4f6 !important; font-weight: bold; }
+        th { background-color: white !important; font-weight: normal; }
       </style></head><body><div class="no-print"><button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button></div>${pagesContent}</body></html>`);
     printWindow.document.close();
   };
@@ -441,147 +443,224 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
   }
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto space-y-4 animate-fade-in">
-      <div className="flex flex-col md:flex-row justify-between items-center border-b border-gray-200 pb-4 print:hidden gap-4">
-        {/* 검색창 좌측 배치 (320px) */}
-        <div className="relative w-full md:w-[320px]">
-          <input 
-            type="text" 
-            placeholder="관리번호, 위치, 업체명 검색..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm font-bold" 
-          />
-          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-        </div>
-        
-        <div className="flex flex-wrap gap-2 shrink-0">
-          <button 
-            onClick={loadData} 
-            disabled={loading} 
-            className="flex items-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-          <button 
-            onClick={() => openIndependentWindow()}
-            className="flex items-center px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm active:scale-95"
-          >
-            <Plus size={18} className="mr-2" />
-            신규 소화기 등록
-          </button>
-          <button 
-            onClick={handlePrint} 
-            className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
-          >
-            <Printer size={18} className="mr-2" />
-            미리보기
-          </button>
-        </div>
-      </div>
-
-      {/* 층별 필터 리스트 바로 위로 이동 */}
-      <div className="print:hidden flex items-center gap-4 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-black text-gray-400 uppercase tracking-widest min-w-max"><Filter size={16} /></div>
-        <div className="flex overflow-x-auto whitespace-nowrap gap-2 scrollbar-hide pb-1">
+    <div className="space-y-2">
+      {/* 층별 필터 탭 네비게이션 */}
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex shrink-0">
           {filterButtons.map(f => (
-            <button 
+            <div 
               key={f} 
               onClick={() => setActiveFloor(f)} 
-              className={`px-5 py-2 rounded-xl text-xs font-black border transition-all ${
+              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                 activeFloor === f 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                  : 'bg-white text-gray-400 border-gray-200 hover:border-blue-200 hover:text-blue-500'
+                  ? 'text-orange-600' 
+                  : 'text-gray-500 hover:text-black'
               }`}
             >
               {f}
-            </button>
+              {activeFloor === f && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
           ))}
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-center min-w-[1000px] border border-gray-300">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-12 border border-gray-200">No</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">관리번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">종 류</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">층 별</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">정비업체</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">제조번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-32 border border-gray-200">전화번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-24 border border-gray-200">검정번호</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 border border-gray-200">제조년월</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest border border-gray-200">비 고</th>
-                <th className="px-3 py-4 text-center text-[11px] font-black text-gray-400 uppercase tracking-widest w-28 print:hidden border border-gray-200">관리</th>
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex items-stretch shrink-0">
+          <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
+            <input 
+              type="text" 
+              placeholder="관리번호, 위치, 업체명 검색..." 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all" 
+            />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
+          </div>
+        </div>
+        
+        <div className="flex items-center shrink-0 px-2">
+          <div className="w-[1px] h-6 bg-black"></div>
+        </div>
+
+        <div className="flex items-center shrink-0">
+          <button 
+            onClick={loadData} 
+            disabled={loading} 
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+          >
+            <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
+          <button 
+            onClick={() => openIndependentWindow()}
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+          >
+            <Plus size={18} className="mr-1.5" />
+            등록
+          </button>
+          <button 
+            onClick={handlePrint} 
+            className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap"
+          >
+            <Printer size={18} className="mr-1.5" />
+            인쇄
+          </button>
+        </div>
+      </div>
+
+      <div className="w-full max-w-7xl mx-auto bg-white border border-black">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[1000px] border-collapse text-center bg-white">
+            <thead className="bg-white">
+              <tr className="h-[40px] border-b border-black">
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-12">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">No</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-32">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">관리번호</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-32">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">종 류</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-40">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">층 별</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-24">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">정비업체</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-24">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">제조번호</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-32">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">전화번호</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-24">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">검정번호</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-28">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">제조년월</div>
+                </th>
+                <th className="border-r border-black px-2 text-[13px] font-normal text-gray-700 w-32">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">비 고</div>
+                </th>
+                <th className="px-2 text-[13px] font-normal text-gray-700 w-28 print:hidden">
+                  <div className="flex items-center justify-center h-full text-[13px] font-normal">관리</div>
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="bg-white">
               {loading && items.length === 0 ? (
-                 <tr><td colSpan={11} className="py-24 text-center text-gray-400 font-bold border border-gray-200">로딩 중...</td></tr>
+                 <tr className="h-[40px] border-b border-black last:border-b-0">
+                   <td colSpan={11} className="text-center text-gray-400 font-normal text-[13px]">
+                     <div className="flex items-center justify-center h-full py-12">로딩 중...</div>
+                   </td>
+                 </tr>
               ) : paginatedFlatItems.length === 0 ? (
-                 <tr><td colSpan={11} className="py-24 text-center text-gray-400 italic border border-gray-200">표시할 데이터가 없습니다.</td></tr>
-              ) : displayGroups.map(group => (
-                <React.Fragment key={group.floor}>
-                  <tr className="bg-slate-50/50"><td colSpan={11} className="text-left pl-6 py-3 border border-gray-200 text-blue-800 font-black text-sm uppercase tracking-widest">[ {String(group.floor)} ]</td></tr>
-                  {group.items.map((item: FireExtinguisherItem) => (
-                    <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                      <td className="px-3 py-4 text-[11px] text-gray-400 font-mono border border-gray-200">{filteredItemsSorted.findIndex(fi => fi.id === item.id) + 1}</td>
-                      <td className="px-3 py-4 text-sm font-black text-slate-800 border border-gray-200">{item.manageNo || ''}</td>
-                      <td className="px-3 py-4 text-[12px] font-bold text-slate-600 border border-gray-200">{item.type || ''}</td>
-                      <td className="px-3 py-4 text-[12px] font-bold text-slate-600 border border-gray-200">{item.floor || ''}</td>
-                      <td className="px-3 py-4 text-[12px] text-slate-500 border border-gray-200">{item.company || '-'}</td>
-                      <td className="px-3 py-4 text-[12px] text-slate-900 font-black border border-gray-200 text-center">{item.serialNo || '-'}</td>
-                      <td className="px-3 py-4 text-[12px] text-slate-500 font-mono border border-gray-200">{item.phone || '-'}</td>
-                      <td className="px-3 py-4 text-[12px] text-slate-900 font-black border border-gray-200 text-center">{item.certNo || '-'}</td>
-                      <td className="px-3 py-4 text-[12px] text-blue-600 font-bold border border-gray-200">{formatToYYMM(item.date || '')}</td>
-                      <td className="px-3 py-4 text-[11px] text-slate-400 italic text-left pl-4 border border-gray-200">{item.remarks || '-'}</td>
-                      <td className="px-3 py-4 print:hidden border border-gray-200">
-                        <div className="flex items-center justify-center gap-2">
-                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all shadow-sm border border-blue-100" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all shadow-sm border border-red-100" title="삭제"><Trash2 size={16} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </React.Fragment>
-              ))}
+                 <tr className="h-[40px] border-b border-black last:border-b-0">
+                   <td colSpan={11} className="text-center text-gray-400 italic text-[13px] font-normal">
+                     <div className="flex items-center justify-center h-full py-12">표시할 데이터가 없습니다.</div>
+                   </td>
+                 </tr>
+              ) : paginatedFlatItems.map((item: FireExtinguisherItem, index) => {
+                return (
+                  <tr key={item.id} className="h-[40px] border-b border-black last:border-b-0 hover:bg-blue-50/30 transition-colors group">
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-700">
+                        {filteredItemsSorted.findIndex(fi => fi.id === item.id) + 1}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-700">
+                        {item.manageNo || ''}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-700">
+                        {item.type || ''}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-700">
+                        {item.floor || ''}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-700">
+                        {item.company || '-'}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-700">
+                        {item.serialNo || '-'}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-700">
+                        {item.phone || '-'}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-700">
+                        {item.certNo || '-'}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-blue-600">
+                        {formatToYYMM(item.date || '')}
+                      </div>
+                    </td>
+                    <td className="border-r border-black p-0">
+                      <div className="flex items-center justify-start h-full px-2 text-[13px] font-normal text-gray-600">
+                        {item.remarks || '-'}
+                      </div>
+                    </td>
+                    <td className="p-0 print:hidden">
+                      <div className="flex items-center justify-center h-full px-2 gap-2">
+                        <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-all" title="수정"><Edit2 size={14} /></button>
+                        <button onClick={() => handleDeleteItem(item.id)} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded transition-all" title="삭제"><Trash2 size={14} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
-      {totalPages > 1 && (
+      {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
+      {filteredItemsSorted.length > 0 && (
         <div className="py-4 flex items-center justify-center gap-2 print:hidden">
           <button
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="flex items-center gap-1.5 px-4">
+          
+          <div className="flex items-center gap-2">
             {visiblePageNumbers.map(pageNum => (
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
-                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
                   currentPage === pageNum
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                    ? 'text-black font-bold scale-110 cursor-default'
+                    : 'text-black font-normal hover:text-blue-500 cursor-pointer'
                 }`}
               >
-                {pageNum}
+                <span className="text-[13px]">{pageNum}</span>
               </button>
             ))}
           </div>
+
           <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronRight size={18} />
           </button>

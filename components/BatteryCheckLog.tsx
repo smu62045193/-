@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { BatteryCheckData, BatteryItem } from '../types';
 import { fetchBatteryCheck, saveBatteryCheck, getInitialBatteryCheck } from '../services/dataService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
-import { Save, Printer, ChevronLeft, ChevronRight, RefreshCw, CheckCircle, X, Cloud, Edit2, Lock } from 'lucide-react';
+import { Save, Printer, ChevronLeft, ChevronRight, RefreshCw, CheckCircle, X, Cloud, Edit2, Lock, CheckCircle2 } from 'lucide-react';
 
 interface BatteryCheckLogProps {
   currentDate: Date;
@@ -14,7 +14,15 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [activeSubTab, setActiveSubTab] = useState('rectifier');
   const [data, setData] = useState<BatteryCheckData>(getInitialBatteryCheck(format(currentDate, 'yyyy-MM')));
+
+  const SUB_TABS = [
+    { id: 'rectifier', label: '정류기반' },
+    { id: 'battery', label: '개별전류' },
+    { id: 'generator', label: '발전기' },
+    { id: 'remarks', label: '특이사항' },
+  ];
 
   useEffect(() => {
     const newMonth = format(currentDate, 'yyyy-MM');
@@ -71,7 +79,8 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
           setData({ 
             ...initial, 
             checkDate: format(currentDate, 'yyyy-MM-dd'),
-            items: carriedItems 
+            items: carriedItems,
+            note: prevFetched.note || ''
           });
         } else {
           initial.checkDate = format(currentDate, 'yyyy-MM-dd');
@@ -169,18 +178,50 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
           <style>
             @page { size: A4 portrait; margin: 0; }
             body { font-family: sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
-            table { table-layout: fixed !important; width: 100% !important; border-collapse: collapse !important; border: 1px solid black !important; }
-            th, td { border: 1px solid black !important; height: 40px !important; font-size: 9pt !important; text-align: center; }
+            table { table-layout: fixed !important; width: 100% !important; border-collapse: collapse !important; border: 1px solid black !important; margin-bottom: 10px !important; }
+            tr { height: 30px !important; }
+            th, td { border: 1px solid black !important; height: 30px !important; font-size: 11px !important; text-align: center; padding: 0 !important; line-height: 1 !important; vertical-align: middle !important; }
+            
+            /* Column Widths */
+            th:nth-child(1), td:nth-child(1) { width: 65px !important; }
+            th:nth-child(2), td:nth-child(2) { width: 145px !important; }
+            th:nth-child(3), td:nth-child(3) { width: 90px !important; }
+            
+            /* Alignment for Spec Column */
+            td:nth-child(4) input { text-align: center !important; }
+            
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; } }
             .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 25mm 10mm 10mm 10mm; background: white !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
+            
+            /* Preview Window Visibility Fix */
+            .print-page .print\\:hidden { display: none !important; }
+            .print-page .hidden.print\\:block { display: block !important; }
+            
             .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; min-height: 100px; }
             .title-area { flex: 1; text-align: center; }
             .doc-title { font-size: 25pt; font-weight: 900; line-height: 1.1; }
-            .approval-table { width: 90mm !important; border: 1.5px solid black !important; margin-left: auto; }
-            .approval-table th { height: 24px !important; font-size: 8pt !important; background: #f3f4f6 !important; font-weight: bold; text-align: center; }
-            .approval-table td { height: 70px !important; border: 1px solid black !important; }
+            .approval-table { width: 90mm !important; border: 1px solid black !important; margin-left: auto; table-layout: fixed !important; border-collapse: collapse !important; }
+            .approval-table tr { height: auto !important; }
+            .approval-table th { height: 24px !important; font-size: 9pt !important; background: white !important; font-weight: normal; text-align: center; padding: 0 !important; }
+            .approval-table th:not(.side-header) { width: 25% !important; }
+            .approval-table td { height: 70px !important; border: 1px solid black !important; padding: 0 !important; }
             .approval-table .side-header { width: 28px !important; }
+            .print-page div { min-width: auto !important; }
+            .print-page div.border-black:not(.remarks-print-box) { border: none !important; }
+            .rounded-xl { border-radius: 0 !important; }
+            .print\\:rounded-xl { border-radius: 0 !important; }
+            .print\\:border { border: 1px solid black !important; }
+            .print\\:border-none { border: none !important; }
+            .print\\:rounded-none { border-radius: 0 !important; }
+            .print\\:shadow-none { box-shadow: none !important; }
+            .hidden-in-ui { display: block !important; margin-bottom: 8px !important; font-size: 13px !important; }
+            .print\\:p-6 { padding: 0 !important; }
+            .print\\:p-0 { padding: 0 !important; }
+            .print\\:shadow-sm { box-shadow: none !important; }
+            .remarks-print-box { width: 100% !important; border: 1px solid black !important; height: 100px !important; line-height: 1.5 !important; font-size: 11px !important; display: block !important; padding: 12px !important; margin-top: 0 !important; box-sizing: border-box !important; visibility: visible !important; white-space: pre-wrap !important; }
+            input { border: none !important; width: 100%; height: 100%; text-align: center !important; outline: none; background: transparent !important; font-size: 11px !important; padding: 0 !important; margin: 0 !important; color: black !important; }
+            td:nth-child(4) input { text-align: center !important; padding: 0 !important; }
           </style>
         </head>
         <body>
@@ -191,12 +232,13 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
                 <div class="doc-title">${titleLine1}<br/>${titleLine2}</div>
               </div>
               <table class="approval-table">
-                <tr><th rowspan="2" class="side-header">결<br/>재</th><th>담 당</th><th>주 임</th><th>대 리</th><th>과 장</th><th>소 장</th></tr>
-                <tr><td></td><td></td><td></td><td></td><td></td></tr>
+                <tr><th rowspan="2" class="side-header">결<br/><br/>재</th><th>주 임</th><th>대 리</th><th>과 장</th><th>소 장</th></tr>
+                <tr><td></td><td></td><td></td><td></td></tr>
               </table>
             </div>
             ${printContent.innerHTML}
           </div>
+          <script>window.onload = function() { const inputs = document.querySelectorAll('input'); inputs.forEach(i => i.setAttribute('value', i.value)); }</script>
         </body>
       </html>
     `);
@@ -223,134 +265,294 @@ const BatteryCheckLog: React.FC<BatteryCheckLogProps> = ({ currentDate }) => {
   };
 
   const [year, month] = currentMonth.split('-');
-  const inputClass = `w-full text-center h-full outline-none text-black font-medium text-sm p-1 transition-all`;
-  const editableInputClass = (isEditing: boolean) => `${inputClass} ${isEditing ? 'bg-orange-50 focus:bg-orange-100' : 'bg-white cursor-not-allowed'}`;
-  const headerClass = "border border-gray-300 p-1.5 bg-gray-50 text-gray-700 font-bold text-[13px]";
-  const cellClass = "border border-gray-300 p-0 h-[40px] align-middle";
   
   const recItems = data?.items?.filter(i => i.section === 'rectifier') || [];
   const batItems = data?.items?.filter(i => i.section === 'battery') || [];
   const genItems = data?.items?.filter(i => i.section === 'generator') || [];
 
   const renderTableSection = (title: string, items: BatteryItem[], sectionIndex: number) => (
-    <div className="mb-6">
-      <h3 className="text-lg font-bold mb-2 text-black border-l-4 border-black pl-2">{sectionIndex}. {title}</h3>
-      <table className="w-full border-collapse text-center text-sm text-black border border-gray-300 table-fixed">
-        <thead>
-          <tr className="bg-gray-50">
-            <th className={`${headerClass} w-20`}>구분</th>
-            <th className={`${headerClass} w-[130px]`}>제조업체</th>
-            <th className={`${headerClass} w-[95px]`}>제조년월일</th>
-            <th className={`${headerClass}`}>규격/차단기</th>
-            <th className={`${headerClass} w-24`}>전압</th>
-            <th className={`${headerClass} w-24`}>비고</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.id} className="h-[40px]">
-              <td className="border border-gray-300 bg-gray-50 font-bold text-gray-700">{item.label}</td>
-              <td className={cellClass}>
-                <input 
-                  type="text" 
-                  className={editableInputClass(isEditMode)} 
-                  value={item.manufacturer || ''} 
-                  onChange={e => updateItem(item.id, 'manufacturer', e.target.value)} 
-                  onKeyDown={handleKeyDown}
-                  readOnly={!isEditMode} 
-                />
-              </td>
-              <td className={cellClass}>
-                <input 
-                  type="text" 
-                  className={editableInputClass(isEditMode)} 
-                  value={item.manufDate || ''} 
-                  onChange={e => updateItem(item.id, 'manufDate', e.target.value)} 
-                  onKeyDown={handleKeyDown}
-                  readOnly={!isEditMode} 
-                />
-              </td>
-              <td className={cellClass}>
-                <input 
-                  type="text" 
-                  className={`${editableInputClass(isEditMode)} !text-left px-3`} 
-                  value={item.spec || ''} 
-                  onChange={e => updateItem(item.id, 'spec', e.target.value)} 
-                  onKeyDown={handleKeyDown}
-                  readOnly={!isEditMode} 
-                />
-              </td>
-              <td className={cellClass}>
-                <input 
-                  type="text" 
-                  className={`${editableInputClass(isEditMode)} font-bold text-blue-700`} 
-                  value={item.voltage || ''} 
-                  onChange={e => updateItem(item.id, 'voltage', e.target.value)} 
-                  onKeyDown={handleKeyDown} 
-                  readOnly={!isEditMode} 
-                />
-              </td>
-              <td className={cellClass}>
-                <input 
-                  type="text" 
-                  className={editableInputClass(isEditMode)} 
-                  value={item.remarks || ''} 
-                  onChange={e => updateItem(item.id, 'remarks', e.target.value)} 
-                  onKeyDown={handleKeyDown} 
-                  readOnly={!isEditMode}
-                />
-              </td>
+    <div className="mb-2 max-w-7xl mx-auto">
+      <h3 className="text-lg font-bold mb-3 text-black border-l-4 border-black pl-2 hidden-in-ui">{sectionIndex}. {title}</h3>
+      <div className="bg-white print:border-none print:rounded-none print:shadow-none">
+        <table className="w-full border-collapse text-center table-fixed border border-black">
+          <thead>
+            <tr className="bg-white border-b border-black h-[40px]">
+              <th className="w-20 border-r border-black p-0">
+                <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">구분</div>
+              </th>
+              <th className="w-[160px] border-r border-black p-0">
+                <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">제조업체</div>
+              </th>
+              <th className="w-[100px] border-r border-black p-0">
+                <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">제조년월일</div>
+              </th>
+              <th className="border-r border-black p-0">
+                <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">규격/차단기</div>
+              </th>
+              <th className="w-24 border-r border-black p-0">
+                <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">전압</div>
+              </th>
+              <th className="w-24 p-0">
+                <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">비고</div>
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="bg-white">
+            {items.map((item) => (
+              <tr key={item.id} className="bg-white border-b border-black h-[40px] last:border-b-0">
+                <td className="border-r border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">{item.label}</div>
+                </td>
+                <td className="border-r border-black p-0">
+                  <div className="flex items-center h-full">
+                    <input 
+                      type="text" 
+                      className={`bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2 ${isEditMode ? 'bg-orange-50/30' : ''}`}
+                      value={item.manufacturer || ''} 
+                      onChange={e => updateItem(item.id, 'manufacturer', e.target.value)} 
+                      onKeyDown={handleKeyDown}
+                      readOnly={!isEditMode} 
+                    />
+                  </div>
+                </td>
+                <td className="border-r border-black p-0">
+                  <div className="flex items-center h-full">
+                    <input 
+                      type="text" 
+                      className={`bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2 ${isEditMode ? 'bg-orange-50/30' : ''}`}
+                      value={item.manufDate || ''} 
+                      onChange={e => updateItem(item.id, 'manufDate', e.target.value)} 
+                      onKeyDown={handleKeyDown}
+                      readOnly={!isEditMode} 
+                    />
+                  </div>
+                </td>
+                <td className="border-r border-black p-0">
+                  <div className="flex items-center h-full">
+                    <input 
+                      type="text" 
+                      className={`bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-left text-[13px] font-normal px-2 ${isEditMode ? 'bg-orange-50/30' : ''}`}
+                      value={item.spec || ''} 
+                      onChange={e => updateItem(item.id, 'spec', e.target.value)} 
+                      onKeyDown={handleKeyDown}
+                      readOnly={!isEditMode} 
+                    />
+                  </div>
+                </td>
+                <td className="border-r border-black p-0">
+                  <div className="flex items-center h-full">
+                    <input 
+                      type="text" 
+                      className={`bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2 text-blue-700 ${isEditMode ? 'bg-orange-50/30' : ''}`}
+                      value={item.voltage || ''} 
+                      onChange={e => updateItem(item.id, 'voltage', e.target.value)} 
+                      onKeyDown={handleKeyDown} 
+                      readOnly={!isEditMode} 
+                    />
+                  </div>
+                </td>
+                <td className="p-0">
+                  <div className="flex items-center h-full">
+                    <input 
+                      type="text" 
+                      className={`bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2 ${isEditMode ? 'bg-orange-50/30' : ''}`}
+                      value={item.remarks || ''} 
+                      onChange={e => updateItem(item.id, 'remarks', e.target.value)} 
+                      onKeyDown={handleKeyDown} 
+                      readOnly={!isEditMode}
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto space-y-6 bg-white rounded-xl border border-gray-200 shadow-sm print:shadow-none print:border-none print:p-0">
-      <div className="flex justify-between items-center border-b border-gray-200 pb-4 print:hidden">
-        <div className="flex items-center space-x-4">
-          <button onClick={handlePrevMonth} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><ChevronLeft /></button>
-          <h2 className="text-2xl font-bold text-gray-800">{year}년 {month}월</h2>
-          <button onClick={handleNextMonth} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><ChevronRight /></button>
+    <div className="max-w-7xl mx-auto space-y-2 pb-10 animate-fade-in">
+      {/* 통합 컨트롤 및 탭 바 (밑줄형 탭 구성) */}
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide whitespace-nowrap border-b border-black mb-2">
+        {/* 1. 날짜 선택 (월 네비게이션) */}
+        <div className="flex items-center shrink-0">
+          <button 
+            onClick={handlePrevMonth} 
+            className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <div className="px-2 py-3 text-[14px] font-bold text-black min-w-[100px] text-center">
+            {year}년 {month}월
+          </div>
+          <button 
+            onClick={handleNextMonth} 
+            className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+          >
+            <ChevronRight size={20} />
+          </button>
         </div>
-        <div className="flex gap-2">
+
+        {/* 구분선 (검정색 1px) */}
+        <div className="flex items-center shrink-0 px-2">
+          <div className="w-[1px] h-6 bg-black"></div>
+        </div>
+
+        {/* 2. 서브탭 메뉴 (정류기반 개별전류 발전기 특이사항) */}
+        <div className="flex items-stretch shrink-0">
+          {SUB_TABS.map(tab => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id)}
+              className={`relative px-4 py-3 text-[14px] font-bold transition-all shrink-0 cursor-pointer flex items-center h-full bg-white ${
+                activeSubTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              {tab.label}
+              {activeSubTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* 구분선 (검정색 1px) */}
+        <div className="flex items-center shrink-0 px-2">
+          <div className="w-[1px] h-6 bg-black"></div>
+        </div>
+
+        {/* 3. 액션 버튼들 (새로고침 수정 저장 인쇄) */}
+        <div className="flex items-center shrink-0">
           {isEditMode && (
-            <button onClick={handleLoadPreviousData} disabled={loading} className="flex items-center px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg font-bold hover:bg-emerald-200 transition-all text-sm active:scale-95 disabled:opacity-50">
-              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-              전월 데이터 불러오기
+            <button 
+              onClick={handleLoadPreviousData} 
+              disabled={loading} 
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              전월 데이터
             </button>
           )}
-          <button onClick={() => loadData(currentMonth)} disabled={loading} className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"><RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침</button>
-          <button onClick={() => setIsEditMode(!isEditMode)} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}>{isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}{isEditMode ? '수정 취소' : '수정'}</button>
-          <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all active:scale-95 ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw size={18} className="mr-2 animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-2" /> : <Save size={18} className="mr-2" />}{saveStatus === 'success' ? '저장완료' : '서버 저장'}</button>
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-sm text-sm transition-all active:scale-95"><Printer size={18} className="mr-2" />미리보기</button>
+          <button 
+            onClick={() => loadData(currentMonth)} 
+            disabled={loading} 
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            title="새로고침"
+          >
+            <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
+          
+          <button 
+            onClick={() => setIsEditMode(!isEditMode)} 
+            className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
+              isEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+            }`}
+          >
+            {isEditMode ? <CheckCircle2 size={18} className="mr-1.5" /> : <Edit2 size={18} className="mr-1.5" />}
+            {isEditMode ? '수정완료' : '수정'}
+            {isEditMode && <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />}
+          </button>
+
+          <button 
+            onClick={handleSave} 
+            disabled={saveStatus === 'loading'} 
+            className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+              saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+            }`}
+          >
+            {saveStatus === 'loading' ? <RefreshCw size={18} className="mr-1.5 animate-spin" /> : saveStatus === 'success' ? <CheckCircle2 size={18} className="mr-1.5" /> : <Save size={18} className="mr-1.5" />}
+            {saveStatus === 'success' ? '저장완료' : '저장'}
+          </button>
+
+          <button 
+            onClick={handlePrint} 
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+          >
+            <Printer size={18} className="mr-1.5" />
+            인쇄
+          </button>
         </div>
+
+        {/* 4. 점검일자 */}
+        <>
+          {/* 구분선 (검정색 1.5px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+          <div className="flex items-center px-4 py-3 text-[14px] font-bold text-gray-700 shrink-0">
+            <span className="mr-2 whitespace-nowrap">점검일자 :</span>
+            {isEditMode ? (
+              <input 
+                type="date" 
+                value={data.checkDate || format(currentDate, 'yyyy-MM-dd')} 
+                onChange={e => setData({...data, checkDate: e.target.value})}
+                className="border-b-2 border-blue-500 bg-blue-50/30 outline-none text-sm font-bold text-black py-0.5 px-2 transition-all rounded-none w-32 text-center"
+              />
+            ) : (
+              <span className="text-black whitespace-nowrap">{data.checkDate ? format(parseISO(data.checkDate), 'yyyy년 MM월 dd일') : format(currentDate, 'yyyy년 MM월 dd일')}</span>
+            )}
+          </div>
+        </>
       </div>
 
-      <div id="battery-check-print-area">
-        <div className="text-right font-bold text-[12pt] mb-2">
-          점검일자 : {isEditMode ? (
-            <input 
-              type="date" 
-              value={data.checkDate || format(currentDate, 'yyyy-MM-dd')} 
-              onChange={e => setData({...data, checkDate: e.target.value})}
-              className="border border-blue-200 bg-orange-50 px-2 py-0.5 rounded outline-none font-bold text-blue-700"
-            />
-          ) : (
-            <span className="text-blue-600">{data.checkDate ? format(parseISO(data.checkDate), 'yyyy년 MM월 dd일') : format(currentDate, 'yyyy년 MM월 dd일')}</span>
-          )}
-        </div>
+      {/* 하단 데이터 박스 */}
+      <div id="battery-check-print-area" className="bg-white border-none print:border border-black print:rounded-xl p-0 print:p-6 shadow-none print:shadow-sm overflow-x-auto">
+        <div className="min-w-[1000px]">
+          <div className="hidden print:block text-right font-normal text-[11pt] mb-2">
+            점검일자 : <span className="text-black">{data.checkDate ? format(parseISO(data.checkDate), 'yyyy년 MM월 dd일') : format(currentDate, 'yyyy년 MM월 dd일')}</span>
+          </div>
 
-        {renderTableSection('정류기반', recItems, 1)}
-        {renderTableSection('정류기반 밧데리 개별전류', batItems, 2)}
-        {renderTableSection('비상용 발전기', genItems, 3)}
+          <div className={activeSubTab === 'rectifier' ? 'block' : 'hidden-in-ui'}>
+            {renderTableSection('정류기반', recItems, 1)}
+          </div>
+          <div className={activeSubTab === 'battery' ? 'block' : 'hidden-in-ui'}>
+            {renderTableSection('개별전류', batItems, 2)}
+          </div>
+          <div className={activeSubTab === 'generator' ? 'block' : 'hidden-in-ui'}>
+            {renderTableSection('발전기', genItems, 3)}
+          </div>
+          <div className={activeSubTab === 'remarks' ? 'block' : 'hidden-in-ui'}>
+            <div className="mb-2 max-w-7xl mx-auto">
+              <h3 className="text-lg font-bold mb-3 text-black border-l-4 border-black pl-2 hidden-in-ui">4. 특이사항</h3>
+              
+              {/* UI 전용: 데이터 테이블 형식 (헤더 삭제) */}
+              <div className={`print:hidden bg-white transition-all ${isEditMode ? 'ring-2 ring-orange-200' : ''}`}>
+                <table className="w-full border-collapse text-center table-fixed border border-black">
+                  <tbody className="bg-white">
+                    <tr className="bg-white">
+                      <td className="p-0">
+                        <textarea
+                          className={`w-full p-3 h-24 bg-transparent border-none outline-none shadow-none appearance-none resize-none text-[13px] leading-relaxed font-normal text-left transition-all ${isEditMode ? 'bg-orange-50/30' : 'bg-white cursor-not-allowed'}`}
+                          value={data.note || ''}
+                          onChange={e => setData({ ...data, note: e.target.value })}
+                          readOnly={!isEditMode}
+                          placeholder="특이사항을 입력하세요."
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 인쇄 전용: 기존 레이아웃 유지 (절대 수정 금지) */}
+              <div className="hidden print:block border border-black rounded-xl overflow-hidden bg-white shadow-sm print:border-none print:rounded-none print:shadow-none p-4 print:p-0">
+                <div className="w-full h-[100px] text-[11px] whitespace-pre-wrap text-black border border-black text-left remarks-print-box">
+                  {data.note || '특이사항 없음'}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <style>{`
         @keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         .animate-scale-up { animation: scale-up 0.2s ease-out forwards; }
+        .hidden-in-ui { display: none; }
+        @media print { .hidden-in-ui { display: block !important; } }
+        .ui-table-border-fix { border-style: hidden; }
       `}</style>
     </div>
   );

@@ -21,7 +21,15 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   const [activeTab, setActiveTab] = useState('status');
   const [items, setItems] = useState<AppointmentItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [editId, setEditId] = useState<string | null>(() => {
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      return id && id !== 'new' ? id : null;
+    }
+    return null;
+  });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
   const initialNewItem: AppointmentItem = { 
@@ -43,33 +51,12 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
     setLoading(true); 
     const data = await fetchAppointmentList(); 
     setItems(data || []); 
-    setLoading(false); 
-  };
-
-  useEffect(() => { 
-    loadData();
-
-    if (isPopupMode) {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get('id');
-      if (id && id !== 'new') setEditId(id);
-    }
-
-    const handleMessage = (e: MessageEvent) => {
-      if (e.data?.type === 'APPOINTMENT_SAVED') {
-        loadData();
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [isPopupMode]);
-
-  useEffect(() => {
-    if (editId && items.length > 0) {
-      const item = items.find(i => String(i.id) === String(editId));
+    if (editId && data) {
+      const item = data.find(i => String(i.id) === String(editId));
       if (item) setNewItem({ ...item });
     }
-  }, [editId, items]);
+    setLoading(false); 
+  };
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 750;
@@ -149,8 +136,8 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
     const rows = sortedItems.map((it) => `
       <tr>
         <td style="width: 50px; text-align: center;">${it.category}</td>
-        <td style="text-align: center; font-weight: bold;">${it.title || ''}</td>
-        <td style="width: 80px; text-align: center; font-weight: bold;">${it.name || ''}</td>
+        <td style="text-align: center; font-weight: normal;">${it.title || ''}</td>
+        <td style="width: 80px; text-align: center; font-weight: normal;">${it.name || ''}</td>
         <td style="text-align: center;">${it.agency || ''}</td>
         <td style="width: 120px; text-align: center;">${it.phone || ''}</td>
         <td style="width: 100px; text-align: center;">${it.appointmentDate || ''}</td>
@@ -160,7 +147,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
       <!DOCTYPE html>
       <html>
         <head>
-          <title>안전관리자 선임 현황 미리보기</title>
+          <title>안전관리자 선임 현황 인쇄</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
@@ -177,10 +164,10 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
               box-sizing: border-box; 
             }
             h1 { text-align: center; font-size: 28pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin-bottom: 40px; margin-top: 0; }
-            .meta-info { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; font-size: 11pt; }
+            .meta-info { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: normal; font-size: 11pt; }
             table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
-            th, td { border: 1px solid black; padding: 10px 4px; font-size: 10.5pt; height: 36px; word-break: break-all; }
-            th { background-color: #f3f4f6; font-weight: bold; }
+            th, td { border: 1px solid black; padding: 10px 4px; font-size: 9.5pt; font-weight: normal; height: 36px; word-break: break-all; }
+            th { background-color: white; font-weight: normal; }
           </style>
         </head>
         <body>
@@ -213,6 +200,47 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
     printWindow.document.close();
   };
 
+  useEffect(() => { 
+    let isMounted = true;
+    const fetchData = async () => {
+      const data = await fetchAppointmentList();
+      if (isMounted) {
+        setItems(data || []);
+        if (editId && data) {
+          const item = data.find(i => String(i.id) === String(editId));
+          if (item) setNewItem({ ...item });
+        }
+        setLoading(false);
+      }
+    };
+    fetchData();
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'APPOINTMENT_SAVED') {
+        loadData();
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      }
+    };
+
+    const handleRefresh = () => loadData();
+    const handleAdd = () => openIndependentWindow();
+    const handlePrintEvent = () => handlePrint();
+
+    window.addEventListener('message', handleMessage);
+    window.addEventListener('REFRESH_APPOINTMENTS', handleRefresh);
+    window.addEventListener('ADD_APPOINTMENT', handleAdd);
+    window.addEventListener('PRINT_APPOINTMENTS', handlePrintEvent);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener('message', handleMessage);
+      window.removeEventListener('REFRESH_APPOINTMENTS', handleRefresh);
+      window.removeEventListener('ADD_APPOINTMENT', handleAdd);
+      window.removeEventListener('PRINT_APPOINTMENTS', handlePrintEvent);
+    };
+  }, [isPopupMode, editId, loadData]);
+
   if (isPopupMode) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
@@ -222,7 +250,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
               <div className={`p-2 rounded-xl ${editId ? 'bg-orange-600' : 'bg-blue-600'}`}>
                 <UserCheck size={20} className="text-white" />
               </div>
-              <span className="font-black text-lg">{editId ? '선임 정보 수정' : '신규 선임 등록'}</span>
+              <span className="font-black text-lg">{editId ? '선임 정보 수정' : '신규등록'}</span>
             </div>
             <button onClick={() => window.close()} className="p-1 hover:bg-white/20 rounded-full transition-colors">
               <X size={24} />
@@ -251,8 +279,8 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                   type="text" 
                   value={newItem.title} 
                   onChange={e => setNewItem({...newItem, title: e.target.value})}
-                  placeholder="예: 소방안전관리자"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="예: 전기안전관리자"
+                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
                 />
               </div>
             </div>
@@ -265,7 +293,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                   value={newItem.name} 
                   onChange={e => setNewItem({...newItem, name: e.target.value})}
                   placeholder="성명"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal text-blue-700"
                 />
               </div>
               <div>
@@ -275,7 +303,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                   value={newItem.agency} 
                   onChange={e => setNewItem({...newItem, agency: e.target.value})}
                   placeholder="예: 한국소방안전원"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
                 />
               </div>
             </div>
@@ -288,7 +316,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                   value={newItem.phone} 
                   onChange={e => setNewItem({...newItem, phone: e.target.value})}
                   placeholder="010-0000-0000"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
                 />
               </div>
               <div>
@@ -297,7 +325,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                   type="date" 
                   value={newItem.appointmentDate} 
                   onChange={e => setNewItem({...newItem, appointmentDate: e.target.value})}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
                 />
               </div>
             </div>
@@ -309,7 +337,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                 value={newItem.license} 
                 onChange={e => setNewItem({...newItem, license: e.target.value})}
                 placeholder="보유 자격증 정보"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
               />
             </div>
 
@@ -319,7 +347,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                 value={newItem.note} 
                 onChange={e => setNewItem({...newItem, note: e.target.value})}
                 placeholder="기타 참고사항"
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24"
+                className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal resize-none h-24"
               />
             </div>
           </div>
@@ -346,82 +374,86 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   }
 
   return (
-    <div className={isEmbedded ? "animate-fade-in" : "max-w-7xl mx-auto p-4 sm:p-8 space-y-8 animate-fade-in relative min-h-screen"}>
+    <div className={isEmbedded ? "animate-fade-in" : "max-w-7xl mx-auto p-4 sm:p-8 space-y-2 animate-fade-in relative min-h-screen"}>
       {/* 메인 컨테이너 (협력업체 스타일의 큰 박스) */}
-      <div className={isEmbedded ? "" : "bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]"}>
-        <div className={isEmbedded ? "space-y-4" : "p-6 space-y-6"}>
-          {/* 작은박스 1: 툴바 영역 */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
-            <div className="flex-1"></div>
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-              <button 
-                onClick={loadData}
-                disabled={loading}
-                className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
-              >
-                <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-                새로고침
-              </button>
-              <button 
-                onClick={() => openIndependentWindow()}
-                className="flex items-center px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all active:scale-95 text-sm"
-              >
-                <UserPlus size={18} className="mr-2" />
-                신규 선임 등록
-              </button>
-              <button 
-                onClick={handlePrint} 
-                className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
-              >
-                <Printer size={18} className="mr-2" />
-                미리보기
-              </button>
+      <div className={isEmbedded ? "" : "bg-white border border-black overflow-hidden min-h-[500px]"}>
+        <div className={isEmbedded ? "space-y-2" : "p-6 space-y-2"}>
+          {!isEmbedded && (
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 border border-black print:hidden">
+              <div className="flex-1"></div>
+              <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                <button 
+                  onClick={loadData}
+                  disabled={loading}
+                  className="flex items-center justify-center px-4 py-2.5 bg-transparent text-gray-500 hover:text-black transition-colors disabled:opacity-50 text-sm font-bold"
+                >
+                  <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  새로고침
+                </button>
+                <button 
+                  onClick={() => openIndependentWindow()}
+                  className={`flex items-center justify-center px-4 py-2.5 bg-transparent transition-colors text-sm font-bold ${saveSuccess ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+                >
+                  <Plus size={18} className="mr-2" />
+                  등록
+                </button>
+                <button 
+                  onClick={handlePrint} 
+                  disabled={loading}
+                  className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-transparent text-gray-500 hover:text-black transition-colors disabled:opacity-50 text-sm font-bold"
+                >
+                  <Printer size={18} className="mr-2" />
+                  인쇄
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 작은박스 2: 리스트 테이블 영역 */}
-          <div className="bg-white rounded-xl border border-gray-300 overflow-hidden overflow-x-auto">
-            <table className="w-full border-collapse min-w-[1000px]">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24 border border-gray-200">구분</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-44 border border-gray-200">선임명칭</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-24 border border-gray-200">성명</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-40 border border-gray-200">기관/단체</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-32 border border-gray-200">연락처</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28 border border-gray-200">선임일자</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 border border-gray-200">자격사항</th>
-                  <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 w-28 print:hidden border border-gray-200">관리</th>
+          <div className="bg-white overflow-x-auto max-w-7xl mx-auto">
+            <table className="w-full border-collapse min-w-[1000px] border border-black text-center bg-white">
+              <thead>
+                <tr className="h-[40px] border-b border-black">
+                  <th className="border-r border-black bg-white text-center text-[13px] font-normal text-black p-0 w-24"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">구분</div></th>
+                  <th className="border-r border-black bg-white text-center text-[13px] font-normal text-black p-0 w-56"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">선임명칭</div></th>
+                  <th className="border-r border-black bg-white text-center text-[13px] font-normal text-black p-0 w-24"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">성명</div></th>
+                  <th className="border-r border-black bg-white text-center text-[13px] font-normal text-black p-0 w-40"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">기관/단체</div></th>
+                  <th className="border-r border-black bg-white text-center text-[13px] font-normal text-black p-0 w-32"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">연락처</div></th>
+                  <th className="border-r border-black bg-white text-center text-[13px] font-normal text-black p-0 w-28"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">선임일자</div></th>
+                  <th className="border-r border-black bg-white text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">자격사항</div></th>
+                  <th className="border-black bg-white text-center text-[13px] font-normal text-black p-0 w-28 print:hidden"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">관리</div></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {sortedItems.length === 0 ? (
-                  <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic border border-gray-200">등록된 정보가 없습니다.</td></tr>
+                  <tr className="border-b border-black"><td colSpan={8} className="h-[200px] text-center text-gray-400 italic text-[13px] font-normal border-r border-black">등록된 정보가 없습니다.</td></tr>
                 ) : sortedItems.map((it, idx) => (
-                  <tr key={it.id} className="text-center hover:bg-gray-50/50 transition-colors group">
-                    <td className="px-4 py-1 border border-gray-200">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        it.category === '전기' ? 'bg-blue-100 text-blue-700' :
-                        it.category === '소방' ? 'bg-red-100 text-red-700' :
-                        it.category === '기계' ? 'bg-orange-100 text-orange-700' :
-                        'bg-slate-100 text-slate-700'
-                      }`}>
-                        {it.category}
-                      </span>
+                  <tr key={it.id} className="text-center hover:bg-blue-50/30 transition-colors group h-[40px] border-b border-black">
+                    <td className="border-r border-black text-[13px] font-normal p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                          it.category === '전기' ? 'bg-blue-100 text-blue-700' :
+                          it.category === '소방' ? 'bg-red-100 text-red-700' :
+                          it.category === '기계' ? 'bg-orange-100 text-orange-700' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>
+                          {it.category}
+                        </span>
+                      </div>
                     </td>
-                    <td className="px-4 py-1 text-sm font-bold text-gray-700 text-center border border-gray-200">{it.title}</td>
-                    <td className="px-4 py-1 text-sm font-black text-gray-900 border border-gray-200">{it.name}</td>
-                    <td className="px-4 py-1 text-sm text-gray-600 text-center border border-gray-200">{it.agency}</td>
-                    <td className="px-4 py-1 text-sm text-gray-600 border border-gray-200">{it.phone}</td>
-                    <td className="px-4 py-1 text-sm text-gray-500 font-mono border border-gray-200">{it.appointmentDate}</td>
-                    <td className="px-4 py-1 text-sm text-gray-600 text-center border border-gray-200">{it.license}</td>
-                    <td className="px-4 py-1 print:hidden border border-gray-200">
-                      <div className="flex justify-center gap-1">
-                        <button onClick={() => openIndependentWindow(it.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="편집">
-                          <Edit2 size={16} />
+                    <td className="border-r border-black text-[13px] font-normal text-gray-700 p-0"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">{it.title}</div></td>
+                    <td className="border-r border-black text-[13px] font-normal text-gray-900 p-0"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">{it.name}</div></td>
+                    <td className="border-r border-black text-[13px] font-normal text-gray-600 p-0"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">{it.agency}</div></td>
+                    <td className="border-r border-black text-[13px] font-normal text-gray-600 p-0"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">{it.phone}</div></td>
+                    <td className="border-r border-black text-[13px] font-normal text-gray-500 p-0"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">{it.appointmentDate}</div></td>
+                    <td className="border-r border-black text-[13px] font-normal text-gray-600 p-0"><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">{it.license}</div></td>
+                    <td className="border-black print:hidden p-0">
+                      <div className="flex justify-center gap-1 h-full items-center px-2 text-[13px] font-normal">
+                        <button onClick={() => openIndependentWindow(it.id)} className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-all" title="편집">
+                          <Edit2 size={14} />
                         </button>
-                        <button onClick={() => handleDeleteItem(it.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제">
-                          <Trash2 size={16} />
+                        <button onClick={() => handleDeleteItem(it.id)} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded transition-all" title="삭제">
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </td>

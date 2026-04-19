@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { WaterTankLogData, WaterTankCheckItem } from '../types';
 import { fetchWaterTankLog, saveWaterTankLog, getInitialWaterTankLog } from '../services/dataService';
 import { format, getDay, parseISO, subMonths, addMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, Save, Printer, RefreshCw, CheckCircle, X, Cloud, Edit2, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Save, RefreshCw, CheckCircle, X, Cloud, Edit2, Lock, Printer } from 'lucide-react';
 import LogSheetLayout from './LogSheetLayout';
 
 interface WaterTankLogDataProps {
@@ -37,25 +37,33 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
       // 1. 해당 월의 데이터 조회 (월 단위 키 사용)
       const fetched = await fetchWaterTankLog(monthKey);
       
+      // 2. 이전 달 데이터 조회 (점검자 정보 복사용)
+      const prevMonthDate = subMonths(viewDate, 1);
+      const prevMonthKey = format(prevMonthDate, 'yyyy-MM');
+      const prevFetched = await fetchWaterTankLog(prevMonthKey);
+      
       if (fetched) {
         const migratedItems = fetched.items.map(item => {
           if (!item.results || !Array.isArray(item.results)) {
-            // @ts-ignore
+            // @ts-expect-error: handling legacy data format
             const oldRes = item.result || 'O';
             return { ...item, results: item.criteria.map(() => oldRes) };
           }
           return item;
         });
-        setData({ ...fetched, items: migratedItems });
+        
+        let currentInspector = fetched.inspector;
+        // 현재 점검자가 비어있고 전월 데이터에 점검자가 있다면 무조건 불러오기
+        if (!currentInspector && prevFetched && prevFetched.inspector) {
+          currentInspector = prevFetched.inspector;
+        }
+        
+        setData({ ...fetched, items: migratedItems, inspector: currentInspector || '' });
       } else {
-        // 2. 데이터가 없을 경우 초기화
+        // 3. 데이터가 없을 경우 초기화
         const initial = getInitialWaterTankLog(format(viewDate, 'yyyy-MM-dd'));
         
-        // 3. 점검자 정보 자동 복사 로직 (이전 달 데이터 확인)
-        const prevMonthDate = subMonths(viewDate, 1);
-        const prevMonthKey = format(prevMonthDate, 'yyyy-MM');
-        const prevFetched = await fetchWaterTankLog(prevMonthKey);
-        
+        // 전월 데이터에 점검자가 있다면 무조건 불러오기
         if (prevFetched && prevFetched.inspector) {
           initial.inspector = prevFetched.inspector;
         }
@@ -131,9 +139,9 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
     const tableRows = data.items.map((it) => {
       return it.criteria.map((crit, cIdx) => `
         <tr style="height:38px;">
-          ${cIdx === 0 ? `<td rowspan="${it.criteria.length}" style="font-weight:bold; border:1px solid black; text-align:center; background-color:#f9fafb; width:120px; font-size:9pt;">${it.category}</td>` : ''}
+          ${cIdx === 0 ? `<td rowspan="${it.criteria.length}" style="font-weight:normal; border:1px solid black; text-align:center; background-color:#fff; width:120px; font-size:9pt;">${it.category}</td>` : ''}
           <td style="border:1px solid black; text-align:left; padding-left:8px; font-size:8.5pt;">${crit}</td>
-          <td style="border:1px solid black; text-align:center; font-weight:900; font-size:13pt; width:80px; color:${it.results[cIdx] === 'O' ? 'blue' : 'red'};">${it.results[cIdx] || ''}</td>
+          <td style="border:1px solid black; text-align:center; font-weight:normal; font-size:13pt; width:80px; color:${it.results[cIdx] === 'O' ? 'blue' : 'red'};">${it.results[cIdx] || ''}</td>
         </tr>
       `).join('');
     }).join('');
@@ -156,7 +164,7 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
             .title-area { flex: 1; text-align: center; }
             .doc-title { font-size: 24pt; font-weight: 900; line-height: 1.1; }
             .approval-table { width: 85mm !important; border: 1.5 solid black !important; margin-left: auto; }
-            .approval-table th { height: 22px !important; font-size: 8pt !important; background-color: #f3f4f6 !important; font-weight: bold; border: 1px solid black !important; }
+            .approval-table th { height: 22px !important; font-size: 8pt !important; background-color: #fff !important; font-weight: normal; border: 1px solid black !important; }
             .approval-table td { height: 60px !important; border: 1px solid black !important; background: #fff; }
             .approval-table .side-header { width: 24px !important; border: 1px solid black !important; font-size: 8pt; }
           </style>
@@ -172,15 +180,15 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
               </table>
             </div>
             <table style="margin-bottom: 10px;">
-              <tr><th style="width: 20%; background:#f9fafb; font-size:9pt;">건축물의 명칭</th><td colspan="3" style="text-align:left; padding-left:10px; font-size:9pt;">${data.buildingName}</td></tr>
-              <tr><th style="background:#f9fafb; font-size:9pt;">설치장소</th><td colspan="3" style="text-align:left; padding-left:10px; font-size:9pt;">${data.location}</td></tr>
-              <tr><th style="width: 20%; background:#f9fafb; font-size:9pt;">건축물 용도</th><td style="width: 30%; font-size:9pt;">${data.usage}</td><th style="width: 20%; background:#f9fafb; font-size:9pt;">점검일시</th><td style="font-size:9pt;">${year}년 ${month}월 ${day}일 (${dayName})</td></tr>
+              <tr><th style="width: 20%; background:#fff; font-weight:normal; font-size:9pt;">건축물의 명칭</th><td colspan="3" style="text-align:left; padding-left:10px; font-size:9pt;">${data.buildingName}</td></tr>
+              <tr><th style="background:#fff; font-weight:normal; font-size:9pt;">설치장소</th><td colspan="3" style="text-align:left; padding-left:10px; font-size:9pt;">${data.location}</td></tr>
+              <tr><th style="width: 20%; background:#fff; font-weight:normal; font-size:9pt;">건축물 용도</th><td style="width: 30%; font-size:9pt;">${data.usage}</td><th style="width: 20%; background:#fff; font-weight:normal; font-size:9pt;">점검일시</th><td style="font-size:9pt;">${year}년 ${month}월 ${day}일 (${dayName})</td></tr>
             </table>
             <table>
-              <thead><tr><th style="width: 15%; background:#f9fafb; font-size:9pt;">조사사항</th><th style="background:#f9fafb; font-size:9pt;">점검기준</th><th style="width: 12%; background:#f9fafb; font-size:9pt;">적부(O·X)</th></tr></thead>
+              <thead><tr><th style="width: 15%; background:#fff; font-weight:normal; font-size:9pt;">조사사항</th><th style="background:#fff; font-weight:normal; font-size:9pt;">점검기준</th><th style="width: 12%; background:#fff; font-weight:normal; font-size:9pt;">적부(O·X)</th></tr></thead>
               <tbody>${tableRows}</tbody>
             </table>
-            <div style="margin-top: 30px; text-align: right; font-weight: bold; font-size: 11pt; padding-right: 10px;">
+            <div style="margin-top: 30px; text-align: right; font-weight: normal; font-size: 11pt; padding-right: 10px;">
               점검자 : <span style="font-size:12pt; border-bottom:1px solid black; padding: 0 15px;">${data.inspector || ''}</span>
             </div>
           </div>
@@ -191,27 +199,36 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
   };
 
   const navTitle = (
-    <div className="flex items-center space-x-4">
-      <button onClick={handlePrevMonth} disabled={isEditMode} className={`p-1 hover:bg-gray-100 rounded-full transition-colors print:hidden ${isEditMode ? 'opacity-20' : ''}`}>
-        <ChevronLeft size={24} className="text-gray-600" />
+    <div className="flex items-center shrink-0">
+      <button 
+        onClick={handlePrevMonth} 
+        disabled={isEditMode} 
+        className="px-2 py-3 text-gray-500 hover:text-black transition-colors disabled:opacity-20"
+      >
+        <ChevronLeft size={20} />
       </button>
-      <span className="text-2xl font-bold text-gray-800">
-        {format(viewDate, 'yyyy년 MM월')}
-      </span>
-      <button onClick={handleNextMonth} disabled={isEditMode} className={`p-1 hover:bg-gray-100 rounded-full transition-colors print:hidden ${isEditMode ? 'opacity-20' : ''}`}>
-        <ChevronRight size={24} className="text-gray-600" />
+      <div className="px-2 py-3 text-[14px] font-bold text-black min-w-[100px] text-center">
+        {format(viewDate, 'yyyy')}년 {format(viewDate, 'MM')}월
+      </div>
+      <button 
+        onClick={handleNextMonth} 
+        disabled={isEditMode} 
+        className="px-2 py-3 text-gray-500 hover:text-black transition-colors disabled:opacity-20"
+      >
+        <ChevronRight size={20} />
       </button>
     </div>
   );
 
   const actionButtons = (
-    <div className="flex gap-2">
+    <div className="flex items-center">
       <button 
         onClick={loadData} 
         disabled={loading} 
-        className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+        className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+        title="새로고침"
       >
-        <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+        <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
         새로고침
       </button>
 
@@ -222,137 +239,151 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
           }
           setIsEditMode(!isEditMode);
         }} 
-        className={`flex items-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
+        className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-all relative whitespace-nowrap disabled:opacity-50 ${
+          isEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+        }`}
       >
-        {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
+        {isEditMode ? <Lock size={18} className="mr-1.5" /> : <Edit2 size={18} className="mr-1.5" />}
         {isEditMode ? '수정완료' : '수정'}
+        {isEditMode && <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />}
       </button>
 
       <button 
         onClick={handleSave} 
         disabled={loading || saveStatus === 'loading'} 
-        className={`flex items-center px-6 py-2 rounded-lg font-bold shadow-md transition-all text-sm ${
-          saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
-        } disabled:bg-blue-400 active:scale-95`}
+        className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+          saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+        }`}
       >
-        {saveStatus === 'loading' ? <RefreshCw size={18} className="mr-2 animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-2" /> : <Save size={18} className="mr-2" />}
-        {saveStatus === 'success' ? '저장완료' : '서버저장'}
+        {saveStatus === 'loading' ? (
+          <RefreshCw size={18} className="mr-1.5 animate-spin" />
+        ) : saveStatus === 'success' ? (
+          <CheckCircle size={18} className="mr-1.5" />
+        ) : (
+          <Save size={18} className="mr-1.5" />
+        )}
+        {saveStatus === 'success' ? '저장완료' : '저장'}
       </button>
 
       <button 
         onClick={handlePrint} 
-        className="flex-1 md:flex-none flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
+        className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
       >
-        <Printer size={18} className="mr-2" />
-        미리보기
+        <Printer size={18} className="mr-1.5" />
+        인쇄
       </button>
     </div>
   );
 
   return (
-    <LogSheetLayout 
-      title={navTitle} 
-      loading={loading} 
-      hideHeader={true}
-      isEmbedded={false}
-      hideSave={true}
-    >
-      <div className="space-y-6">
-        <div className="flex justify-between items-center mb-2 print:hidden">
+    <div className="space-y-2 animate-fade-in">
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex items-center shrink-0">
           {navTitle}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
           {actionButtons}
         </div>
+      </div>
 
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 print:hidden">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-500 mb-1">건축물의 명칭</label>
-              <input 
-                type="text" 
-                value={data.buildingName} 
-                className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
-                readOnly
-              />
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-500 mb-1">설치장소</label>
-              <input 
-                type="text" 
-                value={data.location} 
-                className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
-                readOnly
-              />
-            </div>
+      <div className="w-full max-w-7xl mx-auto flex items-stretch overflow-x-auto scrollbar-hide bg-white print:hidden border-b border-black mb-4">
+        <div className="flex items-center shrink-0 gap-2">
+          <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+            <span className="text-[14px] font-bold text-gray-500 uppercase">건축물의 명칭 :</span>
+            <span className="text-sm font-bold text-black py-0.5 border-b-2 border-transparent">{data.buildingName}</span>
           </div>
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-500 mb-1">건축물 용도</label>
+          <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+            <span className="text-[14px] font-bold text-gray-500 uppercase">설치장소 :</span>
+            <span className="text-sm font-bold text-black py-0.5 border-b-2 border-transparent">{data.location}</span>
+          </div>
+          <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+            <span className="text-[14px] font-bold text-gray-500 uppercase">건축물 용도 :</span>
+            <span className="text-sm font-bold text-black py-0.5 border-b-2 border-transparent">{data.usage}</span>
+          </div>
+          <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+            <span className="text-[14px] font-bold text-gray-500 uppercase">점검자 :</span>
+            {isEditMode ? (
               <input 
                 type="text" 
-                value={data.usage} 
-                className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
-                readOnly
+                value={data.inspector} 
+                onChange={e => updateField('inspector', e.target.value)} 
+                className="border-b-2 border-blue-500 bg-blue-50/30 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none w-24"
+                placeholder="(인)"
               />
-            </div>
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-500 mb-1">점검일시</label>
-              {isEditMode ? (
-                <input 
-                  type="date" 
-                  value={data.date} 
-                  onChange={e => updateField('date', e.target.value)} 
-                  className="w-full border border-orange-200 bg-orange-50 rounded-lg px-3 py-2 text-sm font-bold text-blue-700 h-[38px] text-center"
-                />
-              ) : (
-                <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-3 py-2 text-sm font-bold text-blue-600 flex items-center justify-center h-[38px]">
-                  {format(parseISO(data.date), 'yyyy년 MM월 dd일')} ({['일', '월', '화', '수', '목', '금', '토'][getDay(parseISO(data.date))]})
-                </div>
-              )}
-            </div>
+            ) : (
+              <span className="text-sm font-bold text-black py-0.5 border-b-2 border-transparent w-24 text-center inline-block">{data.inspector || '(인)'}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+            <span className="text-[14px] font-bold text-gray-500 uppercase">점검일시 :</span>
+            {isEditMode ? (
+              <input 
+                type="date" 
+                value={data.date} 
+                onChange={e => updateField('date', e.target.value)} 
+                className="border-b-2 border-blue-500 bg-blue-50/30 outline-none text-sm font-bold text-black py-0.5 px-2 transition-all rounded-none h-[28px]"
+              />
+            ) : (
+              <span className="text-sm font-bold text-black py-0.5 px-2 border-b-2 border-transparent flex items-center h-[28px]">
+                {format(parseISO(data.date), 'yyyy년 MM월 dd일')} ({['일', '월', '화', '수', '목', '금', '토'][getDay(parseISO(data.date))]})
+              </span>
+            )}
           </div>
         </div>
+      </div>
 
-        <div className="bg-white border border-gray-300 rounded-xl overflow-hidden shadow-sm">
-          <table className="w-full border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 w-[15%] border-r border-gray-300">조사사항</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 border-r border-gray-300">점검기준</th>
-                <th className="px-4 py-3 text-center text-sm font-bold text-gray-700 w-[12%]">적부(O·X)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => (
-                <React.Fragment key={item.id}>
-                  {item.criteria.map((crit, idx) => (
-                    <tr key={`${item.id}-${idx}`} className="border-b border-gray-200 last:border-0 hover:bg-gray-50/50 transition-colors">
-                      {idx === 0 && <td rowSpan={item.criteria.length} className="px-4 py-3 border-r border-gray-300 font-bold bg-gray-50/50 text-center text-[13px] align-middle">{item.category}</td>}
-                      <td className="px-4 py-3 text-left border-r border-gray-300 text-[13px] text-gray-600 pl-6">• {crit}</td>
+      <div className="bg-white overflow-x-auto w-full max-w-7xl mx-auto mb-4">
+        <table className="w-full text-center border-collapse border border-black">
+          <thead className="bg-white border-b border-black">
+            <tr className="h-[40px]">
+              <th className="border border-black text-[13px] font-normal text-gray-500 uppercase tracking-wider">
+                <div className="flex items-center justify-center h-full px-2">조사사항</div>
+              </th>
+              <th className="border border-black text-[13px] font-normal text-gray-500 uppercase tracking-wider">
+                <div className="flex items-center justify-center h-full px-2">점검기준</div>
+              </th>
+              <th className="border border-black text-[13px] font-normal text-gray-500 uppercase tracking-wider w-[12%]">
+                <div className="flex items-center justify-center h-full px-2">적부(O·X)</div>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white">
+            {data.items.map((item, itemIdx) => (
+              <React.Fragment key={item.id}>
+                {item.criteria.map((crit, idx) => {
+                  return (
+                    <tr key={`${item.id}-${idx}`} className="h-[40px] hover:bg-blue-50/30 transition-colors border-b border-black text-center">
+                      {idx === 0 && (
+                        <td 
+                          rowSpan={item.criteria.length} 
+                          className="border border-black bg-white align-middle"
+                        >
+                          <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-gray-800">
+                            {item.category}
+                          </div>
+                        </td>
+                      )}
+                      <td className="border border-black text-left">
+                        <div className="flex items-center h-full px-2 text-[13px] font-normal text-gray-600">
+                          • {crit}
+                        </div>
+                      </td>
                       <td 
-                        className={`px-4 py-3 text-center font-black text-xl select-none transition-colors ${isEditMode ? 'cursor-pointer hover:bg-orange-50' : 'cursor-default'} ${item.results[idx] === 'O' ? 'text-blue-600' : 'text-red-600'}`} 
+                        className={`border border-black select-none transition-colors ${isEditMode ? 'cursor-pointer hover:bg-orange-50' : 'cursor-default'}`} 
                         onClick={() => toggleResult(item.id, idx)}
                       >
-                        {item.results[idx] || '-'}
+                        <div className={`flex items-center justify-center h-full px-2 text-[13px] font-normal ${item.results[idx] === 'O' ? 'text-blue-600' : 'text-red-600'}`}>
+                          {item.results[idx] || '-'}
+                        </div>
                       </td>
                     </tr>
-                  ))}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="flex justify-end items-center gap-4 mt-8 px-2">
-          <span className="font-bold text-slate-700">점검자 :</span>
-          <input 
-            type="text" 
-            value={data.inspector} 
-            onChange={e => updateField('inspector', e.target.value)} 
-            className={`border-b-2 w-48 text-center font-bold text-lg outline-none transition-all ${isEditMode ? 'border-orange-500 bg-orange-50 text-blue-700' : 'border-slate-200 bg-transparent cursor-not-allowed'}`}
-            placeholder="(인)"
-            readOnly={!isEditMode}
-          />
-        </div>
+                  );
+                })}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <style>{`
@@ -364,7 +395,7 @@ const WaterTankLog: React.FC<WaterTankLogDataProps> = ({ currentDate }) => {
           animation: scale-up 0.2s ease-out forwards;
         }
       `}</style>
-    </LogSheetLayout>
+    </div>
   );
 };
 

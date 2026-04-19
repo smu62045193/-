@@ -8,13 +8,13 @@ interface SubPageProps {
 }
 
 const SubPage: React.FC<SubPageProps> = ({ title, subItems, onItemClick }) => {
-  const [activeTab, setActiveTab] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<string>(subItems?.[0] || '');
+  const [prevSubItems, setPrevSubItems] = useState(subItems);
 
-  useEffect(() => {
-    if (subItems && subItems.length > 0) {
-      setActiveTab(subItems[0]);
-    }
-  }, [subItems]);
+  if (subItems !== prevSubItems) {
+    setPrevSubItems(subItems);
+    setActiveTab(subItems?.[0] || '');
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 animate-fade-in h-full flex flex-col">

@@ -15,11 +15,11 @@ interface ElecCheckManagerProps {
 }
 
 const TABS = [
-  { id: 'meter', label: '계량기검침' },
-  { id: 'generator', label: '비상발전기' },
+  { id: 'meter', label: '계량기' },
+  { id: 'generator', label: '발전기' },
   { id: 'battery', label: '밧데리' },
   { id: 'load', label: '부하전류' },
-  { id: 'safety_general', label: '전기설비점검' },
+  { id: 'safety_general', label: '전기설비' },
   { id: 'safety_ev', label: '전기자동차' },
 ];
 
@@ -35,34 +35,28 @@ const ElecCheckManager: React.FC<ElecCheckManagerProps> = ({ currentDate, onDate
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-2">
+    <div className="max-w-7xl mx-auto p-4 space-y-2 pb-32">
       <div className="animate-fade-in space-y-2">
-        <div className="mb-2 flex items-center gap-4">
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
-            <Zap className="mr-3 text-blue-600" size={32} />
-            전기 점검 및 관리
-          </h2>
-          <p className="text-gray-500 text-base font-medium">전기 설비 계통의 정기 점검 및 측정 일지를 통합 관리합니다.</p>
-        </div>
-
-        {/* Tab Navigation - 디자인 표준화 */}
-        <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-2 scrollbar-hide items-center">
-          <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-             <LayoutList size={22} />
+        {/* Tab Navigation - 밑줄형 탭 */}
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          <div className="flex shrink-0">
+            {TABS.map(tab => (
+              <div
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer bg-white ${
+                  activeTab === tab.id 
+                    ? 'text-orange-600' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
           </div>
-          {TABS.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
-                activeTab === tab.id 
-                  ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                  : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
         </div>
 
         {/* Content Area */}

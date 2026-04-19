@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { SubstationLogData } from '../types';
 import { fetchSubstationLog, saveSubstationLog, getInitialSubstationLog } from '../services/dataService';
 import { format } from 'date-fns';
-import { Save, Zap } from 'lucide-react';
+import { Save, Zap, RefreshCw, CheckCircle2 } from 'lucide-react';
 
 interface ElectricityUsageProps {
   currentDate: Date;
@@ -11,10 +11,17 @@ interface ElectricityUsageProps {
 
 const ElectricityUsage: React.FC<ElectricityUsageProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   
   // Initialize with default data immediately to prevent "Loading..." screen
   const [data, setData] = useState<SubstationLogData>(getInitialSubstationLog(dateKey));
+  const [prevDateKey, setPrevDateKey] = useState(dateKey);
+
+  if (dateKey !== prevDateKey) {
+    setPrevDateKey(dateKey);
+    setData(getInitialSubstationLog(dateKey));
+  }
 
   const loadData = async () => {
     setLoading(true);
@@ -24,15 +31,28 @@ const ElectricityUsage: React.FC<ElectricityUsageProps> = ({ currentDate }) => {
   };
 
   useEffect(() => {
-    // Reset to defaults for new date immediately while fetching
-    setData(getInitialSubstationLog(dateKey));
-    loadData();
+    let isMounted = true;
+    const fetchData = async () => {
+      const fetched = await fetchSubstationLog(dateKey);
+      if (isMounted) {
+        setData(fetched);
+        setLoading(false);
+      }
+    };
+    fetchData();
+    return () => { isMounted = false; };
   }, [dateKey]);
 
   const handleSave = async () => {
+    setSaveStatus('loading');
     const success = await saveSubstationLog(data);
-    if (success) alert('저장되었습니다.');
-    else alert('저장 실패');
+    if (success) {
+      setSaveStatus('success');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } else {
+      setSaveStatus('error');
+      alert('저장 실패');
+    }
   };
 
   const updateStats = (field: keyof typeof data.dailyStats, value: string) => {
@@ -64,9 +84,21 @@ const ElectricityUsage: React.FC<ElectricityUsageProps> = ({ currentDate }) => {
           전기 사용량 현황
         </h2>
         <div className="flex gap-2">
-          <button onClick={handleSave} className="flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold shadow-sm">
-            <Save size={18} className="mr-2" />
-            저장
+          <button 
+            onClick={handleSave} 
+            disabled={saveStatus === 'loading'}
+            className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+              saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+            }`}
+          >
+            {saveStatus === 'loading' ? (
+              <RefreshCw size={18} className="mr-1.5 animate-spin" />
+            ) : saveStatus === 'success' ? (
+              <CheckCircle2 size={18} className="mr-1.5" />
+            ) : (
+              <Save size={18} className="mr-1.5" />
+            )}
+            {saveStatus === 'success' ? '저장완료' : '저장'}
           </button>
         </div>
       </div>

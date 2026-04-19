@@ -80,7 +80,8 @@ const Header: React.FC<HeaderProps> = ({ currentDate, onChangeDate }) => {
           }
         }
       } catch (e) {
-        console.error('공공데이터 API 호출 실패, 기본 데이터로 대체합니다.', e);
+        // API 호출 실패는 비치명적 오류이므로 경고로 처리하고 fallback을 진행합니다.
+        console.warn('공공데이터 API 호출 실패 (네트워크 또는 CORS 문제일 수 있음). 기본 데이터로 대체합니다.');
       }
 
       // 3. API 키가 없거나 호출에 실패한 경우, 기존 하드코딩된 HOLIDAYS 배열에서 확인 (Fallback)

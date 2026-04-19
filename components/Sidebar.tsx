@@ -16,7 +16,8 @@ import {
   Users, 
   Briefcase,
   CalendarCheck,
-  LayoutDashboard
+  LayoutDashboard,
+  Settings
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -35,12 +36,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuSelect, isOpen, tog
       case MenuId.WEEKLY_WORK: return <CalendarDays size={20} />;
       case MenuId.ELEC_CHECK: return <Zap size={20} />;
       case MenuId.MECH_CHECK: return <Wrench size={20} />;
+      case MenuId.FIRE_ELEVATOR_CHECK: return <Flame size={20} />;
       case MenuId.FIRE_CHECK: return <Flame size={20} />;
       case MenuId.ELEVATOR_CHECK: return <ArrowUpDown size={20} />;
       case MenuId.PARKING_CHECK: return <Car size={20} />;
       case MenuId.CONSUMABLES: return <Package size={20} />;
       case MenuId.CONSTRUCTION: return <HardHat size={20} />;
       case MenuId.STAFF: return <Users size={20} />;
+      case MenuId.ADMIN: return <Settings size={20} />;
       default: return <ClipboardList size={20} />;
     }
   };
@@ -72,7 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuSelect, isOpen, tog
                 <span className={`${activeMenu === item.id ? 'text-white' : 'text-slate-500 group-hover:text-blue-400'} transition-colors duration-200`}>
                   {getIcon(item.id)}
                 </span>
-                <span className={`text-[13px] tracking-tight ${activeMenu === item.id ? 'font-bold' : 'font-medium'}`}>
+                <span className={`text-[14px] tracking-tight ${activeMenu === item.id ? 'font-bold' : 'font-medium'}`}>
                   {item.label}
                 </span>
               </button>

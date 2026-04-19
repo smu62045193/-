@@ -2,11 +2,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tenant } from '../types';
 import { fetchTenants, saveTenants, generateUUID } from '../services/dataService';
-import { Save, Plus, Trash2, Search, Printer, RefreshCw, Cloud, X, CheckCircle2, AlertTriangle, Edit2, Check, Building2, UserPlus } from 'lucide-react';
+import { Save, Plus, Trash2, Search, Printer, RefreshCw, Cloud, X, CheckCircle2, AlertTriangle, Edit2, Check, Building2, UserPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface TenantStatusProps {
   isPopupMode?: boolean;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
+  tabs?: { id: string; label: string }[];
+  currentMonth?: string;
+  onPrevMonth?: () => void;
+  onNextMonth?: () => void;
 }
 
 const getFloorWeight = (floor: string) => {
@@ -21,11 +27,18 @@ const getFloorWeight = (floor: string) => {
   return num;
 };
 
-const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
+const TenantStatus: React.FC<TenantStatusProps> = ({ 
+  isPopupMode = false, 
+  activeTab, 
+  setActiveTab, 
+  tabs,
+  currentMonth,
+  onPrevMonth,
+  onNextMonth
+}) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // 팝업 모드용 입력 폼 상태
@@ -173,13 +186,8 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
   };
 
   const filteredList = useMemo(() => {
-    return tenants
-      .filter(t => 
-        (t.name || '').includes(searchTerm) || 
-        (t.floor || '').includes(searchTerm)
-      )
-      .sort((a, b) => getFloorWeight(a.floor) - getFloorWeight(b.floor));
-  }, [tenants, searchTerm]);
+    return [...tenants].sort((a, b) => getFloorWeight(a.floor) - getFloorWeight(b.floor));
+  }, [tenants]);
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
@@ -188,10 +196,10 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
     const tableRows = filteredList.map((item, idx) => `
       <tr>
         <td style="width: 40px;">${idx + 1}</td>
-        <td style="width: 200px; font-weight: bold; text-align: center;">${item.name}</td>
+        <td style="width: 200px; font-weight: normal; text-align: center;">${item.name}</td>
         <td style="width: 80px;">${item.floor}</td>
         <td style="width: 90px;">${item.area}</td>
-        <td style="width: 90px; font-weight: bold; color: #059669;">${item.refPower}</td>
+        <td style="width: 90px; font-weight: normal; color: black;">${item.refPower}</td>
         <td style="width: 120px; text-align: left; padding-left: 10px; color: #666;">${item.note || ''}</td>
       </tr>
     `).join('');
@@ -211,7 +219,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
             h1 { text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 30px; font-size: 26pt; font-weight: 900; margin-top: 0; letter-spacing: -1px; }
             table { width: 100%; border-collapse: collapse; font-size: 10pt; border: 1.5px solid black; table-layout: fixed; }
             th, td { border: 1px solid black; padding: 4px 2px; text-align: center; word-break: break-all; height: 26px; }
-            th { background-color: #f3f4f6; font-weight: bold; font-size: 11pt; }
+            th { background-color: white; font-weight: normal; font-size: 11pt; }
             .meta-info { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; font-size: 11pt; padding: 0 5px; }
             .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
             .no-print button:hover { background: #172554; transform: translateY(-1px); }
@@ -247,9 +255,9 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
     printWindow.document.close();
   };
 
-  const inputClass = (isEditing: boolean) => `w-full h-full text-center outline-none bg-transparent text-black text-[13px] p-1 font-medium ${isEditing ? 'bg-orange-50 focus:ring-1 focus:ring-blue-400' : 'cursor-default'}`;
-  const headerClass = "border border-gray-300 bg-gray-50 text-center font-bold text-[13px] p-2 text-gray-700";
-  const cellClass = (isEditing: boolean) => `border border-gray-300 p-0 h-11 align-middle relative transition-colors ${isEditing ? 'bg-orange-50/50' : 'bg-white group-hover:bg-gray-50/30'}`;
+  const inputClass = (isEditing: boolean) => `w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-black ${isEditing ? 'bg-orange-50' : 'cursor-default'}`;
+  const headerClass = "bg-white border-b border-r border-black text-center text-[13px] font-normal text-black p-0 h-[40px]";
+  const cellClass = (isEditing: boolean) => `border-b border-r border-black p-0 text-[13px] font-normal text-center h-[40px] ${isEditing ? 'bg-orange-50/50' : ''}`;
 
   if (isPopupMode) {
     return (
@@ -285,69 +293,124 @@ const TenantStatus: React.FC<TenantStatusProps> = ({ isPopupMode = false }) => {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-full mx-auto space-y-6 animate-fade-in relative pb-10">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200 print:hidden">
-        <div className="relative w-[320px]">
-          <input 
-            type="text" 
-            placeholder="검색 (입주사, 층)" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white text-black shadow-inner font-bold"
-          />
-          <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+    <div className="max-w-full mx-auto space-y-2 animate-fade-in relative pb-10">
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        {/* 1. 날짜 선택 영역 (월 네비게이션) */}
+        {currentMonth && onPrevMonth && onNextMonth && (
+          <div className="flex items-center shrink-0">
+            <button 
+              onClick={onPrevMonth} 
+              className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div className="px-2 py-3 text-[14px] font-bold text-black min-w-[100px] text-center">
+              {currentMonth.split('-')[0]}년 {currentMonth.split('-')[1]}월
+            </div>
+            <button 
+              onClick={onNextMonth} 
+              className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+        )}
+
+        {/* 구분선 (검정색 1px) */}
+        <div className="flex items-center shrink-0 px-2">
+          <div className="w-[1px] h-6 bg-black"></div>
         </div>
-        <div className="flex items-center space-x-2 justify-end flex-1">
-          <button onClick={loadData} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition-all active:scale-95 text-sm">
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-            <span>새로고침</span>
+
+        {/* 2. 서브탭 메뉴 */}
+        <div className="flex shrink-0">
+          {tabs && setActiveTab && tabs.map(tab => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer bg-white ${activeTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center shrink-0 px-2">
+          <div className="w-[1px] h-6 bg-black"></div>
+        </div>
+
+        <div className="flex items-center print:hidden shrink-0">
+          <button 
+            onClick={loadData} 
+            disabled={loading}
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            title="새로고침"
+          >
+            <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
           </button>
-          <button onClick={() => openIndependentWindow()} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-all shadow-md text-sm font-black active:scale-95">
-            <UserPlus size={18} />
-            <span>입주사등록</span>
+
+          <button 
+            onClick={() => openIndependentWindow()} 
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+          >
+            <Plus size={18} className="mr-1.5" />
+            등록
           </button>
-          <button onClick={handleExecuteSave} disabled={saveStatus === 'loading'} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-black shadow-md transition-all text-sm active:scale-95 ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-            {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin" /> : <Save size={18} />}
-            <span>서버저장</span>
+
+          <button 
+            onClick={handleExecuteSave} 
+            disabled={saveStatus === 'loading'} 
+            className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+          >
+            {saveStatus === 'loading' ? <RefreshCw size={18} className="mr-1.5 animate-spin" /> : saveStatus === 'success' ? <CheckCircle2 size={18} className="mr-1.5" /> : <Save size={18} className="mr-1.5" />}
+            {saveStatus === 'success' ? '저장완료' : '저장'}
           </button>
-          <button onClick={handlePrint} className="flex items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-all shadow-md text-sm font-bold active:scale-95">
-            <Printer size={18} />
-            <span>미리보기</span>
+
+          <button 
+            onClick={handlePrint} 
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+          >
+            <Printer size={18} className="mr-1.5" />
+            인쇄
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-300 overflow-hidden min-w-[850px]">
+      <div className="max-w-7xl w-full mx-auto bg-white border-t border-l border-black overflow-hidden min-w-[1000px]">
         <table className="w-full border-collapse text-center">
           <thead>
-            <tr>
-              <th className={`${headerClass} w-14`}>No</th>
-              <th className={headerClass}>입주사명</th>
-              <th className={`${headerClass} w-24`}>층 별</th>
-              <th className={`${headerClass} w-32`}>전용면적</th>
-              <th className={`${headerClass} w-32`}>기준전력(월)</th>
-              <th className={headerClass}>비 고</th>
-              <th className={`${headerClass} w-28 print:hidden`}>관리</th>
+            <tr className="bg-white h-[40px]">
+              <th className={`${headerClass} w-14`}><div className="flex items-center justify-center h-full px-2">No</div></th>
+              <th className={`${headerClass}`}><div className="flex items-center justify-center h-full px-2">입주사명</div></th>
+              <th className={`${headerClass} w-24`}><div className="flex items-center justify-center h-full px-2">층 별</div></th>
+              <th className={`${headerClass} w-32`}><div className="flex items-center justify-center h-full px-2">전용면적</div></th>
+              <th className={`${headerClass} w-32`}><div className="flex items-center justify-center h-full px-2">기준전력(월)</div></th>
+              <th className={`${headerClass}`}><div className="flex items-center justify-center h-full px-2">비 고</div></th>
+              <th className={`${headerClass} w-28 print:hidden`}><div className="flex items-center justify-center h-full px-2">관리</div></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody>
             {filteredList.length === 0 ? (
-              <tr><td colSpan={7} className="py-24 text-center text-gray-400 italic font-medium">등록된 입주사 정보가 없습니다.</td></tr>
+              <tr><td colSpan={7} className="h-[40px] text-center text-black italic font-normal text-[13px] border-b border-r border-black">등록된 입주사 정보가 없습니다.</td></tr>
             ) : (
               filteredList.map((item, idx) => {
                 const isEditing = editingId === item.id;
+                const actualIdx = idx + 1;
                 return (
-                  <tr key={item.id} className={`group ${isEditing ? 'bg-orange-50' : ''}`}>
-                    <td className="border border-gray-300 bg-gray-50/30 text-[11px] text-gray-400 font-mono">{idx + 1}</td>
-                    <td className={cellClass(isEditing)}><input type="text" readOnly={!isEditing} className={`${inputClass(isEditing)} font-black text-blue-800`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} /></td>
-                    <td className={cellClass(isEditing)}><input type="text" readOnly={!isEditing} className={inputClass(isEditing)} value={item.floor} onChange={(e) => updateItem(item.id, 'floor', e.target.value)} /></td>
-                    <td className={cellClass(isEditing)}><input type="text" readOnly={!isEditing} className={inputClass(isEditing)} value={item.area} onChange={(e) => updateItem(item.id, 'area', e.target.value)} /></td>
-                    <td className={cellClass(isEditing)}><input type="text" readOnly={!isEditing} className={`${inputClass(isEditing)} font-bold text-emerald-600`} value={item.refPower} onChange={(e) => updateItem(item.id, 'refPower', e.target.value)} /></td>
-                    <td className={cellClass(isEditing)}><input type="text" readOnly={!isEditing} className={`${inputClass(isEditing)} !text-left px-3 text-gray-500`} value={item.note} onChange={(e) => updateItem(item.id, 'note', e.target.value)} /></td>
-                    <td className="border border-gray-300 p-0 print:hidden text-center bg-white relative">
-                      <div className="flex items-center justify-center gap-1 p-1">
-                        <button onClick={() => handleToggleEdit(item.id)} className={`p-2 rounded-lg transition-all ${isEditing ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white border border-blue-100'}`}>{isEditing ? <Check size={16} /> : <Edit2 size={16} />}</button>
-                        <button onClick={() => handleDeleteRequest(item.id)} className="p-2 bg-red-50 text-red-400 hover:bg-red-600 hover:text-white border border-red-100 transition-all rounded-lg"><Trash2 size={16} /></button>
+                  <tr key={item.id} className={`group hover:bg-blue-50/30 transition-colors text-center h-[40px] ${isEditing ? 'bg-orange-50' : ''}`}>
+                    <td className="border-b border-r border-black p-0 text-[13px] font-normal text-center text-black h-[40px]"><div className="flex items-center justify-center h-full px-2">{actualIdx}</div></td>
+                    <td className={`${cellClass(isEditing)}`}><div className="flex items-center justify-center h-full px-2"><input type="text" readOnly={!isEditing} className={`${inputClass(isEditing)}`} value={item.name} onChange={(e) => updateItem(item.id, 'name', e.target.value)} /></div></td>
+                    <td className={`${cellClass(isEditing)}`}><div className="flex items-center justify-center h-full px-2"><input type="text" readOnly={!isEditing} className={inputClass(isEditing)} value={item.floor} onChange={(e) => updateItem(item.id, 'floor', e.target.value)} /></div></td>
+                    <td className={`${cellClass(isEditing)}`}><div className="flex items-center justify-center h-full px-2"><input type="text" readOnly={!isEditing} className={inputClass(isEditing)} value={item.area} onChange={(e) => updateItem(item.id, 'area', e.target.value)} /></div></td>
+                    <td className={`${cellClass(isEditing)}`}><div className="flex items-center justify-center h-full px-2"><input type="text" readOnly={!isEditing} className={`${inputClass(isEditing)}`} value={item.refPower} onChange={(e) => updateItem(item.id, 'refPower', e.target.value)} /></div></td>
+                    <td className={`${cellClass(isEditing)}`}><div className="flex items-center justify-center h-full px-2"><input type="text" readOnly={!isEditing} className={`${inputClass(isEditing)} !text-left`} value={item.note} onChange={(e) => updateItem(item.id, 'note', e.target.value)} /></div></td>
+                    <td className="border-b border-r border-black p-0 text-[13px] font-normal text-center print:hidden relative h-[40px]">
+                      <div className="flex items-center justify-center gap-1 h-full px-2">
+                        <button onClick={() => handleToggleEdit(item.id)} className={`p-1.5 rounded-lg transition-all ${isEditing ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'}`}>{isEditing ? <Check size={16} /> : <Edit2 size={16} />}</button>
+                        <button onClick={() => handleDeleteRequest(item.id)} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all rounded-lg"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>

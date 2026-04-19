@@ -16,16 +16,25 @@ import ElecCheckManager from './components/ElecCheckManager';
 import MechCheckManager from './components/MechCheckManager';
 import FireCheckManager from './components/FireCheckManager';
 import FireHistoryList from './components/FireHistoryList';
+import IntegratedInspectionList from './components/IntegratedInspectionList';
 import FireExtinguisherCheck from './components/FireExtinguisherCheck';
 import ElevatorCheckManager from './components/ElevatorCheckManager';
 import ElevatorInspectionList from './components/ElevatorInspectionList';
 import ConstructionManager from './components/ConstructionManager';
 import ConstructionLog from './components/ConstructionLog';
 import ConstructionContractorManager from './components/ConstructionContractorManager';
+import FireElevatorManager from './components/FireElevatorManager';
 import AppointmentManager from './components/AppointmentManager';
+import AdminManager from './components/AdminManager';
+import ArchiveRegistrationPopup from './components/ArchiveRegistrationPopup';
 import MeterReadingPhotos from './components/MeterReadingPhotos';
 import TenantStatus from './components/TenantStatus';
 import WeeklyWorkImportPopup from './components/WeeklyWorkImportPopup';
+import AirFilterCheck from './components/AirFilterCheck';
+import FancoilCheck from './components/FancoilCheck';
+import SepticTankCheck from './components/SepticTankCheck';
+import EnergyCheck from './components/EnergyCheck';
+import LoadCurrentFormPopup from './components/LoadCurrentFormPopup';
 import { MenuId } from './types';
 import { Menu as MenuIcon, X } from 'lucide-react';
 
@@ -33,44 +42,18 @@ const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'fire_extinguisher' | 'parking_status' | 'meter_photo' | 'tenant' | 'search' | 'weekly_import' | null>(null);
-  const [importDateStr, setImportDateStr] = useState<string>('');
-
-  // 접속 URL 파라미터 체크 (팝업 모드 여부 확인)
-  useEffect(() => {
+  
+  const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'integrated_contractor' | 'fire_extinguisher' | 'parking_status' | 'meter_photo' | 'tenant' | 'search' | 'weekly_import' | 'air_filter' | 'fancoil' | 'septic' | 'energy' | 'load_current_form' | 'archive_reg' | null>(() => {
     const params = new URLSearchParams(window.location.search);
     const popupType = params.get('popup');
-    if (popupType === 'appointment') {
-      setIsPopupMode('appointment');
-    } else if (popupType === 'staff') {
-      setIsPopupMode('staff');
-    } else if (popupType === 'contractor') {
-      setIsPopupMode('contractor');
-    } else if (popupType === 'consumable') {
-      setIsPopupMode('consumable');
-    } else if (popupType === 'construction_contractor') {
-      setIsPopupMode('construction_contractor');
-    } else if (popupType === 'construction_log') {
-      setIsPopupMode('construction_log');
-    } else if (popupType === 'elevator_contractor') {
-      setIsPopupMode('elevator_contractor');
-    } else if (popupType === 'fire_contractor') {
-      setIsPopupMode('fire_contractor');
-    } else if (popupType === 'fire_extinguisher') {
-      setIsPopupMode('fire_extinguisher');
-    } else if (popupType === 'parking_status') {
-      setIsPopupMode('parking_status');
-    } else if (popupType === 'meter_photo') {
-      setIsPopupMode('meter_photo');
-    } else if (popupType === 'tenant') {
-      setIsPopupMode('tenant');
-    } else if (popupType === 'search') {
-      setIsPopupMode('search');
-    } else if (popupType === 'weekly_import') {
-      setIsPopupMode('weekly_import');
-      setImportDateStr(params.get('date') || '');
-    }
-  }, []);
+    const validTypes = ['appointment', 'staff', 'contractor', 'consumable', 'construction_contractor', 'construction_log', 'elevator_contractor', 'fire_contractor', 'integrated_contractor', 'fire_extinguisher', 'parking_status', 'meter_photo', 'tenant', 'search', 'weekly_import', 'air_filter', 'fancoil', 'septic', 'energy', 'load_current_form', 'archive_reg'];
+    return validTypes.includes(popupType || '') ? (popupType as any) : null;
+  });
+  
+  const [importDateStr, setImportDateStr] = useState<string>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('date') || '';
+  });
 
   const handleMenuSelect = (id: MenuId) => {
     setActiveMenu(id);
@@ -114,6 +97,10 @@ const App: React.FC = () => {
     return <FireHistoryList isKeywordPopupMode={true} />;
   }
 
+  if (isPopupMode === 'integrated_contractor') {
+    return <IntegratedInspectionList isPopupMode={true} />;
+  }
+
   if (isPopupMode === 'fire_extinguisher') {
     return <FireExtinguisherCheck isPopupMode={true} />;
   }
@@ -134,6 +121,30 @@ const App: React.FC = () => {
     return <Dashboard currentDate={currentDate} isSearchPopupMode={true} />;
   }
 
+  if (isPopupMode === 'air_filter') {
+    return <AirFilterCheck isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'fancoil') {
+    return <FancoilCheck isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'septic') {
+    return <SepticTankCheck isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'energy') {
+    return <EnergyCheck isPopupMode={true} />;
+  }
+
+  if (isPopupMode === 'load_current_form') {
+    return <LoadCurrentFormPopup />;
+  }
+
+  if (isPopupMode === 'archive_reg') {
+    return <ArchiveRegistrationPopup />;
+  }
+
   const renderContent = () => {
     switch (activeMenu) {
       case MenuId.DASHBOARD:
@@ -148,6 +159,8 @@ const App: React.FC = () => {
         return <ElecCheckManager currentDate={currentDate} onDateChange={setCurrentDate} />;
       case MenuId.MECH_CHECK:
         return <MechCheckManager currentDate={currentDate} onDateChange={setCurrentDate} />;
+      case MenuId.FIRE_ELEVATOR_CHECK:
+        return <FireElevatorManager currentDate={currentDate} />;
       case MenuId.FIRE_CHECK:
         return <FireCheckManager />;
       case MenuId.ELEVATOR_CHECK:
@@ -158,6 +171,8 @@ const App: React.FC = () => {
         return <ConsumablesManager />;
       case MenuId.STAFF:
         return <StaffManager />;
+      case MenuId.ADMIN:
+        return <AdminManager />;
       default:
         return <Dashboard currentDate={currentDate} />;
     }

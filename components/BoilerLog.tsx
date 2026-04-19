@@ -49,13 +49,13 @@ const BoilerLog: React.FC<BoilerLogProps> = ({ currentDate, isEmbedded = false }
 
   const updateSimpleField = (field: keyof BoilerLogData, value: string) => {
     if (!data) return;
-    // @ts-ignore
+    // @ts-expect-error: dynamic field assignment
     setData({ ...data, [field]: value });
   };
 
   const updateNestedField = (parent: 'gas' | 'salt' | 'cleaner', field: string, value: string) => {
     if (!data) return;
-    // @ts-ignore
+    // @ts-expect-error: dynamic nested field assignment
     setData({ ...data, [parent]: { ...data[parent], [field]: value } });
   };
 
@@ -119,8 +119,8 @@ const BoilerLog: React.FC<BoilerLogProps> = ({ currentDate, isEmbedded = false }
   };
 
   const inputClass = "w-full h-full text-center outline-none bg-white text-black p-1 focus:bg-blue-50 text-sm font-bold";
-  const thClass = "border border-black bg-gray-50 p-2 font-bold text-center align-middle text-sm text-gray-700";
-  const tdClass = "border border-black p-0 h-10 relative";
+  const thClass = "border border-black bg-gray-50 p-2 font-bold text-center align-middle text-sm text-black";
+  const tdClass = "border border-black p-0 h-10 relative text-black";
 
   return (
     <LogSheetLayout

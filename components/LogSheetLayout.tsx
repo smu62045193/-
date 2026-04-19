@@ -50,8 +50,8 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
 
   // 임베디드 모드이면서 헤더가 표시되는 경우, 테두리 밀착을 위해 컨테이너 p-0 설정
   const containerClass = isEmbedded 
-    ? `w-full bg-white ${!hideHeader ? 'rounded-2xl border border-slate-200 shadow-sm overflow-hidden' : ''}` 
-    : "p-4 sm:p-8 max-w-[1200px] mx-auto space-y-6 bg-white rounded-2xl border border-slate-200 shadow-sm print:shadow-none print:border-none print:p-0";
+    ? `w-full bg-white ${!hideHeader ? 'border border-black shadow-none overflow-hidden' : ''}` 
+    : "p-4 sm:p-8 max-w-7xl mx-auto space-y-6 bg-white border border-black shadow-none print:shadow-none print:border-none print:p-0";
 
   return (
     <div className={containerClass}>
@@ -109,7 +109,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
               {!hidePrint && onPrint && (
                 <button 
                   onClick={onPrint} 
-                  className="flex-none flex flex-row items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95 whitespace-nowrap"
+                  className="flex-none flex flex-row items-center justify-center px-4 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95 whitespace-nowrap"
                 >
                   <Printer size={18} className="mr-2" />
                   미리보기
@@ -126,7 +126,7 @@ const LogSheetLayout: React.FC<LogSheetLayoutProps> = ({
           </div>
         )}
 
-        <div className={`print:w-full ${isEmbedded && !hideHeader ? 'p-4 sm:p-6 space-y-4' : 'space-y-4'}`}>
+        <div className={`print:w-full ${isEmbedded && !hideHeader ? 'p-4 sm:p-6 space-y-2' : 'space-y-2'}`}>
           {children}
         </div>
       </div>

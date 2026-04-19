@@ -1,5 +1,8 @@
 {
-  "name": "03.05 수정중_배포금지_사이드메뉴통합",
+  "name": "04.17 수정완료",
   "description": "A comprehensive facility management dashboard for the Saemaul Undong Junganghoe Daechi-dong Building, featuring digital logs, scheduling, and AI-assisted weather updates.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "C7": [],
+  "Xp": [],
+  "majorCapabilities": []
 }

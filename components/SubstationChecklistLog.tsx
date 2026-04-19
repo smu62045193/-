@@ -55,28 +55,32 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
   // Right Column: ATS (9 items)
   const rightColItems = safeItems.filter(i => i.category === 'ATS');
 
-  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-[13px] text-slate-700 h-9 uppercase tracking-tight";
-  const tdClass = "border border-slate-300 p-1 text-left bg-white text-slate-900 h-9 text-[13px] font-medium pl-4";
-  const labelClass = "border border-slate-300 p-1 font-bold text-center bg-white text-slate-700 align-middle w-20 text-[13px]";
-  const resultClass = (res: string) => `border border-slate-300 p-1 text-center font-black text-[13px] w-28 cursor-pointer select-none transition-colors h-9 ${res === '양호' ? 'text-blue-600' : 'text-red-600 bg-red-50'}`;
+  const thClass = "border border-black bg-white font-normal text-center text-[13px] text-black h-[32px]";
+  const tdClass = "border border-black p-0 h-[32px] relative bg-white text-center text-black";
+  const labelClass = "border border-black p-0 font-normal text-center bg-white text-black align-middle w-20 text-[13px] h-[32px]";
+  const resultClass = (res: string) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-normal text-[13px] transition-colors px-2 ${res === '양호' ? 'text-blue-600' : 'text-red-600'}`;
 
   const renderRow = (item: SubstationCheckItem, idx: number, arr: SubstationCheckItem[]) => {
     const isFirstInCategory = idx === 0 || arr[idx - 1].category !== item.category;
     const categoryCount = arr.filter(i => i.category === item.category).length;
 
     return (
-      <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+      <tr key={item.id} className="bg-white border-b border-black h-[32px]">
         {isFirstInCategory && (
           <td rowSpan={categoryCount} className={labelClass}>
-            {item.category}
+            <div className="flex items-center justify-center h-full px-2">{item.category}</div>
           </td>
         )}
-        <td className={tdClass}>• {item.label}</td>
+        <td className={tdClass}>
+          <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">• {item.label}</div>
+        </td>
         <td 
-          className={resultClass(item.result as string)}
+          className={tdClass}
           onClick={() => toggleResult(item.id)}
         >
-          {item.result || '양호'}
+          <div className={resultClass(item.result as string)}>
+            {item.result || '양호'}
+          </div>
         </td>
       </tr>
     );
@@ -91,19 +95,16 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
       isEmbedded={isEmbedded}
       hideHeader={true}
     >
-      <div id="substation-checklist-print-area" className="bg-white max-w-5xl mx-auto shadow-sm p-1">
-        <div className="mb-2 px-1">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">수변전반 점검표</h3>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-0 border-t border-l border-slate-300 overflow-hidden shadow-sm">
+      <div id="substation-checklist-print-area" className={`bg-white ${isEmbedded ? 'w-full' : 'max-w-7xl mx-auto'}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-0 overflow-hidden">
           {/* Left Side Section */}
-          <div className="border-r border-slate-300">
-            <table className="w-full border-collapse">
+          <div className="">
+            <table className="w-full border-collapse border border-black">
               <thead>
-                <tr>
-                  <th className={thClass} style={{ width: '80px' }}>구 분</th>
-                  <th className={thClass}>점 검 내 용</th>
-                  <th className={thClass} style={{ width: '110px' }}>점검결과</th>
+                <tr className="border-b border-black h-[32px]">
+                  <th className={thClass} style={{ width: '80px' }}><div className="flex items-center justify-center h-full px-2">구 분</div></th>
+                  <th className={thClass}><div className="flex items-center justify-center h-full px-2">점 검 내 용</div></th>
+                  <th className={thClass} style={{ width: '110px' }}><div className="flex items-center justify-center h-full px-2">점검결과</div></th>
                 </tr>
               </thead>
               <tbody>
@@ -113,21 +114,21 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
           </div>
 
           {/* Right Side Section */}
-          <div className="border-r border-slate-300">
-            <table className="w-full border-collapse">
+          <div className="">
+            <table className="w-full border-collapse border border-black border-l-0">
               <thead>
-                <tr>
-                  <th className={thClass} style={{ width: '80px' }}>구 분</th>
-                  <th className={thClass}>점 검 내 용</th>
-                  <th className={thClass} style={{ width: '110px' }}>점검결과</th>
+                <tr className="border-b border-black h-[32px]">
+                  <th className={thClass} style={{ width: '80px' }}><div className="flex items-center justify-center h-full px-2">구 분</div></th>
+                  <th className={thClass}><div className="flex items-center justify-center h-full px-2">점 검 내 용</div></th>
+                  <th className={thClass} style={{ width: '110px' }}><div className="flex items-center justify-center h-full px-2">점검결과</div></th>
                 </tr>
               </thead>
               <tbody>
                 {rightColItems.map((item, idx) => renderRow(item, idx, rightColItems))}
-                <tr className="h-9">
-                  <td className="border border-slate-300 bg-white"></td>
-                  <td className="border border-slate-300 bg-white"></td>
-                  <td className="border border-slate-300 bg-white"></td>
+                <tr className="h-[32px] border-b border-black last:border-0">
+                  <td className="border border-black bg-white"></td>
+                  <td className="border border-black bg-white"></td>
+                  <td className="border border-black bg-white"></td>
                 </tr>
               </tbody>
             </table>

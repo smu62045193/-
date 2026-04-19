@@ -48,7 +48,7 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
             @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; color: #333; line-height: 1.6; background: #f1f5f9; -webkit-print-color-adjust: exact; }
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; color: #333; line-height: 1.6; background: #000; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
             
@@ -126,130 +126,128 @@ const ParkingInspectionHistory: React.FC<ParkingInspectionHistoryProps> = ({ onS
   }, [currentPage, totalPages]);
 
   return (
-    <div className="p-6 space-y-4 animate-fade-in pb-10">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="relative w-full md:w-[320px]">
-          <input 
-            type="text" 
-            placeholder="업체명, 위치, 차량번호 검색" 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-gray-50 text-black outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all shadow-inner font-bold"
-          />
-          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-        </div>
-        
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button 
-            onClick={loadHistory}
-            disabled={loading}
-            className="flex items-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
+    <div className="space-y-2 animate-fade-in">
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex items-stretch shrink-0">
+          <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
+            <input 
+              type="text" 
+              placeholder="업체명, 위치, 차량번호 검색" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all" 
+            />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
+          </div>
+
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          <div className="flex items-center shrink-0">
+            <button 
+              onClick={loadHistory}
+              disabled={loading}
+              className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent disabled:opacity-50 text-gray-500 hover:text-black transition-colors whitespace-nowrap relative"
+            >
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white border border-black max-w-7xl mx-auto">
         <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[900px] border-collapse">
+          <table className="w-full min-w-[1000px] border-collapse text-center bg-white">
             <thead>
-              <tr className="bg-gray-50/80 border-b border-gray-200">
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20">No</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">변경일자</th>
-                <th className="px-4 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider w-48">업체</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24">위치</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">변경전차량번호</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36">변경후차량번호</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32">상세내역</th>
+              <tr className="bg-white h-[40px] border-b border-black">
+                <th className="border-r border-black text-center text-[13px] font-normal text-black w-20 p-0"><div className="flex items-center justify-center h-full px-2">No</div></th>
+                <th className="border-r border-black text-center text-[13px] font-normal text-black w-32 p-0"><div className="flex items-center justify-center h-full px-2">변경일자</div></th>
+                <th className="border-r border-black text-center text-[13px] font-normal text-black w-48 p-0"><div className="flex items-center justify-center h-full px-2">업체</div></th>
+                <th className="border-r border-black text-center text-[13px] font-normal text-black w-24 p-0"><div className="flex items-center justify-center h-full px-2">위치</div></th>
+                <th className="border-r border-black text-center text-[13px] font-normal text-black w-36 p-0"><div className="flex items-center justify-center h-full px-2">변경전차량번호</div></th>
+                <th className="border-r border-black text-center text-[13px] font-normal text-black w-36 p-0"><div className="flex items-center justify-center h-full px-2">변경후차량번호</div></th>
+                <th className="text-center text-[13px] font-normal text-black w-32 p-0"><div className="flex items-center justify-center h-full px-2">상세내역</div></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="bg-white">
               {loading && history.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-24 text-center">
-                    <RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" />
-                    <p className="text-gray-400 font-medium">기록을 불러오는 중...</p>
+                <tr className="h-[40px] border-b border-black last:border-b-0">
+                  <td colSpan={7} className="p-0">
+                    <div className="flex flex-col items-center justify-center py-24 text-[13px] font-normal text-gray-400">
+                      <RefreshCw size={32} className="animate-spin text-blue-500 mb-3" />
+                      기록을 불러오는 중...
+                    </div>
                   </td>
                 </tr>
               ) : filteredHistory.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-24 text-center text-gray-400 italic">저장된 변경 기록이 없습니다.</td>
+                <tr className="h-[40px] border-b border-black last:border-b-0">
+                  <td colSpan={7} className="p-0">
+                    <div className="flex items-center justify-center h-[100px] text-[13px] font-normal text-gray-400 italic">저장된 변경 기록이 없습니다.</div>
+                  </td>
                 </tr>
               ) : (
-                paginatedHistory.map((item, idx) => (
-                  <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group">
-                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs">{filteredHistory.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx)}</td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="px-2.5 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-100 text-xs font-bold">
-                        {item.date}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-white border border-gray-100 rounded-lg shadow-sm">
-                          <Car size={14} className="text-blue-500" />
+                paginatedHistory.map((item, idx) => {
+                  return (
+                    <tr key={item.id} className="hover:bg-blue-50/30 transition-colors text-center h-[40px] border-b border-black last:border-b-0">
+                      <td className="border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{filteredHistory.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx)}</div></td>
+                      <td className="border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{item.date}</div></td>
+                      <td className="border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{item.company}</div></td>
+                      <td className="border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{item.location}</div></td>
+                      <td className="border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{item.prevPlate || '-'}</div></td>
+                      <td className="border-r border-black text-center text-[13px] font-normal text-blue-600 p-0"><div className="flex items-center justify-center h-full px-2">{item.newPlate}</div></td>
+                      <td className="text-center text-[13px] font-normal p-0">
+                        <div className="flex items-center justify-center h-full px-2">
+                          <button 
+                            onClick={() => handleViewDetail(item)}
+                            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-all active:scale-95"
+                            title="미리보기"
+                          >
+                            <Printer size={14} />
+                          </button>
                         </div>
-                        <span className="font-bold text-gray-900">{item.company}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="font-bold text-gray-600">{item.location}</span>
-                    </td>
-                    <td className="px-4 py-4 text-center text-gray-500 text-sm">
-                      {item.prevPlate || '-'}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <span className="font-black text-blue-600">
-                        {item.newPlate}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      <button 
-                        onClick={() => handleViewDetail(item)}
-                        className="flex items-center gap-1 mx-auto bg-blue-600 text-white px-4 py-1.5 rounded-xl text-[11px] font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
-                      >
-                        미리보기
-                        <Printer size={12} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {totalPages > 1 && (
-        <div className="px-6 py-4 flex items-center justify-center gap-2">
+      {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
+      {filteredHistory.length > 0 && (
+        <div className="py-4 flex items-center justify-center gap-2 print:hidden">
           <button
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="flex items-center gap-1.5 px-4">
+          
+          <div className="flex items-center gap-2">
             {visiblePageNumbers.map(pageNum => (
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
-                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
                   currentPage === pageNum
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                    ? 'text-black font-bold scale-110 cursor-default'
+                    : 'text-black font-normal hover:text-blue-500 cursor-pointer'
                 }`}
               >
-                {pageNum}
+                <span className="text-[13px]">{pageNum}</span>
               </button>
             ))}
           </div>
+
           <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronRight size={18} />
           </button>

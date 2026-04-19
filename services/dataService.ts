@@ -571,13 +571,29 @@ export const getInitialBatteryCheck = (month: string): BatteryCheckData => ({
     { id: 'bat-gen-1', label: '10', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' },
     { id: 'bat-gen-2', label: '11', manufacturer: '', manufDate: '', spec: '', voltage: '', remarks: '', section: 'generator' }
   ],
-  approvers: { staff: '', assistant: '', manager: '', director: '' }
+  approvers: { staff: '', assistant: '', manager: '', director: '' },
+  note: ''
 });
 
 export const getInitialLoadCurrent = (month: string): LoadCurrentData => ({ date: month, period: '', items: [] });
 
 export const getInitialSafetyCheck = (date: string, type: 'general' | 'ev'): SafetyCheckData => ({
-  date, type, items: [], approver: '', opinion: '',
+  date, type, items: [], approver: '', 
+  opinion: type === 'general' ? 
+    " 1.수변전실 정류기반 배터리(9EA),비상발전기 배터리(2EA) 교체주기3년 경과 추후 교체요망\n 2.수변전실,전압계,역율계,주파수계 및 스위치노후화로 인한 계측 불량,추후 교체요망\n 3.고압측 ATS배터리 추후 교체요망" : '',
+  specs: type === 'general' ? {
+    voltageCapacity: '22900 V / 1600 kW',
+    genVoltageCapacity: '380V / 500 kW',
+    solarCapacity: 'kW'
+  } : {
+    evLocation: 'B5F 주차장',
+    evVoltageCapacity: '22900 [V] / 1600 [kW]',
+    evInstallCount: '( 7 )kW ( 3 )기',
+    evVoltageCurrent: '220V 32A 60A',
+    evUnitCount: '3 EA',
+    evManufacturer: '(주) 에바',
+    evModelSerial: 'ELA007C01(EV-SCA-33283)'
+  },
   measurements: type === 'general' ? {
     lv1: { v_r: '', v_s: '', v_t: '', v_n: '', i_r: '', i_s: '', i_t: '', i_n: '', l_r: '', l_s: '', l_t: '', l_n: '' },
     lv3: { v_r: '', v_s: '', v_t: '', v_n: '', i_r: '', i_s: '', i_t: '', i_n: '', l_r: '', l_s: '', l_t: '', l_n: '' },
@@ -680,7 +696,9 @@ export const fetchHvacLog = async (date: string, force = false): Promise<HvacLog
   try {
     const { data } = await supabase.from('hvac_boiler_logs').select('hvac_data').eq('id', `HVAC_BOILER_${date}`).maybeSingle();
     if (data?.hvac_data) return data.hvac_data as HvacLogData;
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchHvacLog error:', e);
+  }
   return null;
 };
 
@@ -695,7 +713,25 @@ export const fetchBoilerLog = async (date: string, force = false): Promise<Boile
   try {
     const { data } = await supabase.from('hvac_boiler_logs').select('boiler_data').eq('id', `HVAC_BOILER_${date}`).maybeSingle();
     if (data?.boiler_data) return data.boiler_data as BoilerLogData;
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchBoilerLog error:', e);
+  }
+  return null;
+};
+
+export const fetchLatestHvacBoilerLogBefore = async (date: string): Promise<any | null> => {
+  try {
+    const { data } = await supabase
+      .from('hvac_boiler_logs')
+      .select('*')
+      .lt('date', date)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data;
+  } catch (e) {
+    console.error('fetchLatestHvacBoilerLogBefore error:', e);
+  }
   return null;
 };
 
@@ -743,7 +779,9 @@ export const fetchDailyData = async (date: string, force = false): Promise<Daily
       const mapped = mapFromDB("DAILY_", data);
       return mapped;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchDailyData error:', e);
+  }
   return null;
 };
 
@@ -759,19 +797,383 @@ export const saveDailyData = async (data: DailyData): Promise<boolean> => {
   return !error;
 };
 
+/**
+ * 자료실 설정 데이터 가져오기
+ */
+export const fetchArchiveSettings = async (): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('archive_data')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    return (data || []).map(item => ({
+      id: item.id,
+      category: item.category,
+      title: item.title,
+      date: item.created_at ? item.created_at.split('T')[0] : '',
+      attachment: item.file_url,
+      fileName: item.file_name
+    }));
+  } catch (e) {
+    console.error('fetchArchiveSettings error:', e);
+    return [];
+  }
+};
+
+/**
+ * 자료실 설정 데이터 저장하기
+ */
+export const saveArchiveSettings = async (rows: any[]): Promise<boolean> => {
+  try {
+    const dbData = rows.map(row => ({
+      id: isValidUUID(row.id) ? row.id : generateUUID(),
+      category: row.category,
+      title: row.title,
+      file_name: row.fileName || null,
+      file_url: row.attachment || null,
+      created_at: row.date ? new Date(row.date).toISOString() : new Date().toISOString()
+    }));
+    
+    const { error } = await supabase
+      .from('archive_data')
+      .upsert(dbData);
+    
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error('saveArchiveSettings error:', e);
+    return false;
+  }
+};
+
+/**
+ * 네트워크 설정 데이터 가져오기
+ */
+export const fetchNetworkSettings = async (subTab: string): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('network_settings')
+      .select('*')
+      .eq('type', subTab)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    
+    return (data || []).map(item => ({
+      id: item.id,
+      category: item.category || '',
+      ipAddress: item.ip_address || '',
+      gateway: item.gateway || '',
+      primaryDns: item.primary_dns || '',
+      secondaryDns: item.secondary_dns || '',
+      loginId: item.login_id || '',
+      loginPw: item.login_pw || '',
+      note: item.note || ''
+    }));
+  } catch (e) {
+    console.error('fetchNetworkSettings error:', e);
+    return [];
+  }
+};
+
+/**
+ * 네트워크 설정 데이터 저장하기
+ */
+export const saveNetworkSettings = async (subTab: string, rows: any[]): Promise<boolean> => {
+  try {
+    // 1. 기존 데이터 삭제
+    await supabase.from('network_settings').delete().eq('type', subTab);
+    
+    // 2. 새 데이터 준비
+    const dbData = rows.map(row => ({
+      id: isValidUUID(row.id) ? row.id : generateUUID(),
+      type: subTab,
+      category: row.category || '',
+      ip_address: row.ipAddress || '',
+      gateway: row.gateway || '',
+      primary_dns: row.primaryDns || '',
+      secondary_dns: row.secondaryDns || '',
+      login_id: row.loginId || '',
+      login_pw: row.loginPw || '',
+      note: row.note || '',
+      created_at: new Date().toISOString()
+    }));
+    
+    // 3. 삽입
+    const { error } = await supabase
+      .from('network_settings')
+      .insert(dbData);
+    
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error('saveNetworkSettings error:', e);
+    return false;
+  }
+};
+
+/**
+ * 비밀번호 설정 데이터 가져오기
+ */
+export const fetchPasswordSettings = async (subTab: string): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('password_settings')
+      .select('*')
+      .eq('type', subTab)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    
+    return (data || []).map(item => ({
+      id: item.id,
+      category: item.category || '',
+      siteName: item.site_name || '',
+      deviceName: item.device_name || '',
+      url: item.url || '',
+      ipAddress: item.ip_address || '',
+      loginId: item.login_id || '',
+      loginPw: item.login_pw || '',
+      note: item.note || ''
+    }));
+  } catch (e) {
+    console.error('fetchPasswordSettings error:', e);
+    return [];
+  }
+};
+
+/**
+ * 비밀번호 설정 데이터 저장하기
+ */
+export const savePasswordSettings = async (subTab: string, rows: any[]): Promise<boolean> => {
+  try {
+    // 1. 기존 데이터 삭제
+    await supabase.from('password_settings').delete().eq('type', subTab);
+    
+    // 2. 새 데이터 준비
+    const dbData = rows.map(row => ({
+      id: isValidUUID(row.id) ? row.id : generateUUID(),
+      type: subTab,
+      category: row.category || '',
+      site_name: row.siteName || '',
+      device_name: row.deviceName || '',
+      url: row.url || '',
+      ip_address: row.ipAddress || '',
+      login_id: row.loginId || '',
+      login_pw: row.loginPw || '',
+      note: row.note || '',
+      created_at: new Date().toISOString()
+    }));
+    
+    // 3. 삽입
+    const { error } = await supabase
+      .from('password_settings')
+      .insert(dbData);
+    
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error('savePasswordSettings error:', e);
+    return false;
+  }
+};
+
+/**
+ * 자료실 파일 업로드
+ */
+export const uploadArchiveFile = async (file: File): Promise<{ url: string; path: string } | null> => {
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+    const filePath = `archive/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('archive')
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('archive')
+      .getPublicUrl(filePath);
+
+    return {
+      url: data.publicUrl,
+      path: filePath
+    };
+  } catch (e) {
+    console.error('uploadArchiveFile error:', e);
+    return null;
+  }
+};
+
+/**
+ * 자동등록 설정 데이터 가져오기
+ */
+export const fetchAutoRegSettings = async (category: string): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('auto_registration_settings')
+      .select('*')
+      .eq('category', category)
+      .order('sort_order', { ascending: true });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (e) {
+    console.error('fetchAutoRegSettings error:', e);
+    return [];
+  }
+};
+
+/**
+ * 자동등록 설정 데이터 저장하기
+ */
+export const saveAutoRegSettings = async (category: string, rows: any[]): Promise<boolean> => {
+  try {
+    // 1. 현재 DB에 있는 해당 카테고리의 모든 ID 가져오기
+    const { data: existingData } = await supabase
+      .from('auto_registration_settings')
+      .select('id')
+      .eq('category', category);
+    
+    const existingIds = existingData?.map(d => d.id) || [];
+    const currentIds = rows.map(r => r.id).filter(id => isValidUUID(id));
+    
+    // 2. 삭제된 행 처리
+    const idsToDelete = existingIds.filter(id => !currentIds.includes(id));
+    if (idsToDelete.length > 0) {
+      await supabase.from('auto_registration_settings').delete().in('id', idsToDelete);
+    }
+
+    // 3. 데이터 준비 (스크린샷의 컬럼명과 정확히 일치시킴)
+    const dbRows = rows.map((row, index) => ({
+      id: isValidUUID(row.id) ? row.id : generateUUID(),
+      category: category,
+      item_name: row.item || '',
+      mon: !!row.mon,
+      tue: !!row.tue,
+      wed: !!row.wed,
+      thu: !!row.thu,
+      fri: !!row.fri,
+      sat: !!row.sat,
+      sun: !!row.sun,
+      exclude_holidays: !!row.excludeHolidays,
+      sort_order: index
+    }));
+
+    const { error } = await supabase.from('auto_registration_settings').upsert(dbRows);
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error('saveAutoRegSettings error:', e);
+    return false;
+  }
+};
+
 export const saveMechanicalChemicals = async (date: string, chemicals: MechanicalChemicals): Promise<boolean> => {
   try {
+    // 1. Save to daily_reports
     const { data: existing } = await supabase.from('daily_reports').select('work_log').eq('id', date).single();
     const workLog = existing?.work_log || {};
     workLog.mechanicalChemicals = chemicals;
-    const { error } = await supabase.from('daily_reports').upsert({
+    const { error: reportError } = await supabase.from('daily_reports').upsert({
       id: date,
       work_log: workLog,
       last_updated: new Date().toISOString()
     });
-    return !error;
+
+    if (reportError) throw reportError;
+
+    // 2. Save to chemical_logs for consistency
+    const chemicalLogData: ChemicalLogData = {
+      date,
+      items: [
+        {
+          id: 'seed',
+          name: '종균제',
+          unit: 'l',
+          prevStock: chemicals.seed.prev,
+          received: chemicals.seed.incoming,
+          used: chemicals.seed.used,
+          currentStock: chemicals.seed.stock,
+          remark: ''
+        },
+        {
+          id: 'sterilizer',
+          name: '소독제',
+          unit: 'kg',
+          prevStock: chemicals.sterilizer.prev,
+          received: chemicals.sterilizer.incoming,
+          used: chemicals.sterilizer.used,
+          currentStock: chemicals.sterilizer.stock,
+          remark: ''
+        }
+      ],
+      lastUpdated: new Date().toISOString()
+    };
+
+    const { error: chemError } = await supabase
+      .from('chemical_logs')
+      .upsert({
+        date,
+        data: chemicalLogData,
+        last_updated: new Date().toISOString()
+      });
+
+    return !chemError;
   } catch (e) {
     console.error('Failed to save mechanical chemicals', e);
+    return false;
+  }
+};
+
+/**
+ * 에너지 사용 현황 (연간) 데이터 처리
+ * daily_reports 테이블을 활용하여 ENERGY_YYYY 형식의 ID로 저장
+ */
+export const fetchEnergyData = async (year: number): Promise<any[] | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('data')
+      .eq('id', `ENERGY_${year}`)
+      .maybeSingle();
+    
+    if (error) throw error;
+    if (!data) return null;
+
+    let energyData = data.data;
+    if (typeof energyData === 'string') {
+      try { energyData = JSON.parse(energyData); } catch (e) { energyData = null; }
+    }
+    return Array.isArray(energyData) ? energyData : null;
+  } catch (e) {
+    console.error('fetchEnergyData error:', e);
+    return null;
+  }
+};
+
+export const saveEnergyData = async (year: number, energyData: any[]): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({
+        id: `ENERGY_${year}`,
+        data: energyData,
+        last_updated: new Date().toISOString()
+      });
+    
+    if (error) {
+      console.error('saveEnergyData error:', error);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error('saveEnergyData catch error:', e);
     return false;
   }
 };
@@ -792,7 +1194,9 @@ export const fetchStaffList = async (): Promise<StaffMember[]> => {
       note: s.note || '', 
       photo: s.photo_url || s.photo 
     }));
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchStaffList error:', e);
+  }
   return [];
 };
 
@@ -831,7 +1235,9 @@ export const fetchShiftSettings = async (): Promise<ShiftSettings | null> => {
   try {
     const { data } = await supabase.from('system_settings').select('data').eq('id', 'SHIFT_SETTINGS').maybeSingle();
     if (data?.data) return data.data as ShiftSettings;
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchShiftSettings error:', e);
+  }
   return null;
 };
 
@@ -844,7 +1250,9 @@ export const fetchConsumables = async (): Promise<ConsumableItem[]> => {
   try {
     const { data } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLES_DB').maybeSingle();
     if (data?.data?.consumables) return data.data.consumables;
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchConsumables error:', e);
+  }
   return [];
 };
 
@@ -857,7 +1265,9 @@ export const fetchAppointmentList = async (): Promise<AppointmentItem[]> => {
   try {
     const { data } = await supabase.from('system_settings').select('data').eq('id', 'APPOINTMENT_DB').maybeSingle();
     if (data?.data?.appointmentList) return data.data.appointmentList;
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchAppointmentList error:', e);
+  }
   return [];
 };
 
@@ -870,7 +1280,9 @@ export const fetchSubstationChecklist = async (date: string): Promise<Substation
   try {
     const { data } = await supabase.from('substation_checklists').select('*').eq('id', `SUB_CHECK_${date}`).maybeSingle();
     if (data) return { date: data.date, items: data.items, approvers: data.approvers, note: data.note };
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchSubstationChecklist error:', e);
+  }
   return null;
 };
 
@@ -883,7 +1295,9 @@ export const fetchFireFacilityLog = async (date: string): Promise<FireFacilityLo
   try {
     const { data } = await supabase.from('fire_facility_logs').select('*').eq('id', `FIRE_FAC_${date}`).maybeSingle();
     if (data) return { date: data.date, items: data.items, remarks: data.remarks, approvers: data.approvers };
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchFireFacilityLog error:', e);
+  }
   return null;
 };
 
@@ -896,7 +1310,9 @@ export const fetchElevatorLog = async (date: string): Promise<ElevatorLogData | 
   try {
     const { data } = await supabase.from('elevator_logs').select('*').eq('id', `ELEV_LOG_${date}`).maybeSingle();
     if (data) return { date: data.date, items: data.items, remarks: data.remarks, inspector: data.inspector };
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchElevatorLog error:', e);
+  }
   return null;
 };
 
@@ -909,7 +1325,9 @@ export const fetchGasLog = async (date: string): Promise<GasLogData | null> => {
   try {
     const { data } = await supabase.from('gas_logs').select('*').eq('id', `GAS_LOG_${date}`).maybeSingle();
     if (data) return { date: data.date, items: data.items };
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchGasLog error:', e);
+  }
   return null;
 };
 
@@ -922,7 +1340,9 @@ export const fetchSepticLog = async (date: string): Promise<SepticLogData | null
   try {
     const { data } = await supabase.from('septic_logs').select('*').eq('id', `SEPTIC_LOG_${date}`).maybeSingle();
     if (data) return { date: data.date, items: data.items };
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchSepticLog error:', e);
+  }
   return null;
 };
 
@@ -935,7 +1355,9 @@ export const fetchWeeklyReport = async (date: string): Promise<WeeklyReportData 
   try {
     const { data } = await supabase.from('weekly_reports').select('*').eq('id', `WEEKLY_${date}`).maybeSingle();
     if (data) return mapFromDB("WEEKLY_", data);
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchWeeklyReport error:', err);
+  }
   return null;
 };
 
@@ -949,7 +1371,9 @@ export const fetchWeeklyReportList = async (): Promise<any[]> => {
   try {
     const { data } = await supabase.from('weekly_reports').select('*').order('start_date', { ascending: false });
     if (data && data.length > 0) return data.map(r => ({ key: r.id, data: mapFromDB("WEEKLY_", r) }));
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchWeeklyReportList error:', err);
+  }
   return [];
 };
 
@@ -967,7 +1391,9 @@ export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> =
   try {
     const { data } = await supabase.from('construction_logs').select('*').eq('source', 'external').order('date', { ascending: false });
     if (data && data.length > 0) return data.map(w => ({ id: w.id, date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos || [] }));
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchExternalWorkList error:', e);
+  }
   return [];
 };
 
@@ -999,7 +1425,9 @@ export const fetchInternalWorkList = async (): Promise<ConstructionWorkItem[]> =
   try {
     const { data } = await supabase.from('construction_logs').select('*').eq('source', 'internal').order('date', { ascending: false });
     if (data && data.length > 0) return data.map(w => ({ id: w.id, date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos || [] }));
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchInternalWorkList error:', e);
+  }
   return [];
 };
 
@@ -1029,7 +1457,9 @@ export const fetchConsumableRequests = async (): Promise<ConsumableRequest[]> =>
   try {
     const { data } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLES_REQ_DB').maybeSingle();
     if (data?.data?.consumableReq) return data.data.consumableReq;
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchConsumableRequests error:', e);
+  }
   return [];
 };
 
@@ -1051,7 +1481,9 @@ export const fetchParkingChangeList = async (): Promise<ParkingChangeItem[]> => 
       newPlate: p.new_plate, 
       note: p.note 
     }));
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchParkingChangeList error:', e);
+  }
   return [];
 };
 
@@ -1074,7 +1506,9 @@ export const fetchParkingStatusList = async (): Promise<ParkingStatusItem[]> => 
       plateNum: p.plate_num,   
       note: p.note 
     }));
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchParkingStatusList error:', e);
+  }
   return [];
 };
 
@@ -1096,7 +1530,9 @@ export const fetchParkingLayout = async (): Promise<any> => {
   try {
     const { data } = await supabase.from('system_settings').select('data').eq('id', 'PARKING_LAYOUT').maybeSingle();
     if (data?.data) return data.data;
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchParkingLayout error:', e);
+  }
   return null;
 };
 
@@ -1127,7 +1563,9 @@ export const fetchContractors = async (): Promise<Contractor[]> => {
         isImportant: isImportant
       };
     });
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchContractors error:', e);
+  }
   return [];
 };
 
@@ -1182,7 +1620,9 @@ export const fetchConstructionContractors = async (): Promise<Contractor[]> => {
         isImportant: isImportant
       };
     });
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchConstructionContractors error:', e);
+  }
   return [];
 };
 
@@ -1219,7 +1659,9 @@ export const fetchMeterReading = async (month: string): Promise<MeterReadingData
   try {
     const { data } = await supabase.from('meter_readings').select('*').eq('id', `METER_${month}`).maybeSingle();
     if (data) return mapFromDB("METER_", data);
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchMeterReading error:', err);
+  }
   return null;
 };
 
@@ -1242,7 +1684,9 @@ export const fetchGeneratorCheck = async (month: string): Promise<GeneratorCheck
   try {
     const { data } = await supabase.from('generator_checks').select('*').eq('id', `GEN_CHECK_${month}`).maybeSingle();
     if (data) return { date: data.date, specs: data.specs, test: data.test, status: data.status, note: data.note };
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchGeneratorCheck error:', err);
+  }
   return null;
 };
 
@@ -1256,7 +1700,9 @@ export const fetchSubstationLog = async (date: string, force = false): Promise<S
   try {
     const { data } = await supabase.from('substation_logs').select('*').eq('id', `SUB_LOG_${date}`).maybeSingle();
     if (data) return mapFromDB("SUB_LOG_", data);
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchSubstationLog error:', e);
+  }
   return null;
 };
 
@@ -1289,7 +1735,9 @@ export const fetchTenants = async (): Promise<Tenant[]> => {
         return a.name.localeCompare(b.name);
       });
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchTenants error:', e);
+  }
   return [];
 };
 
@@ -1326,7 +1774,9 @@ export const fetchMeterPhotos = async (month: string): Promise<MeterPhotoData | 
       }));
       return { month: data.month, items };
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchMeterPhotos error:', e);
+  }
   return null;
 };
 
@@ -1338,13 +1788,15 @@ export const saveMeterPhotos = async (data: MeterPhotoData): Promise<boolean> =>
 export const fetchBatteryCheck = async (month: string): Promise<BatteryCheckData | null> => {
   try {
     const { data } = await supabase.from('battery_checks').select('*').eq('id', `BATTERY_${month}`).maybeSingle();
-    if (data) return { month: data.month, checkDate: data.check_date, items: data.items, approvers: data.approvers };
-  } catch (err) {}
+    if (data) return { month: data.month, checkDate: data.check_date, items: data.items, approvers: data.approvers, note: data.note };
+  } catch (err) {
+    console.error('fetchBatteryCheck error:', err);
+  }
   return null;
 };
 
 export const saveBatteryCheck = async (data: BatteryCheckData): Promise<boolean> => {
-  const dbData = { id: `BATTERY_${data.month}`, month: data.month, check_date: data.checkDate, items: data.items, approvers: data.approvers, last_updated: new Date().toISOString() };
+  const dbData = { id: `BATTERY_${data.month}`, month: data.month, check_date: data.checkDate, items: data.items, approvers: data.approvers, note: data.note, last_updated: new Date().toISOString() };
   const { error = null } = await supabase.from('battery_checks').upsert(dbData);
   return !error;
 };
@@ -1353,7 +1805,9 @@ export const fetchLoadCurrent = async (month: string): Promise<LoadCurrentData |
   try {
     const { data } = await supabase.from('load_currents').select('*').eq('id', `LOAD_${month}`).maybeSingle();
     if (data) return { date: data.date, period: data.period, items: data.items };
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchLoadCurrent error:', err);
+  }
   return null;
 };
 
@@ -1367,7 +1821,9 @@ export const fetchSafetyCheck = async (month: string, type: 'general' | 'ev'): P
   try {
     const { data } = await supabase.from('safety_checks').select('*').eq('id', `SAFETY_${type}_${month}`).maybeSingle();
     if (data) return { date: data.date, type: data.type as 'general' | 'ev', items: data.items, measurements: data.measurements, approver: data.approver, opinion: data.opinion };
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchSafetyCheck error:', err);
+  }
   return null;
 };
 
@@ -1391,7 +1847,9 @@ export const fetchAirEnvironmentLog = async (dateStr: string): Promise<AirEnviro
         tempMax: data.temp_max
       };
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchAirEnvironmentLog error:', e);
+  }
   return null;
 };
 
@@ -1413,7 +1871,9 @@ export const fetchWaterTankLog = async (month: string): Promise<WaterTankLogData
   try {
     const { data } = await supabase.from('water_tank_logs').select('*').eq('id', `WATER_TANK_${month}`).maybeSingle();
     if (data) return { date: data.date, buildingName: data.building_name, location: data.location, usage: data.usage, items: data.items, inspector: data.inspector, lastUpdated: data.last_updated };
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchWaterTankLog error:', err);
+  }
   return null;
 };
 
@@ -1427,7 +1887,25 @@ export const fetchChemicalLog = async (date: string): Promise<ChemicalLogData | 
   try {
     const { data } = await supabase.from('chemical_logs').select('*').eq('id', `CHEM_LOG_${date}`).maybeSingle();
     if (data) return { date: data.date || date, items: data.items };
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchChemicalLog error:', e);
+  }
+  return null;
+};
+
+export const fetchLatestChemicalLogBefore = async (date: string): Promise<ChemicalLogData | null> => {
+  try {
+    const { data } = await supabase
+      .from('chemical_logs')
+      .select('*')
+      .lt('date', date)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) return { date: data.date, items: data.items };
+  } catch (e) {
+    console.error('fetchLatestChemicalLogBefore error:', e);
+  }
   return null;
 };
 
@@ -1451,7 +1929,9 @@ export const fetchFireExtinguisherList = async (): Promise<FireExtinguisherItem[
       date: item.date, 
       remarks: item.remarks 
     }));
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchFireExtinguisherList error:', err);
+  }
   return [];
 };
 
@@ -1465,7 +1945,9 @@ export const fetchLinkedKeywords = async (type: string): Promise<string[]> => {
   try {
     const { data } = await supabase.from('system_settings').select('data').eq('id', `KEYWORDS_${type}`).maybeSingle();
     if (data?.data) return data.data as string[];
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchLinkedKeywords error:', e);
+  }
   return [];
 };
 
@@ -1478,7 +1960,9 @@ export const fetchFireInspectionLog = async (dateStr: string): Promise<FireInspe
   try {
     const { data } = await supabase.from('fire_inspection_logs').select('*').eq('id', `FIRE_INSP_${dateStr}`).maybeSingle();
     if (data) return { date: dateStr, items: data.items, inspector: data.inspector };
-  } catch (e) {}
+  } catch (e) {
+    console.error('fetchFireInspectionLog error:', e);
+  }
   return null;
 };
 
@@ -1497,7 +1981,9 @@ export const fetchFireHistoryList = async (): Promise<FireHistoryItem[]> => {
       content: item.content,
       note: item.note
     }));
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchFireHistoryList error:', err);
+  }
   return [];
 };
 
@@ -1511,7 +1997,9 @@ export const fetchElevatorInspectionList = async (): Promise<ElevatorInspectionI
   try {
     const { data } = await supabase.from('elevator_inspections').select('*').order('date', { ascending: false });
     if (data && data.length > 0) return data;
-  } catch (err) {}
+  } catch (err) {
+    console.error('fetchElevatorInspectionList error:', err);
+  }
   return [];
 };
 
@@ -1519,6 +2007,101 @@ export const saveElevatorInspectionList = async (list: ElevatorInspectionItem[])
   const dbData = list.map(mapElevatorInspectionToDB);
   const { error = null } = await supabase.from('elevator_inspections').upsert(dbData);
   return !error;
+};
+
+export const fetchFireHistory = async (): Promise<FireHistoryItem[]> => {
+  try {
+    const { data } = await supabase.from('fire_inspection_history').select('*').order('date', { ascending: false });
+    if (data) {
+      return data.map((item: any) => ({
+        id: item.id,
+        date: item.date,
+        company: item.company,
+        content: item.content,
+        note: item.note
+      }));
+    }
+  } catch (e) {
+    console.error('fetchFireHistory error:', e);
+  }
+  return [];
+};
+
+export const saveFireHistory = async (list: FireHistoryItem[]): Promise<boolean> => {
+  try {
+    const dbData = list.map(item => ({
+      id: ensureID(item.id),
+      date: item.date,
+      company: item.company,
+      content: item.content,
+      note: item.note,
+      last_updated: new Date().toISOString()
+    }));
+    
+    // Using upsert for the whole list might be tricky if we want to replace everything.
+    // But typically we just upsert the items provided.
+    const { error } = await supabase.from('fire_inspection_history').upsert(dbData);
+    return !error;
+  } catch (e) {
+    console.error('saveFireHistory error:', e);
+    return false;
+  }
+};
+
+export const deleteFireHistory = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('fire_inspection_history').delete().eq('id', id);
+    return !error;
+  } catch (e) {
+    console.error('deleteFireHistory error:', e);
+    return false;
+  }
+};
+
+export const fetchElevatorInspectionHistory = async (): Promise<ElevatorInspectionItem[]> => {
+  try {
+    const { data } = await supabase.from('elevator_inspections').select('*').order('date', { ascending: false });
+    if (data) {
+      return data.map((item: any) => ({
+        id: item.id,
+        date: item.date,
+        company: item.company,
+        content: item.content,
+        note: item.note
+      }));
+    }
+  } catch (e) {
+    console.error('fetchElevatorInspectionHistory error:', e);
+  }
+  return [];
+};
+
+export const saveElevatorInspectionHistory = async (list: ElevatorInspectionItem[]): Promise<boolean> => {
+  try {
+    const dbData = list.map(item => ({
+      id: ensureID(item.id),
+      date: item.date,
+      company: item.company,
+      content: item.content,
+      note: item.note,
+      last_updated: new Date().toISOString()
+    }));
+    const { error } = await supabase.from('elevator_inspections').upsert(dbData);
+    return !error;
+  } catch (e) {
+    console.error('saveElevatorInspectionHistory error:', e);
+    return false;
+  }
+};
+
+export const deleteElevatorInspectionHistory = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase.from('elevator_inspections').delete().eq('id', id);
+    return !error;
+  } catch (e) {
+    console.error('deleteElevatorInspectionHistory error:', e);
+    return false;
+  }
 };
 
 /**
@@ -1545,6 +2128,84 @@ export const saveLogoSealSettings = async (settings: { logo?: string; seal?: str
     });
     return !error;
   } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * 팬코일 점검 기록 조회 (최신 현황만 유지)
+ */
+export const fetchFancoilLog = async (_date?: string): Promise<any[] | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('fancoil_status')
+      .select('*')
+      .order('floor', { ascending: false });
+    
+    if (error) throw error;
+    
+    if (data && data.length > 0) {
+      return data.map(item => ({
+        floor: item.floor,
+        loc: item.location,
+        sensor1Top: item.sensor_1_top,
+        sensor2Top: item.sensor_2_top,
+        sensor1Bot: item.sensor_1_bot,
+        sensor2Bot: item.sensor_2_bot,
+        autoControlTop: item.auto_control_top,
+        operationStatusTop: item.operation_status_top,
+        solenoidLeakTop: item.solenoid_leak_top,
+        autoControlBot: item.auto_control_bot,
+        operationStatusBot: item.operation_status_bot,
+        solenoidLeakBot: item.solenoid_leak_bot,
+        strainerLeakTop: item.strainer_leak_top,
+        strainerLeakBot: item.strainer_leak_bot,
+        bypassTop: item.bypass_top,
+        bypassBot: item.bypass_bot,
+        remarksTop: item.remarks_top,
+        remarksBot: item.remarks_bot,
+      }));
+    }
+  } catch (err) {
+    console.error('fetchFancoilLog error:', err);
+  }
+  return null;
+};
+
+/**
+ * 팬코일 점검 기록 저장
+ */
+export const saveFancoilLog = async (_date: string, items: any[]): Promise<boolean> => {
+  try {
+    // 기존 데이터 전체 삭제 (최신 현황만 유지하므로 날짜 조건 없이 삭제)
+    await supabase.from('fancoil_status').delete().neq('floor', 'dummy_to_delete_all');
+    
+    const dbData = items.map(item => ({
+      floor: item.floor,
+      location: item.loc,
+      sensor_1_top: item.sensor1Top,
+      sensor_2_top: item.sensor2Top,
+      sensor_1_bot: item.sensor1Bot,
+      sensor_2_bot: item.sensor2Bot,
+      auto_control_top: item.autoControlTop,
+      operation_status_top: item.operationStatusTop,
+      solenoid_leak_top: item.solenoidLeakTop,
+      auto_control_bot: item.autoControlBot,
+      operation_status_bot: item.operationStatusBot,
+      solenoid_leak_bot: item.solenoidLeakBot,
+      strainer_leak_top: item.strainerLeakTop,
+      strainer_leak_bot: item.strainerLeakBot,
+      bypass_top: item.bypassTop,
+      bypass_bot: item.bypassBot,
+      remarks_top: item.remarksTop,
+      remarks_bot: item.remarksBot,
+      last_updated: new Date().toISOString()
+    }));
+
+    const { error } = await supabase.from('fancoil_status').insert(dbData);
+    return !error;
+  } catch (e) {
+    console.error('saveFancoilLog error:', e);
     return false;
   }
 };

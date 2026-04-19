@@ -58,8 +58,8 @@ const FireInspectionLog: React.FC<FireInspectionLogProps> = ({ currentDate = new
     groupedItems[item.category].push(item);
   });
 
-  const thClass = "border border-black bg-white p-2 font-bold text-center align-middle text-sm";
-  const tdClass = "border border-black p-2 align-middle text-sm";
+  const thClass = "border border-black bg-white font-normal text-center text-[13px] text-black h-[32px]";
+  const tdClass = "border border-black p-0 h-[32px] relative bg-white text-center text-black";
 
   return (
     <LogSheetLayout
@@ -69,10 +69,10 @@ const FireInspectionLog: React.FC<FireInspectionLogProps> = ({ currentDate = new
       onRefresh={loadData}
       onSave={handleSave}
     >
-      <div className="border border-black">
-        <table className="w-full border-collapse text-sm">
+      <div>
+        <table className="w-full border-collapse border border-black text-sm">
           <thead>
-            <tr>
+            <tr className="bg-white border-b border-black h-[32px]">
               <th className={`${thClass} w-32`}>구분</th>
               <th className={thClass}>점 검 내 용</th>
               <th className={`${thClass} w-24`}>결 과</th>
@@ -83,18 +83,20 @@ const FireInspectionLog: React.FC<FireInspectionLogProps> = ({ currentDate = new
             {Object.keys(groupedItems).map(category => (
               <React.Fragment key={category}>
                 {groupedItems[category].map((item, idx) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} className="bg-white border-b border-black h-[32px]">
                     {idx === 0 && (
                       <td 
                         rowSpan={groupedItems[category].length} 
-                        className="border border-black p-2 font-bold text-center align-middle bg-gray-50"
+                        className="border border-black p-0 font-normal text-center align-middle bg-white text-[13px]"
                       >
                         {category}
                       </td>
                     )}
-                    <td className={`${tdClass} pl-4`}>{item.content}</td>
+                    <td className={`${tdClass} pl-4`}>
+                      <div className="flex items-center h-full px-2">• {item.content}</div>
+                    </td>
                     <td className={`${tdClass} text-center`}>
-                      <div className="flex justify-center gap-2 print:hidden">
+                      <div className="flex justify-center items-center h-full gap-2 print:hidden">
                         <button 
                           onClick={() => updateItem(item.id, 'result', item.result === '양호' ? '' : '양호')}
                           className={`px-3 py-1 rounded border border-gray-300 font-bold text-sm transition-colors ${item.result === '양호' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
@@ -128,7 +130,7 @@ const FireInspectionLog: React.FC<FireInspectionLogProps> = ({ currentDate = new
         </table>
       </div>
 
-      <div className="mt-4 flex justify-end items-center gap-4 border border-black p-4 bg-white print:border-none">
+      <div className="mt-4 flex justify-end items-center gap-4 p-4 bg-white print:border-none">
         <span className="font-bold text-lg">점검자 :</span>
         <input 
           type="text" 

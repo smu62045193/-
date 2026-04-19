@@ -25,23 +25,21 @@ const ElevatorCheckManager: React.FC<ElevatorCheckManagerProps> = () => {
       </div>
 
       {/* Tab Navigation - 협력업체 스타일과 동일하게 디자인 */}
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center">
-        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-           <LayoutList size={22} />
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-gray-200">
+        <div className="flex shrink-0">
+          {TABS.map(tab => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${activeTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
+          ))}
         </div>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
-              activeTab === tab.id 
-                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       {/* Content Area - 큰 박스 레이아웃 */}

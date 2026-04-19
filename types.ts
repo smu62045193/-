@@ -8,6 +8,7 @@ export enum MenuId {
   WEEKLY_WORK = 'WEEKLY_WORK',
   ELEC_CHECK = 'ELEC_CHECK',
   MECH_CHECK = 'MECH_CHECK',
+  FIRE_ELEVATOR_CHECK = 'FIRE_ELEVATOR_CHECK',
   FIRE_CHECK = 'FIRE_CHECK',
   ELEVATOR_CHECK = 'ELEVATOR_CHECK',
   PARKING_CHECK = 'PARKING_CHECK',
@@ -16,6 +17,7 @@ export enum MenuId {
   APPOINTMENTS = 'APPOINTMENTS',
   STAFF = 'STAFF',
   CONTRACTORS = 'CONTRACTORS',
+  ADMIN = 'ADMIN',
 }
 
 export interface MenuItem {
@@ -105,6 +107,7 @@ export interface WorkLogData {
   security: LogCategory;
   cleaning: LogCategory;
   handover: LogCategory;
+  fancoil?: any[];
 }
 
 export interface DailyData {
@@ -185,6 +188,7 @@ export interface ConsumableItem {
   unit: string;      // 단위
   note: string;      // 비고
   minStock?: string; // 적정재고 (부족자재 자동판단 기준)
+  isManual?: boolean; // 수기작업 여부
 }
 
 export interface ConsumableRequestItem {
@@ -442,6 +446,7 @@ export interface BatteryCheckData {
     manager: string;
     director: string;
   };
+  note?: string;
 }
 
 // Substation Checklist Types
@@ -469,6 +474,7 @@ export interface SubstationChecklistData {
 export interface LoadCurrentItem {
   id: string;
   floor: string;      // 추가된 필드
+  inspectionDate?: string; // 점검일자 추가
   // Left Side
   targetL: string;    // 점검대상(좌)
   orderL: string;     // 순서
@@ -507,6 +513,20 @@ export interface SafetyCheckMeasurements {
   power: { active: string; reactive: string; max: string; multiplier: string };
 }
 
+export interface SafetyCheckSpecs {
+  voltageCapacity?: string; // 수전전압/용량
+  genVoltageCapacity?: string; // 발전전압/용량
+  solarCapacity?: string; // 태양광
+  // For EV
+  evLocation?: string; // 설치장소
+  evVoltageCapacity?: string; // 전기설비전압/용량
+  evInstallCount?: string; // 설치기수
+  evVoltageCurrent?: string; // 전압/용량 (EV)
+  evUnitCount?: string; // 대수
+  evManufacturer?: string; // 제조사
+  evModelSerial?: string; // 모델명(일련번호)
+}
+
 export interface SafetyCheckData {
   date: string; // YYYY-MM-DD
   type: 'general' | 'ev'; // 전기설비 or 전기차
@@ -515,6 +535,7 @@ export interface SafetyCheckData {
   approver: string; // 점검자
   opinion?: string; // 종합의견 필드 추가
   lastUpdated?: string;
+  specs?: SafetyCheckSpecs;
 }
 
 // HVAC Log Types
@@ -763,6 +784,28 @@ export interface FireHistoryItem {
 
 // Elevator Daily Log Types
 export type ElevatorResult = '양호' | '불량' | '휴지' | '';
+
+export interface AutoRegRow {
+  id: string;
+  item: string;
+  mon: boolean;
+  tue: boolean;
+  wed: boolean;
+  thu: boolean;
+  fri: boolean;
+  sat: boolean;
+  sun: boolean;
+  excludeHolidays: boolean;
+}
+
+export interface ArchiveItem {
+  id: string;
+  category: string;
+  title: string;
+  date: string;
+  attachment?: string;
+  fileName?: string;
+}
 
 export interface ElevatorLogItem {
   id: string;

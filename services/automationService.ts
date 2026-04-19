@@ -1,7 +1,8 @@
 
-import { TaskItem, ElevatorLogData, FireInspectionLogData, DutyStatus, StaffMember } from '../types';
+import { TaskItem, ElevatorLogData, FireInspectionLogData, DutyStatus, StaffMember, AutoRegRow } from '../types';
 import { HOLIDAYS } from '../constants';
 import { parseISO, getDay, format, addDays, getMonth, differenceInDays } from 'date-fns';
+import { fetchAutoRegSettings } from './dataService';
 
 /**
  * 법정 고정 공휴일 목록 (MM-dd 형식)
@@ -50,81 +51,78 @@ export const isNonWorkingDay = (date: Date): boolean => {
 };
 
 /**
+ * DB에서 설정된 자동 등록 항목 가져오기
+ */
+export const getAutomatedTasksFromDB = async (category: string, dateStr: string): Promise<TaskItem[]> => {
+  const date = parseISO(dateStr);
+  const day = getDay(date); // 0: 일, 1: 월, ..., 6: 토
+  const isHoliday = isHolidayOrSunday(date); // 일요일 또는 공휴일 여부
+  
+  try {
+    const settings = await fetchAutoRegSettings(category);
+    const tasks: TaskItem[] = [];
+    
+    settings.forEach((setting: any) => {
+      let shouldAdd = false;
+      
+      // 요일 체크
+      switch(day) {
+        case 0: if (setting.sun) shouldAdd = true; break;
+        case 1: if (setting.mon) shouldAdd = true; break;
+        case 2: if (setting.tue) shouldAdd = true; break;
+        case 3: if (setting.wed) shouldAdd = true; break;
+        case 4: if (setting.thu) shouldAdd = true; break;
+        case 5: if (setting.fri) shouldAdd = true; break;
+        case 6: if (setting.sat) shouldAdd = true; break;
+      }
+      
+      // 공휴일 제외 체크
+      const excludeHolidays = setting.excludeHolidays || setting.exclude_holidays;
+      if (shouldAdd && excludeHolidays && isHoliday) {
+        shouldAdd = false;
+      }
+      
+      if (shouldAdd) {
+        tasks.push({
+          id: `db-auto-${category}-${setting.id}-${dateStr}`,
+          content: setting.item || setting.item_name || '',
+          frequency: '일일', // 기본값
+          status: '완료'
+        });
+      }
+    });
+    
+    return tasks;
+  } catch (error) {
+    console.error(`Error fetching automated tasks for ${category}:`, error);
+    return [];
+  }
+};
+
+/**
  * ELECTRICAL TASKS
  */
 export const getAutomatedElectricalTasks = (dateStr: string): TaskItem[] => {
-  const date = parseISO(dateStr);
-  const day = getDay(date);
-  const isNonWorking = isNonWorkingDay(date);
-  const tasks: TaskItem[] = [];
-  const generateId = (prefix: string) => `auto-elec-${prefix}-${dateStr}`;
-
-  // 수변전반 점검은 당직 업무이므로 매일 등록
-  tasks.push({ id: generateId('substation'), content: '수변전반 검침 및 점검', frequency: '일일', status: '완료' });
-
-  // 평일에만 등록되는 항목
-  if (!isNonWorking) {
-    tasks.push({ id: generateId('eps'), content: '전층 EPS실 점검 및 청소', frequency: '일일', status: '완료' });
-    if (day === 1) tasks.push({ id: generateId('lighting'), content: '전층 전등 조명상태 제어 및 점검', frequency: '주간', status: '완료' });
-    if (day === 3) tasks.push({ id: generateId('mcc'), content: 'MCC반 및 펌프 외관 점검', frequency: '주간', status: '완료' });
-  }
-  return tasks;
+  // 기존 하드코딩 로직 삭제 (관리자 설정 로직으로 대체됨)
+  return [];
 };
 
 /**
  * MECHANICAL TASKS
  */
 export const getAutomatedMechanicalTasks = (dateStr: string): TaskItem[] => {
-  const date = parseISO(dateStr);
-  const day = getDay(date);
-  const isNonWorking = isNonWorkingDay(date);
-  const tasks: TaskItem[] = [];
-  const generateId = (prefix: string) => `auto-mech-${prefix}-${dateStr}`;
-
-  // 상시 업무: 기계실 점검 및 각층 순찰 점검은 매일 등록
-  tasks.push({ id: generateId('daily-clean'), content: '기계실 일상 점검 및 정리정돈', frequency: '일일', status: '완료' });
-  tasks.push({ id: generateId('patrol'), content: '각층 기계 설비 순찰 점검', frequency: '일일', status: '완료' });
-
-  // 평일에만 추가로 등록되는 항목
-  if (!isNonWorking) {
-    tasks.push({ id: generateId('hvac-monitor'), content: '냉,난방기 가동 및 감시', frequency: '일일', status: '완료' });
-    tasks.push({ id: generateId('tank-check'), content: '물탱크,집수정,정화조 일상점검', frequency: '일일', status: '완료' });
-    
-    if (day === 1 || day === 3 || day === 5) tasks.push({ id: generateId('sludge-removal'), content: 'B6F집수정 슬러지 제거,소독작업', frequency: '주간', status: '완료' });
-    if (day === 1) tasks.push({ id: generateId('graph-paper'), content: 'B2F정압실 그래프용지 교체 및 점검', frequency: '주간', status: '완료' });
-    
-    const tomorrow = addDays(date, 1);
-    const isTomorrowNonWorking = isNonWorkingDay(tomorrow);
-    const isTargetDayForSeptic = (day === 5) || (day === 4 && isTomorrowNonWorking);
-    if (isTargetDayForSeptic) tasks.push({ id: generateId('septic-chemical'), content: 'B6F정화조약품투입,청소 및 점검', frequency: '주간', status: '완료' });
-  }
-
-  return tasks;
+  // 기존 하드코딩 로직 삭제 (관리자 설정 로직으로 대체됨)
+  return [];
 };
 
 /**
  * FIRE TASKS
  */
 export const getAutomatedFireTasks = (dateStr: string, logData?: FireInspectionLogData): TaskItem[] => {
-  const date = parseISO(dateStr);
-  const day = getDay(date);
-  const isNonWorking = isNonWorkingDay(date);
   const tasks: TaskItem[] = [];
-  const generateId = (prefix: string) => `auto-fire-${prefix}-${dateStr}`;
-
-  // 수신반 감시는 24시간 필수 업무이므로 매일 등록
-  tasks.push({ id: generateId('panel-monitor'), content: '종합수신반 감시 및 점검', frequency: '일일', status: '완료' });
-
-  // 평일에만 등록되는 항목
-  if (!isNonWorking) {
-    tasks.push({ id: generateId('patrol'), content: '전층 방화 순찰 점검', frequency: '일일', status: '완료' });
-    if (day === 1) tasks.push({ id: generateId('door-check'), content: '전층전실,방화문 개방 및 적치물 상태점검', frequency: '주간', status: '완료' });
-    if (day === 2) tasks.push({ id: generateId('damper-check'), content: '전실댐퍼 스위치,공기 배출구 상태점검', frequency: '주간', status: '완료' });
-    if (day === 3) tasks.push({ id: generateId('indicator-check'), content: '유도등 및 계단 감지기 외관 상태 점검', frequency: '주간', status: '완료' });
-    if (day === 4) tasks.push({ id: generateId('hydrant-check'), content: '전층 소화전 및 발신기 상태 점검', frequency: '주간', status: '완료' });
-    if (day === 5) tasks.push({ id: generateId('sprinkler-check'), content: '지하주차장 스프링클러 헤드 상태 점검', frequency: '주간', status: '완료' });
-  }
-
+  // 기존 하드코딩 로직 삭제 (관리자 설정 로직으로 대체됨)
+  
+  // 단, 점검표(FireInspectionLogData)에서 연동되는 '불량' 항목은 유지
   if (logData) {
     logData.items.forEach(item => {
       if (item.result === '불량') {
@@ -139,23 +137,10 @@ export const getAutomatedFireTasks = (dateStr: string, logData?: FireInspectionL
  * ELEVATOR TASKS
  */
 export const getAutomatedElevatorTasks = (dateStr: string, logData?: ElevatorLogData): TaskItem[] => {
-  const date = parseISO(dateStr);
-  const day = getDay(date);
-  const month = getMonth(date) + 1;
-  const isNonWorking = isNonWorkingDay(date);
   const tasks: TaskItem[] = [];
-  const generateId = (prefix: string) => `auto-elv-${prefix}-${dateStr}`;
+  // 기존 하드코딩 로직 삭제 (관리자 설정 로직으로 대체됨)
 
-  // 운행 상태 점검은 매일 등록
-  tasks.push({ id: generateId('op-status'), content: '승강기 운행상태 제어 및 점검', frequency: '일일', status: '완료' });
-
-  // 평일에만 등록되는 항목
-  if (!isNonWorking) {
-    tasks.push({ id: generateId('btn-check'), content: '카내부 버튼 및 버튼 동작 상태 점검', frequency: '일일', status: '완료' });
-    if (day === 2 && month >= 3 && month <= 10) tasks.push({ id: generateId('ac-temp-check'), content: '승강기 기계실 에어컨 온도설정 점검', frequency: '주간', status: '완료' });
-    if (day === 4) tasks.push({ id: generateId('machine-room-clean'), content: '승강기 기계실 청소,정리작업', frequency: '주간', status: '완료' });
-  }
-
+  // 점검표(ElevatorLogData)에서 연동되는 '불량/휴지' 항목은 유지
   if (logData) {
     const evLabels = ['1호기', '2호기', '3호기', '4호기', '5호기'];
     const evKeys = ['ev1', 'ev2', 'ev3', 'ev4', 'ev5'] as const;
@@ -175,44 +160,22 @@ export const getAutomatedElevatorTasks = (dateStr: string, logData?: ElevatorLog
  * PARKING TASKS
  */
 export const getAutomatedParkingTasks = (dateStr: string): TaskItem[] => {
-  const date = parseISO(dateStr);
-  const tasks: TaskItem[] = [];
-  const generateId = (prefix: string) => `auto-park-${prefix}-${dateStr}`;
-
-  // 주차 관련 점검은 매일 등록
-  tasks.push({ id: generateId('designated'), content: '지정 주차 구역 차량 현황 점검', frequency: '일일', status: '완료' });
-  tasks.push({ id: generateId('facility'), content: '주차 관제 설비 및 차단기 점검', frequency: '일일', status: '완료' });
-
-  return tasks;
+  // 기존 하드코딩 로직 삭제 (관리자 설정 로직으로 대체됨)
+  return [];
 };
 
 /**
  * SECURITY TASKS
  */
 export const getAutomatedSecurityTasks = (dateStr: string): TaskItem[] => {
-  const tasks: TaskItem[] = [];
-  const generateId = (prefix: string) => `auto-sec-${prefix}-${dateStr}`;
-  
-  // 경비 업무는 365일 상시 업무이므로 매일 등록
-  tasks.push({ id: generateId('visitor-control'), content: '외부 출입자 통제 및 관리', frequency: '일일', status: '완료' });
-  tasks.push({ id: generateId('security-patrol'), content: '임대층 및 공용부 보안 순찰 점검', frequency: '일일', status: '완료' });
-  return tasks;
+  // 기존 하드코딩 로직 삭제 (관리자 설정 로직으로 대체됨)
+  return [];
 };
 
 /**
  * CLEANING TASKS
  */
 export const getAutomatedCleaningTasks = (dateStr: string): TaskItem[] => {
-  const date = parseISO(dateStr);
-  const isNonWorking = isNonWorkingDay(date);
-  const tasks: TaskItem[] = [];
-  const generateId = (prefix: string) => `auto-clean-${prefix}-${dateStr}`;
-
-  // 미화 업무는 평일에만 등록
-  if (!isNonWorking) {
-    tasks.push({ id: generateId('common-area-clean'), content: '임대층 및 공용 부분 청소', frequency: '일일', status: '완료' });
-    tasks.push({ id: generateId('outdoor-clean'), content: '외곽 화단 및 공개 공지 청소', frequency: '일일', status: '완료' });
-    tasks.push({ id: generateId('recycle-collect'), content: '재활용 분리수거 및 배출', frequency: '일일', status: '완료' });
-  }
-  return tasks;
+  // 기존 하드코딩 로직 삭제 (관리자 설정 로직으로 대체됨)
+  return [];
 };

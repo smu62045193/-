@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
 import { fetchConstructionContractors, saveConstructionContractors, deleteConstructionContractor, generateUUID } from '../services/dataService';
-import { Save, Search, Printer, Edit2, RotateCcw, RefreshCw, X, Cloud, CheckCircle, UserPlus, ChevronLeft, ChevronRight, LayoutList, Star, Trash2, Briefcase, Calendar } from 'lucide-react';
+import { Save, Search, Printer, Edit2, RotateCcw, RefreshCw, X, Cloud, CheckCircle, UserPlus, Plus, ChevronLeft, ChevronRight, LayoutList, Star, Trash2, Briefcase, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ConstructionContractorManagerProps {
@@ -250,89 +250,134 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
   }
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] animate-fade-in">
-      <div className="p-6 space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 shadow-sm print:hidden">
-          <div className="relative flex-1 md:w-80 w-full">
-            <input 
-              type="text" 
-              placeholder="업체명, 날짜, 담당자 검색" 
-              value={searchTerm} 
-              onChange={e => setSearchTerm(e.target.value)} 
-              className="w-[320px] pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm"
-            />
-            <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+    <div className="space-y-2 animate-fade-in pb-10">
+      <div className="w-full max-w-7xl mx-auto bg-white">
+        <div className="flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          <div className="flex items-stretch shrink-0">
+            <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
+              <input 
+                type="text" 
+                placeholder="업체명, 날짜, 담당자 검색" 
+                value={searchTerm} 
+                onChange={e => setSearchTerm(e.target.value)} 
+                className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all"
+              />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          <div className="flex items-center shrink-0">
             <button 
               onClick={loadData} 
               disabled={loading}
-              className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+              title="새로고침"
             >
-              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
               새로고침
             </button>
+            
             <button 
               onClick={() => openIndependentWindow()} 
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
             >
-              <UserPlus size={18} /> 신규 공사업체 등록
+              <Plus size={18} className="mr-1.5" />
+              등록
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
-          <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[1000px] border-collapse">
+      <div className="max-w-7xl mx-auto bg-white border border-black overflow-hidden">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[1000px] border-collapse text-center">
             <thead>
-              <tr>
-                <th className={thClass} style={{ width: '60px' }}>No</th>
-                <th className={thClass} style={{ width: '120px' }}>날짜</th>
-                <th className={thClass} style={{ width: '180px' }}>업체명</th>
-                <th className={thClass} style={{ width: '100px' }}>담당자</th>
-                <th className={thClass} style={{ width: '130px' }}>대표번호</th>
-                <th className={thClass} style={{ width: '130px' }}>휴대폰</th>
-                <th className={thClass}>비고</th>
-                <th className={thClass} style={{ width: '100px' }}>관리</th>
+              <tr className="bg-white border-b border-black h-[40px]">
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[60px] border-r border-black px-2"><div className="flex items-center justify-center h-full">No</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[120px] border-r border-black px-2"><div className="flex items-center justify-center h-full">날짜</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[180px] border-r border-black px-2"><div className="flex items-center justify-center h-full">업체명</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[100px] border-r border-black px-2"><div className="flex items-center justify-center h-full">담당자</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[130px] border-r border-black px-2"><div className="flex items-center justify-center h-full">대표번호</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[130px] border-r border-black px-2"><div className="flex items-center justify-center h-full">휴대폰</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider border-r border-black px-2"><div className="flex items-center justify-center h-full">비고</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[100px] px-2"><div className="flex items-center justify-center h-full">관리</div></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-black">
               {paginatedList.length === 0 ? (
-                <tr><td colSpan={8} className="py-20 text-center text-gray-400 italic">등록된 업체가 없습니다.</td></tr>
+                <tr className="h-[40px]">
+                  <td colSpan={8} className="text-center text-gray-400 italic border-b border-black text-[13px] font-normal px-2">
+                    <div className="flex items-center justify-center h-full py-24">
+                      등록된 업체가 없습니다.
+                    </div>
+                  </td>
+                </tr>
               ) : (
-                paginatedList.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className={tdClass}>{totalItems - ((currentPage-1)*ITEMS_PER_PAGE + index)}</td>
-                    <td className={`${tdClass} font-bold text-blue-600`}>{item.type}</td>
-                    <td className={`${tdClass} font-bold`}>{item.name}</td>
-                    <td className={tdClass}>{item.contactPerson}</td>
-                    <td className={tdClass}>{item.phoneMain}</td>
-                    <td className={tdClass}>{item.phoneMobile}</td>
-                    <td className={`${tdClass} text-left px-4 font-medium text-gray-600`}>{item.note}</td>
-                    <td className={tdClass}>
-                      <div className="flex justify-center gap-1">
-                        <button onClick={() => openIndependentWindow(item.id)} className="p-1.5 text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded transition-colors shadow-sm" title="수정"><Edit2 size={16}/></button>
-                        <button onClick={() => handleDelete(item.id)} className="p-1.5 text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 rounded transition-colors shadow-sm" title="삭제"><Trash2 size={16}/></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                paginatedList.map((item, index) => {
+                  return (
+                    <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{totalItems - ((currentPage-1)*ITEMS_PER_PAGE + index)}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.type}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.name}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.contactPerson}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.phoneMain}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.phoneMobile}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.note}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal px-2">
+                        <div className="flex items-center justify-center h-full px-2 gap-1 py-1">
+                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16}/></button>
+                          <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16}/></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* 페이지네이션 UI - 번호형으로 개선 */}
+      {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronLeft size={18} /></button>
-          <div className="flex items-center gap-1 px-4">{visiblePageNumbers.map(pageNum => (<button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>{pageNum}</button>))}</div>
-          <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className={`p-2 rounded-lg border transition-all ${currentPage === totalPages ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronRight size={18} /></button>
+        <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 mt-6">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {visiblePageNumbers.map(pageNum => (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
+                  currentPage === pageNum
+                    ? 'text-black font-bold scale-110 cursor-default'
+                    : 'text-black font-normal hover:text-blue-500 cursor-pointer'
+                }`}
+              >
+                <span className="text-[13px]">{pageNum}</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
       )}
-    </div>
     </div>
   );
 };

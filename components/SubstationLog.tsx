@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchDailyData, fetchSubstationLog, getInitialSubstationLog, saveDailyData, saveSubstationLog, getInitialDailyData } from '../services/dataService';
 import { AcbReadings, PowerUsageReadings, SubstationLogData, VcbReadings, DailyData } from '../types';
 import LogSheetLayout from './LogSheetLayout';
-import { Save, RefreshCw, CheckCircle2, Cloud, X, Zap } from 'lucide-react';
+import { Save, RefreshCw, CheckCircle2, Cloud, X, Zap, Printer, CheckCircle } from 'lucide-react';
 
 interface SubstationLogProps {
   currentDate: Date;
@@ -18,6 +18,14 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   
   const [data, setData] = useState<SubstationLogData>(getInitialSubstationLog(dateKey));
+  const [activeSubTab, setActiveSubTab] = useState<'vcb' | 'acb' | 'usage' | 'analysis'>('vcb');
+
+  const subTabs = [
+    { id: 'vcb', label: 'VCB' },
+    { id: 'acb', label: 'ACB/변압기온도' },
+    { id: 'usage', label: '전력량' },
+    { id: 'analysis', label: '일사용량' },
+  ];
   
   const historySumRef = useRef<number>(0);
   const isInitialLoad = useRef(true);
@@ -276,14 +284,14 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             .print-page { width: 210mm; min-height: 297mm; padding: 25mm 10mm 10mm 10mm; margin: 0 auto; box-sizing: border-box; background: white !important; }
             table { width: 100% !important; border-collapse: collapse !important; border: 1.2px solid black !important; table-layout: fixed !important; margin-bottom: 12px; }
             th, td { border: 1px solid black !important; text-align: center !important; height: 42px !important; color: black !important; }
-            th { font-weight: bold !important; font-size: 8.5pt !important; background-color: #f9fafb !important; }
+            th { font-weight: normal !important; font-size: 8.5pt !important; background-color: white !important; }
             td { font-size: 10pt !important; }
-            input { border: none !important; width: 100% !important; text-align: center !important; font-size: 10.5pt !important; font-weight: bold !important; color: black !important; background: transparent !important; }
+            input { border: none !important; width: 100% !important; text-align: center !important; font-size: 10.5pt !important; font-weight: normal !important; color: black !important; background: transparent !important; }
             .flex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; min-height: 100px; }
             .title-box { flex: 1; text-align: center; }
             .doc-title { font-size: 32pt; font-weight: 900; letter-spacing: 4px; }
             .approval-table { width: 90mm !important; border: 1.5px solid black !important; }
-            .approval-table th { height: 22px !important; font-size: 8.5pt !important; background: #f3f4f6 !important; font-weight: bold; }
+            .approval-table th { height: 22px !important; font-size: 8.5pt !important; background: white !important; font-weight: normal; }
             .approval-table td { height: 70px !important; }
             .approval-table .side-header { width: 28px !important; }
             .info-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-weight: bold; font-size: 11pt; }
@@ -309,15 +317,15 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     printWindow.document.close();
   };
 
-  const inputClass = "w-full text-center h-full py-2 outline-none bg-transparent text-black text-sm font-bold focus:ring-1 focus:ring-gray-400";
-  const readonlyInputClass = "w-full text-center h-full py-2 outline-none bg-transparent text-black text-sm font-extrabold cursor-not-allowed opacity-80 bg-gray-50/30";
-  const thClass = "border border-black px-0.5 py-2 font-bold bg-gray-50 text-gray-700 align-middle text-xs";
-  const tdClass = "border border-black p-0 h-10 align-middle relative bg-transparent";
+  const inputClass = "w-full text-center h-full bg-transparent border-none outline-none shadow-none appearance-none text-black text-[13px] font-normal px-2 focus:ring-0";
+  const readonlyInputClass = "w-full text-center h-full bg-transparent border-none outline-none shadow-none appearance-none text-black text-[13px] font-normal px-2 cursor-not-allowed";
+  const thClass = "border border-black bg-white font-normal text-center text-[13px] text-black h-[32px]";
+  const tdClass = "border border-black p-0 h-[32px] relative bg-white text-center text-black";
 
   return (
     <>
       <LogSheetLayout 
-        title={<div className="flex items-center gap-2"><Zap className="text-blue-600" size={20} />수변전반 일지</div>} 
+        title="" 
         loading={loading} 
         saveStatus={saveStatus} 
         onRefresh={() => loadData(true)} 
@@ -325,31 +333,117 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
         onPrint={handlePrint} 
         isEmbedded={isEmbedded} 
         hideSave={false}
+        hideHeader={true}
       >
-        <div id="substation-log-print-area" className="bg-white text-black">
-          <section className="mb-6">
-            <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">1. VCB (특고압수전반)</h3>
+        <style>{`
+          .ui-hidden { display: none !important; }
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        `}</style>
+        <div className="w-full max-w-7xl bg-white mx-auto mb-6 overflow-hidden print:hidden">
+          <div className="flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+            <div className="flex items-stretch">
+              {subTabs.map(tab => (
+                <div
+                  key={tab.id}
+                  onClick={() => setActiveSubTab(tab.id as any)}
+                  className={`relative px-4 py-3 text-[14px] font-bold transition-colors whitespace-nowrap flex items-center shrink-0 cursor-pointer bg-white ${
+                    activeSubTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  {tab.label}
+                  {activeSubTab === tab.id && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-[1px] h-6 bg-black"></div>
+            </div>
+
+            <div className="flex items-center shrink-0">
+              <button 
+                onClick={() => loadData(true)} 
+                disabled={loading} 
+                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+              >
+                <RefreshCw size={18} className="mr-1.5" />
+                새로고침
+              </button>
+
+              <button 
+                onClick={handleSave} 
+                disabled={loading || saveStatus === 'loading'} 
+                className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                  saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {saveStatus === 'success' ? <CheckCircle2 size={18} className="mr-1.5" /> : <Save size={18} className="mr-1.5" />}
+                {saveStatus === 'success' ? '저장완료' : '저장'}
+              </button>
+
+              {activeSubTab === 'vcb' && (
+                <button 
+                  onClick={handlePrint} 
+                  className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+                >
+                  <Printer size={18} className="mr-1.5" />
+                  인쇄
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div id="substation-log-print-area" className="w-full max-w-7xl mx-auto bg-white text-black">
+          <section className={`mb-6 ${activeSubTab === 'vcb' ? '' : 'ui-hidden'}`}>
+            <h3 className="ui-hidden text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">1. VCB (특고압수전반)</h3>
             <div className="overflow-x-auto print:overflow-visible">
-              <table className="w-full border-collapse text-center table-fixed bg-white border-black">
+              <table className="w-full border-collapse border border-black text-center table-fixed">
                 <thead>
-                  <tr>
-                    <th rowSpan={2} style={{ width: '40px' }} className={thClass}>구분</th>
-                    <th colSpan={4} className={thClass}>특고압수전반 (MAIN VCB)</th>
-                    <th colSpan={3} className={thClass}>VCB1 (TR1)</th>
-                    <th colSpan={3} className={thClass}>VCB2 (TR2)</th>
-                    <th colSpan={3} className={thClass}>VCB3 (TR3)</th>
+                  <tr className="bg-white border-b border-black h-[32px]">
+                    <th rowSpan={2} style={{ width: '40px' }} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">구분</div>
+                    </th>
+                    <th colSpan={4} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">특고압수전반 (MAIN VCB)</div>
+                    </th>
+                    <th colSpan={3} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">VCB1 (TR1)</div>
+                    </th>
+                    <th colSpan={3} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">VCB2 (TR2)</div>
+                    </th>
+                    <th colSpan={3} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">VCB3 (TR3)</div>
+                    </th>
                   </tr>
-                  <tr>
-                    <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th><th className={thClass}>Hz</th>
-                    <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
-                    <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
-                    <th className={thClass}>전압(kV)</th><th className={thClass}>전류(A)</th><th className={thClass}>역률(%)</th>
+                  <tr className="bg-white border-b border-black h-[32px]">
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전압(kV)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전류(A)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">역률(%)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">Hz</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전압(kV)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전류(A)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">역률(%)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전압(kV)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전류(A)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">역률(%)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전압(kV)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전류(A)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">역률(%)</div></th>
                   </tr>
                 </thead>
                 <tbody>
                   {['time9', 'time21'].map((time) => (
-                    <tr key={time}>
-                      <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{time === 'time9' ? '09:00' : '21:00'}</td>
+                    <tr key={time} className="bg-white border-b border-black h-[32px]">
+                      <td className={tdClass}>
+                        <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">
+                          {time === 'time9' ? '09:00' : '21:00'}
+                        </div>
+                      </td>
                       <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.v || ''} readOnly /></td>
                       <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.a || ''} onChange={e => updateVcb(time as any, 'main', 'a', e.target.value)} /></td>
                       <td className={tdClass}><input type="text" className={inputClass} value={data.vcb?.[time as 'time9' | 'time21']?.main?.pf || ''} onChange={e => updateVcb(time as any, 'main', 'pf', e.target.value)} /></td>
@@ -370,29 +464,51 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             </div>
           </section>
 
-          <section className="mb-6">
-            <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">2. ACB / 변압기 온도</h3>
+          <section className={`mb-6 ${activeSubTab === 'acb' ? '' : 'ui-hidden'}`}>
+            <h3 className="ui-hidden text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">2. ACB / 변압기 온도</h3>
             <div className="overflow-x-auto print:overflow-visible">
-              <table className="w-full border-collapse text-center table-fixed bg-white border-black">
+              <table className="w-full border-collapse border border-black text-center table-fixed">
                 <thead>
-                  <tr>
-                    <th rowSpan={2} style={{ width: '40px' }} className={thClass}>구분</th>
-                    <th colSpan={3} className={thClass}>LV1 PANEL (ACB1)</th>
-                    <th colSpan={3} className={thClass}>LV3 PANEL (ACB2)</th>
-                    <th colSpan={3} className={thClass}>LV5 PANEL (ACB3)</th>
-                    <th colSpan={3} className={thClass}>변압기 온도</th>
+                  <tr className="bg-white border-b border-black h-[32px]">
+                    <th rowSpan={2} style={{ width: '40px' }} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">구분</div>
+                    </th>
+                    <th colSpan={3} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">LV1 PANEL (ACB1)</div>
+                    </th>
+                    <th colSpan={3} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">LV3 PANEL (ACB2)</div>
+                    </th>
+                    <th colSpan={3} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">LV5 PANEL (ACB3)</div>
+                    </th>
+                    <th colSpan={3} className={thClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">변압기 온도</div>
+                    </th>
                   </tr>
-                  <tr>
-                    <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
-                    <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
-                    <th className={thClass}>전압(V)</th><th className={thClass}>전류(A)</th><th className={thClass}>전력(kW)</th>
-                    <th className={thClass}>TR1(℃)</th><th className={thClass}>TR2(℃)</th><th className={thClass}>TR3(℃)</th>
+                  <tr className="bg-white border-b border-black h-[32px]">
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전압(V)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전류(A)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전력(kW)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전압(V)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전류(A)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전력(kW)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전압(V)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전류(A)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">전력(kW)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">TR1(℃)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">TR2(℃)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">TR3(℃)</div></th>
                   </tr>
                 </thead>
                 <tbody>
                   {['time9', 'time21'].map((time) => (
-                    <tr key={time}>
-                      <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{time === 'time9' ? '09:00' : '21:00'}</td>
+                    <tr key={time} className="bg-white border-b border-black h-[32px]">
+                      <td className={tdClass}>
+                        <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">
+                          {time === 'time9' ? '09:00' : '21:00'}
+                        </div>
+                      </td>
                       <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.v || ''} onChange={e => updateAcb(time as any, 'acb1', 'v', e.target.value)} /></td>
                       <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.a || ''} onChange={e => updateAcb(time as any, 'acb1', 'a', e.target.value)} /></td>
                       <td className={tdClass}><input type="text" className={inputClass} value={data.acb?.[time as 'time9' | 'time21']?.acb1?.kw || ''} onChange={e => updateAcb(time as any, 'acb1', 'kw', e.target.value)} /></td>
@@ -412,18 +528,20 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             </div>
           </section>
 
-          <section className="mb-6">
-            <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">3. 전력량 사용 현황</h3>
+          <section className={`mb-6 ${activeSubTab === 'usage' ? '' : 'ui-hidden'}`}>
+            <h3 className="ui-hidden text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">3. 전력량 사용 현황</h3>
             <div className="overflow-x-auto print:overflow-visible">
-              <table className="w-full border-collapse text-center table-fixed bg-white border-black">
+              <table className="w-full border-collapse border border-black text-center table-fixed">
                 <thead>
-                  <tr>
-                    <th className={thClass} style={{ width: '100px' }}>구분</th>
-                    <th className={thClass}>유효전력 중간(kWh)</th>
-                    <th className={thClass}>유효전력 최대(kWh)</th>
-                    <th className={thClass}>유효전력 경부하(kWh)</th>
-                    <th className={thClass}>무효전력 중간(kVarh)</th>
-                    <th className={thClass}>무효전력 최대(kVarh)</th>
+                  <tr className="bg-white border-b border-black h-[32px]">
+                    <th className={thClass} style={{ width: '100px' }}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">구분</div>
+                    </th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">유효전력 중간(kWh)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">유효전력 최대(kWh)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">유효전력 경부하(kWh)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">무효전력 중간(kVarh)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">무효전력 최대(kVarh)</div></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -431,8 +549,12 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
                     const isReadOnlyRow = row === 'usage';
                     const rowLabel = row === 'prev' ? '전일지침' : row === 'curr' ? '금일지침' : '사용량';
                     return (
-                      <tr key={row}>
-                        <td className="border border-black font-bold text-xs bg-gray-50 text-gray-700">{rowLabel}</td>
+                      <tr key={row} className="bg-white border-b border-black h-[32px]">
+                        <td className={tdClass}>
+                          <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">
+                            {rowLabel}
+                          </div>
+                        </td>
                         <td className={tdClass}>
                           <input 
                             type="text" 
@@ -486,25 +608,29 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
             </div>
           </section>
 
-          <section>
-            <h3 className="text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">4. 일 사용량 분석</h3>
+          <section className={activeSubTab === 'analysis' ? '' : 'ui-hidden'}>
+            <h3 className="ui-hidden text-lg font-bold text-black mb-2 border-l-4 border-black pl-2">4. 일 사용량 분석</h3>
             <div className="overflow-x-auto print:overflow-visible">
-              <table className="w-full border-collapse table-fixed bg-white border-black">
+              <table className="w-full border-collapse border border-black text-center table-fixed">
                 <thead>
-                  <tr>
-                    <th className={thClass} style={{ width: '100px' }}>구분</th>
-                    <th className={thClass}>유효(kWh)</th>
-                    <th className={thClass}>무효(kVarh)</th>
-                    <th className={thClass}>금월누계(kWh)</th>
-                    <th className={thClass}>최대(kW)</th>
-                    <th className={thClass}>역율(%)</th>
-                    <th className={thClass}>부하율(%)</th>
-                    <th className={thClass}>수용율(%)</th>
+                  <tr className="bg-white border-b border-black h-[32px]">
+                    <th className={thClass} style={{ width: '100px' }}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">구분</div>
+                    </th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">유효(kWh)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">무효(kVarh)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">금월누계(kWh)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">최대(kW)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">역율(%)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">부하율(%)</div></th>
+                    <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">수용율(%)</div></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="h-10">
-                    <td className="border border-black font-bold text-sm bg-gray-50 text-gray-700 text-center">금일 사용량</td>
+                  <tr className="bg-white border-b border-black h-[32px]">
+                    <td className={tdClass}>
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">금일 사용량</div>
+                    </td>
                     <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.activePower || '0'} readOnly /></td>
                     <td className={tdClass}><input type="text" className={readonlyInputClass} value={data.dailyStats?.reactivePower || '0'} readOnly /></td>
                     <td className={tdClass}><input type="text" className={`${readonlyInputClass} font-black text-base`} value={data.dailyStats?.monthTotal || '0'} readOnly /></td>

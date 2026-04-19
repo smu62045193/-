@@ -74,7 +74,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
         
         categoryRows += `
           <tr>
-            ${isFirst ? `<td rowspan="${rowCount}" style="font-weight:bold; background:#f9fafb; text-align:center; vertical-align:middle; width:40px;">${field.label}</td>` : ''}
+            ${isFirst ? `<td rowspan="${rowCount}" style="font-weight:normal; background:#f9fafb; text-align:center; vertical-align:middle; width:40px;">${field.label}</td>` : ''}
             <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${thisWeekLines[i] || ''}</td>
             <td style="text-align:center; padding:2px 6px; vertical-align:middle; width:90px; ${borderStyle}">${resultLines[i] || ''}</td>
             <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${nextWeekLines[i] || ''}</td>
@@ -107,7 +107,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
             <div style="width:100%; aspect-ratio:4/3; overflow:hidden; border:1px solid #000; margin-bottom:5px; display:flex; align-items:center; justify-content:center; background:#f9f9f9;">
               <img src="${photo.dataUrl}" style="width:100%; height:100%; object-fit:cover;" />
             </div>
-            <div style="font-weight:bold; font-size:8.5pt; border-bottom:1.5px solid #000; padding-bottom:2px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${photo.title || '작업 사진'}</div>
+            <div style="font-weight:normal; font-size:8.5pt; border-bottom:1.5px solid #000; padding-bottom:2px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${photo.title || '작업 사진'}</div>
           </div>
         `).join('');
         
@@ -143,7 +143,7 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
             .section-header { font-size: 13pt; font-weight: bold; margin-top: 10px; margin-bottom: 15px; border-left: 8px solid black; padding-left: 15px; text-align: left; }
             table { width: 100%; border-collapse: collapse; border: 1.5px solid black; margin-bottom: 15px; table-layout: fixed; }
             th, td { border: 1px solid black; padding: 6px; font-size: 9pt; vertical-align: top; word-break: break-all; }
-            th { background: #f3f4f6; font-weight: bold; text-align: center; }
+            th { background: #f3f4f6; font-weight: normal; text-align: center; }
           </style>
         </head>
         <body>
@@ -215,57 +215,57 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
   };
 
   return (
-    <div className="space-y-4 animate-fade-in pb-10">
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm p-5 animate-fade-in-down">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm mb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <FileText size={24} />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-gray-800">주간업무보고 저장 이력</h2>
-              <p className="text-xs text-gray-400 mt-0.5">서버에 저장된 모든 주간보고서 목록입니다.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 w-full md:w-auto">
-            <div className="relative w-full md:w-[320px]">
+    <div className="space-y-2 animate-fade-in pb-10">
+      <div className="w-full max-w-7xl mx-auto bg-white">
+        <div className="flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          <div className="flex items-stretch shrink-0">
+            <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
               <input 
                 type="text" 
                 placeholder="작성자 또는 날짜(YYYY-MM) 검색" 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white text-black outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-inner"
+                className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all"
               />
-              <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
             </div>
+          </div>
+
+          <div className="flex items-center shrink-0 px-2">
+            <div className="border-l-[1px] h-6 border-black"></div>
+          </div>
+
+          <div className="flex items-center shrink-0">
             <button 
               onClick={loadData}
-              className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 rounded-xl hover:bg-emerald-50 border border-gray-200 font-bold shadow-sm transition-all text-sm active:scale-95"
+              disabled={loading}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
               title="새로고침"
             >
-              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
               새로고침
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="max-w-7xl mx-auto bg-white border border-black overflow-hidden">
           <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[850px] border-collapse border border-gray-200">
+          <table className="w-full min-w-[850px] border-collapse text-center">
             <thead>
-              <tr className="bg-gray-50/80 border-b border-gray-200">
-                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20 border border-gray-200">No</th>
-                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-56 border border-gray-200">대상 주간 (월~일)</th>
-                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36 border border-gray-200">최종 보고일자</th>
-                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-36 border border-gray-200">작성자</th>
-                <th className="px-6 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-40 border border-gray-200">관리</th>
+              <tr className="bg-white border-b border-black h-[40px]">
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-20 border-r border-black px-2"><div className="flex items-center justify-center h-full">No</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-56 border-r border-black px-2"><div className="flex items-center justify-center h-full">대상 주간 (월~일)</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-36 border-r border-black px-2"><div className="flex items-center justify-center h-full">최종 보고일자</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-36 border-r border-black px-2"><div className="flex items-center justify-center h-full">작성자</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-40 px-2"><div className="flex items-center justify-center h-full">관리</div></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-black">
               {loading && reports.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center border border-gray-200"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></td></tr>
+                <tr className="h-[40px]"><td colSpan={5} className="text-center border-b border-black text-[13px] font-normal px-2"><div className="flex items-center justify-center h-full py-24"><RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" /><p className="text-gray-400 font-medium">데이터를 불러오는 중...</p></div></td></tr>
               ) : filteredReports.length === 0 ? (
-                <tr><td colSpan={5} className="py-24 text-center text-gray-400 italic border border-gray-200">저장된 보고서 이력이 없습니다.</td></tr>
+                <tr className="h-[40px]"><td colSpan={5} className="text-center text-gray-400 italic border-b border-black text-[13px] font-normal px-2"><div className="flex items-center justify-center h-full py-24">저장된 보고서 이력이 없습니다.</div></td></tr>
               ) : (
                 paginatedReports.map((report, idx) => {
                   const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
@@ -274,53 +274,39 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
                   const weekRange = `${format(start, 'yyyy.MM.dd')} ~ ${format(end, 'MM.dd')}`;
                   
                   return (
-                    <tr key={report.key} className="hover:bg-blue-50/40 transition-colors group">
-                      <td className="px-6 py-2 text-center text-gray-400 font-mono text-xs border border-gray-200">{globalIdx}</td>
-                      <td className="px-6 py-2 border border-gray-200">
-                        <div className="flex items-center justify-center gap-3">
-                          <div className="p-1.5 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-100 transition-colors">
-                            <Calendar size={18} />
-                          </div>
-                          <div>
-                            <span className="font-bold text-gray-900 block">{weekRange}</span>
-                          </div>
-                        </div>
+                    <tr key={report.key} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full">{globalIdx}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                        <div className="flex items-center justify-center h-full">{weekRange}</div>
                       </td>
-                      <td className="px-6 py-2 text-center border border-gray-200">
-                        <span className="px-3 py-0.5 bg-gray-50 text-gray-600 rounded-md border border-gray-100 text-sm font-medium">
-                          {report.data.reportingDate}
-                        </span>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                        <div className="flex items-center justify-center h-full">{report.data.reportingDate}</div>
                       </td>
-                      <td className="px-6 py-2 text-center border border-gray-200">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <User size={14} className="text-gray-400" />
-                          <span className="text-gray-800 font-bold text-sm">
-                            {report.data.author}
-                          </span>
-                        </div>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                        <div className="flex items-center justify-center h-full">{report.data.author}</div>
                       </td>
-                      <td className="px-6 py-2 text-center border border-gray-200 print:hidden">
-                        <div className="flex items-center justify-center gap-1">
+                      <td className="text-center text-black text-[13px] font-normal print:hidden px-2">
+                        <div className="flex items-center justify-center h-full gap-1 py-1">
                           <button 
                             onClick={() => handleViewDetail(report.data)}
-                            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
+                            className="p-2 bg-orange-50 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg transition-all"
                             title="상세보기"
                           >
-                            <Search size={14} />
+                            <Search size={16} />
                           </button>
                           <button 
                             onClick={() => onSelectReport(report.data.startDate)}
-                            className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
+                            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
                             title="편집"
                           >
-                            <Edit3 size={14} />
+                            <Edit3 size={16} />
                           </button>
                           <button 
                             onClick={() => handleDeleteReport(report.data.startDate)}
-                            className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all"
+                            className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all"
                             title="삭제"
                           >
-                            <Trash2 size={14} />
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>
@@ -331,53 +317,44 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* 페이지네이션 UI */}
-        {!loading && totalPages > 1 && (
-          <div className="px-6 py-4 bg-gray-50/50 border-t border-gray-100 flex items-center justify-center gap-2">
-            <button
-              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-lg border transition-all ${
-                currentPage === 1 
-                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
-              }`}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            
-            <div className="flex items-center gap-1 px-4">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
-                <button
-                  key={pageNum}
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${
-                    currentPage === pageNum
-                      ? 'bg-blue-600 text-white shadow-md'
-                      : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-lg border transition-all ${
-                currentPage === totalPages 
-                  ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' 
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'
-              }`}
-            >
-              <ChevronRight size={18} />
-            </button>
+      {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
+      {!loading && totalPages > 1 && (
+        <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 mt-6">
+          <button
+            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+              <button
+                key={pageNum}
+                onClick={() => handlePageChange(pageNum)}
+                className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
+                  currentPage === pageNum
+                    ? 'text-black font-bold scale-110 cursor-default'
+                    : 'text-black font-normal hover:text-blue-500 cursor-pointer'
+                }`}
+              >
+                <span className="text-[13px]">{pageNum}</span>
+              </button>
+            ))}
           </div>
-        )}
-      </div>
-      </div>
+
+          <button
+            onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

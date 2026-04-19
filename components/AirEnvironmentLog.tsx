@@ -1,22 +1,33 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { AirEnvironmentLogData, AirEmissionItem, AirPreventionItem, WeatherData } from '../types';
+import React, { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react';
+import { AirEnvironmentLogData, AirEmissionItem, AirPreventionItem } from '../types';
 import { fetchAirEnvironmentLog, saveAirEnvironmentLog, getInitialAirEnvironmentLog, fetchHvacLog, fetchBoilerLog } from '../services/dataService';
 import { format } from 'date-fns';
-import { RefreshCw, Printer, Save, CheckCircle2, Cloud, X, Thermometer, CloudSun, Calendar, Edit2, Check } from 'lucide-react';
-import LogSheetLayout from './LogSheetLayout';
+import { CloudSun, Edit2, Check, Thermometer } from 'lucide-react';
 
 interface AirEnvironmentLogProps {
   currentDate: Date;
 }
 
-const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) => {
+export interface AirEnvironmentLogHandle {
+  handleSyncData: () => Promise<void>;
+  handleSave: () => Promise<void>;
+  handlePrint: () => void;
+}
+
+const AirEnvironmentLog = forwardRef<AirEnvironmentLogHandle, AirEnvironmentLogProps>(({ currentDate }, ref) => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [isWeatherEditing, setIsWeatherEditing] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   const [data, setData] = useState<AirEnvironmentLogData>(getInitialAirEnvironmentLog(dateKey));
+
+  useImperativeHandle(ref, () => ({
+    handleSyncData,
+    handleSave,
+    handlePrint
+  }));
 
   const roundValue = (val: string) => {
     if (!val) return '0';
@@ -143,13 +154,18 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
 
   const handleSyncData = async () => {
     setSyncing(true);
-    const success = await syncFromMechanical(data);
-    if (success) {
-      alert('기계설비 일지 데이터가 최신 정보로 연동되었습니다.');
-    } else {
-      alert('연동할 데이터가 없거나 이미 최신 상태입니다.');
+    try {
+      const success = await syncFromMechanical(data);
+      if (success) {
+        alert('기계설비 일지 데이터가 최신 정보로 연동되었습니다.');
+      } else {
+        alert('연동할 데이터가 없거나 이미 최신 상태입니다.');
+      }
+    } catch (err) {
+      alert('데이터 연동 중 오류가 발생했습니다.');
+    } finally {
+      setSyncing(false);
     }
-    setSyncing(false);
   };
 
   const handleSave = async () => {
@@ -159,7 +175,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
       const success = await saveAirEnvironmentLog(data);
       if (success) {
         setSaveStatus('success');
-        // alert() 제거 (LogSheetLayout에서 모달로 처리)
+        alert('대기환경 기록부가 저장되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -234,9 +250,9 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             }
             .approval-table th { 
               border: 1px solid black !important; 
-              background: #f2f2f2 !important; 
+              background: white !important; 
               font-size: 8.5pt !important; 
-              font-weight: bold; 
+              font-weight: normal; 
               text-align: center; 
               height: 24px !important; 
             }
@@ -251,11 +267,11 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             .info-table td { padding: 5px 15px; font-size: 11pt; font-weight: bold; border: none; }
             .weather-text { text-align: right; }
             
-            table.main-table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; margin-bottom: 5px; }
-            table.main-table th { background: #f2f2f2 !important; border: 1px solid black; padding: 12px 4px; font-size: 11pt; font-weight: bold; text-align: center; }
-            table.main-table td { border: 1px solid black; padding: 10px; font-size: 12.5pt; text-align: center; height: 100px; vertical-align: middle; }
+            table.main-table { width: 100%; border-collapse: collapse; border: 1px solid black; table-layout: fixed; margin-bottom: 5px; }
+            table.main-table th { background: white !important; border: 1px solid black; padding: 12px 4px; font-size: 11pt; font-weight: normal; text-align: center; color: black; }
+            table.main-table td { border: 1px solid black; padding: 10px; font-size: 12.5pt; text-align: center; height: 100px; vertical-align: middle; color: black; }
             .section-title { font-size: 14pt; font-weight: bold; margin: 15px 0 10px 0; text-align: left; border-left: 8px solid black; padding-left: 15px; }
-            .unit-text { font-size: 10.5pt; font-weight: bold; margin-left: 3px; color: #444; }
+            .unit-text { font-size: 10.5pt; font-weight: normal; margin-left: 3px; color: black; }
             .remarks-note { font-size: 10pt; color: #444; margin-top: 5px; font-weight: 500; }
           </style>
         </head>
@@ -282,14 +298,14 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             </table>
             <div class="section-title">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</div>
             <table class="main-table">
-              <thead><tr><th style="width:13%">배 출 구</th><th style="width:37%">배 출 시 설</th><th style="width:35%">가 동 시 한</th><th style="width:15%">비 고</th></tr></thead>
+              <thead><tr><th style="width:13%">배 출 구</th><th style="width:37%">배 출 시 설</th><th style="width:35%">가 동 시 간</th><th style="width:15%">비 고</th></tr></thead>
               <tbody>
                 ${data.emissions.map(item => `
                   <tr>
-                    <td style="font-weight:900; background:#fafafa; font-size:14pt;">${item.outletNo}</td>
-                    <td style="font-weight:bold;">${item.facilityName}</td>
-                    <td style="color:#1d4ed8; font-weight:900; font-size:14pt;">${item.runTime || '-'}</td>
-                    <td style="font-weight:bold;">${item.remarks || '운휴'}</td>
+                    <td style="font-weight:normal; background:white; font-size:14pt; color:black;">${item.outletNo}</td>
+                    <td style="font-weight:normal; color:black;">${item.facilityName}</td>
+                    <td style="color:black; font-weight:normal; font-size:14pt;">${item.runTime || '-'}</td>
+                    <td style="font-weight:normal; color:black;">${item.remarks || '운휴'}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -301,10 +317,10 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
               <tbody>
                 ${data.preventions.map(item => `
                   <tr>
-                    <td style="font-weight:bold;">${item.facilityName}</td>
-                    <td>${item.location}</td>
-                    <td style="text-align:right; padding-right:30px; color:#1d4ed8; font-weight:900; font-size:15pt;">${roundValue(item.gasUsage || '0')} <span class="unit-text">㎥</span></td>
-                    <td style="font-size:11.5pt; font-weight:bold;">${item.pollutants}</td>
+                    <td style="font-weight:normal; color:black;">${item.facilityName}</td>
+                    <td style="color:black;">${item.location}</td>
+                    <td style="text-align:right; padding-right:30px; color:black; font-weight:normal; font-size:15pt;">${roundValue(item.gasUsage || '0')} <span class="unit-text">㎥</span></td>
+                    <td style="font-size:11.5pt; font-weight:normal; color:black;">${item.pollutants}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -316,60 +332,44 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
     printWindow.document.close();
   };
 
-  const thClass = "border border-gray-300 bg-gray-50 p-2 font-bold text-center align-middle text-sm h-10 text-gray-700";
-  const tdClass = "border border-gray-300 p-0 h-10 relative bg-white";
-  const labelDivClass = "w-full h-full flex items-center justify-center text-sm font-bold text-slate-800 bg-white";
-  const dataDivClass = "w-full h-full flex items-center justify-center text-sm font-black text-blue-700 bg-white";
-
-  const refreshButton = (
-    <button 
-      onClick={handleSyncData} 
-      disabled={syncing || loading} 
-      className={`flex-1 sm:flex-none items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm transition-all active:scale-95 flex text-sm ${syncing ? 'bg-gray-100 text-gray-400' : 'hover:bg-emerald-50'}`}
-    >
-      <RefreshCw className={`mr-2 ${syncing ? 'animate-spin' : ''}`} size={18} />
-      <span>새로고침</span>
-    </button>
-  );
+  const thClass = "border border-black bg-white text-[13px] font-normal text-center h-[32px] align-middle text-black";
+  const tdClass = "border border-black p-0 h-[32px] bg-white text-[13px] font-normal text-center text-black";
+  const labelDivClass = "w-full h-full flex items-center justify-center text-[13px] font-normal text-black bg-white px-2";
+  const dataDivClass = "w-full h-full flex items-center justify-center text-[13px] font-normal text-black bg-white px-2";
 
   return (
-    <>
-      <LogSheetLayout 
-        title={<div className="flex items-center gap-2"><Cloud className="text-sky-500" size={20} />대기배출시설 및 방지시설 운영기록부</div>} 
-        loading={loading} 
-        onSave={handleSave} 
-        onPrint={handlePrint} 
-        hideRefresh={true}
-        hideSave={false}
-        isEmbedded={true}
-        extraActions={refreshButton}
-        saveStatus={saveStatus}
-      >
-        <div className="bg-transparent text-black w-full">
-          
-          <div className="flex items-center justify-between mb-6 px-6 py-4 bg-slate-50 rounded-2xl border border-slate-200">
+    <div className="bg-transparent text-black w-full">
+      {loading && (
+        <div className="flex items-center justify-center py-10">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+        </div>
+      )}
+      
+      {!loading && (
+        <>
+          <div className="flex items-center justify-between mb-6 px-6 py-4 bg-slate-50 border border-slate-200">
             <div className="flex items-center gap-4 font-bold text-slate-700 text-base">
               {isWeatherEditing ? (
                 <div className="flex items-center gap-3 animate-fade-in">
-                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-blue-200">
+                  <div className="flex items-center gap-2 bg-white px-2 py-1 border border-black">
                     <CloudSun size={18} className="text-blue-500" />
                     <input 
                       type="text" 
                       value={data.weatherCondition || ''} 
                       onChange={e => setData({...data, weatherCondition: e.target.value})} 
-                      className="w-20 outline-none font-bold text-blue-700 text-sm"
+                      className="w-20 bg-transparent border-none outline-none shadow-none appearance-none font-normal text-blue-700 text-[13px]"
                       placeholder="날씨"
                     />
                   </div>
                   <span className="text-slate-300">|</span>
-                  <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-orange-200">
+                  <div className="flex items-center gap-2 bg-white px-2 py-1 border border-black">
                     <Thermometer size={18} className="text-orange-500" />
                     <div className="flex items-center gap-1">
                       <input 
                         type="text" 
                         value={data.tempMin || ''} 
                         onChange={e => setData({...data, tempMin: e.target.value})} 
-                        className="w-8 outline-none font-bold text-orange-700 text-sm text-center"
+                        className="w-8 bg-transparent border-none outline-none shadow-none appearance-none font-normal text-orange-700 text-[13px] text-center"
                         placeholder="최저"
                       />
                       <span className="text-slate-400">~</span>
@@ -377,10 +377,10 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
                         type="text" 
                         value={data.tempMax || ''} 
                         onChange={e => setData({...data, tempMax: e.target.value})} 
-                        className="w-8 outline-none font-bold text-orange-700 text-sm text-center"
+                        className="w-8 bg-transparent border-none outline-none shadow-none appearance-none font-normal text-orange-700 text-[13px] text-center"
                         placeholder="최고"
                       />
-                      <span className="text-slate-400 text-xs">℃</span>
+                      <span className="text-slate-400 text-[13px]">℃</span>
                     </div>
                   </div>
                 </div>
@@ -397,7 +397,7 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             
             <button
               onClick={() => setIsWeatherEditing(!isWeatherEditing)}
-              className={`flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-[13px] transition-all shadow-sm ${
+              className={`flex items-center gap-2 px-5 py-2 font-bold text-[13px] transition-all shadow-sm ${
                 isWeatherEditing 
                   ? 'bg-blue-600 text-white border border-blue-700 active:scale-95' 
                   : 'bg-white text-blue-600 border border-blue-200 hover:bg-blue-50 active:scale-95'
@@ -408,37 +408,37 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
             </button>
           </div>
 
-          <div className="mb-8">
-            <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</h3>
-            <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
-              <table className="w-full border-collapse text-center">
-                <thead><tr className="bg-gray-50"><th className={`${thClass} w-[13%]`}>배 출 구</th><th className={`${thClass} w-[37%]`}>배 출 시 설</th><th className={`${thClass} w-[35%]`}>가 동 시 간</th><th className={`${thClass} w-[15%]`}>비 고</th></tr></thead>
+          <div className="mb-8 max-w-7xl mx-auto">
+            <h3 className="text-base font-bold mb-3 border-l-4 border-black pl-2 text-black">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</h3>
+            <div className="max-w-7xl mx-auto">
+              <table className="w-full border-collapse bg-white text-center text-black border border-black">
+                <thead><tr className="border-b border-black h-[32px]"><th className={`${thClass} w-[13%]`}>배 출 구</th><th className={`${thClass} w-[37%]`}>배 출 시 설</th><th className={`${thClass} w-[35%]`}>가 동 시 간</th><th className={`${thClass} w-[15%]`}>비 고</th></tr></thead>
                 <tbody>
                   {data?.emissions?.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className={`${tdClass} font-bold text-gray-500 bg-gray-50/20`}>{item.outletNo}</td>
+                    <tr key={item.id} className="h-[32px]">
+                      <td className={tdClass}>{item.outletNo}</td>
                       <td className={tdClass}><div className={labelDivClass}>{item.facilityName}</div></td>
                       <td className={tdClass}><div className={dataDivClass}>{item.runTime || '-'}</div></td>
-                      <td className={tdClass}><div className={`${labelDivClass} ${item.remarks === '정상' ? 'text-blue-600' : 'text-slate-400'}`}>{item.remarks || '운휴'}</div></td>
+                      <td className={tdClass}><div className={labelDivClass}>{item.remarks || '운휴'}</div></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="text-xs mt-2 font-medium text-gray-500">* 비고란은 정상 여부 기재합니다.</p>
+            <p className="text-xs mt-2 font-medium text-black">* 비고란은 정상 여부 기재합니다.</p>
           </div>
           
-          <div className="mt-8">
-            <h3 className="text-base font-bold mb-3 border-l-4 border-gray-800 pl-2">2. 방지시설 운영사항</h3>
-            <div className="overflow-hidden border border-gray-300 rounded-lg shadow-sm">
-              <table className="w-full border-collapse text-center">
-                <thead><tr className="bg-gray-50"><th className={`${thClass} w-[25%]`}>방 지 시 설 명</th><th className={`${thClass} w-[25%]`}>설치 위치</th><th className={`${thClass} w-[25%]`}>가스사용량</th><th className={`${thClass} w-[25%]`}>처리오염물질</th></tr></thead>
+          <div className="mt-8 max-w-7xl mx-auto">
+            <h3 className="text-base font-bold mb-3 border-l-4 border-black pl-2 text-black">2. 방지시설 운영사항</h3>
+            <div className="max-w-7xl mx-auto">
+              <table className="w-full border-collapse bg-white text-center text-black border border-black">
+                <thead><tr className="border-b border-black h-[32px]"><th className={`${thClass} w-[25%]`}>방 지 시 설 명</th><th className={`${thClass} w-[25%]`}>설치 위치</th><th className={`${thClass} w-[25%]`}>가스사용량</th><th className={`${thClass} w-[25%]`}>처리오염물질</th></tr></thead>
                 <tbody>
                   {data?.preventions?.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
+                    <tr key={item.id} className="h-[32px]">
                       <td className={tdClass}><div className={labelDivClass}>{item.facilityName}</div></td>
                       <td className={tdClass}><div className={labelDivClass}>{item.location}</div></td>
-                      <td className={tdClass}><div className={`${dataDivClass} justify-end pr-8`}>{roundValue(item.gasUsage)} <span className="ml-1 text-xs font-bold text-gray-400">㎥</span></div></td>
+                      <td className={tdClass}><div className={dataDivClass}>{roundValue(item.gasUsage)} ㎥</div></td>
                       <td className={tdClass}><div className={labelDivClass}>{item.pollutants}</div></td>
                     </tr>
                   ))}
@@ -446,10 +446,10 @@ const AirEnvironmentLog: React.FC<AirEnvironmentLogProps> = ({ currentDate }) =>
               </table>
             </div>
           </div>
-        </div>
-      </LogSheetLayout>
-    </>
+        </>
+      )}
+    </div>
   );
-};
+});
 
 export default AirEnvironmentLog;

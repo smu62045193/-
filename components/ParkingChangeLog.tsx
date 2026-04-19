@@ -35,7 +35,16 @@ const ParkingChangeLog: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
+    let isMounted = true;
+    const fetchData = async () => {
+      const data = await fetchParkingChangeList();
+      if (isMounted) {
+        setItems(data || []);
+        setLoading(false);
+      }
+    };
+    fetchData();
+    return () => { isMounted = false; };
   }, []);
 
   const handleEdit = (item: ParkingChangeItem) => {
@@ -235,32 +244,32 @@ const ParkingChangeLog: React.FC = () => {
         </div>
         <div className="mt-2"><label className="block text-xs font-bold text-gray-500 mb-1">비고</label><input type="text" placeholder="특이사항 입력" value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full border border-gray-300 rounded px-2 py-2 text-sm bg-white text-black outline-none" /></div>
       </div>
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center"><h4 className="font-bold text-gray-700 flex items-center"><Calendar size={18} className="mr-2 text-blue-600" />{newItem.date} 내역 ({filteredItems.length}건)</h4></div>
-        <table className="w-full min-w-[1000px]">
-          <thead className="bg-gray-100 border-b border-gray-200">
-            <tr>
-              <th className="px-3 py-2 text-center text-sm font-bold text-gray-500 w-28">날짜</th>
-              <th className="px-3 py-2 text-center text-sm font-bold text-gray-500 w-16">구분</th>
-              <th className="px-3 py-2 text-left text-sm font-bold text-gray-500 w-32">업체</th>
-              <th className="px-3 py-2 text-center text-sm font-bold text-gray-500 w-20">위치</th>
-              <th className="px-3 py-2 text-center text-sm font-bold text-gray-500 w-32">변경전 차량번호</th>
-              <th className="px-3 py-2 text-center text-sm font-bold text-gray-500 text-blue-600 w-32">변경후 차량번호</th>
-              <th className="px-3 py-2 text-left text-sm font-bold text-gray-500">비고</th>
-              <th className="px-3 py-2 text-center text-sm font-bold text-gray-500 w-16">관리</th>
+      <div className="bg-white border-t border-l border-black overflow-hidden">
+        <div className="p-4 border-b border-black bg-white flex justify-between items-center"><h4 className="font-normal text-[13px] text-black flex items-center"><Calendar size={18} className="mr-2 text-blue-600" />{newItem.date} 내역 ({filteredItems.length}건)</h4></div>
+        <table className="w-full min-w-[1000px] border-collapse">
+          <thead>
+            <tr className="bg-white h-[40px]">
+              <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-28 p-0"><div className="flex items-center justify-center h-full px-2">날짜</div></th>
+              <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-16 p-0"><div className="flex items-center justify-center h-full px-2">구분</div></th>
+              <th className="border-b border-r border-black text-left text-[13px] font-normal text-black w-32 p-0"><div className="flex items-center justify-start h-full px-2">업체</div></th>
+              <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-20 p-0"><div className="flex items-center justify-center h-full px-2">위치</div></th>
+              <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-32 p-0"><div className="flex items-center justify-center h-full px-2">변경전 차량번호</div></th>
+              <th className="border-b border-r border-black text-center text-[13px] font-normal text-blue-600 w-32 p-0"><div className="flex items-center justify-center h-full px-2">변경후 차량번호</div></th>
+              <th className="border-b border-r border-black text-left text-[13px] font-normal text-black p-0"><div className="flex items-center justify-start h-full px-2">비고</div></th>
+              <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-16 p-0"><div className="flex items-center justify-center h-full px-2">관리</div></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
-            {filteredItems.length === 0 ? <tr><td colSpan={8} className="text-center py-8 text-sm text-gray-400 italic">내역이 없습니다.</td></tr> : filteredItems.map((item) => (
-               <tr key={item.id} className={`hover:bg-gray-50 transition-colors ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
-                 <td className="px-3 py-2 text-center text-sm text-gray-700">{item.date}</td>
-                 <td className="px-3 py-2 text-center"><span className={`px-2 py-0.5 rounded text-xs font-bold ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{item.type}</span></td>
-                 <td className="px-3 py-2 text-sm text-gray-800 font-medium">{item.company}</td>
-                 <td className="px-3 py-2 text-center text-sm text-gray-600">{item.location}</td>
-                 <td className="px-3 py-2 text-center text-sm text-gray-500">{item.prevPlate || '-'}</td>
-                 <td className="px-3 py-2 text-center text-sm text-blue-600 font-bold">{item.newPlate}</td>
-                 <td className="px-3 py-2 text-left text-sm text-gray-500">{item.note}</td>
-                 <td className="px-3 py-2 text-center"><div className="flex items-center justify-center gap-2"><button onClick={() => handleEdit(item)} className="text-gray-400 hover:text-blue-500 transition-colors"><Edit size={16} /></button><button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button></div></td>
+          <tbody>
+            {filteredItems.length === 0 ? <tr><td colSpan={8} className="text-center h-[100px] text-[13px] text-black italic font-normal border-b border-r border-black">내역이 없습니다.</td></tr> : filteredItems.map((item) => (
+               <tr key={item.id} className={`hover:bg-gray-50 transition-colors h-[40px] ${String(editId) === String(item.id) ? 'bg-orange-50' : ''}`}>
+                 <td className="border-b border-r border-black text-center text-[13px] text-black font-normal p-0"><div className="flex items-center justify-center h-full px-2">{item.date}</div></td>
+                 <td className="border-b border-r border-black text-center p-0"><div className="flex items-center justify-center h-full px-2"><span className={`px-2 py-0.5 rounded text-[11px] font-normal ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{item.type}</span></div></td>
+                 <td className="border-b border-r border-black text-[13px] text-black font-normal p-0"><div className="flex items-center justify-start h-full px-2">{item.company}</div></td>
+                 <td className="border-b border-r border-black text-center text-[13px] text-black font-normal p-0"><div className="flex items-center justify-center h-full px-2">{item.location}</div></td>
+                 <td className="border-b border-r border-black text-center text-[13px] text-black font-normal p-0"><div className="flex items-center justify-center h-full px-2">{item.prevPlate || '-'}</div></td>
+                 <td className="border-b border-r border-black text-center text-[13px] text-blue-600 font-normal p-0"><div className="flex items-center justify-center h-full px-2">{item.newPlate}</div></td>
+                 <td className="border-b border-r border-black text-left text-[13px] text-black font-normal p-0"><div className="flex items-center justify-start h-full px-2">{item.note}</div></td>
+                 <td className="border-b border-r border-black text-center p-0"><div className="flex items-center justify-center gap-2 h-full px-2"><button onClick={() => handleEdit(item)} className="text-gray-400 hover:text-blue-500 transition-colors"><Edit size={16} /></button><button onClick={() => handleDelete(item.id)} className="text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button></div></td>
                </tr>
             ))}
           </tbody>

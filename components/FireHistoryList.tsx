@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FireHistoryItem, DailyData, LogCategory } from '../types';
-import { fetchFireHistoryList, saveFireHistoryList, apiFetchRange, fetchLinkedKeywords, saveLinkedKeywords } from '../services/dataService';
+import { fetchFireHistoryList, saveFireHistoryList, apiFetchRange, fetchLinkedKeywords, saveLinkedKeywords, generateUUID } from '../services/dataService';
 import { RefreshCw, Search, Link, Plus, Trash2, X, Save, AlertCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -50,7 +50,7 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
     setKeywords(data || []);
   };
 
-  const normalize = (text: string) => (text || '').replace(/[\s()\-]/g, '').toUpperCase();
+  const normalize = (text: string) => (text || '').replace(/[\s()-]/g, '').toUpperCase();
 
   const openIndependentWindow = () => {
     const width = 500;
@@ -76,8 +76,12 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
 
     setLoading(true);
     try {
-      const year = new Date().getFullYear();
-      const logs = await apiFetchRange("DAILY_", `${year}-01-01`, `${year}-12-31`);
+      // 현재 날짜 기준 과거 6개월부터 오늘까지 데이터를 가져오도록 개선 (미래 예정사항 제외)
+      const now = new Date();
+      const startDate = format(new Date(now.getFullYear(), now.getMonth() - 6, 1), 'yyyy-MM-dd');
+      const endDate = format(now, 'yyyy-MM-dd');
+      
+      const logs = await apiFetchRange("DAILY_", startDate, endDate);
       const normalizedKeywords = keywords.map(normalize);
       
       const newEntries: FireHistoryItem[] = [];
@@ -97,18 +101,25 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
             let cleanContent = task.content;
             const escapedK = matchedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const cleaningPatterns = [
-              new RegExp(`\\s?\\(${escapedK}\\)`, 'gi'),
-              new RegExp(`\\(${escapedK}\\)`, 'gi'),
+              new RegExp(`\\s?\\(\\s?${escapedK}\\s?\\)`, 'gi'), // 괄호 안 공백 허용
+              new RegExp(`\\(\\s?${escapedK}\\s?\\)`, 'gi'),
               new RegExp(`\\s?${escapedK}`, 'gi')
             ];
             cleaningPatterns.forEach(pattern => {
               cleanContent = cleanContent.replace(pattern, '');
             });
             cleanContent = cleanContent.trim();
-            const exists = items.some(item => item.date === dateKey && normalize(item.content) === normalize(cleanContent));
+            
+            // 날짜, 업체명, 내용이 모두 일치할 때만 중복으로 판단하도록 개선
+            const exists = items.some(item => 
+              item.date === dateKey && 
+              item.company === matchedKeyword &&
+              normalize(item.content) === normalize(cleanContent)
+            );
+            
             if (!exists) {
               newEntries.push({
-                id: `auto_${dateKey}_${Math.random().toString(36).substr(2, 5)}`,
+                id: generateUUID(),
                 date: dateKey,
                 company: matchedKeyword,
                 content: cleanContent,
@@ -331,32 +342,32 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
+      <div className="bg-white border-t border-l border-black overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[1000px] border-collapse border border-gray-300">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16 border border-gray-200">No</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-200">날짜</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-48 border border-gray-200">업체</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider border border-gray-200">내용</th>
-                <th className="px-4 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-200">비고</th>
+          <table className="w-full min-w-[1000px] border-collapse">
+            <thead>
+              <tr className="bg-white h-[40px]">
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-16 p-0"><div className="flex items-center justify-center h-full px-2">No</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-32 p-0"><div className="flex items-center justify-center h-full px-2">날짜</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-48 p-0"><div className="flex items-center justify-center h-full px-2">업체</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">내용</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-32 p-0"><div className="flex items-center justify-center h-full px-2">비고</div></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody>
               {loading && items.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-20 text-center border border-gray-200 text-gray-400">로딩 중...</td></tr>
+                <tr><td colSpan={5} className="h-[100px] text-center border-b border-r border-black text-black font-normal text-[13px]">로딩 중...</td></tr>
               ) : filteredItems.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-20 text-center border border-gray-200 text-gray-400 italic">데이터가 없습니다. [데이터연동하기]를 눌러 연동하세요.</td></tr>
+                <tr><td colSpan={5} className="h-[100px] text-center border-b border-r border-black text-black font-normal text-[13px] italic">데이터가 없습니다. [데이터연동하기]를 눌러 연동하세요.</td></tr>
               ) : (
                 paginatedItems.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group">
-                    <td className="px-4 py-4 text-center text-gray-400 font-mono text-xs border border-gray-200">{filteredItems.length - ((currentPage-1)*ITEMS_PER_PAGE + index)}</td>
-                    <td className="px-4 py-4 text-center text-sm text-gray-700 font-bold whitespace-nowrap border border-gray-200">{item.date}</td>
-                    <td className="px-4 py-4 text-sm text-gray-900 font-black border border-gray-200 text-center">{item.company}</td>
-                    <td className="px-4 py-4 text-sm text-gray-700 border border-gray-200 text-center">{item.content}</td>
-                    <td className="px-4 py-4 text-center border border-gray-200">
-                      <span className="text-[11px] font-bold text-gray-400">{item.note || '-'}</span>
+                  <tr key={item.id} className="hover:bg-blue-50/30 transition-colors group h-[40px]">
+                    <td className="border-b border-r border-black text-center text-black font-normal text-[13px] p-0"><div className="flex items-center justify-center h-full px-2">{filteredItems.length - ((currentPage-1)*ITEMS_PER_PAGE + index)}</div></td>
+                    <td className="border-b border-r border-black text-center text-[13px] text-black font-normal whitespace-nowrap p-0"><div className="flex items-center justify-center h-full px-2">{item.date}</div></td>
+                    <td className="border-b border-r border-black text-[13px] text-black font-normal p-0"><div className="flex items-center justify-center h-full px-2">{item.company}</div></td>
+                    <td className="border-b border-r border-black text-[13px] text-black font-normal p-0"><div className="flex items-center justify-center h-full px-2">{item.content}</div></td>
+                    <td className="border-b border-r border-black text-center p-0">
+                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">{item.note || '-'}</div>
                     </td>
                   </tr>
                 ))
@@ -366,34 +377,37 @@ const FireHistoryList: React.FC<FireHistoryListProps> = ({ isKeywordPopupMode = 
         </div>
       </div>
 
-      {totalPages > 1 && (
+      {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
+      {filteredItems.length > 0 && (
         <div className="py-4 flex items-center justify-center gap-2 print:hidden">
           <button
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="flex items-center gap-1.5 px-4">
+          
+          <div className="flex items-center gap-2">
             {visiblePageNumbers.map(pageNum => (
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
-                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
                   currentPage === pageNum
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                    ? 'text-black font-bold scale-110 cursor-default'
+                    : 'text-black font-normal hover:text-blue-500 cursor-pointer'
                 }`}
               >
-                {pageNum}
+                <span className="text-[13px]">{pageNum}</span>
               </button>
             ))}
           </div>
+
           <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronRight size={18} />
           </button>

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ConsumableItem } from '../types';
 import { fetchConsumables, saveConsumables } from '../services/dataService';
 import { Save, RefreshCw, PackagePlus } from 'lucide-react';
+import { format } from 'date-fns';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
@@ -19,7 +20,7 @@ const ConsumablesRegister: React.FC = () => {
 
   const [newItem, setNewItem] = useState<ConsumableItem>({
     id: '',
-    date: new Date().toISOString().split('T')[0],
+    date: format(new Date(), 'yyyy-MM-dd'),
     category: CATEGORIES[0],
     itemName: '',
     modelName: '',
@@ -28,7 +29,8 @@ const ConsumablesRegister: React.FC = () => {
     outQty: '',
     stockQty: '',
     unit: 'EA',
-    note: ''
+    note: '',
+    isManual: false
   });
 
   useEffect(() => {
@@ -113,7 +115,7 @@ const ConsumablesRegister: React.FC = () => {
         setExistingItems(newList);
         setNewItem({
           id: '',
-          date: new Date().toISOString().split('T')[0],
+          date: format(new Date(), 'yyyy-MM-dd'),
           category: newItem.category, 
           itemName: '',
           modelName: '',
@@ -122,7 +124,8 @@ const ConsumablesRegister: React.FC = () => {
           outQty: '',
           stockQty: '',
           unit: 'EA',
-          note: ''
+          note: '',
+          isManual: false
         });
         setBaseStock(0);
       } else {
@@ -224,6 +227,16 @@ const ConsumablesRegister: React.FC = () => {
         <div className="col-span-2">
           <label className="block text-sm font-bold text-gray-700 mb-2">비고</label>
           <input type="text" value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none text-sm bg-white text-black" />
+        </div>
+        <div className="col-span-2 flex items-center gap-2 mt-2">
+          <input 
+            type="checkbox" 
+            id="isManualCheckReg" 
+            checked={newItem.isManual || false} 
+            onChange={e => setNewItem({...newItem, isManual: e.target.checked})} 
+            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label htmlFor="isManualCheckReg" className="text-sm font-bold text-gray-700 cursor-pointer">수기작업</label>
         </div>
       </div>
 

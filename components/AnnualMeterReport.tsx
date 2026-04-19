@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetchRange, fetchTenants } from '../services/dataService';
 import { MeterReadingData, MeterReadingItem, Tenant } from '../types';
 import { format, parseISO } from 'date-fns';
-import { Search, Printer, RefreshCw, FileText, ChevronDown, User, Calendar } from 'lucide-react';
+import { Search, Printer, RefreshCw, FileText, ChevronDown, User, Calendar, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const getFloorWeight = (floor: string) => {
   const f = floor.trim().toUpperCase();
@@ -17,7 +17,20 @@ const getFloorWeight = (floor: string) => {
   return num;
 };
 
-const AnnualMeterReport: React.FC = () => {
+interface AnnualMeterReportProps {
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
+  tabs?: { id: string; label: string }[];
+  currentMonth?: string;
+  setCurrentMonth?: (month: string) => void;
+}
+
+const AnnualMeterReport: React.FC<AnnualMeterReportProps> = ({ 
+  activeTab, 
+  setActiveTab, 
+  tabs,
+  currentMonth
+}) => {
   const [loading, setLoading] = useState(false);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [allYearData, setAllYearData] = useState<MeterReadingData[]>([]);
@@ -104,13 +117,13 @@ const AnnualMeterReport: React.FC = () => {
       <tr style="height:38px;">
         <td>${m.month}월</td>
         <td>${m.data?m.data.nPrev:'-'}</td>
-        <td style="background:#fff7ed;">${m.data?m.data.nCurr:'-'}</td>
-        <td style="font-weight:bold;">${m.data?m.data.nUsage.toLocaleString():'-'}</td>
-        <td style="font-weight:bold; text-align:right; padding-right:10px;">${m.data?m.data.nAmount.toLocaleString():'-'}</td>
+        <td>${m.data?m.data.nCurr:'-'}</td>
+        <td>${m.data?m.data.nUsage.toLocaleString():'-'}</td>
+        <td style="text-align:right; padding-right:10px;">${m.data?m.data.nAmount.toLocaleString():'-'}</td>
         <td>${m.data?m.data.sPrev:'-'}</td>
-        <td style="background:#fff7ed;">${m.data?m.data.sCurr:'-'}</td>
-        <td style="font-weight:bold;">${m.data?m.data.sUsage.toLocaleString():'-'}</td>
-        <td style="font-weight:bold; text-align:right; padding-right:10px;">${m.data?m.data.sAmount.toLocaleString():'-'}</td>
+        <td>${m.data?m.data.sCurr:'-'}</td>
+        <td>${m.data?m.data.sUsage.toLocaleString():'-'}</td>
+        <td style="text-align:right; padding-right:10px;">${m.data?m.data.sAmount.toLocaleString():'-'}</td>
       </tr>`).join('');
     const totals = monthlyStats.reduce((acc, curr) => { 
       if(curr.data) { acc.nUsage += curr.data.nUsage; acc.nAmount += curr.data.nAmount; acc.sUsage += curr.data.sUsage; acc.sAmount += curr.data.sAmount; acc.total += curr.data.totalAmount; } return acc; 
@@ -125,82 +138,172 @@ const AnnualMeterReport: React.FC = () => {
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
         .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
         h1 { text-align: center; font-size: 26pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin-bottom: 35px; margin-top: 0; }
-        table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
-        th, td { border: 1px solid black; padding: 6px; text-align: center; font-size: 9pt; height: 35px; }
-        th { background: #f3f4f6; font-weight: bold; }
-        .total-row { background: #fffbeb; font-weight: bold; font-size: 10pt; }
+        table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; background: white; }
+        th, td { border: 1px solid black; padding: 6px; text-align: center; font-size: 9pt; height: 35px; background: white; font-weight: normal; color: black; }
+        th { font-weight: bold; }
+        .total-row { background: white; font-weight: normal; font-size: 10pt; }
         .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
         .no-print button:hover { background: #172554; transform: translateY(-1px); }
       </style></head><body>
         <div class="no-print"><button onclick="window.print()">인쇄하기</button></div>
         <div class="print-page"><h1>${selectedYear}년도 연간 전기검침 보고서</h1><div style="font-weight:bold; font-size:12pt; margin-bottom:15px;">업체명 : ${selName} (${selFloor})</div>
         <table><thead><tr><th rowspan="2" style="width:40px;">월별</th><th colspan="4">일반 지침</th><th colspan="4">특수 지침</th></tr><tr><th>전월</th><th>당월</th><th>사용량</th><th>청구금액</th><th>전월</th><th>당월</th><th>사용량</th><th>청구금액</th></tr></thead>
-          <tbody>${rows}<tr class="total-row"><td>합계</td><td colspan="2">일반 합계</td><td style="color:blue;">${totals.nUsage.toLocaleString()}</td><td style="text-align:right; padding-right:10px;">${totals.nAmount.toLocaleString()}</td><td colspan="2">특수 합계</td><td style="color:blue;">${totals.sUsage.toLocaleString()}</td><td style="text-align:right; padding-right:10px;">${totals.sAmount.toLocaleString()}</td></tr>
-            <tr class="total-row" style="background:#fef3c7; height:45px;"><td colspan="7" style="font-size:11pt; letter-spacing:1px;">연 간 청 구 총 액 (일반 + 특수)</td><td colspan="2" style="text-align:right; padding-right:15px; font-size:14pt; color:red;">${totals.total.toLocaleString()} 원</td></tr>
+          <tbody>${rows}<tr class="total-row"><td>합계</td><td colspan="2">일반 합계</td><td style="color:black;">${totals.nUsage.toLocaleString()}</td><td style="text-align:right; padding-right:10px;">${totals.nAmount.toLocaleString()}</td><td colspan="2">특수 합계</td><td style="color:black;">${totals.sUsage.toLocaleString()}</td><td style="text-align:right; padding-right:10px;">${totals.sAmount.toLocaleString()}</td></tr>
+            <tr class="total-row" style="background:white; height:45px;"><td colspan="7" style="font-size:11pt; letter-spacing:1px;">연 간 청 구 총 액 (일반 + 특수)</td><td colspan="2" style="text-align:right; padding-right:15px; font-size:14pt; color:black;">${totals.total.toLocaleString()} 원</td></tr>
           </tbody></table></div></body></html>`);
     printWindow.document.close();
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 animate-fade-in pb-10">
-      <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <select value={selectedYear} onChange={e => setSelectedYear(parseInt(e.target.value))} className="px-4 py-2.5 border border-gray-300 rounded-xl font-bold bg-white outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
-            {Array.from({length: 11}, (_, i) => (new Date().getFullYear() - 5) + i).map(y => (
-              <option key={y} value={y}>{y}년도</option>
-            ))}
-          </select>
-          <select value={selectedTenantKey} onChange={e => setSelectedTenantKey(e.target.value)} className="w-[400px] px-4 py-2.5 border border-gray-300 rounded-xl font-black text-blue-700 bg-white outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
+    <div className="space-y-2 animate-fade-in pb-10">
+      {/* Row 1: Year Nav, Sub-tabs and Action Buttons */}
+      <div className="bg-white w-full max-w-7xl mx-auto flex items-stretch justify-start scrollbar-hide overflow-x-auto border-b border-black">
+        {/* 1. 날짜 선택 영역 (년 네비게이션) */}
+        <div className="flex items-center shrink-0">
+          <button 
+            onClick={() => setSelectedYear(prev => prev - 1)} 
+            className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <div className="px-2 py-3 text-[14px] font-bold text-black min-w-[100px] text-center">
+            {selectedYear}년
+          </div>
+          <button 
+            onClick={() => setSelectedYear(prev => prev + 1)} 
+            className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+
+        {/* 구분선 (검정색 1px) */}
+        <div className="flex items-center shrink-0 px-2">
+          <div className="w-[1px] h-6 bg-black"></div>
+        </div>
+
+        <div className="flex shrink-0">
+          {tabs && setActiveTab && tabs.map(tab => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer bg-white ${activeTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
+          ))}
+        </div>
+        
+        <div className="flex items-center shrink-0 px-2">
+          <div className="w-[1px] h-6 bg-black"></div>
+        </div>
+
+        <div className="flex items-center print:hidden shrink-0">
+          <button 
+            onClick={loadYearData} 
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            title="새로고침"
+          >
+            <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
+          <button 
+            onClick={handlePrint} 
+            disabled={!selectedTenantKey||loading} 
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+          >
+            <Printer size={18} className="mr-1.5" />
+            인쇄
+          </button>
+        </div>
+
+        {/* 구분선 (검정색 1px) */}
+        <div className="flex items-center shrink-0 px-2">
+          <div className="w-[1px] h-6 bg-black"></div>
+        </div>
+
+        {/* 입주사 선택 */}
+        <div className="flex items-center shrink-0">
+          <select 
+            value={selectedTenantKey} 
+            onChange={e => setSelectedTenantKey(e.target.value)} 
+            className="px-4 py-2 font-black text-blue-700 bg-white outline-none text-[14px] min-w-[200px]"
+          >
             <option value="">입주사 선택</option>
             {tenantList.map(t=><option key={`${t.name}|${t.floor}`} value={`${t.name}|${t.floor}`}>{t.name} ( {t.floor} )</option>)}
           </select>
         </div>
-        <div className="flex gap-2 w-full md:w-auto justify-end">
-          <button onClick={loadYearData} className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition-all active:scale-95 text-sm">
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-            <span className="ml-2">새로고침</span>
-          </button>
-          <button onClick={handlePrint} disabled={!selectedTenantKey||loading} className="flex items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-all shadow-md text-sm font-bold active:scale-95 disabled:bg-slate-300">
-            <Printer size={18} />
-            <span>미리보기</span>
-          </button>
-        </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-300 overflow-hidden">
-        <div className="p-4 bg-gray-50 border-b border-gray-200 font-black text-gray-800 flex justify-between items-center">
-            <span>연간 검침 데이터 현황</span>
-            {selectedTenantKey && <span className="text-blue-600 text-sm font-bold">{selectedTenantKey.split('|')[0]} ( {selectedTenantKey.split('|')[1]} )</span>}
-        </div>
+      <div className="bg-white border-t border-l border-black w-full max-w-7xl mx-auto">
         <div className="overflow-x-auto">
-          <table className="w-full text-center border-collapse text-sm">
+          <table className="w-full text-center border-collapse">
             <thead>
-              <tr className="bg-gray-50 border-b">
-                <th rowSpan={2} className="py-4 px-2 border-r border-gray-200 font-bold text-gray-600 w-16">월</th>
-                <th colSpan={3} className="py-2 border-r border-gray-200 font-bold text-blue-600">일반 지침</th>
-                <th colSpan={3} className="py-2 border-r border-gray-200 font-bold text-orange-600">특수 지침</th>
-                <th rowSpan={2} className="font-black text-blue-700 bg-blue-50/50">합계 사용량(kWh)</th>
+              <tr className="bg-white h-[40px]">
+                <th rowSpan={2} className="border-b border-r border-black text-center text-[13px] font-normal text-black w-16 p-0">
+                  <div className="flex items-center justify-center h-full px-2">월</div>
+                </th>
+                <th colSpan={3} className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">일반 지침</div>
+                </th>
+                <th colSpan={3} className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">특수 지침</div>
+                </th>
+                <th rowSpan={2} className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">합계 사용량(kWh)</div>
+                </th>
               </tr>
-              <tr className="bg-gray-50 border-b text-[11px] text-gray-400 font-bold uppercase tracking-tighter">
-                <th className="py-1 border-r border-gray-200">전월지침</th>
-                <th className="py-1 border-r border-gray-200">당월지침</th>
-                <th className="py-1 border-r border-gray-200">사용량</th>
-                <th className="py-1 border-r border-gray-200">전월지침</th>
-                <th className="py-1 border-r border-gray-200">당월지침</th>
-                <th className="py-1 border-r border-gray-200">사용량</th>
+              <tr className="bg-white h-[40px]">
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">전월지침</div>
+                </th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">당월지침</div>
+                </th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">사용량</div>
+                </th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">전월지침</div>
+                </th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">당월지침</div>
+                </th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">사용량</div>
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {monthlyStats.map(m => (
-                <tr key={m.month} className="h-11 hover:bg-gray-50/50 transition-colors">
-                  <td className="font-bold border-r border-gray-200 bg-gray-50/30 text-gray-500">{m.month}월</td>
-                  <td className="border-r border-gray-100 text-gray-500 font-mono text-xs">{m.data?.nPrev||'-'}</td>
-                  <td className="bg-blue-50/30 border-r border-gray-100 font-black text-blue-600">{m.data?.nCurr||'-'}</td>
-                  <td className="border-r border-gray-100 font-bold text-blue-700">{m.data ? m.data.nUsage.toLocaleString() : '-'}</td>
-                  <td className="border-r border-gray-100 text-gray-500 font-mono text-xs">{m.data?.sPrev||'-'}</td>
-                  <td className="bg-orange-50/30 border-r border-gray-100 font-black text-orange-600">{m.data?.sCurr||'-'}</td>
-                  <td className="border-r border-gray-100 font-bold text-orange-700">{m.data ? m.data.sUsage.toLocaleString() : '-'}</td>
-                  <td className="font-black text-blue-800 bg-blue-50/20">{m.data ? m.data.totalUsage.toLocaleString() : '-'}</td>
+                <tr key={m.month} className="bg-white hover:bg-blue-50/30 transition-colors text-center h-[40px]">
+                  <td className="border-b border-r border-black text-[13px] font-normal text-black p-0">
+                    <div className="flex items-center justify-center h-full px-2">{m.month}월</div>
+                  </td>
+                  <td className="border-b border-r border-black text-[13px] font-normal text-black p-0">
+                    <div className="flex items-center justify-center h-full px-2">{m.data?.nPrev||'-'}</div>
+                  </td>
+                  <td className="border-b border-r border-black text-[13px] font-normal text-black p-0">
+                    <div className="flex items-center justify-center h-full px-2">{m.data?.nCurr||'-'}</div>
+                  </td>
+                  <td className="border-b border-r border-black text-[13px] font-normal text-black p-0">
+                    <div className="flex items-center justify-center h-full px-2">{m.data ? m.data.nUsage.toLocaleString() : '-'}</div>
+                  </td>
+                  <td className="border-b border-r border-black text-[13px] font-normal text-black p-0">
+                    <div className="flex items-center justify-center h-full px-2">{m.data?.sPrev||'-'}</div>
+                  </td>
+                  <td className="border-b border-r border-black text-[13px] font-normal text-black p-0">
+                    <div className="flex items-center justify-center h-full px-2">{m.data?.sCurr||'-'}</div>
+                  </td>
+                  <td className="border-b border-r border-black text-[13px] font-normal text-black p-0">
+                    <div className="flex items-center justify-center h-full px-2">{m.data ? m.data.sUsage.toLocaleString() : '-'}</div>
+                  </td>
+                  <td className="border-b border-r border-black text-[13px] font-normal text-black p-0">
+                    <div className="flex items-center justify-center h-full px-2">{m.data ? m.data.totalUsage.toLocaleString() : '-'}</div>
+                  </td>
                 </tr>
               ))}
             </tbody>

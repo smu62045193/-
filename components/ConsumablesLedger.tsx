@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ConsumableItem } from '../types';
 import { fetchConsumables, saveConsumables } from '../services/dataService';
-import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch, Lock } from 'lucide-react';
+import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch, Lock, Plus } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ConsumablesLedgerProps {
   onBack?: () => void;
@@ -33,7 +34,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
 
   const [newItem, setNewItem] = useState<ConsumableItem>({
     id: '',
-    date: new Date().toISOString().split('T')[0],
+    date: format(new Date(), 'yyyy-MM-dd'),
     category: CATEGORIES[0],
     itemName: '',
     modelName: '',
@@ -43,7 +44,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     stockQty: '',
     unit: 'EA',
     note: '',    
-    minStock: '5' 
+    minStock: '5',
+    isManual: false
   });
 
   useEffect(() => {
@@ -69,6 +71,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           minStock: params.get('minStock') || '5',
           note: params.get('note') || '',
           date: params.get('date') || prev.date,
+          isManual: params.get('isManual') === 'true',
           details: '' 
         }));
         // 여기서 바로 true를 설정하면 재고 계산 useEffect가 실행되지 않으므로 제거
@@ -153,7 +156,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       url.searchParams.set('unit', initialData.unit || 'EA');
       url.searchParams.set('minStock', initialData.minStock || '5');
       url.searchParams.set('note', initialData.note || '');
-      url.searchParams.set('date', initialData.date || '');
+      url.searchParams.set('date', format(new Date(), 'yyyy-MM-dd'));
+      url.searchParams.set('isManual', initialData.isManual ? 'true' : 'false');
+      url.searchParams.set('details', '');
     }
 
     window.open(
@@ -342,7 +347,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     }
   }, [items, summaryItems, searchTerm, viewMode]);
 
-  const totalPages = Math.ceil(processedList.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(processedList.length / ITEMS_PER_PAGE));
   const paginatedList = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return processedList.slice(start, start + ITEMS_PER_PAGE);
@@ -358,8 +363,11 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return pages;
   }, [currentPage, totalPages]);
 
-  const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center align-middle text-sm text-gray-700 h-10 whitespace-nowrap";
-  const tdClass = "border border-gray-300 px-3 py-2 text-sm text-gray-700 h-10 align-middle bg-white text-center";
+  const thClass = "bg-white border-b border-r border-black text-center text-[13px] font-normal text-black p-0 h-[40px]";
+  const tdClass = "border-b border-r border-black text-center text-[13px] font-normal text-black p-0 h-[40px]";
+  const inputClass = "bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center w-full h-full px-2";
+  const cellDivClass = "flex items-center justify-center h-full px-2 text-[13px] font-normal";
+  const cellDivLeftClass = "flex items-center justify-start h-full px-2 text-[13px] font-normal";
 
   if (isPopupMode) {
     const currentActiveMode = isPopupMode ? popupViewMode : viewMode;
@@ -442,9 +450,19 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               {currentActiveMode === 'usage' && (
                 <div>
                   <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">상세내역 (사용 장소/사유)</label>
-                  <textarea value={newItem.details} onChange={e => setNewItem({...newItem, details: e.target.value})} placeholder="사용 장소, 작업 내용 등 구체적인 사유 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24" />
+                  <textarea value={newItem.details} onChange={e => setNewItem({...newItem, details: e.target.value})} placeholder="사용 장소, 작업 내용 등 구체적인 사유 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-12" />
                 </div>
               )}
+              <div className="flex items-center gap-2 mt-2">
+                <input 
+                  type="checkbox" 
+                  id="isManualCheck" 
+                  checked={newItem.isManual || false} 
+                  onChange={e => setNewItem({...newItem, isManual: e.target.checked})} 
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="isManualCheck" className="text-sm font-bold text-gray-700 cursor-pointer">수기작업</label>
+              </div>
             </div>
           </div>
 
@@ -461,83 +479,92 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-2">
       {/* 툴바 */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
-        <div className="relative w-full md:w-[320px]">
-          <input 
-            type="text" 
-            placeholder="품명, 모델명, 상세내역 검색" 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm font-bold" 
-          />
-          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-        </div>
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button 
-            onClick={loadData}
-            disabled={loading}
-            className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-          <button 
-            onClick={() => {
-              let initialData;
-              if (viewMode === 'usage') {
-                if (processedList.length > 0) {
-                  initialData = processedList[0];
-                } else if (searchTerm.trim()) {
-                  initialData = { itemName: searchTerm.trim() } as any;
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex items-stretch shrink-0">
+          <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
+            <input 
+              type="text" 
+              placeholder="품명, 모델명, 상세내역 검색" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all" 
+            />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
+          </div>
+
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          <div className="flex items-center shrink-0">
+            <button 
+              onClick={loadData}
+              disabled={loading}
+              className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent disabled:opacity-50 text-gray-500 hover:text-black transition-colors whitespace-nowrap relative"
+            >
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </button>
+            <button 
+              onClick={() => {
+                let initialData;
+                if (viewMode === 'usage') {
+                  if (processedList.length > 0) {
+                    initialData = processedList[0];
+                  } else if (searchTerm.trim()) {
+                    initialData = { itemName: searchTerm.trim() } as any;
+                  }
                 }
-              }
-              openIndependentWindow('new', initialData);
-            }}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
-          >
-            <PlusCircle size={18} /> {viewMode === 'ledger' ? '소모품 등록/수정' : '소모품 사용/입고'}
-          </button>
+                openIndependentWindow('new', initialData);
+              }}
+              className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative"
+            >
+              <Plus size={18} className="mr-1.5" /> {viewMode === 'ledger' ? '등록' : '사용'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* 리스트 */}
-      <div className="bg-white rounded-xl border border-gray-300 overflow-hidden shadow-sm">
+      <div className="bg-white border-t border-l border-black max-w-7xl mx-auto overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[1000px] border-collapse">
+          <table className="w-full min-w-[1000px] border-collapse text-center">
             <thead>
               {viewMode === 'ledger' ? (
-                <tr>
-                  <th className={`${thClass} w-16`}>No</th>
-                  <th className={`${thClass} w-20`}>구분</th>
-                  <th className={`${thClass} text-left pl-6`}>품명</th>
-                  <th className={`${thClass} w-64`}>모델명</th>
-                  <th className={`${thClass} w-24`}>현재재고</th>
-                  <th className={`${thClass} w-20`}>적정재고</th>
-                  <th className={`${thClass} w-20`}>단위</th>
-                  <th className={`${thClass}`}>비고</th>
-                  <th className={`${thClass} w-28 print:hidden`}>관리</th>
+                <tr className="h-[40px]">
+                  <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>No</div></th>
+                  <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>구분</div></th>
+                  <th className={`${thClass} w-[180px]`}><div className={cellDivClass}>품명</div></th>
+                  <th className={`${thClass} w-[140px]`}><div className={cellDivClass}>모델명</div></th>
+                  <th className={`${thClass} w-[76px]`}><div className={cellDivClass}>현재재고</div></th>
+                  <th className={`${thClass} w-[76px]`}><div className={cellDivClass}>적정재고</div></th>
+                  <th className={`${thClass} w-[76px]`}><div className={cellDivClass}>단위</div></th>
+                  <th className={`${thClass} w-[180px]`}><div className={cellDivClass}>비고</div></th>
+                  <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>수기</div></th>
+                  <th className={`${thClass} w-[104px] print:hidden`}><div className={cellDivClass}>관리</div></th>
                 </tr>
               ) : (
-                <tr>
-                  <th className={`${thClass} w-16`}>No</th>
-                  <th className={`${thClass} w-36`}>날짜</th>
-                  <th className={`${thClass} w-20`}>구분</th>
-                  <th className={`${thClass} text-left pl-6`}>품명</th>
-                  <th className={`${thClass} w-56`}>모델명</th>
-                  <th className={`${thClass} w-20`}>입고</th>
-                  <th className={`${thClass} w-20`}>사용</th>
-                  <th className={`${thClass} w-24`}>재고</th>
-                  <th className={`${thClass}`}>상세내역</th>
-                  <th className={`${thClass} w-28 print:hidden`}>관리</th>
+                <tr className="h-[40px]">
+                  <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>No</div></th>
+                  <th className={`${thClass} w-[120px]`}><div className={cellDivClass}>날짜</div></th>
+                  <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>구분</div></th>
+                  <th className={`${thClass} w-[180px]`}><div className={cellDivClass}>품명</div></th>
+                  <th className={`${thClass} w-[140px]`}><div className={cellDivClass}>모델명</div></th>
+                  <th className={`${thClass} w-[36px]`}><div className={cellDivClass}>입고</div></th>
+                  <th className={`${thClass} w-[36px]`}><div className={cellDivClass}>사용</div></th>
+                  <th className={`${thClass} w-[36px]`}><div className={cellDivClass}>재고</div></th>
+                  <th className={`${thClass} w-[180px]`}><div className={cellDivClass}>상세내역</div></th>
+                  <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>수기</div></th>
+                  <th className={`${thClass} w-[104px] print:hidden`}><div className={cellDivClass}>관리</div></th>
                 </tr>
               )}
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody>
               {processedList.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-20 text-center text-gray-400 italic">
+                  <td colSpan={11} className="h-[100px] text-center text-[13px] text-black italic font-normal border-b border-r border-black">
                     {viewMode === 'usage' && !searchTerm.trim() ? '상단 검색창에 품명을 입력하면 내역이 표시됩니다.' : '내역이 없습니다.'}
                   </td>
                 </tr>
@@ -548,23 +575,26 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                   const minStock = parseFloat(item.minStock || '5');
                   const isLowStock = currentStock <= minStock;
                   return (
-                    <tr key={`summary-${item.id}`} className="hover:bg-gray-50/50 transition-colors">
-                      <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{globalIdx}</td>
-                      <td className={`${tdClass} font-normal text-blue-600`}>{item.category}</td>
-                      <td className={`${tdClass} text-left pl-6 font-normal text-gray-800`}>{item.itemName}</td>
-                      <td className={`${tdClass} text-gray-600`}>{item.modelName || '-'}</td>
+                    <tr key={`summary-${item.id}`} className="hover:bg-blue-50/30 transition-colors text-center h-[40px]">
+                      <td className={tdClass}><div className={cellDivClass}>{globalIdx}</div></td>
+                      <td className={`${tdClass} text-blue-600`}><div className={cellDivClass}>{item.category}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.itemName}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.modelName || '-'}</div></td>
                       <td className={tdClass}>
-                        <span className={`inline-block px-3 py-1 font-black rounded-lg text-sm ${isLowStock ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                          {item.stockQty}
-                        </span>
+                        <div className={cellDivClass}>
+                          <span className={`inline-block px-2 py-0.5 font-normal rounded text-[11px] ${isLowStock ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {item.stockQty}
+                          </span>
+                        </div>
                       </td>
-                      <td className={tdClass}>{item.minStock || '5'}</td>
-                      <td className={tdClass}>{item.unit}</td>
-                      <td className={`${tdClass} text-left px-4 text-gray-500 italic`}>{item.note}</td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.minStock || '5'}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.unit}</div></td>
+                      <td className={`${tdClass} text-left`}><div className={`${cellDivLeftClass} italic text-gray-500`}>{item.note}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.isManual ? 'O' : ''}</div></td>
                       <td className={`${tdClass} print:hidden`}>
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                        <div className="flex items-center justify-center gap-1 h-full px-2">
+                          <button onClick={() => openIndependentWindow(item.id)} className="p-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-all" title="수정"><Edit2 size={14} /></button>
+                          <button onClick={() => handleDeleteItem(item.id)} className="p-1 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded transition-all" title="삭제"><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>
@@ -574,20 +604,21 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                 paginatedList.map((item, idx) => {
                   const globalIdx = processedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
                   return (
-                    <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className={`${tdClass} text-gray-400 font-mono text-xs`}>{globalIdx}</td>
-                      <td className={`${tdClass} font-bold text-gray-700`}>{item.date}</td>
-                      <td className={`${tdClass} font-normal text-blue-600`}>{item.category}</td>
-                      <td className={`${tdClass} text-left pl-6 font-normal text-gray-800`}>{item.itemName}</td>
-                      <td className={tdClass}>{item.modelName}</td>
-                      <td className={`${tdClass} text-blue-600 font-bold`}>{item.inQty !== '0' && item.inQty !== '' ? item.inQty : ''}</td>
-                      <td className={`${tdClass} text-red-600 font-bold`}>{item.outQty !== '0' && item.outQty !== '' ? item.outQty : ''}</td>
-                      <td className={`${tdClass} font-black text-emerald-700`}>{item.stockQty}</td>
-                      <td className={`${tdClass} text-left px-4 text-gray-500 italic`}>{item.details}</td>
+                    <tr key={item.id} className="hover:bg-blue-50/30 transition-colors text-center h-[40px]">
+                      <td className={tdClass}><div className={cellDivClass}>{globalIdx}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.date}</div></td>
+                      <td className={`${tdClass} text-blue-600`}><div className={cellDivClass}>{item.category}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.itemName}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.modelName}</div></td>
+                      <td className={`${tdClass} text-blue-600`}><div className={cellDivClass}>{item.inQty !== '0' && item.inQty !== '' ? item.inQty : ''}</div></td>
+                      <td className={`${tdClass} text-red-600`}><div className={cellDivClass}>{item.outQty !== '0' && item.outQty !== '' ? item.outQty : ''}</div></td>
+                      <td className={`${tdClass} text-emerald-700`}><div className={cellDivClass}>{item.stockQty}</div></td>
+                      <td className={`${tdClass} text-left`}><div className={cellDivLeftClass + " italic text-gray-500"}>{item.details}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{item.isManual ? 'O' : ''}</div></td>
                       <td className={`${tdClass} print:hidden`}>
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={() => handleDeleteItem(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
+                        <div className="flex items-center justify-center gap-1 h-full px-2">
+                          <button onClick={() => openIndependentWindow(item.id)} className="p-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-all" title="수정"><Edit2 size={14} /></button>
+                          <button onClick={() => handleDeleteItem(item.id)} className="p-1 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded transition-all" title="삭제"><Trash2 size={14} /></button>
                         </div>
                       </td>
                     </tr>
@@ -599,40 +630,46 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         </div>
       </div>
 
-      {/* 페이지네이션 - 리스트 박스 외부로 이동 */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-6 py-4">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-            disabled={currentPage === 1}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <div className="flex items-center gap-1.5 px-4">
-            {visiblePageNumbers.map(pageNum => (
+      {/* 페이지네이션 - 미니멀 텍스트 스타일 */}
+      <div className="flex items-center justify-center gap-2 py-4 print:hidden">
+        <button
+          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+          disabled={currentPage === 1}
+          className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        
+        <div className="flex items-center gap-2">
+          {totalPages <= 1 ? (
+            <button className="w-9 h-9 bg-transparent border-none text-black font-bold scale-110 cursor-default flex items-center justify-center">
+              <span className="text-[13px]">1</span>
+            </button>
+          ) : (
+            visiblePageNumbers.map(pageNum => (
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
-                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
                   currentPage === pageNum
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                    ? 'text-black font-bold scale-110 cursor-default'
+                    : 'text-black font-normal hover:text-blue-500 cursor-pointer'
                 }`}
               >
-                {pageNum}
+                <span className="text-[13px]">{pageNum}</span>
               </button>
-            ))}
-          </div>
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
-          >
-            <ChevronRight size={18} />
-          </button>
+            ))
+          )}
         </div>
-      )}
+
+        <button
+          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+          disabled={currentPage === totalPages || totalPages <= 1}
+          className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
 
       <style>{`
         @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }

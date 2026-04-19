@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import { ConstructionWorkItem, WorkPhoto } from '../types';
 import { 
   fetchExternalWorkList, 
@@ -35,7 +37,7 @@ const resizeImage = (file: File): Promise<string> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_SIZE = 1000;
+        const MAX_SIZE = 800;
         if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
@@ -262,6 +264,58 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
     } catch (e) { alert('삭제 중 오류 발생'); } finally { setLoading(false); }
   };
 
+  const handleDownloadAllImages = async (item: ConstructionWorkItem) => {
+    if (!item.photos || item.photos.length === 0) {
+      alert('다운로드할 이미지가 없습니다.');
+      return;
+    }
+
+    try {
+      const zip = new JSZip();
+      const folderName = `${item.date}_${item.company || '작업'}_이미지`;
+      
+      const downloadPromises = item.photos.map(async (photo, index) => {
+        if (!photo.dataUrl) return;
+        try {
+          let blob: Blob;
+          if (photo.dataUrl.startsWith('data:')) {
+            // Base64 처리
+            const response = await fetch(photo.dataUrl);
+            blob = await response.blob();
+          } else {
+            // URL 처리
+            const response = await fetch(photo.dataUrl);
+            blob = await response.blob();
+          }
+
+          // 확장자 추출 (없으면 jpg)
+          let extension = 'jpg';
+          const urlToParse = photo.dataUrl;
+          if (urlToParse.includes('.')) {
+            const parts = urlToParse.split('.');
+            const lastPart = parts[parts.length - 1].split('?')[0].toLowerCase();
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(lastPart)) {
+              extension = lastPart;
+            }
+          } else if (photo.dataUrl.startsWith('data:image/')) {
+            extension = photo.dataUrl.split(';')[0].split('/')[1];
+          }
+          
+          zip.file(`${folderName}/image_${index + 1}.${extension}`, blob);
+        } catch (error) {
+          console.error(`이미지 다운로드 실패: ${photo.dataUrl}`, error);
+        }
+      });
+
+      await Promise.all(downloadPromises);
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `${folderName}.zip`);
+    } catch (error) {
+      console.error("압축 파일 생성 실패", error);
+      alert("이미지 압축 중 오류가 발생했습니다.");
+    }
+  };
+
   const filteredItems = useMemo(() => {
     if (!searchTerm.trim()) return items;
     const lowerSearch = searchTerm.toLowerCase();
@@ -403,84 +457,96 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
   }
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px] animate-fade-in">
-      <div className="p-6 space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-center mb-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 shadow-sm gap-4 print:hidden">
-          <div className="flex items-center gap-4 w-full md:w-auto">
-            <h2 className="text-xl font-bold text-gray-800 whitespace-nowrap">{mode === 'external' ? '외부업체 공사' : '시설직 작업'} 관리 대장</h2>
-            <div className="relative flex-1 md:w-[320px] lg:w-[320px]">
+    <div className="space-y-2 animate-fade-in pb-10">
+      <div className="w-full max-w-7xl mx-auto bg-white">
+        <div className="flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          <div className="flex items-stretch shrink-0">
+            <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
               <input 
                 type="text" 
                 placeholder="내용, 업체명 검색..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white text-black outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
+                className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all"
               />
-              <Search className="absolute left-3.5 top-3 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
             </div>
           </div>
-          <div className="flex items-center gap-2 w-full md:w-auto">
+
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          <div className="flex items-center shrink-0">
             <button 
               onClick={loadData} 
               disabled={loading}
-              className="flex-1 md:flex-none flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all text-sm active:scale-95 disabled:opacity-50"
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+              title="새로고침"
             >
-              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-              <span>새로고침</span>
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
             </button>
+            
             <button 
               onClick={() => openIndependentWindow()} 
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all text-sm flex-1 md:flex-none active:scale-95"
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
             >
-              <Plus size={18} />
-              작업 등록
+              <Plus size={18} className="mr-1.5" />
+              등록
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition-all">
-          <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[1000px] border-collapse border border-gray-300">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-16 border border-gray-300">No</th>
-                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-32 border border-gray-300">일자</th>
-                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-300">구분</th>
-                {mode === 'external' && <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-48 border border-gray-300">업체명</th>}
-                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider border border-gray-300">작업내용</th>
-                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20 border border-gray-300">사진</th>
-                <th className="px-4 py-2 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-24 border border-gray-300">관리</th>
+      <div className="max-w-7xl mx-auto bg-white border border-black overflow-hidden">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full min-w-[1000px] border-collapse text-center">
+            <thead>
+              <tr className="bg-white border-b border-black h-[40px]">
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-16 border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">No</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-32 border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">일자</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-24 border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">구분</div></th>
+                {mode === 'external' && <th className="text-[13px] font-normal text-black uppercase tracking-wider w-48 border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">업체명</div></th>}
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">작업내용</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-20 border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">사진</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-24 px-2"><div className="flex items-center justify-center h-full px-2">관리</div></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-black">
               {paginatedItems.length === 0 ? (
-                <tr>
-                  <td colSpan={mode === 'external' ? 7 : 6} className="px-4 py-20 text-center text-gray-400 italic text-sm border border-gray-300">
-                    등록된 {mode === 'external' ? '외부업체' : '시설직'} 내역이 없습니다.
+                <tr className="h-[40px]">
+                  <td colSpan={mode === 'external' ? 7 : 6} className="text-center text-gray-400 italic border-b border-black text-[13px] font-normal px-2">
+                    <div className="flex items-center justify-center h-full py-24">
+                      등록된 {mode === 'external' ? '외부업체' : '시설직'} 내역이 없습니다.
+                    </div>
                   </td>
                 </tr>
               ) : (
                 paginatedItems.map((item, idx) => {
                   const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
                   return (
-                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-2 text-center text-gray-400 font-mono text-xs border border-gray-300">{globalIdx}</td>
-                      <td className="px-4 py-2 text-center text-sm text-gray-700 border border-gray-300">{item.date}</td>
-                      <td className="px-4 py-2 text-center border border-gray-300">
-                         <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px]">{item.category}</span>
+                    <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{globalIdx}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.date}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                        <div className="flex items-center justify-center h-full px-2">
+                          <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px]">{item.category}</span>
+                        </div>
                       </td>
-                      {mode === 'external' && <td className="px-4 py-2 text-center text-sm font-bold text-gray-800 border border-gray-300">{item.company || '-'}</td>}
-                      <td className="px-4 py-2 text-center text-sm text-gray-700 whitespace-pre-wrap border border-gray-300">{item.content}</td>
-                      <td className="px-4 py-2 text-center border border-gray-300">
-                        <div className="flex items-center justify-center gap-1 text-blue-500 font-bold text-xs">
+                      {mode === 'external' && <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.company || '-'}</div></td>}
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2 whitespace-pre-wrap"><div className="flex items-center justify-center h-full px-2">{item.content}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                        <div className="flex items-center justify-center h-full px-2 gap-1 text-blue-500 font-bold text-xs">
                           <ImageIcon size={14} />
                           {item.photos.length}
                         </div>
                       </td>
-                      <td className="px-4 py-2 text-center border border-gray-300">
-                        <div className="flex items-center justify-center space-x-2">
-                          <button onClick={() => openIndependentWindow(String(item.id))} className="text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 p-1.5 rounded-lg transition-colors shadow-sm" title="수정"><Edit2 size={16} /></button>
-                          <button onClick={(e) => handleDelete(e, item)} className="text-red-600 bg-red-50 border border-red-200 hover:bg-red-100 p-1.5 rounded-lg transition-colors shadow-sm" title="삭제"><Trash2 size={16} /></button>
+                      <td className="text-center text-black text-[13px] font-normal px-2">
+                        <div className="flex items-center justify-center h-full px-2 gap-1 py-1">
+                          <button onClick={() => handleDownloadAllImages(item)} className="p-2 bg-green-50 text-green-600 hover:bg-green-600 hover:text-white rounded-lg transition-all" title="이미지 전체 다운로드"><Download size={16} /></button>
+                          <button onClick={() => openIndependentWindow(String(item.id))} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
+                          <button onClick={(e) => handleDelete(e, item)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -492,14 +558,42 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         </div>
       </div>
 
+      {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className={`p-2 rounded-lg border transition-all ${currentPage === 1 ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronLeft size={18} /></button>
-          <div className="flex items-center gap-1 px-4">{visiblePageNumbers.map(pageNum => (<button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'}`}>{pageNum}</button>))}</div>
-          <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className={`p-2 rounded-lg border transition-all ${currentPage === totalPages ? 'bg-gray-100 text-gray-300 cursor-not-allowed border-gray-200' : 'bg-white text-gray-600 hover:bg-gray-100 border-gray-300 shadow-sm active:scale-90'}`}><ChevronRight size={18} /></button>
+        <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 mt-6">
+          <button
+            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+            disabled={currentPage === 1}
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {visiblePageNumbers.map(pageNum => (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
+                  currentPage === pageNum
+                    ? 'text-black font-bold scale-110 cursor-default'
+                    : 'text-black font-normal hover:text-blue-500 cursor-pointer'
+                }`}
+              >
+                <span className="text-[13px]">{pageNum}</span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
+          >
+            <ChevronRight size={18} />
+          </button>
         </div>
       )}
-    </div>
     </div>
   );
 };

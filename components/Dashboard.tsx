@@ -487,93 +487,106 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-3 pb-20">
+    <div className="p-4 max-w-7xl mx-auto space-y-2 pb-32">
       
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+      <div className="bg-white shadow-sm border border-black overflow-hidden">
+        <div className="bg-slate-50 px-6 pt-4 border-b border-black flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="flex items-center gap-4 pb-3">
             <div className="flex items-center gap-2">
               <Calendar className="text-emerald-600" size={20} />
               <h3 className="font-black text-xl text-slate-800 tracking-tight">금일 시설 근무 현황</h3>
             </div>
-            <span className={`px-6 py-2.5 rounded-xl font-bold text-sm uppercase tracking-widest shadow-md transition-colors ${isHolidayMode ? 'bg-rose-600 text-white' : 'bg-blue-600 text-white'}`}>
-              {isHolidayMode ? '휴일 근무' : '평일 근무'}
-            </span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button 
+          <div className="flex flex-wrap items-center gap-6">
+            <div className={`relative pb-3 font-bold text-sm transition-colors ${isHolidayMode ? 'text-rose-600' : 'text-blue-600'}`}>
+              {isHolidayMode ? '휴일 근무' : '평일 근무'}
+              <div className={`absolute bottom-0 left-0 w-full h-1 ${isHolidayMode ? 'bg-rose-600' : 'bg-blue-600'}`}></div>
+            </div>
+
+            <div 
               onClick={() => loadData('2-shift')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('2-shift') ? 'bg-emerald-600 text-white border-emerald-700' : 'bg-slate-100 text-slate-500 border-slate-200'}`}
+              className={`relative pb-3 font-bold text-sm cursor-pointer transition-colors flex items-center gap-1 ${isAutoActiveOnCurrentDate('2-shift') ? 'text-emerald-600' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              <Power size={16} />
+              <Power size={14} />
               2교대 자동 {isAutoActiveOnCurrentDate('2-shift') ? '[ON]' : '[OFF]'}
-            </button>
+              {isAutoActiveOnCurrentDate('2-shift') && <div className="absolute bottom-0 left-0 w-full h-1 bg-emerald-600"></div>}
+            </div>
 
-            <button 
+            <div 
               onClick={() => loadData('3-shift')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all border shadow-sm active:scale-95 ${isAutoActiveOnCurrentDate('3-shift') ? 'bg-violet-600 text-white border-violet-700' : 'bg-slate-100 text-slate-500 border-slate-200'}`}
+              className={`relative pb-3 font-bold text-sm cursor-pointer transition-colors flex items-center gap-1 ${isAutoActiveOnCurrentDate('3-shift') ? 'text-violet-600' : 'text-slate-500 hover:text-slate-800'}`}
             >
-              <Power size={16} />
+              <Power size={14} />
               3교대 자동 {isAutoActiveOnCurrentDate('3-shift') ? '[ON]' : '[OFF]'}
-            </button>
-
-            <div className="h-6 w-px bg-slate-200 mx-1"></div>
+              {isAutoActiveOnCurrentDate('3-shift') && <div className="absolute bottom-0 left-0 w-full h-1 bg-violet-600"></div>}
+            </div>
 
             {isDutyEditing ? (
-              <div className="flex gap-2">
-                <button onClick={handleLocalConfirm} className="flex items-center px-6 py-2.5 bg-orange-600 text-white rounded-xl font-bold shadow-md text-sm active:scale-95">
-                  <CheckCircle size={18} className="mr-2" />편집완료
-                </button>
+              <div 
+                onClick={handleLocalConfirm} 
+                className="relative pb-3 text-orange-600 font-bold text-sm cursor-pointer transition-colors flex items-center gap-1 group"
+              >
+                <CheckCircle size={14} />수정완료
+                <div className="absolute bottom-0 left-0 w-full h-1 bg-orange-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </div>
             ) : (
-              <div className="flex gap-2">
-                <button onClick={startManualEdit} className="flex items-center px-6 py-2.5 bg-gray-100 text-slate-600 border border-slate-200 rounded-xl font-bold shadow-sm text-sm hover:bg-gray-200 active:scale-95"><Edit2 size={18} className="mr-2" />편집</button>
-                <button 
-                  onClick={() => handleSave(dutyWasEdited)} 
-                  disabled={saveStatus === 'loading'} 
-                  className={`flex items-center px-6 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md active:scale-95 ${saveStatus === 'loading' ? 'bg-blue-400 text-white cursor-wait' : saveStatus === 'success' ? 'bg-green-600 text-white' : saveStatus === 'error' ? 'bg-red-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+              <>
+                <div 
+                  onClick={startManualEdit} 
+                  className="relative pb-3 text-slate-600 font-bold text-sm cursor-pointer transition-colors flex items-center gap-1 group"
                 >
-                  {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin mr-2" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-2" /> : <Save size={18} className="mr-2" />}
-                  {saveStatus === 'loading' ? '저장 중...' : saveStatus === 'success' ? '저장 완료' : '서버저장'}
-                </button>
-              </div>
+                  <Edit2 size={14} />수정
+                  <div className="absolute bottom-0 left-0 w-full h-1 bg-slate-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+                <div 
+                  onClick={() => !saveStatus.includes('loading') && handleSave(dutyWasEdited)} 
+                  className={`relative pb-3 font-bold text-sm transition-colors flex items-center gap-1 ${saveStatus === 'loading' ? 'text-blue-400 cursor-wait' : saveStatus === 'success' ? 'text-green-600' : saveStatus === 'error' ? 'text-red-600' : 'text-blue-600 cursor-pointer group'}`}
+                >
+                  {saveStatus === 'loading' ? <RefreshCw size={14} className="animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={14} /> : <Save size={14} />}
+                  {saveStatus === 'loading' ? '저장 중...' : saveStatus === 'success' ? '저장 완료' : '저장'}
+                  {(!saveStatus.includes('loading') && saveStatus !== 'success' && saveStatus !== 'error') && <div className="absolute bottom-0 left-0 w-full h-1 bg-blue-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>}
+                </div>
+              </>
             )}
           </div>
         </div>
 
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="space-y-3">
-              <label className="text-[11px] font-black text-slate-400 flex items-center justify-between uppercase tracking-tighter">주간 {isHolidayMode && <span className="text-rose-500 font-bold">[휴무]</span>}</label>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="flex items-center gap-3">
+              <label className="text-[12px] font-black text-slate-500 flex flex-col uppercase tracking-tighter shrink-0 w-10">
+                주간 
+                {isHolidayMode && <span className="text-rose-500 font-bold text-[10px]">[휴무]</span>}
+              </label>
               {isDutyEditing ? (
-                <input type="text" value={dutyStatus.day || ''} onChange={(e) => updateDutyField('day', e.target.value)} className="w-full bg-emerald-50/30 border-2 border-emerald-200 rounded-2xl px-5 py-4 text-emerald-700 text-lg font-black outline-none focus:ring-2 focus:ring-emerald-400" placeholder="성명" />
+                <input type="text" value={dutyStatus.day || ''} onChange={(e) => updateDutyField('day', e.target.value)} className="flex-1 w-full bg-emerald-50/30 border border-black px-3 py-3 text-emerald-700 text-lg font-black outline-none focus:ring-2 focus:ring-emerald-400" placeholder="성명" />
               ) : (
-                <div className={`border-2 rounded-2xl px-5 py-4 min-h-[70px] flex items-center justify-center shadow-sm ${isHolidayMode ? 'bg-slate-50 border-slate-100 opacity-60' : 'bg-emerald-50 border-emerald-100'}`}><span className={`${isHolidayMode ? 'text-slate-400' : 'text-emerald-700'} font-black text-xl tracking-tight`}>{dutyStatus.day || (isHolidayMode ? '휴무' : '-')}</span></div>
+                <div className={`flex-1 border border-black px-3 py-3 min-h-[50px] flex items-center justify-center shadow-sm ${isHolidayMode ? 'bg-slate-50 opacity-60' : 'bg-emerald-50'}`}><span className={`${isHolidayMode ? 'text-slate-400' : 'text-emerald-700'} font-black text-lg tracking-tight`}>{dutyStatus.day || (isHolidayMode ? '휴무' : '-')}</span></div>
               )}
             </div>
-            <div className="space-y-3">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-tighter">당직</label>
+            <div className="flex items-center gap-3">
+              <label className="text-[12px] font-black text-slate-500 uppercase tracking-tighter shrink-0 w-10">당직</label>
               {isDutyEditing ? (
-                <input type="text" value={dutyStatus.night || ''} onChange={(e) => updateDutyField('night', e.target.value)} className="w-full bg-orange-50/30 border-2 border-orange-200 rounded-2xl px-5 py-4 text-blue-600 text-lg font-black outline-none focus:ring-2 focus:ring-orange-400" placeholder="성명" />
+                <input type="text" value={dutyStatus.night || ''} onChange={(e) => updateDutyField('night', e.target.value)} className="flex-1 w-full bg-orange-50/30 border border-black px-3 py-3 text-blue-600 text-lg font-black outline-none focus:ring-2 focus:ring-orange-400" placeholder="성명" />
               ) : (
-                <div className="bg-orange-50 border-2 border-orange-200 rounded-2xl px-5 py-4 min-h-[70px] flex items-center justify-center shadow-sm"><span className="text-blue-600 font-black text-xl tracking-tight">{dutyStatus.night || '-'}</span></div>
+                <div className="flex-1 bg-orange-50 border border-black px-3 py-3 min-h-[50px] flex items-center justify-center shadow-sm"><span className="text-blue-600 font-black text-lg tracking-tight">{dutyStatus.night || '-'}</span></div>
               )}
             </div>
-            <div className="space-y-3">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-tighter">비번</label>
+            <div className="flex items-center gap-3">
+              <label className="text-[12px] font-black text-slate-500 uppercase tracking-tighter shrink-0 w-10">비번</label>
               {isDutyEditing ? (
-                <input type="text" value={dutyStatus.off || ''} onChange={(e) => updateDutyField('off', e.target.value)} className="w-full bg-slate-50 border-2 border-slate-200 rounded-2xl px-5 py-4 text-slate-700 text-lg font-black outline-none focus:ring-2 focus:ring-slate-400" placeholder="성명" />
+                <input type="text" value={dutyStatus.off || ''} onChange={(e) => updateDutyField('off', e.target.value)} className="flex-1 w-full bg-slate-50 border border-black px-3 py-3 text-slate-700 text-lg font-black outline-none focus:ring-2 focus:ring-slate-400" placeholder="성명" />
               ) : (
-                <div className="bg-slate-50 border-2 border-slate-100 rounded-2xl px-5 py-4 min-h-[70px] flex items-center justify-center shadow-sm"><span className="text-slate-700 font-black text-xl tracking-tight">{dutyStatus.off || '-'}</span></div>
+                <div className="flex-1 bg-slate-50 border border-black px-3 py-3 min-h-[50px] flex items-center justify-center shadow-sm"><span className="text-slate-700 font-black text-lg tracking-tight">{dutyStatus.off || '-'}</span></div>
               )}
             </div>
-            <div className="space-y-3">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-tighter">휴가</label>
+            <div className="flex items-center gap-3">
+              <label className="text-[12px] font-black text-slate-500 uppercase tracking-tighter shrink-0 w-10">휴가</label>
               {isDutyEditing ? (
-                <input type="text" value={dutyStatus.vacation || ''} onChange={(e) => updateDutyField('vacation', e.target.value)} className="w-full bg-white border-2 border-slate-200 rounded-2xl px-5 py-4 text-slate-900 text-lg font-black outline-none focus:ring-2 focus:ring-slate-400" placeholder="휴가 인원" />
+                <input type="text" value={dutyStatus.vacation || ''} onChange={(e) => updateDutyField('vacation', e.target.value)} className="flex-1 w-full bg-white border border-black px-3 py-3 text-slate-900 text-lg font-black outline-none focus:ring-2 focus:ring-slate-400" placeholder="휴가 인원" />
               ) : (
-                <div className="bg-white border-2 border-slate-100 rounded-2xl px-5 py-4 min-h-[70px] flex items-center justify-center shadow-sm"><span className="text-slate-900 font-black text-xl tracking-tight">{dutyStatus.vacation || '-'}</span></div>
+                <div className="flex-1 bg-white border border-black px-3 py-3 min-h-[50px] flex items-center justify-center shadow-sm"><span className="text-slate-900 font-black text-lg tracking-tight">{dutyStatus.vacation || '-'}</span></div>
               )}
             </div>
           </div>
@@ -585,9 +598,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col lg:flex-row items-center gap-6">
+      <div className="bg-white border border-black p-5 shadow-sm flex flex-col lg:flex-row items-center gap-6">
         <div className="flex items-center gap-3 shrink-0">
-          <div className="p-3 bg-blue-600 rounded-2xl shadow-lg text-white"><Search size={24} /></div>
+          <div className="p-3 bg-blue-600 text-white"><Search size={24} /></div>
           <div>
             <h3 className="font-black text-xl text-slate-800 tracking-tight">과거 업무 일지 검색</h3>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Archive Retrieval System</p>
@@ -596,17 +609,17 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
         <div className="flex flex-1 w-full gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input type="text" placeholder="전체 기간 기록에서 검색어 입력..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-base outline-none font-bold focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
+            <input type="text" placeholder="전체 기간 기록에서 검색어 입력..." className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-black text-base outline-none font-bold focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSearch()} />
           </div>
-          <button onClick={() => handleSearch()} disabled={isSearching} className="px-8 py-3 bg-blue-600 text-white rounded-2xl font-black shadow-xl hover:bg-blue-700 transition-all flex items-center gap-2 whitespace-nowrap active:scale-95 disabled:bg-slate-400">
+          <button onClick={() => handleSearch()} disabled={isSearching} className="px-8 py-3 bg-blue-600 text-white font-black shadow-xl hover:bg-blue-700 transition-all flex items-center gap-2 whitespace-nowrap active:scale-95 disabled:bg-slate-400">
             {isSearching ? <RefreshCw size={20} className="animate-spin" /> : <Search size={20} />}
             {isSearching ? "검색 중" : "검색하기"}
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+      <div className="bg-white shadow-sm border border-black overflow-hidden">
+        <div className="bg-slate-50 px-6 py-4 border-b border-black flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ClipboardList className="text-indigo-600" size={20} />
             <h3 className="font-black text-xl text-slate-800 tracking-tight">금일 중요 업무 요약</h3>
@@ -623,9 +636,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {keyWorkTasks.map((section, idx) => (
-                <div key={idx} className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100 hover:border-indigo-200 transition-colors group">
-                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
-                    <div className="p-2.5 bg-white rounded-xl text-slate-500 shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-colors">{section.icon}</div>
+                <div key={idx} className="bg-slate-50/50 p-6 border border-black hover:border-indigo-400 transition-colors group">
+                  <div className="flex items-center gap-3 mb-4 pb-4 border-b border-black">
+                    <div className="p-2.5 bg-white text-slate-500 shadow-sm border border-black group-hover:bg-indigo-600 group-hover:text-white transition-colors">{section.icon}</div>
                     <span className="font-black text-slate-800 tracking-tight">{section.label}</span>
                   </div>
                   <ul className="space-y-3">

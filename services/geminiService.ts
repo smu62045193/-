@@ -70,7 +70,9 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
       weatherCache.set(storageKey, parsed);
       return parsed;
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('localStorage getItem error:', e);
+  }
 
   if (pendingRequests.has(storageKey)) return pendingRequests.get(storageKey)!;
 
@@ -89,7 +91,9 @@ export const fetchWeatherInfo = async (dateStr: string, force: boolean = false, 
 
         const weatherData = JSON.parse(response.text || '{}');
         weatherCache.set(storageKey, weatherData);
-        try { localStorage.setItem(storageKey, JSON.stringify(weatherData)); } catch (e) {}
+        try { localStorage.setItem(storageKey, JSON.stringify(weatherData)); } catch (e) {
+          console.error('localStorage setItem error:', e);
+        }
         return weatherData;
       });
     } catch (error) {

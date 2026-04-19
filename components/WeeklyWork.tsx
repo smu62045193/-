@@ -4,7 +4,7 @@ import { startOfWeek, addDays, format, subDays, parseISO, isWithinInterval } fro
 import { HOLIDAYS } from '../constants';
 import { fetchWeeklyReport, saveWeeklyReport, fetchDateRangeData, fetchExternalWorkList, fetchInternalWorkList } from '../services/dataService';
 import { WeeklyReportData, WeeklyWorkPhoto, TaskItem, ConstructionWorkItem, WorkPhoto, LogCategory, WorkLogData } from '../types';
-import { Printer, Save, Upload, X, RefreshCw, Plus, CheckSquare, Square, CheckCircle2, Calendar, Image as ImageIcon, Sparkles, LayoutList, ClipboardEdit, Cloud, CheckCircle, ClipboardList, Lock, Edit2 } from 'lucide-react';
+import { Printer, Save, Upload, X, RefreshCw, Plus, CheckSquare, Square, CheckCircle2, Calendar, Image as ImageIcon, Sparkles, LayoutList, ClipboardEdit, Cloud, CheckCircle, ClipboardList, Lock, Edit2, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import WeeklyReportList from './WeeklyReportList';
 import { 
   getAutomatedElectricalTasks, 
@@ -49,6 +49,18 @@ const FIELDS = [
   { id: 'security', label: '경비' },
   { id: 'cleaning', label: '미화' },
   { id: 'handover', label: '특이사항' },
+];
+
+const SUB_TABS = [
+  { id: 'electrical', label: '전기' },
+  { id: 'mechanical', label: '기계' },
+  { id: 'fire', label: '소방' },
+  { id: 'elevator', label: '승강기' },
+  { id: 'parking', label: '주차' },
+  { id: 'security', label: '경비' },
+  { id: 'cleaning', label: '미화' },
+  { id: 'handover', label: '특이사항' },
+  { id: 'photos', label: '작업사진' },
 ];
 
 const createDefaultPhotos = (): WeeklyWorkPhoto[] => [
@@ -103,6 +115,7 @@ const resizeImage = (file: File): Promise<string> => {
 
 const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) => {
   const [activeTab, setActiveTab] = useState<'form' | 'list'>('list');
+  const [activeSubTab, setActiveSubTab] = useState('electrical');
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectableItems, setSelectableItems] = useState<SelectableItem[]>([]);
@@ -110,6 +123,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   const [selectablePhotos, setSelectablePhotos] = useState<SelectablePhoto[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [photoGroupingMode, setPhotoGroupingMode] = useState<'date' | 'content'>('date');
   
   const startOfCurrentWeek = startOfWeek(currentDate, { weekStartsOn: 1 });
   const startDateStr = format(startOfCurrentWeek, 'yyyy-MM-dd');
@@ -129,7 +143,9 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       mechanical: { thisWeek: '', results: '', nextWeek: '' },
       fire: { thisWeek: '', results: '', nextWeek: '' },
       elevator: { thisWeek: '', results: '', nextWeek: '' },
-      park_sec_clean: { thisWeek: '', results: '', nextWeek: '' },
+      parking: { thisWeek: '', results: '', nextWeek: '' },
+      security: { thisWeek: '', results: '', nextWeek: '' },
+      cleaning: { thisWeek: '', results: '', nextWeek: '' },
       handover: { thisWeek: '', results: '', nextWeek: '' },
     },
     photos: createDefaultPhotos()
@@ -140,19 +156,18 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       document.querySelectorAll('.auto-expand-textarea').forEach((ta) => {
         const element = ta as HTMLTextAreaElement;
         element.style.height = 'auto';
-        const newHeight = Math.min(element.scrollHeight, 200);
-        element.style.height = `${newHeight}px`;
+        element.style.height = `${element.scrollHeight}px`;
       });
     };
-    const timer = setTimeout(adjustHeight, 100);
+    const timer = setTimeout(adjustHeight, 50);
     return () => clearTimeout(timer);
-  }, [report, activeTab]);
+  }, [report, activeTab, activeSubTab]);
 
   useEffect(() => {
     const newStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const newStartStr = format(newStart, 'yyyy-MM-dd');
     loadReport(newStartStr);
-  }, [startDateStr]);
+  }, [currentDate, startDateStr]);
 
   const loadReport = async (dateKey: string) => {
     setLoading(true);
@@ -228,12 +243,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           const selThis = items.filter(i => i.fieldKey === field.id && i.weekType === 'this' && i.selected);
           const selNext = items.filter(i => i.fieldKey === field.id && i.weekType === 'next' && i.selected);
           
-          const formatGroup = (items: SelectableItem[], isThis: boolean) => {
-            return items.map(it => {
-              const dateSuffix = (isThis && it.dayName) ? `(${it.dayName})` : '';
-              return `- ${it.content}${dateSuffix}`;
-            }).join('\n');
-          };
+          if (selThis.length === 0 && selNext.length === 0) return;
 
           const resultsList: string[] = selThis.map(it => {
             const text = it.content;
@@ -249,23 +259,35 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             return res;
           });
 
-          const thisStr = formatGroup(selThis, true);
-          const nextStr = formatGroup(selNext, false);
-          const resStr = resultsList.join('\n');
+          const currentThisLines = (newFields[field.id as keyof typeof newFields]?.thisWeek || '').split('\n').map(l => l.trim()).filter(l => l !== '');
+          const currentResLines = (newFields[field.id as keyof typeof newFields]?.results || '').split('\n').map(l => l.trim()).filter(l => l !== '');
+          const currentNextLines = (newFields[field.id as keyof typeof newFields]?.nextWeek || '').split('\n').map(l => l.trim()).filter(l => l !== '');
 
-          if (thisStr) {
-            newFields[field.id] = {
-              ...newFields[field.id],
-              thisWeek: newFields[field.id]?.thisWeek ? newFields[field.id].thisWeek + '\n' + thisStr : thisStr,
-              results: newFields[field.id]?.results ? newFields[field.id].results + '\n' + resStr : resStr
-            };
-          }
-          if (nextStr) {
-            newFields[field.id] = {
-              ...newFields[field.id],
-              nextWeek: newFields[field.id]?.nextWeek ? newFields[field.id].nextWeek + '\n' + nextStr : nextStr
-            };
-          }
+          const updatedThisLines = [...currentThisLines];
+          const updatedResLines = [...currentResLines];
+          const updatedNextLines = [...currentNextLines];
+
+          selThis.forEach((it, idx) => {
+            const dateSuffix = it.dayName ? `(${it.dayName})` : '';
+            const content = `${it.content}${dateSuffix}`;
+            if (!updatedThisLines.includes(content)) {
+              updatedThisLines.push(content);
+              updatedResLines.push(resultsList[idx]);
+            }
+          });
+
+          selNext.forEach(it => {
+            const content = it.content;
+            if (!updatedNextLines.includes(content)) {
+              updatedNextLines.push(content);
+            }
+          });
+
+          newFields[field.id as keyof typeof newFields] = {
+            thisWeek: updatedThisLines.join('\n'),
+            results: updatedResLines.join('\n'),
+            nextWeek: updatedNextLines.join('\n')
+          };
         });
 
         return { ...prev, fields: newFields };
@@ -339,6 +361,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
         });
       };
       process(ext || []); process(int || []);
+      photos.sort((a, b) => a.date.localeCompare(b.date));
       setSelectablePhotos(photos); setIsPhotoModalOpen(true);
     } catch (e) { alert('사진 로드 오류'); } finally { setLoading(false); }
   };
@@ -384,7 +407,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       const formatGroup = (items: SelectableItem[], isThis: boolean) => {
         return items.map(it => {
           const dateSuffix = (isThis && it.dayName) ? `(${it.dayName})` : '';
-          return `- ${it.content}${dateSuffix}`;
+          return `${it.content}${dateSuffix}`;
         }).join('\n');
       };
 
@@ -452,7 +475,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
         
         categoryRows += `
           <tr>
-            ${isFirst ? `<td rowspan="${rowCount}" style="font-weight:bold; background:#f9fafb; text-align:center; vertical-align:middle; width:40px;">${displayLabel}</td>` : ''}
+            ${isFirst ? `<td rowspan="${rowCount}" style="font-weight:normal; background:white; text-align:center; vertical-align:middle; width:40px;">${displayLabel}</td>` : ''}
             <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${thisWeekLines[i] || ''}</td>
             <td style="text-align:center; padding:2px 6px; vertical-align:middle; width:90px; ${borderStyle}">${resultLines[i] || ''}</td>
             <td style="text-align:left; padding:2px 6px; vertical-align:middle; ${borderStyle}">${nextWeekLines[i] || ''}</td>
@@ -519,13 +542,13 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             .section-header { font-size: 13pt; font-weight: bold; margin-top: 10px; margin-bottom: 15px; border-left: 8px solid black; padding-left: 15px; text-align: left; }
             table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; margin-bottom: 15px; }
             th, td { border: 1px solid black; padding: 6px; font-size: 9pt; vertical-align: top; text-align: center; word-break: break-all; }
-            th { background: #f3f4f6; font-weight: bold; }
+            th { background: white; font-weight: normal; }
             .text-left { text-align: left; }
             .photo-grid { display: flex; flex-wrap: wrap; gap: 1%; margin-top: 15px; }
             .photo-card { width: 32%; border: 1px solid #000; padding: 5px; box-sizing: border-box; margin-bottom: 10px; background: white; }
             .photo-img-wrap { width: 100%; aspect-ratio: 4/3; overflow: hidden; border: 1px solid #000; display: flex; align-items: center; justify-content: center; background: #f9f9f9; }
             .photo-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
-            .photo-title { font-weight: bold; font-size: 8.5pt; text-align: center; padding-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .photo-title { font-weight: normal; font-size: 8.5pt; text-align: center; padding-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
           </style>
         </head>
         <body>
@@ -558,237 +581,307 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     printWindow.document.close();
   };
 
-  const groupedPhotosByDate = selectablePhotos.reduce((acc, photo) => {
-    const date = photo.date;
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(photo);
+  const groupedPhotos = selectablePhotos.reduce((acc, photo) => {
+    const key = photoGroupingMode === 'date' ? photo.date : (photo.content || '내용 없음');
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(photo);
     return acc;
   }, {} as Record<string, SelectablePhoto[]>);
 
-  const sortedDates = Object.keys(groupedPhotosByDate).sort((a, b) => a.localeCompare(b));
+  const sortedGroupKeys = Object.keys(groupedPhotos).sort((a, b) => {
+    if (photoGroupingMode === 'date') return a.localeCompare(b);
+    return a.localeCompare(b);
+  });
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-2 pb-32 text-black relative">
-      <div className="mb-2 print:hidden">
-        <div className="flex items-center gap-4">
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
-            <ClipboardList className="mr-3 text-blue-600" size={32} />
-            주간 업무
-          </h2>
-          <p className="text-gray-500 text-base font-medium">주간 업무 실적 및 차주 계획을 관리합니다.</p>
-        </div>
-      </div>
-
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-2 mb-2 scrollbar-hide items-center print:hidden">
-        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-          <LayoutList size={22} />
-        </div>
-        <button 
+    <div className="max-w-7xl mx-auto p-4 space-y-2 pb-32 text-black relative">
+      {/* Tab Navigation */}
+      <div className="w-full max-w-7xl mx-auto bg-white flex items-stretch justify-start overflow-x-auto whitespace-nowrap scrollbar-hide print:hidden border-b border-black">
+        <div 
           onClick={() => setActiveTab('list')} 
-          className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
+          className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
             activeTab === 'list' 
-              ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+              ? 'text-orange-600' 
+              : 'text-gray-500 hover:text-black'
           }`}
         >
-          보고서이력
-        </button>
-        <button 
+          전체이력
+          {activeTab === 'list' && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+          )}
+        </div>
+        <div 
           onClick={() => setActiveTab('form')} 
-          className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
+          className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
             activeTab === 'form' 
-              ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-              : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
+              ? 'text-orange-600' 
+              : 'text-gray-500 hover:text-black'
           }`}
         >
           작성/수정
-        </button>
+          {activeTab === 'form' && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+          )}
+        </div>
       </div>
       {activeTab === 'list' ? <WeeklyReportList onSelectReport={(s) => { if(onDateChange) onDateChange(parseISO(s)); setActiveTab('form'); }} /> : (
-        <>
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm p-5 animate-fade-in-down">
-        <div className="border-b-2 border-black mb-6 pb-3 flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-widest flex-shrink-0">주간업무보고</h1>
-          <div className="flex justify-end gap-2 print:hidden">
-            <button 
-              onClick={handleOpenImportModal} 
-              disabled={loading} 
-              className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"
-            >
-              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-              가져오기
-            </button>
-            <button 
-              onClick={() => setIsEditMode(!isEditMode)} 
-              className={`flex items-center justify-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
-            >
-              {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
-              {isEditMode ? '수정완료' : '수정'}
-            </button>
-            <button 
-              onClick={handleSave} 
-              disabled={saveStatus === 'loading'} 
-              className={`flex items-center justify-center px-4 py-2 rounded-lg font-bold shadow-md transition-all text-sm active:scale-95 text-white ${saveStatus === 'success' ? 'bg-green-600' : 'bg-blue-600 hover:bg-blue-700'}`}
-            >
-              {saveStatus === 'loading' ? <RefreshCw size={18} className="animate-spin mr-2" /> : <Save size={18} className="mr-2" />}
-              {saveStatus === 'success' ? '저장완료' : '서버저장'}
-            </button>
-            <button 
-              onClick={handlePrint} 
-              className="flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-md transition-all text-sm active:scale-95"
-            >
-              <Printer size={18} className="mr-2" />
-              미리보기
-            </button>
-          </div>
-        </div>
-        
-        <div className="mb-6 border border-gray-300 rounded-xl px-6 py-4 bg-white shadow-sm flex items-center justify-between gap-4 overflow-x-auto scrollbar-hide">
-          <div className="flex items-center gap-3 whitespace-nowrap">
-            <span className="text-[12px] font-black text-gray-400 uppercase tracking-tight">사업장명</span>
-            <span className="font-bold text-gray-800">새마을운동중앙회 대치동사옥</span>
-          </div>
-          <div className="flex items-center gap-3 whitespace-nowrap">
-            <span className="text-[12px] font-black text-gray-400 uppercase tracking-tight">작성자</span>
-            <input 
-              type="text" 
-              value={report.author} 
-              onChange={e => setReport({...report, author: e.target.value})} 
-              disabled={!isEditMode}
-              className={`border-b-2 ${isEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-gray-100 bg-transparent'} w-28 outline-none font-bold text-gray-800 py-1 text-center transition-all`} 
-            />
-          </div>
-          <div className="flex items-center gap-3 whitespace-nowrap">
-            <span className="text-[12px] font-black text-gray-400 uppercase tracking-tight">작성일자</span>
-            {isEditMode ? (
-              <input 
-                type="date" 
-                value={report.reportingDate} 
-                onChange={e => handleReportingDateChange(e.target.value)}
-                className="border-b-2 border-blue-500 bg-blue-50/30 outline-none font-bold text-gray-800 py-1 px-2 text-sm transition-all rounded"
-              />
-            ) : (
-              <span className="font-bold text-gray-800">{format(parseISO(report.reportingDate), 'yyyy년 MM월 dd일')}</span>
-            )}
-          </div>
-        </div>
-        
-        <div className="border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white">
-          <div className="flex bg-gray-50 font-bold text-sm text-gray-500 uppercase tracking-wider divide-x divide-gray-300 border-b border-gray-300">
-            <div className="w-[80px] py-4 text-center">분야</div>
-            <div className="flex-1 py-4 text-center">금주 업무 실적</div>
-            <div className="w-[120px] py-4 text-center">점검결과</div>
-            <div className="flex-1 py-4 text-center">다음주 업무 계획</div>
-          </div>
-          <div className="divide-y divide-gray-300">
-            {FIELDS.map(f => (
-              <div key={f.id} className="flex divide-x divide-gray-300 group hover:bg-gray-50/30 transition-colors">
-                <div className="w-[80px] flex items-center justify-center font-bold bg-gray-50 text-[13px] text-gray-700">{f.label}</div>
-                <div className="flex-1 min-h-[50px]">
-                  <textarea 
-                    value={report.fields[f.id as keyof typeof report.fields]?.thisWeek || ''} 
-                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), thisWeek: e.target.value}}})} 
-                    disabled={!isEditMode}
-                    className={`auto-expand-textarea w-full h-full p-3 text-[13px] outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide !text-left transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
-                    placeholder="내용 입력..."
-                  />
+        <div className="space-y-2">
+          {/* Sub-tab menu moved here, immediately below main tabs */}
+          <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+            <div className="flex shrink-0">
+              {SUB_TABS.map(tab => (
+                <div
+                  key={tab.id}
+                  onClick={() => setActiveSubTab(tab.id)}
+                  className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer bg-white ${
+                    activeSubTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  {tab.label}
+                  {activeSubTab === tab.id && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                  )}
                 </div>
-                <div className="w-[120px] min-h-[50px]">
-                  <textarea 
-                    value={report.fields[f.id as keyof typeof report.fields]?.results || ''} 
-                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), results: e.target.value}}})} 
-                    disabled={!isEditMode}
-                    className={`auto-expand-textarea w-full h-full p-3 text-[13px] text-center outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
-                    placeholder="결과..."
-                  />
-                </div>
-                <div className="flex-1 min-h-[50px]">
-                  <textarea 
-                    value={report.fields[f.id as keyof typeof report.fields]?.nextWeek || ''} 
-                    onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), nextWeek: e.target.value}}})} 
-                    disabled={!isEditMode}
-                    className={`auto-expand-textarea w-full h-full p-3 text-[13px] outline-none resize-none max-h-[200px] overflow-y-auto scrollbar-hide !text-left transition-colors ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : 'bg-transparent'}`}
-                    placeholder="계획 입력..."
-                  />
-                </div>
+              ))}
+            </div>
+            
+          <div className="flex items-center shrink-0 px-2">
+            <div className="border-l-[1px] h-6 border-black"></div>
+          </div>
+
+            <div className="flex items-center print:hidden shrink-0">
+              <button 
+                onClick={() => loadReport(report.startDate)}
+                disabled={loading}
+                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+              >
+                <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+                새로고침
+              </button>
+              <button 
+                onClick={handleOpenImportModal} 
+                disabled={loading} 
+                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-all relative whitespace-nowrap disabled:opacity-50"
+              >
+                <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+                연동
+              </button>
+              <button 
+                onClick={() => setIsEditMode(!isEditMode)} 
+                disabled={loading}
+                className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-all relative whitespace-nowrap disabled:opacity-50 ${
+                  isEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {isEditMode ? <Lock size={18} className="mr-1.5" /> : <Edit2 size={18} className="mr-1.5" />}
+                {isEditMode ? '수정완료' : '수정'}
+              </button>
+              <button 
+                onClick={handleSave} 
+                disabled={saveStatus === 'loading' || loading} 
+                className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                  saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {saveStatus === 'loading' ? (
+                  <RefreshCw size={18} className="animate-spin mr-1.5" />
+                ) : saveStatus === 'success' ? (
+                  <CheckCircle2 size={18} className="mr-1.5" />
+                ) : (
+                  <Save size={18} className="mr-1.5" />
+                )}
+                {saveStatus === 'success' ? '저장완료' : '저장'}
+              </button>
+              <button 
+                onClick={handlePrint} 
+                disabled={loading}
+                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+              >
+                <Printer size={18} className="mr-1.5" />
+                인쇄
+              </button>
+            </div>
+          </div>
+          <div className="w-full max-w-7xl mx-auto flex items-stretch overflow-x-auto scrollbar-hide bg-white print:hidden border-b border-black">
+            {/* Replaced '주간업무보고' with Info Fields */}
+            <div className="flex items-center shrink-0 gap-2">
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+                <span className="text-[14px] font-bold text-gray-500 uppercase">사업자명 :</span>
+                <span className="text-sm font-bold text-black">새마을운동중앙회 대치동사옥</span>
               </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-8 border border-gray-300 rounded-xl p-4 bg-white shadow-sm">
-          <div className="flex justify-between items-center mb-4 pb-2 border-b border-100">
-            <h3 className="font-bold text-gray-800 flex items-center">
-              <ImageIcon size={18} className="mr-2 text-blue-500" />작업 사진
-            </h3>
-            <button 
-              onClick={handleOpenPhotoImportModal} 
-              disabled={!isEditMode}
-              className={`flex items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 print:hidden ${isEditMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
-            >
-              사진 불러오기
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-4">{(report.photos || []).map((p, i) => (
-            <div key={p.id} className="border border-gray-200 p-1.5 rounded-xl relative group bg-gray-50">
-              <div className="aspect-[4/3] bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 shadow-inner">
-                {p.dataUrl ? <img src={p.dataUrl} className="w-full h-full object-cover" /> : (
-                  <div className="text-center p-4">
-                    <label className={`cursor-pointer text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${isEditMode ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-400 bg-gray-50 cursor-not-allowed'}`}>
-                      <Upload size={14}/> 사진 업로드
-                      <input 
-                        type="file" 
-                        accept="image/*" 
-                        className="hidden" 
-                        disabled={!isEditMode}
-                        onChange={async e => { 
-                          const f=e.target.files?.[0]; 
-                          if(f && isEditMode){
-                            const u=await resizeImage(f); 
-                            const n=[...(report.photos || [])]; 
-                            n[i]={...n[i],dataUrl:u}; 
-                            setReport({...report,photos:n});
-                          } 
-                        }} 
-                      />
-                    </label>
-                  </div>
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+                <span className="text-[14px] font-bold text-gray-500 uppercase">작성자 :</span>
+                <input 
+                  type="text" 
+                  value={report.author} 
+                  onChange={e => setReport({...report, author: e.target.value})} 
+                  disabled={!isEditMode}
+                  className={`border-b-2 ${isEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-transparent'} w-24 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none`} 
+                />
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+                <span className="text-[14px] font-bold text-gray-500 uppercase">작성일자 :</span>
+                {isEditMode ? (
+                  <input 
+                    type="date" 
+                    value={report.reportingDate} 
+                    onChange={e => handleReportingDateChange(e.target.value)}
+                    className="border-b-2 border-blue-500 bg-blue-50/30 outline-none text-sm font-bold text-black py-0.5 px-2 transition-all rounded-none"
+                  />
+                ) : (
+                  <span className="text-sm font-bold text-black">{format(parseISO(report.reportingDate), 'yyyy년 MM월 dd일')}</span>
                 )}
               </div>
-              <input 
-                type="text" 
-                value={p.title} 
-                onChange={e => {const n=[...(report.photos || [])]; n[i]={...n[i],title:e.target.value}; setReport({...report,photos:n});}} 
-                disabled={!isEditMode}
-                placeholder="사진 제목 (예: 1층 전등 교체)" 
-                className={`w-full mt-2 border-b outline-none px-1 text-[11px] font-normal text-center bg-transparent transition-all ${isEditMode ? 'border-blue-400 focus:border-blue-600' : 'border-gray-200'}`} 
-              />
             </div>
-          ))}</div>
+          </div>
+          
+          {activeSubTab !== 'photos' ? (
+            <>
+              <table className="w-full max-w-7xl mx-auto text-center border border-black bg-white table-fixed">
+                <thead>
+                  <tr className="border-b border-black h-[40px]">
+                    <th className="w-[80px] border-r border-black text-[13px] font-normal px-2">분야</th>
+                    <th className="border-r border-black text-[13px] font-normal px-2">금주 업무 실적</th>
+                    <th className="w-[120px] border-r border-black text-[13px] font-normal px-2">점검결과</th>
+                    <th className="text-[13px] font-normal px-2">다음주 업무 계획</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {FIELDS.filter(f => f.id === activeSubTab).map(f => (
+                    <tr key={f.id} className="border-b border-black hover:bg-gray-50/30 transition-colors">
+                      <td className="w-[80px] border-r border-black text-[13px] font-normal px-2 h-[250px]">
+                        <div className="flex items-center justify-center h-full text-[13px] font-normal">{f.label}</div>
+                      </td>
+                      <td className="border-r border-black text-[13px] font-normal px-2 align-top">
+                        <div className="flex items-start min-h-full text-[13px] font-normal py-2">
+                          <textarea 
+                            value={report.fields[f.id as keyof typeof report.fields]?.thisWeek || ''} 
+                            onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), thisWeek: e.target.value}}})} 
+                            disabled={!isEditMode}
+                            className={`w-full min-h-full resize-none bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal !text-left auto-expand-textarea ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : ''}`}
+                            placeholder="내용 입력..."
+                          />
+                        </div>
+                      </td>
+                      <td className="w-[120px] border-r border-black text-[13px] font-normal px-2 align-top">
+                        <div className="flex items-start min-h-full text-[13px] font-normal py-2">
+                          <textarea 
+                            value={report.fields[f.id as keyof typeof report.fields]?.results || ''} 
+                            onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), results: e.target.value}}})} 
+                            disabled={!isEditMode}
+                            className={`w-full min-h-full resize-none bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal !text-left auto-expand-textarea ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : ''}`}
+                            placeholder="결과..."
+                          />
+                        </div>
+                      </td>
+                      <td className="text-[13px] font-normal px-2 align-top">
+                        <div className="flex items-start min-h-full text-[13px] font-normal py-2">
+                          <textarea 
+                            value={report.fields[f.id as keyof typeof report.fields]?.nextWeek || ''} 
+                            onChange={e => setReport({...report, fields: {...report.fields, [f.id]: {...(report.fields[f.id as keyof typeof report.fields] || {thisWeek: '', results: '', nextWeek: ''}), nextWeek: e.target.value}}})} 
+                            disabled={!isEditMode}
+                            className={`w-full min-h-full resize-none bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal !text-left auto-expand-textarea ${isEditMode ? 'bg-blue-50/30 focus:bg-blue-50/50' : ''}`}
+                            placeholder="계획 입력..."
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          ) : (
+            <div className="border border-black p-4 bg-white">
+              <div className="flex justify-between items-center mb-4 pb-2 border-b border-black">
+                <h3 className="font-bold text-gray-800 flex items-center">
+                  <ImageIcon size={18} className="mr-2 text-blue-500" />작업 사진
+                </h3>
+                <button 
+                  onClick={handleOpenPhotoImportModal} 
+                  disabled={!isEditMode}
+                  className={`flex items-center justify-center px-6 py-2 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 print:hidden ${isEditMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+                >
+                  사진 불러오기
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-4">{(report.photos || []).map((p, i) => (
+                <div key={p.id} className="border border-gray-200 p-1.5 rounded-xl relative group bg-gray-50">
+                  <div className="aspect-[4/3] bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 shadow-inner">
+                    {p.dataUrl ? <img src={p.dataUrl} className="w-full h-full object-cover" /> : (
+                      <div className="text-center p-4">
+                        <label className={`cursor-pointer text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${isEditMode ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-400 bg-gray-50 cursor-not-allowed'}`}>
+                          <Upload size={14}/> 사진 업로드
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            disabled={!isEditMode}
+                            onChange={async e => { 
+                              const f=e.target.files?.[0]; 
+                              if(f && isEditMode){
+                                const u=await resizeImage(f); 
+                                const n=[...(report.photos || [])]; 
+                                n[i]={...n[i],dataUrl:u}; 
+                                setReport({...report,photos:n});
+                              } 
+                            }} 
+                          />
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                  <input 
+                    type="text" 
+                    value={p.title} 
+                    onChange={e => {const n=[...(report.photos || [])]; n[i]={...n[i],title:e.target.value}; setReport({...report,photos:n});}} 
+                    disabled={!isEditMode}
+                    placeholder="사진 제목 (예: 1층 전등 교체)" 
+                    className={`w-full mt-2 border-b outline-none px-1 text-[11px] font-normal text-center bg-transparent transition-all ${isEditMode ? 'border-blue-400 focus:border-blue-600' : 'border-gray-200'}`} 
+                  />
+                </div>
+              ))}</div>
+            </div>
+          )}
         </div>
-        </div></>
       )}
       {isPhotoModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="font-bold text-gray-800 flex items-center gap-2"><ImageIcon size={18} className="text-emerald-500" />공사/작업 사진 연동</h3>
-              <button onClick={() => setIsPhotoModalOpen(false)} className="p-1 hover:bg-gray-200 rounded-full transition-colors"><X size={20} /></button>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
+                  <button 
+                    onClick={() => setPhotoGroupingMode('date')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${photoGroupingMode === 'date' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    <Calendar size={14} /> 일자별
+                  </button>
+                  <button 
+                    onClick={() => setPhotoGroupingMode('content')}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${photoGroupingMode === 'content' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                  >
+                    <LayoutList size={14} /> 작업내용별
+                  </button>
+                </div>
+                <button onClick={() => setIsPhotoModalOpen(false)} className="p-1 hover:bg-gray-200 rounded-full transition-colors"><X size={20} /></button>
+              </div>
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-8 bg-gray-50/50">
               {selectablePhotos.length === 0 ? (
                 <div className="py-20 text-center text-gray-400 italic font-medium">이번 주에 등록된 공사/작업 사진이 없습니다.</div>
               ) : (
-                sortedDates.map(date => (
-                  <div key={date} className="space-y-4">
+                sortedGroupKeys.map(key => (
+                  <div key={key} className="space-y-4">
                     <div className="flex items-center gap-2 sticky top-0 bg-gray-50/90 backdrop-blur-sm z-10 py-2">
                       <span className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-black shadow-sm">
-                        {format(parseISO(date), 'MM월 dd일')}
+                        {photoGroupingMode === 'date' ? format(parseISO(key), 'MM월 dd일') : key}
                       </span>
                       <div className="flex-1 h-px bg-gray-200"></div>
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                      {groupedPhotosByDate[date].map(p => (
+                      {groupedPhotos[key].map(p => (
                         <div key={p.id} onClick={() => toggleSelectPhoto(p.id)} className={`group relative border-2 rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 shadow-sm ${p.selected ? 'border-blue-600 ring-4 ring-blue-100 translate-y-[-4px]' : 'border-white hover:border-blue-300 bg-white'}`}>
                           <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
                             <img src={p.dataUrl} className="object-cover w-full h-full group-hover:scale-110 transition-transform duration-500" alt="" />
@@ -796,6 +889,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                           <div className="p-2 text-[11px] bg-white border-t border-gray-100 flex flex-col gap-0.5">
                             <div className="flex justify-between items-center mb-0.5">
                               <span className="text-blue-600 font-black tracking-tighter">{p.category}</span>
+                              <span className="text-gray-400 font-medium text-[10px]">{format(parseISO(p.date), 'MM/dd')}</span>
                             </div>
                             <div className="text-gray-700 font-normal leading-tight line-clamp-2 min-h-[2.4em]" title={p.content}>
                               {p.content}

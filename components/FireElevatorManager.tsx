@@ -1,19 +1,21 @@
-
 import React, { useState } from 'react';
-import ConsumablesLedger from './ConsumablesLedger';
-import ConsumableRequestManager from './ConsumableRequestManager';
+import FireExtinguisherCheck from './FireExtinguisherCheck';
+import IntegratedInspectionList from './IntegratedInspectionList';
+
+interface FireElevatorManagerProps {
+  currentDate: Date;
+}
 
 const TABS = [
-  { id: 'ledger', label: '관리대장' },
-  { id: 'usage', label: '사용내역' },
-  { id: 'request', label: '자재신청' },
+  { id: 'integrated_history', label: '점검이력' },
+  { id: 'extinguisher', label: '소화기관리' },
 ];
 
-const ConsumablesManager: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('ledger');
+const FireElevatorManager: React.FC<FireElevatorManagerProps> = ({ currentDate }) => {
+  const [activeTab, setActiveTab] = useState('integrated_history');
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-2 pb-32 animate-fade-in print:p-0">
+    <div className="p-4 max-w-7xl mx-auto space-y-2 pb-32 animate-fade-in">
       <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
         <div className="flex shrink-0">
           {TABS.map(tab => (
@@ -35,13 +37,12 @@ const ConsumablesManager: React.FC = () => {
         </div>
       </div>
 
-      {activeTab === 'ledger' || activeTab === 'usage' ? (
-        <ConsumablesLedger viewMode={activeTab as 'ledger' | 'usage'} />
-      ) : (
-        <ConsumableRequestManager />
-      )}
+      <div className="min-h-[500px]">
+        {activeTab === 'integrated_history' && <IntegratedInspectionList />}
+        {activeTab === 'extinguisher' && <FireExtinguisherCheck />}
+      </div>
     </div>
   );
 };
 
-export default ConsumablesManager;
+export default FireElevatorManager;

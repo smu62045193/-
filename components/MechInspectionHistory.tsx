@@ -174,28 +174,30 @@ const MechInspectionHistory: React.FC<MechInspectionHistoryProps> = ({ onSelect 
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white border-t border-l border-black overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
           <table className="w-full min-w-[700px] border-collapse">
             <thead>
-              <tr className="bg-gray-50/80 border-b border-gray-200">
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-20">No</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-40">점검일자</th>
-                <th className="px-6 py-4 text-left text-sm font-bold text-gray-500 uppercase tracking-wider">점검 항목명 (구분)</th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-gray-500 uppercase tracking-wider w-64">상세보기</th>
+              <tr className="bg-white h-[40px]">
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-20 p-0"><div className="flex items-center justify-center h-full px-2">No</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-40 p-0"><div className="flex items-center justify-center h-full px-2">점검일자</div></th>
+                <th className="border-b border-r border-black text-left text-[13px] font-normal text-black p-0"><div className="flex items-center justify-start h-full px-2">점검 항목명 (구분)</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-64 p-0"><div className="flex items-center justify-center h-full px-2">상세보기</div></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody>
               {loading && history.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-24 text-center">
-                    <RefreshCw size={32} className="animate-spin text-blue-500 mx-auto mb-3" />
-                    <p className="text-gray-400 font-medium">데이터를 집계하는 중...</p>
+                  <td colSpan={4} className="h-[100px] text-center border-b border-r border-black">
+                    <div className="flex flex-col items-center justify-center h-full gap-2">
+                      <RefreshCw size={24} className="animate-spin text-blue-500" />
+                      <p className="text-black font-normal text-[13px]">데이터를 집계하는 중...</p>
+                    </div>
                   </td>
                 </tr>
               ) : filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-24 text-center text-gray-400 italic">저장된 점검 기록이 없습니다.</td>
+                  <td colSpan={4} className="h-[100px] text-center text-black italic font-normal text-[13px] border-b border-r border-black">저장된 점검 기록이 없습니다.</td>
                 </tr>
               ) : (
                 filteredHistory.map((item, idx) => {
@@ -203,35 +205,37 @@ const MechInspectionHistory: React.FC<MechInspectionHistoryProps> = ({ onSelect 
                   const icon = prefix ? CATEGORY_MAP[prefix].icon : <Droplets size={16} />;
                   
                   return (
-                    <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group">
-                      <td className="px-6 py-4 text-center text-gray-400 font-mono text-xs">{filteredHistory.length - idx}</td>
-                      <td className="px-6 py-4 text-center">
-                        <span className="px-3 py-1 bg-gray-50 text-gray-700 rounded-md border border-gray-100 text-sm font-bold">
+                    <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group h-[40px]">
+                      <td className="border-b border-r border-black text-center text-black font-normal text-[13px] p-0"><div className="flex items-center justify-center h-full px-2">{filteredHistory.length - idx}</div></td>
+                      <td className="border-b border-r border-black text-center p-0">
+                        <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-black">
                           {item.date}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-white border border-gray-100 rounded-lg shadow-sm">
-                            {icon}
-                          </div>
-                          <span className="font-bold text-gray-900">{item.category}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-center flex gap-2 justify-center">
-                        <button 
-                          onClick={() => handleViewDetail(item)}
-                          className="flex items-center gap-1 bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-all active:scale-95 shadow-md shadow-blue-100"
-                        >
-                          상세보기
-                          <Printer size={12} />
-                        </button>
-                        <button 
-                          onClick={() => onSelect(item.tabId, item.date)}
-                          className="flex items-center gap-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-200 transition-all active:scale-95"
-                        >
-                          편집
-                        </button>
+                      <td className="border-b border-r border-black p-0">
+                        <div className="flex items-center gap-3 h-full px-2">
+                          <div className="p-1 bg-white border border-gray-100 rounded shadow-sm flex items-center justify-center">
+                            {icon}
+                          </div>
+                          <span className="font-normal text-[13px] text-black">{item.category}</span>
+                        </div>
+                      </td>
+                      <td className="border-b border-r border-black p-0 text-center">
+                        <div className="flex items-center justify-center gap-2 h-full px-2">
+                          <button 
+                            onClick={() => handleViewDetail(item)}
+                            className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded text-[11px] font-normal hover:bg-blue-700 transition-all active:scale-95 shadow-md"
+                          >
+                            상세보기
+                            <Printer size={12} />
+                          </button>
+                          <button 
+                            onClick={() => onSelect(item.tabId, item.date)}
+                            className="flex items-center gap-1 bg-gray-100 text-gray-700 px-3 py-1 rounded text-[11px] font-normal hover:bg-gray-200 transition-all active:scale-95"
+                          >
+                            편집
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

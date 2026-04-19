@@ -2,7 +2,11 @@
 import React, { useState } from 'react';
 import WaterTankLog from './WaterTankLog';
 import MechInspectionHistory from './MechInspectionHistory';
-import { LayoutList, Hammer } from 'lucide-react';
+import AirFilterCheck from './AirFilterCheck';
+import FancoilCheck from './FancoilCheck';
+import SepticTankCheck from './SepticTankCheck';
+import EnergyCheck from './EnergyCheck';
+import { Hammer } from 'lucide-react';
 import { parseISO } from 'date-fns';
 
 interface MechCheckManagerProps {
@@ -11,7 +15,11 @@ interface MechCheckManagerProps {
 }
 
 const TABS = [
-  { id: 'water', label: '저수조위생점검' },
+  { id: 'water', label: '저수조' },
+  { id: 'filter', label: '공조기' },
+  { id: 'fancoil', label: '팬코일' },
+  { id: 'septic', label: '정화조' },
+  { id: 'energy', label: '에너지' },
 ];
 
 const MechCheckManager: React.FC<MechCheckManagerProps> = ({ currentDate, onDateChange }) => {
@@ -25,42 +33,42 @@ const MechCheckManager: React.FC<MechCheckManagerProps> = ({ currentDate, onDate
   };
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
-      <div className="mb-2">
-        <h2 className="text-3xl font-black text-slate-800 tracking-tight">기계 점검 및 관리</h2>
-        <p className="text-slate-500 mt-2 text-base font-medium">저수조 위생 등 기계 설비의 주요 시설물 점검을 수행합니다.</p>
-      </div>
-
-      {/* Tab Navigation - 디자인 표준화 */}
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center">
-        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-           <LayoutList size={22} />
+    <div className="p-4 max-w-7xl mx-auto space-y-2 pb-32 animate-fade-in">
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex shrink-0">
+          {TABS.map(tab => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                activeTab === tab.id 
+                  ? 'text-orange-600' 
+                  : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
+          ))}
         </div>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
-              activeTab === tab.id 
-                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       {/* Content Area */}
       <div className="min-h-[500px]">
         {activeTab === 'water' && <WaterTankLog currentDate={currentDate} />}
+        {activeTab === 'filter' && <AirFilterCheck />}
+        {activeTab === 'fancoil' && <FancoilCheck />}
+        {activeTab === 'septic' && <SepticTankCheck />}
+        {activeTab === 'energy' && <EnergyCheck />}
         
-        {!TABS.some(t => t.id === activeTab) && (
+        {activeTab !== 'water' && activeTab !== 'filter' && activeTab !== 'fancoil' && activeTab !== 'septic' && activeTab !== 'energy' && (
           <div className="flex flex-col items-center justify-center p-24 text-center bg-white rounded-3xl border border-slate-200 shadow-sm animate-fade-in">
             <div className="p-8 bg-slate-50 rounded-full mb-8">
               <Hammer size={64} className="text-slate-300" />
             </div>
-            <h3 className="text-2xl font-black text-slate-800 mb-4">기능 준비중</h3>
+            <h3 className="text-2xl font-black text-slate-800 mb-4">준비중입니다.</h3>
             <div className="bg-slate-100 text-slate-600 px-6 py-3 rounded-2xl text-sm font-black tracking-widest uppercase">
               Under Development
             </div>

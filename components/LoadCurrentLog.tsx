@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { LoadCurrentData, LoadCurrentItem } from '../types';
 import { fetchLoadCurrent, saveLoadCurrent, getInitialLoadCurrent } from '../services/dataService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
@@ -14,14 +14,15 @@ const generateId = () => Math.random().toString(36).substr(2, 9);
 const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [isEditMode, setIsEditMode] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(format(currentDate, 'yyyy-MM'));
   const [data, setData] = useState<LoadCurrentData>(getInitialLoadCurrent(format(currentDate, 'yyyy-MM')));
   const [activeFloor, setActiveFloor] = useState<string>('전체');
+  const [isEditingPeriod, setIsEditingPeriod] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   // 페이지네이션 상태 - 15개씩 보기로 수정
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 15;
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     loadData(currentMonth);
@@ -32,9 +33,10 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
     setCurrentPage(1);
   }, [activeFloor, currentMonth]);
 
+  // Removed popup submit handlers as per user request to use inline editing
+
   const loadData = async (monthKey: string) => {
     setLoading(true);
-    setIsEditMode(false);
     try {
       const fetched = await fetchLoadCurrent(monthKey);
       
@@ -89,16 +91,15 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
       const success = await saveLoadCurrent(data);
       if (success) {
         setSaveStatus('success');
-        setIsEditMode(false);
-        alert('저장이 완료되었습니다.');
+        window.alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
-        alert('저장에 실패했습니다.');
+        window.alert('저장에 실패했습니다.');
       }
     } catch (error) {
       setSaveStatus('error');
-      alert('오류가 발생했습니다.');
+      window.alert('오류가 발생했습니다.');
     }
   };
 
@@ -145,7 +146,6 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
           </div>
 
           <div class="info-row">
-            <div>${activeFloor !== '전체' ? `[ ${activeFloor} ] 층 점검 내역` : '전체 층 점검 내역'}</div>
             <div>점검일자 : ${data?.period || data?.date}</div>
           </div>
           ` : ''}
@@ -156,8 +156,8 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
                 <th rowspan="2" style="width: 45px;">층</th>
                 <th rowspan="2" style="width: 130px;">점검대상</th>
                 <th rowspan="2" style="width: 45px;">순서</th>
-                <th colSpan="3" style="background: #eff6ff !important;">좌측</th>
-                <th colSpan="3" style="background: #fff7ed !important;">우측</th>
+                <th colSpan="3" style="background: white !important;">좌측</th>
+                <th colSpan="3" style="background: white !important;">우측</th>
               </tr>
               <tr>
                 <th style="width: 50px;">용량</th>
@@ -175,10 +175,10 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
                   <td>${item.targetL || ''}</td>
                   <td>${item.orderL || ''}</td>
                   <td>${item.capacityL || ''}</td>
-                  <td style="font-weight: bold; color: blue !important;">${item.valueL || ''}</td>
+                  <td style="font-weight: normal; color: black !important;">${item.valueL || ''}</td>
                   <td>${item.noteL || ''}</td>
                   <td>${item.capacityR || ''}</td>
-                  <td style="font-weight: bold; color: blue !important;">${item.valueR || ''}</td>
+                  <td style="font-weight: normal; color: black !important;">${item.valueR || ''}</td>
                   <td>${item.noteR || ''}</td>
                 </tr>
               `).join('')}
@@ -196,22 +196,22 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
           <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
           <style>
             @page { size: A4 portrait; margin: 25mm 12mm 10mm 12mm; }
-            html, body { margin: 0 !important; padding: 0 !important; background: black; color: black; font-family: 'Noto Sans KR', sans-serif; line-height: 1.2; -webkit-print-color-adjust: exact; }
+            html, body { margin: 0 !important; padding: 0 !important; padding-right: 0.5mm !important; background: black; color: black; font-family: 'Noto Sans KR', sans-serif; line-height: 1.2; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
-            @media print { .no-print { display: none !important; } body { background: white !important; } .page-break { page-break-after: always; } }
+            @media print { .no-print { display: none !important; } html, body { background: white !important; } .page-break { page-break-after: always; } }
             .print-page { width: 100%; background: white; box-sizing: border-box; }
-            @media screen { .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 25mm 12mm 10mm 12mm; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); } }
-            table { border-collapse: collapse !important; width: 100% !important; table-layout: fixed !important; border: 1.5px solid black !important; }
-            th, td { border: 1px solid black !important; text-align: center !important; overflow: hidden; height: 30px !important; font-size: 9px !important; padding: 0 2px !important; }
-            th { font-weight: bold !important; background: #f3f4f6 !important; }
+            @media screen { .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; padding: 25mm 12mm 10mm 12mm; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); background: white; } body { background: black !important; } }
+            table { border-collapse: collapse !important; width: 100% !important; table-layout: fixed !important; border: 1px solid black !important; box-sizing: border-box; }
+            th, td { border: 1px solid black !important; text-align: center !important; height: 30px !important; font-size: 10px !important; padding: 0 2px !important; word-break: break-all; }
+            th { font-weight: normal !important; background: white !important; }
             .header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; min-height: 90px; }
             .title-area { flex: 1; text-align: center; }
             .doc-title { font-size: 26pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin: 0; line-height: 1; }
-            .approval-table { width: 70mm !important; border: 1.5px solid black !important; margin-left: auto; flex-shrink: 0; table-layout: fixed !important; }
-            .approval-table th { height: 22px !important; font-size: 9pt !important; background: #f3f4f6 !important; font-weight: bold; border: 1px solid black !important; }
+            .approval-table { width: 70mm !important; border: 1px solid black !important; margin-left: auto; flex-shrink: 0; table-layout: fixed !important; }
+            .approval-table th { height: 22px !important; font-size: 9pt !important; background: white !important; font-weight: normal; border: 1px solid black !important; }
             .approval-table td { height: 65px !important; border: 1px solid black !important; background: white !important; }
             .approval-table .side-header { width: 28px !important; font-size: 9pt; }
-            .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: bold; font-size: 11pt; }
+            .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: normal; font-size: 11pt; }
           </style>
         </head>
         <body>
@@ -231,26 +231,10 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
     setData({ ...data, items: newItems });
   };
 
-  const addItem = () => {
+  const deleteItem = (id: string) => {
     if (!data) return;
-    const newItem: LoadCurrentItem = {
-      id: generateId(),
-      floor: activeFloor !== '전체' ? activeFloor : '',
-      targetL: '', orderL: '', capacityL: '', valueL: '', noteL: '',
-      orderR: '', capacityR: '', valueR: '', noteR: ''
-    };
-    setData({ ...data, items: [...(data.items || []), newItem] });
-    // 새로 추가된 항목을 보기 위해 마지막 페이지로 이동
-    setTimeout(() => {
-        const newTotalPages = Math.ceil((data.items.length + 1) / ITEMS_PER_PAGE);
-        setCurrentPage(newTotalPages);
-    }, 0);
-  };
-
-  const deleteItem = async (id: string) => {
-    if (!data) return;
-    if (confirm('삭제하시겠습니까?')) {
-      const newItems = data.items.filter(i => i.id !== id);
+    if (window.confirm('삭제하시겠습니까?')) {
+      const newItems = data.items.filter(i => String(i.id) !== String(id));
       const newData = { ...data, items: newItems };
       setData(newData);
     }
@@ -280,6 +264,7 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
 
   const availableFloors = useMemo(() => {
     const floors = new Set<string>();
+
     data.items.forEach(item => {
       if (item.floor && item.floor.trim() !== '' && item.floor !== '창고') {
         floors.add(item.floor);
@@ -290,16 +275,51 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
   }, [data.items]);
 
   const filteredItems = useMemo(() => {
-    if (activeFloor === '전체') return data.items;
-    return data.items.filter(item => item.floor === activeFloor);
-  }, [data.items, activeFloor]);
+    const items = [...data.items];
+    
+    // 수정 모드가 아닐 때만 정렬 수행 (수정 중에는 행이 갑자기 이동하면 불편하므로)
+    if (!isEditing) {
+      items.sort((a, b) => {
+        // 1. 층별 정렬
+        const floorA = getFloorSortScore(a.floor || '');
+        const floorB = getFloorSortScore(b.floor || '');
+        if (floorA !== floorB) return floorB - floorA; // 높은 층부터 (RF -> 7F -> B1)
+
+        // 2. 점검대상 정렬 (사용자 지정 순서: 일반 -> 특수 -> 일반 업체 -> 특수 업체)
+        const getTargetWeight = (t: string) => {
+          if (t.includes('일반 업체')) return 3;
+          if (t.includes('특수 업체')) return 4;
+          if (t.includes('일반')) return 1;
+          if (t.includes('특수')) return 2;
+          return 10;
+        };
+
+        const targetA = (a.targetL || '').trim();
+        const targetB = (b.targetL || '').trim();
+        const weightA = getTargetWeight(targetA);
+        const weightB = getTargetWeight(targetB);
+
+        if (weightA !== weightB) return weightA - weightB;
+        if (targetA !== targetB) return targetA.localeCompare(targetB, 'ko', { numeric: true });
+
+        // 3. 순서 정렬
+        const orderA = parseInt((a.orderL || '0').replace(/[^0-9]/g, '')) || 0;
+        const orderB = parseInt((b.orderL || '0').replace(/[^0-9]/g, '')) || 0;
+        return orderA - orderB;
+      });
+    }
+
+    if (activeFloor === '전체') return items;
+    return items.filter(item => item.floor === activeFloor);
+  }, [data.items, activeFloor, isEditing]);
 
   // 페이지네이션 로직 적용
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const paginatedItems = useMemo(() => {
+    if (activeFloor !== '전체') return filteredItems;
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredItems.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredItems, currentPage]);
+  }, [filteredItems, currentPage, activeFloor]);
 
   // 하단에 보일 페이지 번호 5개 계산 로직
   const visiblePageNumbers = useMemo(() => {
@@ -321,162 +341,358 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
 
   const [year, month] = currentMonth.split('-');
   
-  const thClass = "border border-gray-300 p-2 bg-gray-50 font-bold text-center text-[12px] text-gray-700 h-10 align-middle";
-  const tdClass = "border border-gray-300 p-0 h-10 align-middle relative bg-white";
-  const inputClass = (editable: boolean) => `w-full h-full text-center outline-none bg-transparent text-black text-[12px] font-normal p-1 transition-all ${editable ? 'focus:bg-blue-50/30' : 'cursor-not-allowed'}`;
+  const thClass = "border-b border-r border-black p-0 bg-white font-normal text-center text-[13px] text-black whitespace-nowrap h-[40px]";
+  const tdClass = "border-b border-r border-black p-0 text-[13px] text-black text-center font-normal bg-white h-[40px]";
 
   return (
-    <div className="p-6 max-w-[1200px] mx-auto space-y-6 animate-fade-in relative bg-white rounded-xl border border-gray-200 shadow-sm print:shadow-none print:border-none print:p-0">
-      <div className="flex justify-between items-center border-b border-gray-200 pb-4 print:hidden">
-        <div className="flex items-center space-x-4">
-          <button onClick={handlePrevMonth} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><ChevronLeft /></button>
-          <h2 className="text-2xl font-bold text-gray-800">{year}년 {month}월</h2>
-          <button onClick={handleNextMonth} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><ChevronRight /></button>
-        </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => loadData(currentMonth)} 
-            disabled={loading}
-            className="flex items-center px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold hover:bg-gray-200 transition-all text-sm active:scale-95 disabled:opacity-50"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-          <button 
-            onClick={() => setIsEditMode(!isEditMode)} 
-            className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
-          >
-            {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
-            {isEditMode ? '수정 취소' : '수정'}
-          </button>
-          <button 
-            onClick={handleSave} 
-            disabled={saveStatus === 'loading'}
-            className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${
-              saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            {saveStatus === 'loading' ? (
-              <RefreshCw size={18} className="mr-2 animate-spin" />
-            ) : saveStatus === 'success' ? (
-              <CheckCircle size={18} className="mr-2" />
-            ) : (
-              <Save size={18} className="mr-2" />
-            )}
-            {saveStatus === 'success' ? '저장완료' : '서버 저장'}
-          </button>
-          <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 font-bold shadow-sm transition-all text-sm active:scale-95">
-            <Printer size={18} className="mr-2" />미리보기
-          </button>
-        </div>
-      </div>
-
-      <div className="print:hidden flex flex-wrap items-center gap-4 bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-        <div className="flex items-center gap-2 text-sm font-bold text-gray-500 min-w-max"><Filter size={16} />층별 필터:</div>
-        <div className="flex flex-wrap gap-2">
+    <div className="max-w-7xl mx-auto space-y-2 pb-10 animate-fade-in relative">
+      {/* 층 필터 박스 (밑줄형 탭으로 수정) */}
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex shrink-0">
           {availableFloors.map(f => (
-            <button 
+            <div 
               key={f} 
               onClick={() => setActiveFloor(f)} 
-              className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-all ${activeFloor === f ? 'bg-blue-600 text-white border-blue-600 shadow-md scale-105' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer bg-white ${
+                activeFloor === f 
+                  ? 'text-orange-600' 
+                  : 'text-gray-500 hover:text-black'
+              }`}
             >
               {f}
-            </button>
+              {activeFloor === f && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
           ))}
         </div>
       </div>
 
-      <div id="load-current-print-area">
-        <div className="text-center mb-6 pb-2 print:hidden border-b border-gray-100 flex flex-col items-center">
-          <div className="flex items-center gap-3 mb-2">
-            <LayoutList className="text-blue-600" size={28} />
-            <h1 className="text-3xl font-black text-gray-800 tracking-tight">부하 전류 점검 기록부</h1>
-          </div>
-          <div className="flex items-center gap-3 bg-gray-50 px-6 py-3 rounded-2xl border border-gray-100 mt-2 shadow-inner">
-            <span className="font-bold text-gray-500">측정 일자 :</span>
-            <input 
-              type="text" 
-              value={data?.period || ''} 
-              onChange={e => setData({...data, period: e.target.value})}
-              readOnly={!isEditMode}
-              className="font-black text-blue-600 bg-transparent outline-none w-64 text-center text-xl"
-              placeholder="예: 2026년 1월 12~13일"
-            />
-          </div>
+      {/* 상단 컨트롤 박스 (밑줄형 탭 스타일로 수정) */}
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide whitespace-nowrap border-b border-black mb-2">
+        {/* 1. 날짜 선택 */}
+        <div className="flex items-center shrink-0">
+          <button onClick={handlePrevMonth} className="px-2 py-3 transition-colors text-gray-500 hover:text-black"><ChevronLeft size={20} /></button>
+          <div className="text-[14px] font-bold text-black min-w-[100px] text-center">{year}년 {month}월</div>
+          <button onClick={handleNextMonth} className="px-2 py-3 transition-colors text-gray-500 hover:text-black"><ChevronRight size={20} /></button>
         </div>
 
-        <div id="load-current-print-area-table" className="border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white">
-          <table className="w-full border-collapse border-hidden table-fixed min-w-[1000px] print:min-w-0">
+        {/* 구분선 (검정색 1px) */}
+        <div className="px-2 flex items-center">
+          <div className="w-px h-6 bg-black"></div>
+        </div>
+
+        {/* 2. 액션 버튼들 */}
+        <div className="flex items-center shrink-0">
+          <button 
+            onClick={() => loadData(currentMonth)} 
+            disabled={loading}
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            title="새로고침"
+          >
+            <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+            새로고침
+          </button>
+          
+          <button 
+            onClick={() => setIsEditing(!isEditing)} 
+            className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
+              isEditing ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+            }`}
+          >
+            {isEditing ? <Lock size={18} className="mr-1.5" /> : <Edit2 size={18} className="mr-1.5" />}
+            {isEditing ? '수정완료' : '수정'}
+            {isEditing && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+            )}
+          </button>
+
+          <button 
+            onClick={handleSave} 
+            disabled={saveStatus === 'loading'}
+            className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+              saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+            }`}
+          >
+            {saveStatus === 'loading' ? <RefreshCw size={18} className="mr-1.5 animate-spin" /> : saveStatus === 'success' ? <CheckCircle size={18} className="mr-1.5" /> : <Save size={18} className="mr-1.5" />}
+            {saveStatus === 'success' ? '저장완료' : '저장'}
+          </button>
+          
+          <button 
+            onClick={handlePrint} 
+            className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+          >
+            <Printer size={18} className="mr-1.5" />
+            인쇄
+          </button>
+        </div>
+
+        {/* 구분선 (검정색 1px) */}
+        <div className="px-2 flex items-center">
+          <div className="w-px h-6 bg-black"></div>
+        </div>
+
+        {/* 3. 점검일자 */}
+        <div className="flex items-center shrink-0">
+          <div className="flex items-center font-bold text-[14px] text-black px-4 py-3 h-full">
+            <span className="whitespace-nowrap">점검일자 :</span>
+            {isEditingPeriod ? (
+              <input 
+                type="text" 
+                value={data?.period || ''} 
+                autoFocus
+                onBlur={() => setIsEditingPeriod(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') setIsEditingPeriod(false);
+                }}
+                onChange={e => setData({...data, period: e.target.value})}
+                className="border border-gray-300 bg-orange-50 px-2 py-0.5 rounded outline-none font-bold text-black ml-2 w-32 text-center"
+                placeholder="점검일자 입력"
+              />
+            ) : (
+              <div className="flex items-center gap-1 cursor-pointer ml-2" onClick={() => setIsEditingPeriod(true)}>
+                <span className="text-black">
+                  {data?.period || '입력'}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto">
+        <div id="load-current-print-area-table" className="bg-white border border-black overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full table-fixed min-w-[1000px] print:min-w-0 border-collapse">
             <thead>
-              <tr>
-                <th rowSpan={2} style={{ width: '45px' }} className={thClass}>층</th>
-                <th rowSpan={2} style={{ width: '130px' }} className={thClass}>점검대상</th>
-                <th rowSpan={2} style={{ width: '45px' }} className={thClass}>순서</th>
-                <th colSpan={3} className="border border-gray-300 p-2 font-bold bg-blue-50/50 text-blue-700 text-[13px] h-10">좌측</th>
-                <th colSpan={3} className="border border-gray-300 p-2 font-bold bg-orange-50/50 text-orange-700 text-[13px] h-10">우측</th>
-                <th rowSpan={2} style={{ width: '45px' }} className="border border-gray-300 p-2 bg-gray-50 text-[11px] font-bold text-gray-400 no-print">관리</th>
+              <tr className="bg-white h-[40px]">
+                <th rowSpan={2} style={{ width: '100px' }} className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">층</div></th>
+                <th rowSpan={2} style={{ width: '160px' }} className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">점검대상</div></th>
+                <th rowSpan={2} style={{ width: '80px' }} className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">순서</div></th>
+                <th colSpan={3} className={`${thClass} text-black`}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">좌측</div></th>
+                <th colSpan={3} className={`${thClass} text-black print:border-r-0`}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">우측</div></th>
+                <th rowSpan={2} style={{ width: '80px' }} className={`${thClass} text-black no-print border-r-0`}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">관리</div></th>
               </tr>
-              <tr>
-                <th style={{ width: '25px' }} className={thClass}>용량</th>
-                <th style={{ width: '25px' }} className={thClass}>측정</th>
-                <th className={thClass}>비고</th>
-                <th style={{ width: '25px' }} className={thClass}>용량</th>
-                <th style={{ width: '25px' }} className={thClass}>측정</th>
-                <th className={thClass}>비고</th>
+              <tr className="bg-white h-[40px]">
+                <th style={{ width: '60px' }} className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">용량</div></th>
+                <th style={{ width: '60px' }} className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">측정</div></th>
+                <th className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">비고</div></th>
+                <th style={{ width: '60px' }} className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">용량</div></th>
+                <th style={{ width: '60px' }} className={thClass}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">측정</div></th>
+                <th className={`${thClass} print:border-r-0`}><div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">비고</div></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-300 border-t border-gray-300">
+            <tbody className="bg-white">
               {paginatedItems.length === 0 ? (
-                <tr><td colSpan={10} className="py-20 text-gray-400 italic text-center">점검 내역이 없습니다.</td></tr>
+                <tr className="h-[40px]">
+                  <td colSpan={10} className={`${tdClass} py-20 text-gray-400 italic border-b-0 border-r-0`}>
+                    <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal">점검 내역이 없습니다.</div>
+                  </td>
+                </tr>
               ) : (
-                paginatedItems.map((item) => (
-                  <tr key={item.id} className="group hover:bg-gray-50/50 transition-colors divide-x divide-gray-300">
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} font-normal text-blue-600 ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.floor || ''} onChange={e => updateItem(item.id, 'floor', e.target.value)} onKeyDown={handleKeyDown} placeholder="층" readOnly={!isEditMode} /></td>
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.targetL || ''} onChange={e => updateItem(item.id, 'targetL', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.orderL || ''} onChange={e => updateItem(item.id, 'orderL', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.capacityL || ''} onChange={e => updateItem(item.id, 'capacityL', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} font-normal text-blue-700 ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.valueL || ''} onChange={e => updateItem(item.id, 'valueL', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.noteL || ''} onChange={e => updateItem(item.id, 'noteL', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.capacityR || ''} onChange={e => updateItem(item.id, 'capacityR', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} font-normal text-blue-700 ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.valueR || ''} onChange={e => updateItem(item.id, 'valueR', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
-                    <td className={tdClass}><input type="text" className={`${inputClass(isEditMode)} ${isEditMode ? 'bg-orange-50/20' : ''}`} value={item.noteR || ''} onChange={e => updateItem(item.id, 'noteR', e.target.value)} onKeyDown={handleKeyDown} readOnly={!isEditMode} /></td>
-                    <td className="border border-gray-300 p-0 text-center no-print bg-white relative">
-                      {isEditMode && (
-                        <button onClick={() => deleteItem(item.id)} className="text-gray-300 hover:text-red-500 p-1 w-full h-full flex items-center justify-center transition-colors">
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                paginatedItems.map((item, index) => {
+                  const isLastRow = index === paginatedItems.length - 1;
+                  const rowTdClass = `${tdClass} ${isLastRow ? 'border-b-0' : ''}`;
+                  return (
+                    <tr key={item.id} className="text-center h-[40px]">
+                      <td className={rowTdClass}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.floor || ''} 
+                              onChange={(e) => updateItem(item.id, 'floor', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.floor || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={rowTdClass}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.targetL || ''} 
+                              onChange={(e) => updateItem(item.id, 'targetL', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.targetL || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={rowTdClass}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.orderL || ''} 
+                              onChange={(e) => updateItem(item.id, 'orderL', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.orderL || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={rowTdClass}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.capacityL || ''} 
+                              onChange={(e) => updateItem(item.id, 'capacityL', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.capacityL || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={rowTdClass}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.valueL || ''} 
+                              onChange={(e) => updateItem(item.id, 'valueL', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2 text-black"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.valueL || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={rowTdClass}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.noteL || ''} 
+                              onChange={(e) => updateItem(item.id, 'noteL', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.noteL || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={rowTdClass}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.capacityR || ''} 
+                              onChange={(e) => updateItem(item.id, 'capacityR', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.capacityR || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={rowTdClass}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.valueR || ''} 
+                              onChange={(e) => updateItem(item.id, 'valueR', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2 text-black"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.valueR || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={`${rowTdClass} print:border-r-0`}>
+                        <div className="flex items-center h-full">
+                          {isEditing ? (
+                            <input 
+                              type="text" 
+                              value={item.noteR || ''} 
+                              onChange={(e) => updateItem(item.id, 'noteR', e.target.value)}
+                              className="bg-transparent border-none outline-none shadow-none appearance-none w-full h-full text-center text-[13px] font-normal px-2"
+                            />
+                          ) : (
+                            <div className="flex items-center justify-center w-full h-full px-2 text-[13px] font-normal text-black">{item.noteR || ''}</div>
+                          )}
+                        </div>
+                      </td>
+                      <td className={`${rowTdClass} no-print border-r-0`}>
+                        <div className="flex items-center justify-center h-full gap-1">
+                          <button 
+                            onClick={() => deleteItem(item.id)} 
+                            className="bg-red-50 text-red-600 hover:bg-red-600 hover:text-white p-2 rounded-lg transition-all"
+                            title="삭제"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
+        </div>
+        {isEditing && (
+          <div className="mt-4 flex justify-center no-print">
+            <button
+              onClick={() => {
+                const newItem: LoadCurrentItem = {
+                  id: generateId(),
+                  floor: activeFloor !== '전체' ? activeFloor : '',
+                  targetL: '',
+                  orderL: '',
+                  capacityL: '',
+                  valueL: '',
+                  noteL: '',
+                  orderR: '',
+                  capacityR: '',
+                  valueR: '',
+                  noteR: ''
+                };
+                setData({ ...data, items: [...data.items, newItem] });
+              }}
+              className="flex items-center justify-center px-6 py-2 bg-white text-gray-600 border border-gray-300 rounded-xl font-bold shadow-sm hover:bg-gray-50 transition-all active:scale-95"
+            >
+              <Plus size={18} className="mr-2" />
+              행 추가
+            </button>
+          </div>
+        )}
+      </div>
 
-        {/* 페이지네이션 UI - 번호 5개만 노출되도록 수정 */}
-        {totalPages > 1 && (
-          <div className="mt-4 flex items-center justify-center gap-2 py-4 no-print border-t border-gray-100">
+      {/* Modal removed as it's now a popup window */}
+
+        {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
+        {activeFloor === '전체' && totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6 no-print">
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+              className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
             >
               <ChevronLeft size={18} />
             </button>
             
-            <div className="flex items-center gap-1.5 px-4">
+            <div className="flex items-center gap-2">
               {visiblePageNumbers.map(pageNum => (
                 <button
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                  className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
                     currentPage === pageNum
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                      : 'bg-white text-gray-400 border border-gray-100 hover:border-blue-200 hover:text-blue-500'
+                      ? 'text-black font-bold scale-110 cursor-default'
+                      : 'text-black font-normal hover:text-blue-500 cursor-pointer'
                   }`}
                 >
-                  {pageNum}
+                  <span className="text-[13px]">{pageNum}</span>
                 </button>
               ))}
             </div>
@@ -484,25 +700,12 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
               disabled={currentPage === totalPages}
-              className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+              className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
             >
               <ChevronRight size={18} />
             </button>
           </div>
         )}
-
-        {isEditMode && (
-          <div className="mt-4 print:hidden px-1">
-            <button 
-              onClick={addItem}
-              className="w-full py-3.5 border-2 border-dashed border-gray-200 rounded-2xl text-gray-400 hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50/50 flex items-center justify-center font-black transition-all group shadow-inner"
-            >
-              <Plus size={20} className="mr-2 group-hover:scale-125 transition-transform" />
-              새 측정 항목 추가
-            </button>
-          </div>
-        )}
-      </div>
 
       <style>{`
         @keyframes scale-up {

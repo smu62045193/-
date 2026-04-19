@@ -4,7 +4,7 @@ import { MeterPhotoData, MeterPhotoItem, Tenant, MeterReadingData } from '../typ
 import { fetchMeterPhotos, saveMeterPhotos, fetchTenants, fetchMeterReading, saveMeterReading, uploadFile, generateUUID } from '../services/dataService';
 import { analyzeMeterPhoto } from '../services/geminiService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
-import { Camera, Plus, Trash2, Save, RefreshCw, X, Image as ImageIcon, Search, ChevronLeft, ChevronRight, Upload, Zap, ZapOff, Edit2, FileText, Calendar, RotateCcw, AlertTriangle, CheckCircle, Sparkles, Bot, Maximize2 } from 'lucide-react';
+import { Camera, Plus, Trash2, Save, RefreshCw, X, Image as ImageIcon, Search, ChevronLeft, ChevronRight, Upload, Zap, ZapOff, Edit2, FileText, Calendar, RotateCcw, AlertTriangle, CheckCircle, Sparkles, Bot, Maximize2, CheckCircle2 } from 'lucide-react';
 
 const getFloorWeight = (floor: string) => {
   const f = floor.trim().toUpperCase();
@@ -27,7 +27,7 @@ const resizeImage = (file: File): Promise<string> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_SIZE = 1200; 
+        const MAX_SIZE = 800; 
         if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
         else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
         canvas.width = width; canvas.height = height;
@@ -45,21 +45,30 @@ const resizeImage = (file: File): Promise<string> => {
 interface MeterReadingPhotosProps {
   currentDate: Date;
   isPopupMode?: boolean;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
+  tabs?: { id: string; label: string }[];
+  currentMonth: string;
+  setCurrentMonth: (month: string) => void;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
 }
 
-const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, isPopupMode = false }) => {
+const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ 
+  currentDate, 
+  isPopupMode = false,
+  activeTab,
+  setActiveTab,
+  tabs,
+  currentMonth,
+  setCurrentMonth,
+  onPrevMonth,
+  onNextMonth
+}) => {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [isAiEnabled, setIsAiEnabled] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    if (isPopupMode) {
-      const params = new URLSearchParams(window.location.search);
-      const month = params.get('month');
-      if (month) return month;
-    }
-    return format(currentDate, 'yyyy-MM');
-  });
   const [data, setData] = useState<MeterPhotoData>({ month: currentMonth, items: [] });
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -80,15 +89,27 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
 
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-    loadTenants();
+  const loadData = async () => {
+    setLoading(true);
+    let monthToFetch = currentMonth;
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const urlMonth = params.get('month');
+      if (urlMonth) monthToFetch = urlMonth;
+    }
+    const fetched = await fetchMeterPhotos(monthToFetch);
+    setData(fetched || { month: monthToFetch, items: [] });
+    setLoading(false);
+  };
 
+  useEffect(() => {
     if (isPopupMode) {
       const params = new URLSearchParams(window.location.search);
       const id = params.get('id');
       if (id && id !== 'new') setEditingId(id);
     }
+    loadData();
+    loadTenants();
 
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'METER_PHOTO_SAVED') loadData();
@@ -100,16 +121,11 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
   useEffect(() => {
     if (isPopupMode && editingId && data.items.length > 0) {
       const item = data.items.find(i => String(i.id) === String(editingId));
-      if (item) setNewItem({ ...item });
+      if (item) {
+        setNewItem({ ...item });
+      }
     }
   }, [editingId, data.items, isPopupMode]);
-
-  const loadData = async () => {
-    setLoading(true);
-    const fetched = await fetchMeterPhotos(currentMonth);
-    setData(fetched || { month: currentMonth, items: [] });
-    setLoading(false);
-  };
 
   const loadTenants = async () => {
     const fetched = await fetchTenants();
@@ -127,8 +143,8 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
   };
 
   const openIndependentWindow = (id: string = 'new') => {
-    const width = 850;
-    const height = 800;
+    const width = 1100;
+    const height = 700;
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
     const url = new URL(window.location.href);
@@ -166,7 +182,9 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
           });
           await saveMeterReading({ ...monthlyReadingData, items: updatedMonthlyItems });
         }
-      } catch (syncError) {}
+      } catch (syncError) {
+        console.error("Failed to sync meter reading data:", syncError);
+      }
       setSaveStatus('success');
       window.alert('저장이 완료되었습니다.');
       setTimeout(() => setSaveStatus('idle'), 3000);
@@ -185,7 +203,9 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
       try {
         const result = await analyzeMeterPhoto(resized, tenants);
         if (result) setNewItem(prev => ({ ...prev, tenant: result.tenantName, floor: result.floor, type: result.type, reading: result.reading ? Math.floor(parseFloat(result.reading.toString().replace(/,/g, ''))).toString() : '' }));
-      } catch (err) {} finally { setAnalyzing(false); }
+      } catch (err) {
+        console.error("Failed to analyze meter photo:", err);
+      } finally { setAnalyzing(false); }
     }
   };
 
@@ -244,7 +264,16 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
           }
         }
         if (window.opener) window.opener.postMessage({ type: 'METER_PHOTO_SAVED' }, '*');
-        window.alert('저장되었습니다.'); window.close();
+        window.alert('저장되었습니다.');
+        if (!editingId) {
+          setNewItem(prev => ({
+            ...prev,
+            floor: '',
+            tenant: '',
+            reading: '',
+            photo: ''
+          }));
+        }
       } else {
         window.alert('저장에 실패했습니다.');
       }
@@ -336,7 +365,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
                   <div className="flex flex-col"><label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">당월 지침 (숫자만)</label><input type="text" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 outline-none font-black text-blue-700 text-2xl focus:bg-white focus:ring-4 focus:ring-blue-100 transition-all shadow-sm" placeholder="0" value={newItem.reading} onChange={e => setNewItem({ ...newItem, reading: e.target.value.replace(/[^0-9]/g, '') })} /></div>
                   <div className="flex flex-col"><label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">촬영/입력 일자</label><input type="date" className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-6 py-4 outline-none font-bold text-slate-700 text-lg focus:bg-white focus:ring-4 focus:ring-slate-100 transition-all shadow-sm h-[72px]" value={newItem.date} onChange={e => setNewItem({ ...newItem, date: e.target.value })} /></div>
                 </div>
-                <div className="mt-auto pt-6 border-t border-slate-100 flex gap-4"><button onClick={() => window.close()} className="flex-1 py-5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-[24px] font-black text-base transition-all active:scale-95">CANCEL</button><button onClick={handleSubmit} disabled={loading} className={`flex-[2] py-5 text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all tracking-widest ${editingId ? 'bg-orange-600 shadow-orange-100' : 'bg-amber-600 shadow-amber-100'} disabled:bg-slate-400`}>{loading ? 'SAVING...' : editingId ? 'UPDATE DATA' : 'REGISTER NOW'}</button></div>
+                <div className="mt-auto pt-6 border-t border-slate-100 flex gap-4"><button onClick={() => window.close()} className="flex-1 py-5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-[24px] font-black text-base transition-all active:scale-95">취소</button><button onClick={handleSubmit} disabled={loading} className={`flex-[2] py-5 text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all tracking-widest ${editingId ? 'bg-orange-600 shadow-orange-100' : 'bg-amber-600 shadow-amber-100'} disabled:bg-slate-400`}>{loading ? '저장 중...' : editingId ? '수정하기' : '등록'}</button></div>
               </div>
             </div>
           </div>
@@ -346,47 +375,121 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({ currentDate, is
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 animate-fade-in relative">
-      <div className="flex flex-col md:flex-row justify-between items-center bg-gray-50/50 p-4 rounded-2xl border border-gray-200 gap-4">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="flex items-center space-x-2">
-            <button onClick={() => setCurrentMonth(prev => format(subMonths(parseISO(`${prev}-01`), 1), 'yyyy-MM'))} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><ChevronLeft /></button>
-            <h2 className="text-xl font-bold text-gray-800 tracking-tight">{currentMonth}</h2>
-            <button onClick={() => setCurrentMonth(prev => format(addMonths(parseISO(`${prev}-01`), 1), 'yyyy-MM'))} className="p-1 hover:bg-gray-100 rounded-full transition-colors"><ChevronRight /></button>
-          </div>
-          <div className="relative w-[320px]">
-            <input type="text" placeholder="입주사/층 검색..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none shadow-sm font-bold" />
-            <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-          </div>
-        </div>
-        <div className="flex gap-2 w-full md:w-auto justify-end">
-          <button onClick={() => openIndependentWindow()} className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg font-bold shadow-md hover:bg-amber-700 transition-all active:scale-95 whitespace-nowrap text-sm"><Plus size={18} /> 사진 추가 등록</button>
-          <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold shadow-md transition-all active:scale-95 whitespace-nowrap text-sm ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}{saveStatus === 'success' ? '저장/연동완료' : '서버저장'}</button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="py-24 flex flex-col items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100"><RefreshCw className="animate-spin text-amber-500" size={48} /><p className="text-gray-400 font-bold">사진 데이터를 불러오는 중...</p></div>
-      ) : filteredItems.length === 0 ? (
-        <div className="py-32 flex flex-col items-center gap-4 bg-white text-gray-400 rounded-2xl shadow-sm border border-gray-100"><ImageIcon size={64} /><p className="font-bold text-lg">등록된 검침 사진이 없습니다.</p></div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {filteredItems.map(item => (
-            <div key={item.id} className="bg-white rounded-[24px] overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col relative animate-scale-up">
-              <div className="aspect-[4/3] w-full overflow-hidden relative cursor-pointer" onClick={() => openIndependentWindow(item.id)}>
-                <img src={item.photo} alt={item.tenant} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                <div className="absolute top-3 left-3 px-3 py-1 bg-amber-600 text-white rounded-full text-[10px] font-black shadow-md uppercase tracking-wider">{item.floor}</div>
+    <div className="pb-20">
+      <div className="space-y-2 animate-fade-in pb-10 max-w-7xl mx-auto">
+        {!isPopupMode && (
+          <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start scrollbar-hide overflow-x-auto border-b border-black">
+            {/* 1. 날짜 선택 영역 (월 네비게이션) */}
+            <div className="flex items-center shrink-0">
+              <button 
+                onClick={onPrevMonth} 
+                className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <div className="px-2 py-3 text-[14px] font-bold text-black min-w-[100px] text-center">
+                {currentMonth.split('-')[0]}년 {currentMonth.split('-')[1]}월
               </div>
-              <div className="p-4 flex-1 flex flex-col gap-3">
-                <h3 className="font-black text-gray-900 truncate text-base mb-1">{item.tenant}</h3>
-                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md self-start ${item.type === '특수' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{item.type} 계량기</span>
-                <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 shadow-inner flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">지침값</span><span className="text-xl font-black text-blue-700 tracking-tighter">{item.reading ? parseInt(item.reading).toLocaleString() : '0'}</span></div>
-                <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50"><div className="flex items-center gap-1.5 text-gray-400 text-[10px] font-bold"><Calendar size={12} />{item.date}</div><div className="flex items-center gap-1"><button onClick={() => openIndependentWindow(item.id)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-xl transition-all"><Edit2 size={16} /></button><button onClick={() => handleDeleteRequest(item.id)} className="p-2 text-rose-400 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={16} /></button></div></div>
+              <button 
+                onClick={onNextMonth} 
+                className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </div>
+
+            {/* 구분선 (검정색 1px) */}
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-[1px] h-6 bg-black"></div>
+            </div>
+
+            {/* 2. 서브탭 메뉴 */}
+            <div className="flex shrink-0">
+              {tabs && setActiveTab && tabs.map(tab => (
+                <div
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer bg-white ${activeTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+                >
+                  {tab.label}
+                  {activeTab === tab.id && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-[1px] h-6 bg-black"></div>
+            </div>
+
+            <div className="flex items-center print:hidden shrink-0">
+              <button 
+                onClick={() => openIndependentWindow()} 
+                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+              >
+                <Plus size={18} className="mr-1.5" />
+                등록
+              </button>
+              <button 
+                onClick={handleSave} 
+                disabled={saveStatus === 'loading'} 
+                className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+              >
+                {saveStatus === 'loading' ? <RefreshCw className="animate-spin mr-1.5" size={18} /> : saveStatus === 'success' ? <CheckCircle2 size={18} className="mr-1.5" /> : <Save size={18} className="mr-1.5" />}
+                {saveStatus === 'success' ? '저장완료' : '저장'}
+              </button>
+            </div>
+
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-[1px] h-6 bg-black"></div>
+            </div>
+
+            {/* 3. 검색창 */}
+            <div className="flex items-stretch shrink-0">
+              <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
+                <input 
+                  type="text" 
+                  placeholder="입주사/층 검색..." 
+                  value={searchTerm} 
+                  onChange={e => setSearchTerm(e.target.value)} 
+                  className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all" 
+                />
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="py-24 flex flex-col items-center gap-4 bg-white rounded-2xl shadow-sm border border-gray-100"><RefreshCw className="animate-spin text-amber-500" size={48} /><p className="text-gray-400 font-bold">사진 데이터를 불러오는 중...</p></div>
+        ) : filteredItems.length === 0 ? (
+          <div className="py-32 flex flex-col items-center gap-4 bg-white text-gray-400 rounded-2xl shadow-sm border border-gray-100"><ImageIcon size={64} /><p className="font-bold text-lg">등록된 검침 사진이 없습니다.</p></div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+            {filteredItems.map(item => (
+              <div key={item.id} className="bg-white rounded-xl overflow-hidden border border-black shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col relative animate-scale-up">
+                <div className="aspect-[4/3] w-full overflow-hidden relative cursor-pointer" onClick={() => openIndependentWindow(item.id)}>
+                  <img src={item.photo} alt={item.tenant} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  <div className="absolute top-3 left-3 px-3 py-1 bg-amber-600 text-white rounded-full text-[10px] font-black shadow-md uppercase tracking-wider">{item.floor}</div>
+                </div>
+                <div className="p-4 flex-1 flex flex-col gap-3">
+                  <h3 className="font-black text-gray-900 truncate text-base mb-1">{item.tenant}</h3>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md self-start ${item.type === '특수' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>{item.type} 계량기</span>
+                  <div className="bg-slate-50 rounded-2xl p-3 border border-slate-100 shadow-inner flex justify-between items-center"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">지침값</span><span className="text-xl font-black text-blue-700 tracking-tighter">{item.reading ? parseInt(item.reading).toLocaleString() : '0'}</span></div>
+                  <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50">
+                    <div className="flex items-center gap-1.5 text-gray-400 text-[10px] font-bold"><Calendar size={12} />{item.date}</div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all"><Edit2 size={16} /></button>
+                      <button onClick={() => handleDeleteRequest(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all"><Trash2 size={16} /></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <style>{` @keyframes scale-up { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } } .animate-scale-up { animation: scale-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; } `}</style>
     </div>
   );

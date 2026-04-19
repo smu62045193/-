@@ -7,9 +7,10 @@ import LogSheetLayout from './LogSheetLayout';
 
 interface ElevatorLogProps {
   currentDate: Date;
+  isEmbedded?: boolean;
 }
 
-const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate }) => {
+const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate, isEmbedded = false }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const dateKey = format(currentDate, 'yyyy-MM-dd');
@@ -71,10 +72,10 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate }) => {
   const elevators = ['ev1', 'ev2', 'ev3', 'ev4', 'ev5'] as const;
   const elevatorLabels = ['1호기', '2호기', '3호기', '4호기', '5호기'];
 
-  const thClass = "border border-slate-300 p-2 bg-slate-100 font-bold text-center text-[13px] text-slate-700 h-9";
-  const tdClass = "border border-slate-300 p-0 h-9 relative bg-white";
-  const labelClass = "border border-slate-300 p-1 font-bold text-center bg-white text-slate-700 align-middle w-28 text-[13px]";
-  const resultCellClass = (res: ElevatorResult) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-black text-[13px] transition-colors ${res === '양호' ? 'text-blue-600' : res === '불량' ? 'text-red-600 bg-red-50' : 'text-slate-300'}`;
+  const thClass = "border border-black bg-white font-normal text-center text-[13px] text-black h-[32px]";
+  const tdClass = "border border-black p-0 h-[32px] relative bg-white text-center text-black";
+  const labelClass = "border border-black p-0 font-normal text-center bg-white text-black align-middle w-28 text-[13px] h-[32px]";
+  const resultCellClass = (res: ElevatorResult) => `w-full h-full flex items-center justify-center cursor-pointer select-none font-normal text-[13px] transition-colors px-2 ${res === '양호' ? 'text-blue-600' : res === '불량' ? 'text-red-600' : 'text-slate-300'}`;
 
   return (
     <LogSheetLayout
@@ -89,25 +90,22 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate }) => {
       isEmbedded={true}
       hideHeader={true}
     >
-      <div id="elevator-log-print-area" className="bg-white max-w-5xl mx-auto shadow-sm p-1">
-        <div className="mb-2 px-1">
-          <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">승강기 일일 점검 일지</h3>
-        </div>
-        <div className="bg-white border border-slate-300 overflow-hidden">
-          <table className="w-full border-collapse">
+      <div id="elevator-log-print-area" className={`bg-white ${isEmbedded ? 'w-full' : 'max-w-7xl mx-auto'}`}>
+        <div className="bg-white overflow-hidden">
+          <table className="w-full border-collapse border border-black">
             <thead>
-              <tr className="bg-slate-100">
-                <th className={`${thClass} w-28`}>구 &nbsp; 분</th>
+              <tr className="bg-white border-b border-black h-[32px]">
+                <th className={`${thClass} w-28`}><div className="flex items-center justify-center h-full px-2">구 &nbsp; 분</div></th>
                 {elevatorLabels.map((label) => (
-                  <th key={label} className={`${thClass} w-16`}>{label}</th>
+                  <th key={label} className={`${thClass} w-16`}><div className="flex items-center justify-center h-full px-2">{label}</div></th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {data.items.map((item) => (
-                <tr key={item.id} className="h-9 hover:bg-slate-50/50 transition-colors">
+                <tr key={item.id} className="h-[32px] bg-white border-b border-black">
                   <td className={labelClass}>
-                    {item.content}
+                    <div className="flex items-center justify-center h-full px-2">{item.content}</div>
                   </td>
                   {elevators.map((evKey) => {
                     const res = item.results[evKey];
@@ -125,16 +123,16 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate }) => {
                   })}
                 </tr>
               ))}
-              <tr className="h-20">
-                <td className={`${labelClass} font-black text-[13px]`}>
-                  특 이 사 항
+              <tr className="h-20 border-b border-black last:border-0">
+                <td className={`${labelClass} font-normal text-[13px] h-20`}>
+                  <div className="flex items-center justify-center h-full px-2">특 이 사 항</div>
                 </td>
-                <td colSpan={5} className="border border-slate-300 p-0 h-20">
+                <td colSpan={5} className="p-0 h-20 border border-black">
                   <textarea 
                     value={data.remarks || ''} 
                     onChange={(e) => updateRemarks(e.target.value)}
                     placeholder="특이사항 입력"
-                    className="w-full h-full p-2 resize-none outline-none text-slate-700 text-[13px] leading-relaxed font-medium bg-transparent !text-left scrollbar-hide"
+                    className="w-full h-full p-2 resize-none outline-none text-black text-[13px] leading-relaxed font-normal bg-transparent !text-center scrollbar-hide border-none shadow-none appearance-none"
                   />
                 </td>
               </tr>

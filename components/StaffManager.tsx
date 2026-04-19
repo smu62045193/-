@@ -3,7 +3,7 @@ import StaffStatus from './StaffStatus';
 import LogoSealManager from './LogoSealManager';
 import AppointmentManager from './AppointmentManager';
 import ContractorManager from './ContractorManager';
-import { LayoutList, User, Camera, Printer, RefreshCw, CalendarDays, UserPlus, Image as ImageIcon, Users } from 'lucide-react';
+import { LayoutList, User, Camera, Printer, RefreshCw, CalendarDays, UserPlus, Image as ImageIcon, Users, Edit2, Save, Search, Plus, Lock } from 'lucide-react';
 import { fetchStaffList, saveStaffList } from '../services/dataService';
 import { StaffMember } from '../types';
 
@@ -12,10 +12,10 @@ interface StaffManagerProps {
 }
 
 const TABS = [
-  { id: 'chart', label: '직원 조직도' },
-  { id: 'status', label: '직원 현황' },
+  { id: 'chart', label: '직원조직도' },
+  { id: 'status', label: '직원현황' },
   { id: 'appointments', label: '선임현황' },
-  { id: 'contractors', label: '협력업체현황' },
+  { id: 'contractors', label: '협력업체' },
   { id: 'logoseal', label: '로고/직인' },
 ];
 
@@ -113,25 +113,25 @@ const StaffCard: React.FC<StaffCardProps> = ({ member, isManager = false }) => {
       
       <div className="flex flex-col items-center justify-center w-full px-1 overflow-hidden">
         <div className="flex items-center justify-center w-full whitespace-nowrap mb-0.5">
-          <span className={`font-bold text-black ${commonTextStyle}`}>
+          <span className={`font-normal text-black ${commonTextStyle}`}>
             {member.name}
-            <span className="font-medium text-black">
+            <span className="font-normal text-black">
               {birthText}
             </span>
           </span>
         </div>
         
         <div className="flex items-center justify-center w-full whitespace-nowrap">
-          <span className={`font-bold text-black ${commonTextStyle}`}>
+          <span className={`font-normal text-black ${commonTextStyle}`}>
             {getSubTitle()}
-            <span className="font-medium text-black">
+            <span className="font-normal text-black">
               {joinText}
             </span>
           </span>
         </div>
         
         {member.phone && (
-          <span className={`font-bold text-black mt-0.5 text-[9px] print:text-[7pt]`}>
+          <span className={`font-normal text-black mt-0.5 text-[9px] print:text-[7pt]`}>
             {member.phone}
           </span>
         )}
@@ -185,20 +185,28 @@ const DepartmentGroup: React.FC<DepartmentGroupProps> = ({ title, members, heade
   const leader = allDisplayMembers.length > 0 ? allDisplayMembers[0] : null;
   let teamMembers = leader ? allDisplayMembers.slice(1) : [];
 
-  // 경비팀 특정 배치 요구사항 적용 (수직: 하병주-공석 / 박종두-이선근)
+  // 경비팀 특정 배치 요구사항 적용 (좌측: 대원A 2명 / 우측: 대원B 2명)
   if (title === '경비팀') {
-    const ha = teamMembers.find(m => m.name === '하병주');
-    const park = teamMembers.find(m => m.name === '박종두');
-    const lee = teamMembers.find(m => m.name === '이선근');
-    
+    // 대원A 그룹 (하병주 포함)
+    const daewonA = teamMembers.filter(m => !m.isPlaceholder && (m.jobTitle?.includes('대원A') || m.name === '하병주'));
+    // 대원B 그룹 (박종두, 한응식 포함)
+    const daewonB = teamMembers.filter(m => !m.isPlaceholder && (m.jobTitle?.includes('대원B') || m.name === '박종두' || m.name === '한응식'));
+
     const arranged: any[] = [];
-    arranged[0] = ha || { id: 'fixed-ha', name: '하병주', category: '경비', isPlaceholder: true };
-    arranged[2] = { id: 'fixed-vacant-a', name: '공석', category: '경비', isPlaceholder: true };
-    arranged[1] = park || { id: 'fixed-park', name: '박종두', category: '경비', isPlaceholder: true };
-    arranged[3] = lee || { id: 'fixed-lee', name: '이선근', category: '경비', isPlaceholder: true };
     
-    const others = teamMembers.filter(m => m !== ha && m !== park && m !== lee && !m.isPlaceholder);
-    teamMembers = [...arranged, ...others];
+    // 좌측열 (index 0, 2) - 대원A
+    // 1순위: 하병주
+    arranged[0] = daewonA.find(m => m.name === '하병주') || daewonA[0] || { id: 'fixed-ha', name: '하병주', category: '경비', isPlaceholder: true, jobTitle: '대원A' };
+    // 2순위: 하병주가 아닌 다른 대원A
+    arranged[2] = daewonA.find(m => m.id !== arranged[0].id) || { id: 'fixed-vacant-a2', name: '공석', category: '경비', isPlaceholder: true, jobTitle: '대원A' };
+    
+    // 우측열 (index 1, 3) - 대원B
+    // 1순위: 박종두
+    arranged[1] = daewonB.find(m => m.name === '박종두') || daewonB[0] || { id: 'fixed-park', name: '박종두', category: '경비', isPlaceholder: true, jobTitle: '대원B' };
+    // 2순위: 한응식 (또는 박종두가 아닌 다른 대원B)
+    arranged[3] = daewonB.find(m => m.name === '한응식' && m.id !== arranged[1].id) || daewonB.find(m => m.id !== arranged[1].id) || { id: 'fixed-han', name: '한응식', category: '경비', isPlaceholder: true, jobTitle: '대원B' };
+
+    teamMembers = arranged;
   }
 
   const numCols = title === '시설팀' ? 1 : 2;
@@ -261,6 +269,9 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
   const [activeTab, setActiveTab] = useState('chart');
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
 
   useEffect(() => {
     if (activeSubItem === '직원현황') setActiveTab('status');
@@ -269,8 +280,18 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
   }, [activeSubItem]);
 
   useEffect(() => {
-    if (activeTab !== 'logoseal') loadData();
+    setIsEditMode(false);
+    setIsSaved(false);
   }, [activeTab]);
+
+  useEffect(() => {
+    const handleSaved = () => {
+      setIsSaved(true);
+      setTimeout(() => setIsSaved(false), 3000);
+    };
+    window.addEventListener('LOGOSEAL_SAVED', handleSaved);
+    return () => window.removeEventListener('LOGOSEAL_SAVED', handleSaved);
+  }, []);
 
   const loadData = async () => {
     setLoading(true);
@@ -284,6 +305,10 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
     }
   };
 
+  useEffect(() => {
+    if (activeTab !== 'logoseal') loadData();
+  }, [activeTab]);
+
   const handlePrint = () => {
     const printContent = document.getElementById('staff-org-chart-container');
     if (!printContent) return;
@@ -294,7 +319,7 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
     printWindow.document.write(`
       <html>
         <head>
-          <title>직원 조직도 - 새마을운동중앙회 대치동사옥</title>
+          <title>직원조직도 - 새마을운동중앙회 대치동사옥</title>
           <script src="https://cdn.tailwindcss.com"></script>
           <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap" rel="stylesheet">
           <style>
@@ -368,57 +393,132 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
   const cleaningTeam = activeStaff.filter(m => m.category === '미화' && m.id !== manager?.id);
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-3 animate-fade-in print:p-0">
-      <div className="mb-0 print:hidden flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center">
-            <Users className="mr-2 text-blue-600" size={32} />
-            직원/선임/협력업체 관리
-          </h2>
+    <div className="p-4 max-w-7xl mx-auto space-y-2 pb-32 animate-fade-in print:p-0">
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex shrink-0 items-stretch">
+          {TABS.map(tab => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                activeTab === tab.id 
+                  ? 'text-orange-600' 
+                  : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
+          ))}
         </div>
-      </div>
 
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-0 mb-0 scrollbar-hide items-center print:hidden">
-        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-           <CalendarDays size={22} />
-        </div>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
-              activeTab === tab.id 
-                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {(activeTab === 'chart' || activeTab === 'status' || activeTab === 'appointments' || activeTab === 'contractors' || activeTab === 'logoseal') && (
+          <div className="flex items-center shrink-0 pr-2">
+            <div className="px-2 flex items-center">
+              <div className="w-px h-6 bg-black"></div>
+            </div>
+            <button 
+              onClick={() => {
+                if (activeTab === 'chart' || activeTab === 'status') loadData();
+                else if (activeTab === 'appointments') window.dispatchEvent(new CustomEvent('REFRESH_APPOINTMENTS'));
+                else if (activeTab === 'contractors') window.dispatchEvent(new CustomEvent('REFRESH_CONTRACTORS'));
+                else if (activeTab === 'logoseal') window.dispatchEvent(new CustomEvent('REFRESH_LOGOSEAL'));
+              }}
+              disabled={loading}
+              className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative disabled:opacity-50"
+            >
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />새로고침
+            </button>
+
+            {activeTab === 'logoseal' && (
+              <>
+                <button 
+                  onClick={() => {
+                    setIsEditMode(!isEditMode);
+                    window.dispatchEvent(new CustomEvent('EDIT_LOGOSEAL'));
+                  }}
+                  disabled={loading}
+                  className={`shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent transition-all relative disabled:opacity-50 whitespace-nowrap ${
+                    isEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  {isEditMode ? <Lock size={18} className="mr-1.5" /> : <Edit2 size={18} className="mr-1.5" />}
+                  {isEditMode ? '수정완료' : '수정'}
+                </button>
+                <button 
+                  onClick={() => window.dispatchEvent(new CustomEvent('SAVE_LOGOSEAL'))}
+                  disabled={loading}
+                  className={`shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent transition-all relative disabled:opacity-50 whitespace-nowrap ${
+                    isSaved ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  <Save size={18} className="mr-1.5" />저장
+                </button>
+              </>
+            )}
+            
+            {(activeTab === 'status' || activeTab === 'appointments' || activeTab === 'contractors') && (
+              <button 
+                onClick={() => {
+                  if (activeTab === 'status') window.dispatchEvent(new CustomEvent('ADD_STAFF'));
+                  else if (activeTab === 'appointments') window.dispatchEvent(new CustomEvent('ADD_APPOINTMENT'));
+                  else if (activeTab === 'contractors') window.dispatchEvent(new CustomEvent('ADD_CONTRACTOR'));
+                }}
+                disabled={loading}
+                className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative disabled:opacity-50"
+              >
+                <Plus size={18} className="mr-1.5" />등록
+              </button>
+            )}
+
+            {(activeTab === 'chart' || activeTab === 'status' || activeTab === 'appointments' || activeTab === 'contractors') && (
+              <button 
+                onClick={() => {
+                  if (activeTab === 'chart') handlePrint();
+                  else if (activeTab === 'status') window.dispatchEvent(new CustomEvent('PRINT_STAFF'));
+                  else if (activeTab === 'appointments') window.dispatchEvent(new CustomEvent('PRINT_APPOINTMENTS'));
+                  else if (activeTab === 'contractors') window.dispatchEvent(new CustomEvent('PRINT_CONTRACTORS'));
+                }} 
+                disabled={loading}
+                className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative disabled:opacity-50"
+              >
+                <Printer size={18} className="mr-1.5" />인쇄
+              </button>
+            )}
+
+            {(activeTab === 'status' || activeTab === 'contractors') && (
+              <div className="px-2 flex items-center">
+                <div className="w-px h-6 bg-black"></div>
+              </div>
+            )}
+
+            {(activeTab === 'status' || activeTab === 'contractors') && (
+              <div className="flex-1 flex justify-end items-center px-4 min-w-[200px]">
+                <div className="relative w-full max-w-[280px]">
+                  <input 
+                    type="text" 
+                    placeholder={activeTab === 'status' ? "성명 또는 담당구역 검색" : "업체명 또는 대표자 검색"} 
+                    value={searchTerm} 
+                    onChange={(e) => setSearchTerm(e.target.value)} 
+                    className="w-full pl-9 pr-4 py-1.5 bg-transparent border-none rounded-none outline-none focus:ring-0 text-[13px] font-normal" 
+                  />
+                  <Search className="absolute left-3 top-2 text-gray-400" size={16} />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {loading && staffList.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col items-center justify-center py-20 bg-white border-b border-black">
           <RefreshCw className="animate-spin text-blue-500 mb-4" size={32} />
           <p className="text-gray-500 font-bold">직원 정보를 불러오는 중...</p>
         </div>
       ) : activeTab === 'chart' ? (
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 overflow-hidden print:p-0 print:border-none">
-          <div className="flex justify-end mb-6 print:hidden gap-2">
-            <button 
-              onClick={loadData}
-              disabled={loading}
-              className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
-            >
-              <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />새로고침
-            </button>
-            <button 
-              onClick={handlePrint} 
-              className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
-            >
-              <Printer size={18} className="mr-2" /> 미리보기
-            </button>
-          </div>
+        <div className="bg-white p-8 border border-black overflow-hidden print:p-0 print:border-none">
           <div id="staff-org-chart-container" className="flex flex-col items-center min-w-[750px] print:min-w-0 print:w-full">
             <h1 className="text-xl font-black text-gray-900 border-b-4 border-gray-800 pb-1.5 px-12 mb-0 print:text-[20pt] print:border-black print:mb-0">
               새마을운동중앙회 대치동사옥 조직도
@@ -435,13 +535,13 @@ const StaffManager: React.FC<StaffManagerProps> = ({ activeSubItem }) => {
           </div>
         </div>
       ) : activeTab === 'status' ? (
-        <StaffStatus staffList={staffList} setStaffList={setStaffList} isEmbedded={true} />
+        <StaffStatus staffList={staffList} setStaffList={setStaffList} isEmbedded={true} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
       ) : activeTab === 'appointments' ? (
         <AppointmentManager isEmbedded={true} />
       ) : activeTab === 'contractors' ? (
-        <ContractorManager isEmbedded={true} />
+        <ContractorManager isEmbedded={true} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
       ) : (
-        <LogoSealManager isEmbedded={true} />
+        <LogoSealManager isEmbedded={true} isEditMode={isEditMode} />
       )}
     </div>
   );

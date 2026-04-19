@@ -257,10 +257,10 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
         <td class="text-center">${index + 1}</td>
         <td class="text-center">${item.date || ''}</td>
         <td class="text-center">${item.type || ''}</td>
-        <td class="text-center font-bold">${item.company}</td>
-        <td class="text-center font-bold">${item.location}</td>
+        <td class="text-center">${item.company}</td>
+        <td class="text-center">${item.location}</td>
         <td class="text-center">${item.prevPlate || ''}</td>
-        <td class="text-center font-bold" style="color:blue;">${item.plateNum}</td>
+        <td class="text-center">${item.plateNum}</td>
         <td class="text-center">${item.note}</td>
       </tr>`).join('');
 
@@ -277,9 +277,9 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
           @media print { .no-print { display: none !important; } .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; } }
           .print-page { width: 210mm; min-height: 297mm; padding: 25mm 12mm 10mm 12mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
           h1 { text-align: center; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 30px; font-size: 24pt; font-weight: 900; }
-          table { width: 100%; border-collapse: collapse; font-size: 9.5pt; border: 1.5px solid black; table-layout: fixed; }
-          th, td { border: 1px solid black; padding: 8px 4px; text-align: center; word-break: break-all; }
-          th { background-color: #f3f4f6; font-weight: bold; }
+          table { width: 100%; border-collapse: collapse; font-size: 8.5pt; border: 1.5px solid black; table-layout: fixed; }
+          th, td { border: 1px solid black; padding: 8px 4px; text-align: center; word-break: break-all; font-weight: normal; }
+          th { background-color: #ffffff; font-weight: normal; }
           .font-bold { font-weight: bold; }
         </style>
       </head>
@@ -444,120 +444,141 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
   }
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50/50 p-4 rounded-2xl border border-gray-200 print:hidden">
-        <div className="relative w-full md:w-[320px]">
-          <input 
-            type="text" 
-            placeholder="업체명, 위치, 차량번호 검색" 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm font-bold" 
-          />
-          <Search className="absolute left-3.5 top-3 text-gray-400" size={18} />
-        </div>
+    <div className="space-y-2 animate-fade-in">
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex items-stretch shrink-0">
+          <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
+            <input 
+              type="text" 
+              placeholder="업체명, 위치, 차량번호 검색" 
+              value={searchTerm} 
+              onChange={(e) => setSearchTerm(e.target.value)} 
+              className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all" 
+            />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
+          </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button 
-            onClick={loadData} 
-            disabled={loading}
-            className="flex items-center justify-center px-4 py-2.5 bg-white text-emerald-600 border border-emerald-200 rounded-xl font-bold shadow-sm hover:bg-emerald-50 transition-all active:scale-95 text-sm"
-          >
-            <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
-            새로고침
-          </button>
-          <button 
-            onClick={() => openIndependentWindow()}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all shadow-lg text-sm font-black active:scale-95"
-          >
-            <Plus size={18} /> 신규 차량 등록
-          </button>
-          <button 
-            onClick={handlePrint} 
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-amber-600 text-white px-5 py-2.5 rounded-xl hover:bg-amber-700 font-bold shadow-md text-sm transition-all active:scale-95"
-          >
-            <Printer size={18} /> 미리보기
-          </button>
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          <div className="flex items-center shrink-0">
+            <button 
+              onClick={loadData} 
+              disabled={loading}
+              className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent disabled:opacity-50 text-gray-500 hover:text-black transition-colors whitespace-nowrap relative"
+            >
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </button>
+            <button 
+              onClick={() => openIndependentWindow()}
+              disabled={loading}
+              className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative disabled:opacity-50"
+            >
+              <Plus size={18} className="mr-1.5" /> 등록
+            </button>
+            <button 
+              onClick={handlePrint} 
+              disabled={loading}
+              className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative disabled:opacity-50"
+            >
+              <Printer size={18} className="mr-1.5" /> 인쇄
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
+      <div className="bg-white border-t border-l border-black overflow-hidden">
         <div className="overflow-x-auto scrollbar-hide">
-          <table className="w-full min-w-[1000px] border-collapse border border-gray-300">
+          <table className="w-full min-w-[1000px] border-collapse">
             <thead>
-              <tr className="bg-gray-50 divide-x divide-gray-300">
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-12">No</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-32">등록일자</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-16">구분</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-44">업체명</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-24">주차위치</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-36">이전차량번호</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-36">현재차량번호</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700">비고</th>
-                <th className="border border-gray-300 p-3 font-bold text-center text-[12px] text-gray-700 w-28 print:hidden">관리</th>
+              <tr className="bg-white h-[40px]">
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-12 p-0"><div className="flex items-center justify-center h-full px-2">No</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-32 p-0"><div className="flex items-center justify-center h-full px-2">등록일자</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-20 p-0"><div className="flex items-center justify-center h-full px-2">구분</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-44 p-0"><div className="flex items-center justify-center h-full px-2">업체명</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-24 p-0"><div className="flex items-center justify-center h-full px-2">주차위치</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-36 p-0"><div className="flex items-center justify-center h-full px-2">이전차량번호</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-36 p-0"><div className="flex items-center justify-center h-full px-2">현재차량번호</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">비고</div></th>
+                <th className="border-b border-r border-black text-center text-[13px] font-normal text-black w-28 p-0 print:hidden"><div className="flex items-center justify-center h-full px-2">관리</div></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-300">
+            <tbody className="bg-white">
               {paginatedItems.length === 0 ? (
-                <tr><td colSpan={9} className="text-center py-20 text-gray-400 italic">검색 결과가 없습니다.</td></tr>
+                <tr><td colSpan={9} className="text-center h-[100px] text-[13px] text-black italic font-normal border-b border-r border-black">검색 결과가 없습니다.</td></tr>
               ) : (
-                paginatedItems.map((item, index) => (
-                  <tr key={item.id} className="hover:bg-blue-50/30 transition-colors divide-x divide-gray-300 text-center">
-                    <td className="p-3 text-gray-400 font-mono text-xs">{filteredItems.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}</td>
-                    <td className="p-3 text-xs text-gray-700">{item.date || '-'}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
-                        {item.type || '-'}
-                      </span>
-                    </td>
-                    <td className="p-3 font-bold text-gray-900 text-sm">{item.company}</td>
-                    <td className="p-3 font-black text-gray-700 text-sm">{item.location}</td>
-                    <td className="p-3 text-gray-500 text-sm">{item.prevPlate || '-'}</td>
-                    <td className="p-3 font-black text-blue-600 text-sm">{item.plateNum}</td>
-                    <td className="p-3 text-left pl-4 text-gray-600 text-xs truncate max-w-[200px]">{item.note || '-'}</td>
-                    <td className="p-3 print:hidden">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button onClick={() => openIndependentWindow(item.id, 'edit')} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16} /></button>
-                        <button onClick={() => openIndependentWindow(item.id, 'change')} className="p-2 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-all" title="변경"><RotateCcw size={16} /></button>
-                        <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                paginatedItems.map((item, index) => {
+                  return (
+                    <tr key={item.id} className="hover:bg-blue-50/30 transition-colors text-center h-[40px]">
+                      <td className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{filteredItems.length - ((currentPage - 1) * ITEMS_PER_PAGE + index)}</div></td>
+                      <td className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{item.date || '-'}</div></td>
+                      <td className="border-b border-r border-black text-center text-[13px] font-normal p-0">
+                        <div className="flex items-center justify-center h-full px-2">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '추가' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {item.type || '-'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{item.company}</div></td>
+                      <td className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{item.location}</div></td>
+                      <td className="border-b border-r border-black text-center text-[13px] font-normal text-black p-0"><div className="flex items-center justify-center h-full px-2">{item.prevPlate || '-'}</div></td>
+                      <td className="border-b border-r border-black text-center text-[13px] font-normal text-blue-600 p-0"><div className="flex items-center justify-center h-full px-2">{item.plateNum}</div></td>
+                      <td className="border-b border-r border-black text-left text-[13px] font-normal text-black p-0"><div className="flex items-center justify-start h-full px-2 truncate max-w-[200px]">{item.note || '-'}</div></td>
+                      <td className="border-b border-r border-black text-center text-[13px] font-normal print:hidden p-0">
+                        <div className="flex items-center justify-center gap-1 h-full px-2">
+                          <button onClick={() => openIndependentWindow(item.id, 'edit')} className="p-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-all" title="수정"><Edit2 size={14} /></button>
+                          <button onClick={() => openIndependentWindow(item.id, 'change')} className="p-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded transition-all" title="변경"><RotateCcw size={14} /></button>
+                          <button onClick={() => handleDelete(item.id)} className="p-1.5 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded transition-all" title="삭제"><Trash2 size={14} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {totalPages > 1 && (
-        <div className="px-6 py-4 flex items-center justify-center gap-2">
+      {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
+      {filteredItems.length > 0 && (
+        <div className="py-4 flex items-center justify-center gap-2 print:hidden">
           <button
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="flex items-center gap-1.5 px-4">
-            {visiblePageNumbers.map(pageNum => (
-              <button
-                key={pageNum}
-                onClick={() => setCurrentPage(pageNum)}
-                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
-                  currentPage === pageNum
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
-                }`}
-              >
-                {pageNum}
+          
+          <div className="flex items-center gap-2">
+            {totalPages <= 1 ? (
+              <button className="w-9 h-9 bg-transparent border-none text-black font-bold scale-110 cursor-default flex items-center justify-center">
+                <span className="text-[13px]">1</span>
               </button>
-            ))}
+            ) : (
+              visiblePageNumbers.map(pageNum => (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
+                    currentPage === pageNum
+                      ? 'text-black font-bold scale-110 cursor-default'
+                      : 'text-black font-normal hover:text-blue-500 cursor-pointer'
+                  }`}
+                >
+                  <span className="text-[13px]">{pageNum}</span>
+                </button>
+              ))
+            )}
           </div>
+
           <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-            disabled={currentPage === totalPages}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            disabled={currentPage === totalPages || totalPages <= 1}
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronRight size={18} />
           </button>

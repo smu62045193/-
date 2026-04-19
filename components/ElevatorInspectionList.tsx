@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ElevatorInspectionItem, DailyData, LogCategory } from '../types';
-import { fetchElevatorInspectionList, saveElevatorInspectionList, apiFetchRange, fetchLinkedKeywords, saveLinkedKeywords } from '../services/dataService';
+import { fetchElevatorInspectionList, saveElevatorInspectionList, apiFetchRange, fetchLinkedKeywords, saveLinkedKeywords, generateUUID } from '../services/dataService';
 import { RefreshCw, Search, Link, Plus, Trash2, X, Save, AlertCircle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -51,7 +51,7 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
     setKeywords(data || []);
   };
 
-  const normalize = (text: string) => (text || '').replace(/[\s()\-]/g, '').toUpperCase();
+  const normalize = (text: string) => (text || '').replace(/[\s()-]/g, '').toUpperCase();
 
   const openIndependentWindow = () => {
     const width = 500;
@@ -77,8 +77,12 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
 
     setLoading(true);
     try {
-      const year = new Date().getFullYear();
-      const logs = await apiFetchRange("DAILY_", `${year}-01-01`, `${year}-12-31`);
+      // 현재 날짜 기준 과거 6개월부터 오늘까지 데이터를 가져오도록 개선 (미래 예정사항 제외)
+      const now = new Date();
+      const startDate = format(new Date(now.getFullYear(), now.getMonth() - 6, 1), 'yyyy-MM-dd');
+      const endDate = format(now, 'yyyy-MM-dd');
+      
+      const logs = await apiFetchRange("DAILY_", startDate, endDate);
       const normalizedKeywords = keywords.map(normalize);
       
       const newEntries: ElevatorInspectionItem[] = [];
@@ -98,8 +102,8 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
             let cleanContent = task.content;
             const escapedK = matchedKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const cleaningPatterns = [
-              new RegExp(`\\s?\\(${escapedK}\\)`, 'gi'),
-              new RegExp(`\\(${escapedK}\\)`, 'gi'),
+              new RegExp(`\\s?\\(\\s?${escapedK}\\s?\\)`, 'gi'), // 괄호 안 공백 허용
+              new RegExp(`\\(\\s?${escapedK}\\s?\\)`, 'gi'),
               new RegExp(`\\s?${escapedK}`, 'gi')
             ];
             cleaningPatterns.forEach(pattern => {
@@ -107,11 +111,16 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
             });
             cleanContent = cleanContent.trim();
 
-            const exists = items.some(item => item.date === dateKey && normalize(item.content) === normalize(cleanContent));
+            // 날짜, 업체명, 내용이 모두 일치할 때만 중복으로 판단하도록 개선
+            const exists = items.some(item => 
+              item.date === dateKey && 
+              item.company === matchedKeyword && 
+              normalize(item.content) === normalize(cleanContent)
+            );
             
             if (!exists) {
               newEntries.push({
-                id: `auto_${dateKey}_${Math.random().toString(36).substr(2, 5)}`,
+                id: generateUUID(),
                 date: dateKey,
                 company: matchedKeyword,
                 content: cleanContent,
@@ -374,35 +383,37 @@ const ElevatorInspectionList: React.FC<ElevatorInspectionListProps> = ({ isKeywo
         </div>
       </div>
 
-      {/* 페이지네이션 - 리스트 박스 외부(하단)에 위치 */}
-      {totalPages > 1 && (
+      {/* 페이지네이션 UI - 미니멀 텍스트 스타일로 정밀 수정 */}
+      {filteredItems.length > 0 && (
         <div className="py-4 flex items-center justify-center gap-2 print:hidden">
           <button
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronLeft size={18} />
           </button>
-          <div className="flex items-center gap-1.5 px-4">
+          
+          <div className="flex items-center gap-2">
             {visiblePageNumbers.map(pageNum => (
               <button
                 key={pageNum}
                 onClick={() => setCurrentPage(pageNum)}
-                className={`w-9 h-9 rounded-xl font-black text-xs transition-all ${
+                className={`w-9 h-9 bg-transparent border-none transition-all active:scale-90 flex items-center justify-center ${
                   currentPage === pageNum
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 scale-110'
-                    : 'bg-white text-gray-500 hover:bg-gray-100 border border-gray-200'
+                    ? 'text-black font-bold scale-110 cursor-default'
+                    : 'text-black font-normal hover:text-blue-500 cursor-pointer'
                 }`}
               >
-                {pageNum}
+                <span className="text-[13px]">{pageNum}</span>
               </button>
             ))}
           </div>
+
           <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
             disabled={currentPage === totalPages}
-            className="p-2 rounded-xl border border-gray-200 bg-white text-gray-600 disabled:opacity-30 hover:bg-gray-50 transition-all active:scale-90"
+            className="p-2 bg-transparent border-none text-black disabled:text-gray-300 disabled:cursor-not-allowed transition-all active:scale-90 shadow-none cursor-pointer"
           >
             <ChevronRight size={18} />
           </button>

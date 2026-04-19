@@ -3,10 +3,17 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { MeterReadingData, MeterReadingItem, Tenant, MeterPhotoItem, StaffMember, MeterPhotoData } from '../types';
 import { fetchMeterReading, saveMeterReading, getInitialMeterReading, fetchTenants, fetchMeterPhotos, fetchStaffList, fetchLogoSealSettings } from '../services/dataService';
 import { format, subMonths, addMonths, parseISO } from 'date-fns';
-import { Save, Printer, Plus, Trash2, RefreshCw, CheckCircle2, X, Cloud, FileText, ChevronLeft, ChevronRight, Calculator, Download, Building2, Edit2, Lock } from 'lucide-react';
+import { Save, Printer, Plus, Trash2, RefreshCw, CheckCircle2, X, Cloud, FileText, ChevronLeft, ChevronRight, Calculator, Download, Building2, Edit2, Lock, ArrowRight } from 'lucide-react';
 
 interface MeterReadingLogProps {
   currentDate: Date;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
+  tabs?: { id: string; label: string }[];
+  currentMonth: string;
+  setCurrentMonth: (month: string) => void;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
 }
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
@@ -39,16 +46,25 @@ const getFloorWeight = (floor: string) => {
   return num;
 };
 
-const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
+const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ 
+  currentDate, 
+  activeTab, 
+  setActiveTab, 
+  tabs,
+  currentMonth,
+  setCurrentMonth,
+  onPrevMonth,
+  onNextMonth
+}) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   
   // 수정 모드 분리
   const [isSummaryEditMode, setIsSummaryEditMode] = useState(false);
-  const [isTableEditMode, setIsTableEditMode] = useState(false);
 
-  const [currentMonth, setCurrentMonth] = useState(format(currentDate, 'yyyy-MM'));
-  const [data, setData] = useState<MeterReadingData>(getInitialMeterReading(format(currentDate, 'yyyy-MM')));
+  const [data, setData] = useState<MeterReadingData>(getInitialMeterReading(currentMonth));
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [brandSettings, setBrandSettings] = useState<{ logo?: string; seal?: string } | null>(null);
 
   useEffect(() => {
     loadData(currentMonth);
@@ -65,20 +81,24 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
   const loadData = async (monthStr: string) => {
     setLoading(true);
     setIsSummaryEditMode(false);
-    setIsTableEditMode(false);
     try {
       // 1. 기본 검침 기록과 사진첩 데이터를 동시에 가져옴
-      const [fetched, photoData] = await Promise.all([
+      const [fetched, photoData, staff, settings] = await Promise.all([
         fetchMeterReading(monthStr),
-        fetchMeterPhotos(monthStr)
+        fetchMeterPhotos(monthStr),
+        fetchStaffList(),
+        fetchLogoSealSettings()
       ]);
+
+      setStaffList(staff || []);
+      setBrandSettings(settings);
 
       const photos = photoData?.items || [];
 
       if (fetched) {
         // 이미 서버에 데이터가 있는 경우
         const normalize = (str: string) => (str || '').replace(/\s+/g, '');
-        let updatedItems = (fetched.items || []).map(item => {
+        const updatedItems = (fetched.items || []).map(item => {
           const matchedPhoto = photos.find(p => 
             normalize(p.tenant) === normalize(item.tenant) && 
             normalize(p.floor) === normalize(item.floor) && 
@@ -272,8 +292,8 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     }
   }
 
-  const handlePrevMonth = () => setCurrentMonth(prev => format(subMonths(parseISO(`${prev}-01`), 1), 'yyyy-MM'));
-  const handleNextMonth = () => setCurrentMonth(prev => format(addMonths(parseISO(`${prev}-01`), 1), 'yyyy-MM'));
+  const handlePrevMonth = onPrevMonth;
+  const handleNextMonth = onNextMonth;
 
   const handleSave = async () => {
     if (!data) return;
@@ -283,7 +303,6 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
       if (success) {
         setSaveStatus('success');
         setIsSummaryEditMode(false);
-        setIsTableEditMode(false);
         alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
@@ -349,12 +368,18 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
   const totalCalculatedUsage = useMemo(() => data.items.reduce((sum, it) => sum + getCalculations(it).usage, 0), [data.items]);
   const totalArea = useMemo(() => Object.keys(groupedItems).reduce((sum, key) => sum + (parseFloat(groupedItems[key][0]?.area?.toString().replace(/,/g, '') || '0') || 0), 0), [groupedItems]);
 
-  const handleSummaryChange = (field: 'totalBillInput' | 'totalUsageInput' | 'creationDate', value: string) => {
+  const handleSummaryChange = (field: 'totalBillInput' | 'totalUsageInput' | 'unitPrice' | 'creationDate', value: string) => {
     if (field === 'creationDate') {
       setData({ ...data, creationDate: value });
       return;
     }
     const unformatted = unformatNumber(value);
+    
+    if (field === 'unitPrice') {
+      setData(prev => ({ ...prev, unitPrice: unformatted }));
+      return;
+    }
+
     const bill = field === 'totalBillInput' ? parseFloat(unformatted) : parseFloat(data.totalBillInput || totalCalculatedBill.toString());
     const usage = field === 'totalUsageInput' ? parseFloat(unformatted) : parseFloat(data.totalUsageInput || totalCalculatedUsage.toString());
     let nextPrice = data.unitPrice;
@@ -363,10 +388,24 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
   };
 
   const handlePrintMain = () => {
-    const printWindow = window.open('', '_blank', 'width=1100,height=900');
+    const printWindow = window.open('', '_blank', 'width=900,height=1000');
     if (!printWindow) return;
     const [y, m] = currentMonth.split('-');
     const title = `${y}년 ${parseInt(m)}월 층별 계량기 검침내역`;
+    
+    // 결재란 정보
+    const manager = staffList.find(s => s.jobTitle && s.jobTitle.includes('소장'));
+    const checker = staffList.find(s => s.jobTitle && s.jobTitle.includes('과장')) || staffList.find(s => s.jobTitle && s.jobTitle.includes('대리'));
+    const managerName = manager ? manager.name : '';
+    const checkerName = checker ? checker.name : '';
+    const sealImg = brandSettings?.seal || '';
+
+    // 요약 정보
+    const displayTotalBill = data.totalBillInput || totalCalculatedBill.toString();
+    const displayTotalUsage = data.totalUsageInput || totalCalculatedUsage.toString();
+    const displayUnitPrice = data.unitPrice || '228';
+    const displayCreationDate = data.creationDate ? format(parseISO(data.creationDate), 'yyyy년 MM월 dd일') : format(new Date(), 'yyyy년 MM월 dd일');
+
     let tableRowsHtml = '';
     Object.keys(groupedItems).forEach(groupKey => {
       const items = groupedItems[groupKey];
@@ -374,14 +413,14 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
         const { diff, usage, bill, excess } = getCalculations(item);
         tableRowsHtml += `
           <tr>
-            ${idx === 0 ? `<td rowspan="${items.length}" style="text-align:left; padding-left:10px; font-weight:bold;">${item.tenant}</td>` : ''}
+            ${idx === 0 ? `<td rowspan="${items.length}" style="text-align:left; padding-left:10px;">${item.tenant}</td>` : ''}
             ${idx === 0 ? `<td rowspan="${items.length}">${item.floor}</td>` : ''}
-            ${idx === 0 ? `<td rowspan="${items.length}" style="color:#059669; font-weight:bold;">${formatNumber(item.refPower)}</td>` : ''}
-            <td style="text-align:right; padding-right:8px; color:blue;">${bill.toLocaleString()}</td>
-            <td style="color:#f97316; font-weight:bold;">${formatNumber(item.currentReading)}</td>
+            ${idx === 0 ? `<td rowspan="${items.length}">${formatNumber(item.refPower)}</td>` : ''}
+            <td style="text-align:right; padding-right:8px;">${bill.toLocaleString()}</td>
+            <td>${formatNumber(item.currentReading)}</td>
             <td>${formatNumber(item.prevReading)}</td>
-            <td style="font-weight:bold;">${usage.toLocaleString()}</td>
-            <td style="color:${excess !== null && excess > 0 ? 'red' : '#059669'}; font-weight:bold;">${excess !== null ? excess.toLocaleString() : ''}</td>
+            <td>${usage.toLocaleString()}</td>
+            <td>${excess !== null ? excess.toLocaleString() : ''}</td>
             <td style="font-size:7pt;">${item.note}</td>
           </tr>
         `;
@@ -398,39 +437,45 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
             body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
             .no-print { display: flex; justify-content: center; padding: 20px; }
             @media print { .no-print { display: none !important; } body { background: white !important; } }
-            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 10mm 10mm 10mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
-            @media print { .print-page { box-shadow: none !important; margin: 0 !important; width: 100%; } }
-            .flex-header { display: flex; justify-content: center; align-items: center; margin-bottom: 25px; min-height: 60px; width: 100%; }
-            .title-area { flex: 1; text-align: center; }
-            .doc-title { font-size: 24pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin: 0; }
+            .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; padding: 10mm; }
+            @media print { .print-page { width: 100%; margin: 0; padding: 10mm; box-shadow: none; } }
+            
+            .header-container { display: flex; justify-content: center; align-items: flex-start; margin-bottom: 20px; }
+            .title-section { flex: 1; text-align: center; }
+            .doc-title { font-size: 24pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin: 0; margin-bottom: 15px; text-align: center; }
+            
+            .summary-info { display: flex; gap: 20px; font-size: 10pt; font-weight: bold; color: #374151; justify-content: center; }
+            .summary-item { background: #f9fafb; padding: 5px 12px; border: 1px solid #e5e7eb; border-radius: 4px; }
+            
             table.main-table { width: 100%; border-collapse: collapse; border: 1.5px solid black; }
-            table.main-table th, table.main-table td { border: 1px solid black; padding: 0 2px; text-align: center; font-size: 8.5pt; height: 20px; }
-            table.main-table th { background: #f3f4f6; font-weight: bold; }
+            table.main-table th, table.main-table td { border: 1px solid black; padding: 4px 2px; text-align: center; font-size: 9px; font-weight: normal; color: black; height: 22px; }
+            table.main-table th { background: #ffffff; font-weight: normal; }
             .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
-            .no-print button:hover { background: #172554; transform: translateY(-1px); }
           </style>
         </head>
         <body>
           <div class="no-print"><button onclick="window.print()">인쇄하기</button></div>
           <div class="print-page">
-            <div class="flex-header">
-              <div class="title-area"><h1 class="doc-title">${y}년 ${parseInt(m)}월 계량기 검침내역</h1></div>
+            <div class="header-container">
+              <div class="title-section">
+                <h1 class="doc-title">${y}년 ${parseInt(m)}월 계량기 검침내역</h1>
+              </div>
             </div>
             <table class="main-table">
               <thead>
                 <tr>
-                  <th style="width:130px;">입주사명</th><th style="width:40px;">층</th><th style="width:65px;">기준전력</th>
-                  <th style="width:75px;">전기요금</th><th style="width:80px;">당월지침</th><th style="width:80px;">전월지침</th>
-                  <th style="width:65px;">사용량</th><th style="width:65px;">초과전력</th><th style="width:40px;">비고</th>
+                  <th style="width:150px;">입주사명</th><th style="width:50px;">층</th><th style="width:80px;">기준전력</th>
+                  <th style="width:100px;">전기요금</th><th style="width:100px;">당월지침</th><th style="width:100px;">전월지침</th>
+                  <th style="width:80px;">사용량</th><th style="width:80px;">초과전력</th><th style="width:60px;">비고</th>
                 </tr>
               </thead>
               <tbody>
                 ${tableRowsHtml}
-                <tr style="background:#f9fafb; font-weight:bold; height:20px;">
+                <tr style="background:#ffffff; height:25px;">
                   <td colspan="2">합 계</td><td></td>
-                  <td style="text-align:right; padding-right:8px; color:blue;">${totalCalculatedBill.toLocaleString()}</td>
+                  <td style="text-align:right; padding-right:8px;">${totalCalculatedBill.toLocaleString()}</td>
                   <td colspan="2"></td>
-                  <td style="color:#f97316;">${totalCalculatedUsage.toLocaleString()}</td>
+                  <td>${totalCalculatedUsage.toLocaleString()}</td>
                   <td colspan="2"></td>
                 </tr>
               </tbody>
@@ -442,15 +487,10 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     printWindow.document.close();
   };
 
-  const handlePrintInvoiceSummary = async () => {
+  const handlePrintInvoiceSummary = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
     if (!printWindow) return;
 
-    const [staffList, brandSettings] = await Promise.all([
-      fetchStaffList(),
-      fetchLogoSealSettings()
-    ]);
-    
     const manager = staffList.find(s => s.jobTitle && s.jobTitle.includes('소장'));
     const managerName = manager ? manager.name : '김용만';
     const sealImg = brandSettings?.seal || '';
@@ -458,6 +498,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     const [y, m] = currentMonth.split('-');
     const title = `${y}년 ${parseInt(m)}월 대치사옥 추가전기요금 총괄표(계산서발행)`;
     const formatValue = (val: number) => val === 0 ? '-' : val.toLocaleString();
+    
     const invoiceData = Object.keys(groupedItems).map((key, idx) => {
       const items = groupedItems[key];
       const subtotal = items.reduce((sum, it) => {
@@ -469,40 +510,110 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
       const tax = subtotal - supplyValue;
       return { index: idx + 1, floor: items[0].floor, tenant: items[0].tenant, subtotal, supplyValue, tax };
     });
+
     const grandSubtotal = invoiceData.reduce((sum, d) => sum + d.subtotal, 0);
     const grandSupply = invoiceData.reduce((sum, d) => sum + d.supplyValue, 0);
     const grandTax = invoiceData.reduce((sum, d) => sum + d.tax, 0);
-    const tableRows = invoiceData.map(d => `<tr><td>${d.index}</td><td>${d.floor}</td><td style="text-align:left; padding-left:15px;">${d.tenant}</td><td style="text-align:right; padding-right:15px;">${formatValue(d.subtotal)}</td><td style="text-align:right; padding-right:15px;">${formatValue(d.supplyValue)}</td><td style="text-align:right; padding-right:15px;">${formatValue(d.tax)}</td><td></td></tr>`).join('');
     
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
-      @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-      @page { size: A4 portrait; margin: 0; }
-      body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
-      .no-print { display: flex; justify-content: center; padding: 20px; }
-      @media print { .no-print { display: none !important; } body { background: white !important; } .container { box-shadow: none !important; margin: 0 !important; width: 100% !important; padding: 15mm !important; } }
-      .container { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; padding: 20mm 15mm; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); box-sizing: border-box; }
-      h1 { text-align: center; font-size: 20px; font-weight: 900; margin-bottom: 5px; }
-      .unit-label { text-align: right; font-size: 9pt; font-weight: bold; margin-bottom: 5px; }
-      table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
-      th, td { border: 1px solid black; padding: 4px; font-size: 9.5pt; text-align: center; height: 25px; }
-      thead th { background-color: #f8fafc; font-weight: bold; }
-      .bg-purple { background-color: #e0e7ff !important; }
-      .font-bold { font-weight: bold; }
-      .footer { margin-top: 50px; display: flex; justify-content: center; align-items: center; font-weight: 900; font-size: 14pt; gap: 10px; }
-      .seal-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 65px; height: 65px; margin: 0 5px; }
-      .seal-img { width: 100%; height: 100%; object-fit: contain; }
-      .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
-      .no-print button:hover { background: #172554; transform: translateY(-1px); }
-    </style></head><body><div class="no-print"><button onclick="window.print()">인쇄하기</button></div>
-<div class="container"><h1>${title}</h1><div class="unit-label">(단위 : 원)</div><table><thead><tr><th rowspan="2" style="width:7%;">연번</th><th rowspan="2" style="width:10%;">층</th><th rowspan="2" style="width:25%;">업 체 명</th><th colspan="3">추가전기요금</th><th rowspan="2" style="width:15%;">비고</th></tr><tr><th style="width:15%;">소 계</th><th style="width:15%;">공급가액</th><th style="width:13%;">세 액</th></tr></thead><tbody><tr class="font-bold"><td colspan="3">계</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSubtotal)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSupply)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandTax)}</td><td></td></tr><tr class="bg-purple font-bold"><td colspan="3">소계[세금계산서 청구]</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSubtotal)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandSupply)}</td><td style="text-align:right; padding-right:15px;">${formatValue(grandTax)}</td><td></td></tr>${tableRows}</tbody></table><div class="footer"><span>관리소장 : ${managerName}</span>${sealImg ? `<div class="seal-wrapper"><img src="${sealImg}" class="seal-img" /></div>` : ''}<span>(인)</span></div></div></body></html>`);
+    const tableRows = invoiceData.map(d => `
+      <tr>
+        <td>${d.index}</td>
+        <td>${d.floor}</td>
+        <td style="text-align:left; padding-left:15px;">${d.tenant}</td>
+        <td class="text-right">${formatValue(d.subtotal)}</td>
+        <td class="text-right">${formatValue(d.supplyValue)}</td>
+        <td class="text-right">${formatValue(d.tax)}</td>
+        <td></td>
+      </tr>
+    `).join('');
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+          @page { size: A4 portrait; margin: 0; }
+          body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.4; -webkit-print-color-adjust: exact; }
+          .no-print { display: flex; justify-content: center; padding: 20px; }
+          @media print { .no-print { display: none !important; } body { background: white !important; } }
+          .container { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; padding: 15mm 15mm; }
+          @media print { .container { width: 100%; margin: 0; padding: 15mm; box-shadow: none; } }
+          h1 { text-align: center; font-size: 18px; font-weight: 900; margin-bottom: 15px; margin-top: 20px; letter-spacing: -0.5px; }
+          .unit-label { text-align: right; font-size: 10pt; font-weight: bold; margin-bottom: 5px; padding-right: 2px; }
+          table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
+          th, td { border: 1px solid black; padding: 6px 4px; font-size: 11px; font-weight: normal; text-align: center; height: 20px; }
+          thead th { background-color: #ffffff; font-weight: normal; }
+          .bg-light-blue { background-color: #eef2ff !important; }
+          .font-bold { font-weight: bold; }
+          .text-right { text-align: right; padding-right: 12px; }
+          .footer { margin-top: 20px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16pt; gap: 5px; }
+          .seal-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 50px; height: 50px; margin: 0 5px; }
+          .seal-img { width: 100%; height: 100%; object-fit: contain; }
+          .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+          .no-print button:hover { background: #172554; transform: translateY(-1px); }
+        </style>
+      </head>
+      <body>
+        <div class="no-print"><button onclick="window.print()">인쇄하기</button></div>
+        <div class="container">
+          <h1>${title}</h1>
+          <div class="unit-label">(단위 : 원)</div>
+          <table>
+            <thead>
+              <tr>
+                <th rowspan="2" style="width:5%;">NO</th>
+                <th rowspan="2" style="width:7%;">층</th>
+                <th rowspan="2" style="width:33%;">업 체 명</th>
+                <th colspan="3">추가전기요금</th>
+                <th rowspan="2" style="width:12%;">비고</th>
+              </tr>
+              <tr>
+                <th style="width:15%;">소 계</th>
+                <th style="width:15%;">공급가액</th>
+                <th style="width:13%;">세 액</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="font-bold">
+                <td colspan="3">계</td>
+                <td class="text-right">${formatValue(grandSubtotal)}</td>
+                <td class="text-right">${formatValue(grandSupply)}</td>
+                <td class="text-right">${formatValue(grandTax)}</td>
+                <td></td>
+              </tr>
+              <tr class="font-bold">
+                <td colspan="3">소계[세금계산서 청구]</td>
+                <td class="text-right">${formatValue(grandSubtotal)}</td>
+                <td class="text-right">${formatValue(grandSupply)}</td>
+                <td class="text-right">${formatValue(grandTax)}</td>
+                <td></td>
+              </tr>
+              ${tableRows}
+            </tbody>
+          </table>
+          <div class="footer">
+            <span>관리소장 : ${managerName}</span>
+            ${sealImg ? `<div class="seal-wrapper"><img src="${sealImg}" class="seal-img" /></div>` : ''}
+            <span>(인)</span>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
     printWindow.document.close();
   };
 
-  const generateTenantBillHtml = (tenantName: string, floor: string, isLast: boolean, photos: MeterPhotoItem[], brandSettings: { logo?: string; seal?: string } | null) => {
+  const generateTenantBillHtml = (tenantName: string, floor: string, isLast: boolean, photos: MeterPhotoItem[], brandSettings: { logo?: string; seal?: string } | null, staffList: StaffMember[]) => {
     const tenantItems = data.items.filter(it => it.tenant === tenantName && it.floor === floor);
     const normalItem = tenantItems.find(it => it.note === '일반');
     const specialItem = tenantItems.find(it => it.note === '특수');
     
+    const manager = staffList.find(s => s.jobTitle && s.jobTitle.includes('소장'));
+    const managerName = manager ? manager.name : '김용만';
+    const sealImg = brandSettings?.seal || '';
+
     // 특수계량기 데이터가 있는지 확인 (지침값이 있는 경우만 표시)
     const hasSpecialData = specialItem && specialItem.currentReading && specialItem.currentReading.trim() !== '';
     
@@ -615,8 +726,10 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
           </table>
           ${photosHtml}
           <div class="footer-info">입금계좌안내 : 우리은행 1006-401-220508 (새마을운동중앙회)</div>
-          <div class="footer-logo">
-            <img src="${logoUrl}" style="height: 90px; width: auto; max-width: 400px; object-fit: contain;" />
+          <div class="footer-bottom-container">
+            <div class="footer-logo">
+              <img src="${logoUrl}" />
+            </div>
           </div>
         </div>
       </div>`;
@@ -647,188 +760,291 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ currentDate }) => {
     .photo-item img { width: 100%; height: 40mm; object-fit: contain; border: 1px solid black; background: #fafafa; }
     .photo-label { font-size: 9pt; font-weight: bold; margin-top: 3px; }
     .footer-info { margin-top: 20px; font-weight: bold; font-size: 12pt; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
-    .footer-logo { margin-top: 30px; display: flex; justify-content: center; align-items: center; width: 100%; }
+    .footer-bottom-container { margin-top: 30px; display: flex; justify-content: center; align-items: center; width: 100%; padding-top: 20px; }
+    .footer-logo { display: flex; justify-content: center; }
     .footer-logo img { height: 90px; width: auto; object-fit: contain; }
+    .footer-seal-area { flex: 1; display: flex; justify-content: flex-end; align-items: center; font-weight: 900; font-size: 16pt; gap: 10px; }
+    .seal-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; }
+    .seal-wrapper img { width: 100%; height: 100%; object-fit: contain; }
     .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
     .no-print button:hover { background: #172554; transform: translateY(-1px); }
   </style>`;
 
   const handlePrintTenantBill = async (tenantName: string, floor: string) => {
-    const [photosData, brandSettings] = await Promise.all([
-      fetchMeterPhotos(currentMonth),
-      fetchLogoSealSettings()
-    ]);
+    const photosData = await fetchMeterPhotos(currentMonth);
     const photos = photosData?.items || [];
     const printWindow = window.open('', '_blank', 'width=900,height=950');
     if (!printWindow) return;
-    printWindow.document.write(`<html><head><title>전기요금 사용내역서 - ${tenantName}</title>${billStyles}</head><body><div class="no-print"><button onclick="window.print()">인쇄하기</button></div>${generateTenantBillHtml(tenantName, floor, true, photos, brandSettings)}</body></html>`);
+    printWindow.document.write(`<html><head><title>전기요금 사용내역서 - ${tenantName}</title>${billStyles}</head><body><div class="no-print"><button onclick="window.print()">인쇄하기</button></div>${generateTenantBillHtml(tenantName, floor, true, photos, brandSettings, staffList)}</body></html>`);
     printWindow.document.close();
   };
 
   const handlePrintAllTenantBills = async () => {
-    const [photosData, brandSettings] = await Promise.all([
-      fetchMeterPhotos(currentMonth),
-      fetchLogoSealSettings()
-    ]);
+    const photosData = await fetchMeterPhotos(currentMonth);
     const photos = photosData?.items || [];
     const printWindow = window.open('', '_blank', 'width=1000,height=950');
     if (!printWindow) return;
     const groupKeys = Object.keys(groupedItems);
     const allBillsHtml = groupKeys.map((key, index) => {
       const [tenantName, floor] = key.split('_');
-      return generateTenantBillHtml(tenantName, floor, index === groupKeys.length - 1, photos, brandSettings);
+      return generateTenantBillHtml(tenantName, floor, index === groupKeys.length - 1, photos, brandSettings, staffList);
     }).join('');
     printWindow.document.write(`<html><head><title>전체 입주사 전기요금 사용내역서</title>${billStyles}</head><body><div class="no-print"><button onClick="window.print()" style="padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt;">전체 인쇄하기</button></div>${allBillsHtml}</body></html>`);
     printWindow.document.close();
   };
 
-  const thClass = "border border-gray-300 p-2 bg-gray-50 text-center font-normal text-[12px] text-gray-600";
-  const tdClass = "border border-gray-300 p-0 text-center text-[12px] align-middle h-11 relative";
-  const inputClass = "w-full h-full text-center outline-none bg-transparent font-normal focus:bg-blue-50/50";
+  const thClass = "bg-white border-b border-r last:border-r-0 border-black p-0 h-[40px] text-center text-[13px] font-normal text-black align-middle";
+  const tdClass = "border-b border-r last:border-r-0 border-black p-0 h-[40px] text-[13px] font-normal text-black text-center align-middle transition-colors";
+  const inputClass = "w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none font-normal text-[13px] text-black flex items-center px-2";
 
   return (
-    <div className="pb-20 px-4 sm:px-6">
-      <div className="pt-6 space-y-6 animate-fade-in pb-10 max-w-7xl mx-auto">
-        <div className="flex justify-between items-center bg-white p-3 rounded-xl border border-gray-200 shadow-sm print:hidden w-full">
-          <div className="flex items-center space-x-6 ml-2">
-            <button onClick={handlePrevMonth} className="p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-600"><ChevronLeft size={24} /></button>
-            <h2 className="text-2xl font-black text-gray-800 tracking-tight min-w-[140px] text-center">{currentMonth.split('-')[0]}년 {currentMonth.split('-')[1]}월</h2>
-            <button onClick={handleNextMonth} className="p-1 hover:bg-gray-100 rounded-full transition-colors text-gray-600"><ChevronRight size={24} /></button>
+    <div className="pb-20">
+      <div className="space-y-2 animate-fade-in pb-10 max-w-7xl mx-auto">
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          {/* 1. 날짜 선택 영역 (월 네비게이션) */}
+          <div className="flex items-center shrink-0">
+            <button 
+              onClick={handlePrevMonth} 
+              className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div className="px-2 py-3 text-[14px] font-bold text-black min-w-[100px] text-center">
+              {currentMonth.split('-')[0]}년 {currentMonth.split('-')[1]}월
+            </div>
+            <button 
+              onClick={handleNextMonth} 
+              className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
           </div>
-          <div className="flex items-center gap-2 pr-2">
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          {/* 2. 서브탭 메뉴 */}
+          <div className="flex shrink-0">
+            {tabs && setActiveTab && tabs.map(tab => (
+              <div
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer bg-white ${activeTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          <div className="flex items-center print:hidden shrink-0">
             <button 
               onClick={() => loadData(currentMonth)} 
               disabled={loading} 
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg font-bold shadow-sm hover:bg-gray-200 transition-all active:scale-95 text-sm"
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+              title="새로고침"
             >
-              <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
-              <span>새로고침</span>
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
             </button>
-            
             <button 
               onClick={() => setIsSummaryEditMode(!isSummaryEditMode)} 
-              className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${isSummaryEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-700 text-white hover:bg-gray-800'}`}
+              disabled={loading}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-all relative whitespace-nowrap disabled:opacity-50 ${isSummaryEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
             >
-              {isSummaryEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
-              {isSummaryEditMode ? '수정완료' : '요약 정보 수정'}
+              {isSummaryEditMode ? <Lock size={18} className="mr-1.5" /> : <Edit2 size={18} className="mr-1.5" />}
+              {isSummaryEditMode ? '수정완료' : '수정'}
             </button>
-
-            <button onClick={handleSave} disabled={saveStatus === 'loading'} className={`flex items-center px-4 py-2 rounded-lg font-bold shadow-sm transition-all text-sm active:scale-95 ${saveStatus === 'success' ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>{saveStatus === 'loading' ? <RefreshCw size={18} className="mr-2 animate-spin" /> : <Save size={18} className="mr-2" />}서버저장</button>
-            
-            <button onClick={handlePrintMain} className="flex items-center gap-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-all shadow-md text-sm font-bold active:scale-95">
-              <Printer size={18} />
-              <span>미리보기</span>
-            </button>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden w-full">
-          <div className="bg-gray-50/50 py-3 text-center border-b font-bold text-gray-700">전기요금 청구서 요약 및 작성일 설정</div>
-          <table className="w-full border-collapse table-fixed">
-            <thead>
-              <tr className="bg-gray-50 text-xs text-gray-500 border-b">
-                <th className="py-2 border-r font-bold w-1/4">전기요금(원)</th>
-                <th className="py-2 border-r font-bold w-1/4">사용량(kwh)</th>
-                <th className="py-2 border-r font-bold w-1/4">kwh당 단가(원)</th>
-                <th className="py-2 font-bold w-1/4">내역서 작성일 (고지서 상단)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="text-center font-black">
-                <td className="py-4 border-r">
-                  <input 
-                    type="text" 
-                    readOnly={!isSummaryEditMode}
-                    value={formatNumber(data.totalBillInput || totalCalculatedBill.toString())} 
-                    onChange={e => handleSummaryChange('totalBillInput', e.target.value)} 
-                    className={`w-full h-full text-center text-xl font-black outline-none bg-transparent ${isSummaryEditMode ? 'text-blue-600 bg-orange-50' : 'text-blue-600'}`} 
-                  />
-                </td>
-                <td className="py-4 border-r">
-                  <input 
-                    type="text" 
-                    readOnly={!isSummaryEditMode}
-                    value={formatNumber(data.totalUsageInput || totalCalculatedUsage.toString())} 
-                    onChange={e => handleSummaryChange('totalUsageInput', e.target.value)} 
-                    className={`w-full h-full text-center text-xl font-black outline-none bg-transparent ${isSummaryEditMode ? 'text-orange-500 bg-orange-50' : 'text-orange-500'}`} 
-                  />
-                </td>
-                <td className="py-4 border-r"><input type="text" value={formatNumber(data.unitPrice || '228')} readOnly className="w-full h-full text-center text-xl text-gray-800 font-black outline-none bg-transparent cursor-not-allowed" /></td>
-                <td className="py-4">
-                  <input 
-                    type="date" 
-                    readOnly={!isSummaryEditMode}
-                    value={data.creationDate || format(new Date(), 'yyyy-MM-dd')} 
-                    onChange={e => handleSummaryChange('creationDate', e.target.value)} 
-                    className={`text-center text-lg font-black outline-none bg-transparent cursor-pointer ${isSummaryEditMode ? 'text-emerald-600 bg-orange-50' : 'text-emerald-600 hover:text-emerald-700'}`} 
-                  />
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div className="flex flex-col md:flex-row justify-between items-center w-full px-1 gap-4 pt-4">
-          <div className="flex-1"></div>
-          <h2 className="text-3xl font-black text-gray-900 tracking-tighter text-center">{data.month.split('-')[0]}년 {data.month.split('-')[1]}월 층별 계량기 검침내역</h2>
-          <div className="flex-1 flex justify-end gap-2">
-            {/* 하단 수정 버튼 - 테이블 지침 전용 (동일한 스타일 적용) */}
             <button 
-              onClick={() => setIsTableEditMode(!isTableEditMode)} 
-              className={`px-4 py-2 rounded-lg font-bold text-sm flex items-center shadow-sm transition-all active:scale-95 ${isTableEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
+              onClick={handlePrintAllTenantBills} 
+              disabled={loading}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
             >
-              {isTableEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
-              {isTableEditMode ? '수정완료' : '지침수정'}
+              <Printer size={18} className="mr-1.5" />
+              내역서
             </button>
-            <button onClick={handlePrintAllTenantBills} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center shadow-sm hover:bg-emerald-700 active:scale-95 transition-all"><Printer size={16} className="mr-1.5" />전체 출력</button>
-            <button onClick={handlePrintInvoiceSummary} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center shadow-sm hover:bg-blue-700 active:scale-95 transition-all"><Calculator size={16} className="mr-1.5" />계산서발행</button>
+            <button 
+              onClick={handlePrintInvoiceSummary} 
+              disabled={loading}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            >
+              <Calculator size={18} className="mr-1.5" />
+              계산서
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={saveStatus === 'loading' || loading} 
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+            >
+              {saveStatus === 'loading' ? (
+                <RefreshCw size={18} className="animate-spin mr-1.5" />
+              ) : saveStatus === 'success' ? (
+                <CheckCircle2 size={18} className="mr-1.5" />
+              ) : (
+                <Save size={18} className="mr-1.5" />
+              )}
+              {saveStatus === 'success' ? '저장완료' : '저장'}
+            </button>
+            <button 
+              onClick={handlePrintMain} 
+              disabled={loading}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            >
+              <Printer size={18} className="mr-1.5" />
+              인쇄
+            </button>
           </div>
         </div>
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden w-full">
+        <div className="w-full max-w-7xl mx-auto flex items-stretch overflow-x-auto scrollbar-hide bg-white print:hidden border-b border-black">
+          <div className="flex items-center shrink-0 gap-2">
+            <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+              <span className="text-[14px] font-bold text-gray-500 uppercase">전기요금총액 (원) :</span>
+              <input 
+                type="text" 
+                readOnly={!isSummaryEditMode}
+                value={formatNumber(data.totalBillInput || totalCalculatedBill.toString())} 
+                onChange={e => handleSummaryChange('totalBillInput', e.target.value)} 
+                className={`border-b-2 ${isSummaryEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-transparent'} w-28 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none`} 
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+              <span className="text-[14px] font-bold text-gray-500 uppercase">총사용량 (kWh) :</span>
+              <input 
+                type="text" 
+                readOnly={!isSummaryEditMode}
+                value={formatNumber(data.totalUsageInput || totalCalculatedUsage.toString())} 
+                onChange={e => handleSummaryChange('totalUsageInput', e.target.value)} 
+                className={`border-b-2 ${isSummaryEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-transparent'} w-24 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none`} 
+              />
+            </div>
+
+            <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+              <span className="text-[14px] font-bold text-gray-500 uppercase">kWh당 단가 (원) :</span>
+              <input 
+                type="text" 
+                readOnly={!isSummaryEditMode}
+                value={formatNumber(data.unitPrice || '228')} 
+                onChange={e => handleSummaryChange('unitPrice', e.target.value)} 
+                className={`border-b-2 ${isSummaryEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-transparent'} w-20 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none`} 
+              />
+            </div>
+
+            <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+              <span className="text-[14px] font-bold text-gray-500 uppercase">내역서 작성일 :</span>
+              {isSummaryEditMode ? (
+                <input 
+                  type="date" 
+                  value={data.creationDate || format(new Date(), 'yyyy-MM-dd')} 
+                  onChange={e => handleSummaryChange('creationDate', e.target.value)} 
+                  className="border-b-2 border-blue-500 bg-blue-50/30 outline-none text-sm font-bold text-black py-0.5 px-2 transition-all rounded-none"
+                />
+              ) : (
+                <span className="text-sm font-bold text-black">{data.creationDate ? format(parseISO(data.creationDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="bg-white border border-black w-full max-w-7xl mx-auto">
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse table-fixed min-w-full">
-              <thead><tr className="bg-gray-50"><th className={`${thClass} w-60`}>입주사명</th><th className={`${thClass} w-16`}>층 별</th><th className={`${thClass} w-20`}>기준전력(월)</th><th className={`${thClass} w-20`}>전기요금</th><th className={`${thClass} w-20`}>당월지침</th><th className={`${thClass} w-20`}>전월지침</th><th className={`${thClass} w-20`}>사용량(kwh)</th><th className={`${thClass} w-20`}>초과전력량</th><th className={`${thClass} w-14`}>비 고</th><th className={`${thClass} w-14`}>계산서제외</th></tr></thead>
-              <tbody className="divide-y divide-gray-200">
+            <table className="w-full border-collapse table-fixed min-w-full bg-white text-center">
+              <thead>
+                <tr className="bg-white">
+                  <th className={`${thClass} w-60`}><div className="flex items-center justify-center h-full px-2">입주사명</div></th>
+                  <th className={`${thClass} w-16`}><div className="flex items-center justify-center h-full px-2">층 별</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">기준전력(월)</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">전기요금</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">당월지침</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">전월지침</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">사용량(kwh)</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">초과전력량</div></th>
+                  <th className={`${thClass} w-14`}><div className="flex items-center justify-center h-full px-2">비 고</div></th>
+                  <th className={`${thClass} w-14`}><div className="flex items-center justify-center h-full px-2">계산서제외</div></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white">
                 {Object.keys(groupedItems).map(groupKey => {
                   const items = groupedItems[groupKey];
                   return items.map((item, idx) => {
                     const { diff, usage, bill, excess } = getCalculations(item);
                     return (
-                      <tr key={item.id} className="hover:bg-gray-50/50 transition-colors group">
+                      <tr key={item.id} className="hover:bg-gray-50/50 transition-colors text-center group">
                         {idx === 0 && (
-                          <><td rowSpan={items.length} className={`${tdClass} px-2 text-left border-r border-gray-300`}><div className="flex items-center justify-between"><input type="text" readOnly className="w-full h-full text-left outline-none bg-transparent font-normal text-blue-800 text-[12px] truncate" value={item.tenant} /><FileText size={18} className="text-blue-500 shrink-0 ml-1 cursor-pointer hover:text-blue-700 transition-colors" onClick={() => handlePrintTenantBill(item.tenant, item.floor)} /></div></td><td rowSpan={items.length} className={`${tdClass} border-r border-gray-300 font-normal`}><input type="text" readOnly className="w-full h-full text-center outline-none bg-transparent font-normal text-[12px]" value={item.floor} /></td><td rowSpan={items.length} className={`${tdClass} border-r border-gray-300`}><input type="text" readOnly className="w-full h-full text-center outline-none bg-transparent font-normal text-emerald-600 text-[12px]" value={formatNumber(item.refPower)} /></td></>
+                          <>
+                            <td rowSpan={items.length} className={`${tdClass} text-left`}>
+                              <div className="flex items-center justify-between h-full w-full px-2">
+                                <input type="text" readOnly className="w-full h-full text-left bg-transparent border-none outline-none shadow-none appearance-none font-normal text-black text-[13px] truncate" value={item.tenant} />
+                                <FileText size={18} className="text-blue-500 shrink-0 ml-1 cursor-pointer hover:text-blue-700 transition-colors" onClick={() => handlePrintTenantBill(item.tenant, item.floor)} />
+                              </div>
+                            </td>
+                            <td rowSpan={items.length} className={`${tdClass}`}>
+                              <div className="flex items-center justify-center h-full w-full px-2">
+                                <input type="text" readOnly className="w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none font-normal text-black text-[13px]" value={item.floor} />
+                              </div>
+                            </td>
+                            <td rowSpan={items.length} className={`${tdClass}`}>
+                              <div className="flex items-center justify-center h-full w-full px-2">
+                                <input type="text" readOnly className="w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none font-normal text-black text-[13px]" value={formatNumber(item.refPower)} />
+                              </div>
+                            </td>
+                          </>
                         )}
-                        <td className={`${tdClass} text-right pr-2 border-r border-gray-200`}><span className={`font-normal ${bill < 0 ? 'text-red-600' : 'text-blue-600'}`}>{bill.toLocaleString()}</span></td>
-                        <td className={`${tdClass} border-r border-gray-200`}>
-                          <input 
-                            type="text" 
-                            readOnly={!isTableEditMode} 
-                            className={`${inputClass} text-orange-500 text-[12px] ${isTableEditMode ? 'bg-orange-50 focus:ring-1 focus:ring-orange-300 font-bold' : ''}`} 
-                            value={formatNumber(item.currentReading)} 
-                            onChange={e => updateItemField(item.id, 'currentReading', e.target.value)}
-                          />
+                        <td className={`${tdClass} text-right`}><div className="flex items-center justify-end h-full w-full px-2"><span className={`font-normal text-[13px] ${bill < 0 ? 'text-red-600' : 'text-black'}`}>{bill.toLocaleString()}</span></div></td>
+                        <td className={`${tdClass}`}>
+                          <div className="flex items-center justify-center h-full w-full">
+                            <input 
+                              type="text" 
+                              readOnly={!isSummaryEditMode} 
+                              className={`${inputClass} ${isSummaryEditMode ? 'bg-orange-50' : ''}`} 
+                              value={formatNumber(item.currentReading)} 
+                              onChange={e => updateItemField(item.id, 'currentReading', e.target.value)}
+                            />
+                          </div>
                         </td>
-                        <td className={`${tdClass} border-r border-gray-200`}>
-                          <input 
-                            type="text" 
-                            readOnly={!isTableEditMode} 
-                            className={`${inputClass} text-[12px] ${isTableEditMode ? 'bg-orange-50 focus:ring-1 focus:ring-orange-300 font-bold text-blue-600' : ''}`} 
-                            value={formatNumber(item.prevReading)} 
-                            onChange={e => updateItemField(item.id, 'prevReading', e.target.value)}
-                          />
+                        <td className={`${tdClass}`}>
+                          <div className="flex items-center justify-center h-full w-full">
+                            <input 
+                              type="text" 
+                              readOnly={!isSummaryEditMode} 
+                              className={`${inputClass} ${isSummaryEditMode ? 'bg-orange-50' : ''}`} 
+                              value={formatNumber(item.prevReading)} 
+                              onChange={e => updateItemField(item.id, 'prevReading', e.target.value)}
+                            />
+                          </div>
                         </td>
-                        <td className={`${tdClass} border-r border-gray-200 font-normal`}>{usage.toLocaleString()}</td><td className={`${tdClass} border-r border-gray-200 font-normal ${excess !== null && (excess as number) > 0 ? 'text-red-500' : 'text-emerald-600'}`}>{excess !== null ? (excess as number).toLocaleString() : ''}</td><td className={`${tdClass} border-r border-gray-200`}><select disabled className="w-full h-full text-center outline-none bg-transparent appearance-none font-normal text-gray-600 text-[12px]" value={item.note}><option value="일반">일반</option><option value="특수">특수</option></select></td>
-                        <td className={`${tdClass} border-r border-gray-200`}>
-                          <input 
-                            type="checkbox" 
-                            checked={!!item.excludeFromInvoice} 
-                            onChange={() => toggleExcludeFromInvoice(item.id)}
-                            className="w-4 h-4 cursor-pointer"
-                          />
+                        <td className={`${tdClass}`}><div className="flex items-center justify-center h-full w-full px-2"><span className="font-normal text-[13px]">{usage.toLocaleString()}</span></div></td>
+                        <td className={`${tdClass}`}><div className="flex items-center justify-center h-full w-full px-2"><span className={`font-normal text-[13px] ${excess !== null && (excess as number) > 0 ? 'text-red-500' : 'text-black'}`}>{excess !== null ? (excess as number).toLocaleString() : ''}</span></div></td>
+                        <td className={`${tdClass}`}><div className="flex items-center justify-center h-full w-full px-2"><select disabled className="w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none font-normal text-black text-[13px]" value={item.note}><option value="일반">일반</option><option value="특수">특수</option></select></div></td>
+                        <td className={`${tdClass}`}>
+                          <div className="flex items-center justify-center h-full w-full">
+                            <input 
+                              type="checkbox" 
+                              checked={!!item.excludeFromInvoice} 
+                              onChange={() => toggleExcludeFromInvoice(item.id)}
+                              className="w-4 h-4 cursor-pointer"
+                            />
+                          </div>
                         </td>
                       </tr>
                     );
                   });
                 })}
-                <tr className="bg-blue-50/50 font-normal border-t-2 border-gray-400"><td colSpan={2} className={`${tdClass} border-r border-gray-300 bg-gray-100`}>합 계</td><td className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} text-right pr-2 border-r border-gray-200 text-blue-700`}>{totalCalculatedBill.toLocaleString()}</td><td colSpan={2} className={`${tdClass} border-r border-gray-300`}></td><td className={`${tdClass} border-r border-gray-200 text-orange-600`}>{totalCalculatedUsage.toLocaleString()}</td><td colSpan={3} className={`${tdClass}`}></td></tr>
+                <tr className="bg-blue-50/50">
+                  <td colSpan={2} className={`${tdClass} bg-gray-100`}><div className="flex items-center justify-center h-full w-full px-2"><span className="font-normal text-[13px]">합 계</span></div></td>
+                  <td className={`${tdClass}`}></td>
+                  <td className={`${tdClass} text-right`}><div className="flex items-center justify-end h-full w-full px-2"><span className="font-normal text-[13px] text-blue-700">{totalCalculatedBill.toLocaleString()}</span></div></td>
+                  <td colSpan={2} className={`${tdClass}`}></td>
+                  <td className={`${tdClass}`}><div className="flex items-center justify-center h-full w-full px-2"><span className="font-normal text-[13px] text-orange-600">{totalCalculatedUsage.toLocaleString()}</span></div></td>
+                  <td colSpan={3} className={`${tdClass}`}></td>
+                </tr>
               </tbody>
             </table>
           </div>

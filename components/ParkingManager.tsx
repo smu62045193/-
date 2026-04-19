@@ -7,9 +7,9 @@ import { ParkingStatusItem } from '../types';
 import { LayoutList, Printer, Map as MapIcon, RefreshCw, Save, Cloud, X, CheckCircle, Edit2, Lock, Car } from 'lucide-react';
 
 const TABS = [
-  { id: 'history', label: '지정주차변경이력' },
-  { id: 'status', label: '지정주차차량현황' },
-  { id: 'location', label: '지정주차차량위치' },
+  { id: 'history', label: '변경이력' },
+  { id: 'status', label: '차량현황' },
+  { id: 'location', label: '차량위치' },
 ];
 
 const INITIAL_LAYOUT = {
@@ -173,104 +173,122 @@ const ParkingManager: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8 animate-fade-in">
-      <div className="mb-6">
-        <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-          <Car className="text-blue-600" size={32} />
-          주차 점검 및 관리
-        </h2>
-        <p className="text-slate-500 mt-2 text-base font-medium">지정주차 차량 현황 관리 및 배치도 조회를 수행합니다.</p>
-      </div>
-
-      <div className="flex overflow-x-auto whitespace-nowrap gap-2 pb-4 mb-4 scrollbar-hide border-b border-slate-200 items-center">
-        <div className="mr-3 text-slate-400 p-2 bg-white rounded-xl shadow-sm border border-slate-100">
-           <LayoutList size={22} />
+    <div className="p-4 max-w-7xl mx-auto space-y-2 pb-32 animate-fade-in">
+      {/* 테이블 형태의 메뉴 구성 */}
+      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="flex shrink-0">
+          {TABS.map(tab => (
+            <div
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                activeTab === tab.id 
+                  ? 'text-orange-600' 
+                  : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              {tab.label}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
+            </div>
+          ))}
         </div>
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-6 py-3 rounded-2xl text-sm font-black transition-all duration-300 border ${
-              activeTab === tab.id 
-                ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 scale-105' 
-                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:border-slate-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
       </div>
 
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
+      <div className="min-h-[500px]">
         {activeTab === 'history' && <ParkingInspectionHistory onSelect={handleSelectFromHistory} />}
         {activeTab === 'status' && <ParkingStatusList />}
         {activeTab === 'location' && (
-          <div className="p-8 flex flex-col items-center">
-            {/* 배치 조정: 층 버튼 좌측, 액션 버튼 우측 */}
-            <div className="flex flex-col md:flex-row justify-between items-center w-full max-w-6xl mb-10 gap-6">
-              <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 shadow-inner">
-                <button 
+          <div className="flex flex-col items-center space-y-2">
+            <div className="bg-white w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black shrink-0">
+              <div className="flex shrink-0">
+                <div 
                   onClick={() => setCurrentFloor('B2F')} 
-                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B2F' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`relative px-4 py-3 flex items-center text-[14px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${currentFloor === 'B2F' ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
                 >
                   B2F
-                </button>
-                <button 
+                  {currentFloor === 'B2F' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                  )}
+                </div>
+                <div 
                   onClick={() => setCurrentFloor('B3F_Yeongdong')} 
-                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yeongdong' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`relative px-4 py-3 flex items-center text-[14px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${currentFloor === 'B3F_Yeongdong' ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
                 >
-                  B3F (영동변)
-                </button>
-                <button 
+                  B3F(영동변)
+                  {currentFloor === 'B3F_Yeongdong' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                  )}
+                </div>
+                <div 
                   onClick={() => setCurrentFloor('B3F_Yusuji')} 
-                  className={`px-6 py-2 rounded-xl text-sm font-black transition-all ${currentFloor === 'B3F_Yusuji' ? 'bg-white text-blue-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                  className={`relative px-4 py-3 flex items-center text-[14px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${currentFloor === 'B3F_Yusuji' ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
                 >
-                  B3F (유수지)
-                </button>
+                  B3F(유수지)
+                  {currentFloor === 'B3F_Yusuji' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center px-2 shrink-0">
+                <div className="h-6 w-[1px] bg-black" />
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center shrink-0">
                 <button 
                   onClick={loadAllData} 
                   disabled={loading}
-                  className="flex items-center justify-center px-4 py-2 bg-white text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-50 font-bold shadow-sm transition-all text-sm active:scale-95"
+                  className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent disabled:opacity-50 text-gray-500 hover:text-black transition-colors whitespace-nowrap relative"
                 >
-                  <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
                   새로고침
                 </button>
                 <button 
-                  onClick={() => {
-                    if (isEditMode) {
-                      if (window.confirm('배치 수정 내용을 서버에 저장하시겠습니까?')) {
-                        handleSaveLayout();
-                      }
-                    } else {
-                      setIsEditMode(true);
-                    }
-                  }} 
-                  className={`flex items-center px-4 py-3 rounded-2xl font-bold shadow-sm transition-all text-sm ${isEditMode ? 'bg-orange-600 text-white hover:bg-orange-700' : 'bg-gray-100 text-slate-600 border border-slate-200 hover:bg-gray-200'}`}
+                  onClick={() => setIsEditMode(!isEditMode)} 
+                  disabled={loading}
+                  className={`shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent transition-all whitespace-nowrap relative disabled:opacity-50 ${
+                    isEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                  }`}
                 >
-                  {isEditMode ? <Lock size={18} className="mr-2" /> : <Edit2 size={18} className="mr-2" />}
+                  {isEditMode ? <Lock size={18} className="mr-1.5" /> : <Edit2 size={18} className="mr-1.5" />}
                   {isEditMode ? '수정완료' : '수정'}
+                  {isEditMode && <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />}
                 </button>
-                <button onClick={handleSaveLayout} disabled={loading} className="flex items-center px-6 py-3 bg-blue-600 text-white rounded-2xl hover:bg-blue-700 font-bold shadow-lg transition-all active:scale-95 text-sm">
-                  <Save size={20} className="mr-2" />
-                  서버저장
+                <button 
+                  onClick={handleSaveLayout} 
+                  disabled={loading} 
+                  className={`shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent transition-colors whitespace-nowrap disabled:opacity-50 relative ${
+                    saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  {saveStatus === 'loading' ? (
+                    <RefreshCw size={18} className="animate-spin mr-1.5" />
+                  ) : saveStatus === 'success' ? (
+                    <CheckCircle size={18} className="mr-1.5" />
+                  ) : (
+                    <Save size={18} className="mr-1.5" />
+                  )}
+                  {saveStatus === 'success' ? '저장완료' : '저장'}
                 </button>
-                <button onClick={handlePrintMap} className="flex items-center px-6 py-3 bg-amber-600 text-white rounded-2xl hover:bg-amber-700 font-bold shadow-lg transition-all active:scale-95 text-sm">
-                  <Printer size={20} className="mr-2" />
-                  미리보기
+                <button 
+                  onClick={handlePrintMap} 
+                  disabled={loading}
+                  className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative disabled:opacity-50"
+                >
+                  <Printer size={18} className="mr-1.5" />
+                  인쇄
                 </button>
               </div>
             </div>
-            
             {loading ? (
               <div className="py-24 flex flex-col items-center gap-4">
                 <RefreshCw className="animate-spin text-blue-500" size={48} />
                 <p className="text-slate-400 font-black">데이터 로딩 중...</p>
               </div>
             ) : (
-              <div id="parking-map-container" className="w-full flex justify-center p-4 bg-slate-50 rounded-3xl border border-slate-100">
+              <div id="parking-map-container" className="w-full flex justify-center">
                 {currentFloor === 'B2F' && (
                   <div className="w-full max-w-6xl border-2 border-black p-8 bg-white relative mt-4 shadow-lg">
                     <div className="grid grid-cols-11 gap-px bg-black border border-black mb-12">
