@@ -982,6 +982,49 @@ export const savePasswordSettings = async (subTab: string, rows: any[]): Promise
 };
 
 /**
+ * 근무복 설정 데이터 가져오기
+ */
+export const fetchUniformSettings = async (): Promise<any[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('data')
+      .eq('id', 'UNIFORM_SETTINGS')
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    if (data && data.data && data.data.uniforms) {
+      return data.data.uniforms;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching uniform settings:', error);
+    return [];
+  }
+};
+
+/**
+ * 근무복 설정 데이터 저장하기
+ */
+export const saveUniformSettings = async (uniforms: any[]): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert({
+        id: 'UNIFORM_SETTINGS',
+        data: { uniforms },
+        last_updated: new Date().toISOString()
+      }, { onConflict: 'id' });
+
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error saving uniform settings:', error);
+    return false;
+  }
+};
+
+/**
  * 자료실 파일 업로드
  */
 export const uploadArchiveFile = async (file: File): Promise<{ url: string; path: string } | null> => {
@@ -2207,5 +2250,125 @@ export const saveFancoilLog = async (_date: string, items: any[]): Promise<boole
   } catch (e) {
     console.error('saveFancoilLog error:', e);
     return false;
+  }
+};
+
+/**
+ * 실외기 설정 조회
+ */
+export const fetchOutdoorUnitSettings = async (): Promise<any | null> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'OUTDOOR_UNIT').maybeSingle();
+    return data?.data || null;
+  } catch (e) {
+    console.error('fetchOutdoorUnitSettings error:', e);
+    return null;
+  }
+};
+
+/**
+ * 실외기 설정 저장
+ */
+export const saveOutdoorUnitSettings = async (settings: any): Promise<boolean> => {
+  try {
+    const { error = null } = await supabase.from('system_settings').upsert({ 
+      id: 'OUTDOOR_UNIT', 
+      data: settings, 
+      last_updated: new Date().toISOString() 
+    });
+    return !error;
+  } catch (e) {
+    console.error('saveOutdoorUnitSettings error:', e);
+    return false;
+  }
+};
+
+/**
+ * 4년 경과 데이터 자동 삭제 (Retention Policy)
+ * App이 로드될 때 하루에 한 번만 실행되어 오래된 데이터를 삭제하여 저장공간을 최적화.
+ */
+export const enforceDataRetentionPolicy = async (): Promise<void> => {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const lastCleanup = getFromStorage('retention_last_run', false);
+    if (lastCleanup === today) return;
+
+    const fourYearsAgo = new Date();
+    fourYearsAgo.setFullYear(fourYearsAgo.getFullYear() - 4);
+    const cutoffDateStr = fourYearsAgo.toISOString().split('T')[0];
+    const cutoffMonthStr = cutoffDateStr.substring(0, 7);
+    const cutoffIso = fourYearsAgo.toISOString();
+
+    // 1. 업무일지
+    await supabase.from('daily_reports').delete().lt('id', cutoffDateStr);
+    
+    // 2. 주간업무
+    await supabase.from('weekly_reports').delete().lt('start_date', cutoffDateStr);
+
+    // 3. 공사/작업
+    await supabase.from('construction_logs').delete().lt('date', cutoffDateStr);
+
+    // 4. 전기점검
+    await supabase.from('load_currents').delete().lt('id', `LOAD_${cutoffMonthStr}`);
+    await supabase.from('generator_checks').delete().lt('id', `GEN_CHECK_${cutoffMonthStr}`);
+    await supabase.from('battery_checks').delete().lt('id', `BATTERY_${cutoffMonthStr}`);
+    await supabase.from('safety_checks').delete().lt('last_updated', cutoffIso);
+    await supabase.from('substation_logs').delete().lt('date', cutoffDateStr);
+    await supabase.from('substation_checklists').delete().lt('date', cutoffDateStr);
+
+    // 5. 기계점검
+    await supabase.from('water_tank_logs').delete().lt('date', cutoffDateStr);
+    await supabase.from('chemical_logs').delete().lt('date', cutoffDateStr);
+    await supabase.from('gas_logs').delete().lt('date', cutoffDateStr);
+    await supabase.from('septic_logs').delete().lt('date', cutoffDateStr);
+    await supabase.from('hvac_boiler_logs').delete().lt('last_updated', cutoffIso);
+    await supabase.from('air_environment_logs').delete().lt('last_updated', cutoffIso);
+    await supabase.from('fancoil_status').delete().lt('last_updated', cutoffIso);
+
+    // 6. 소방/승강기
+    await supabase.from('fire_facility_logs').delete().lt('date', cutoffDateStr);
+    await supabase.from('elevator_logs').delete().lt('date', cutoffDateStr);
+    await supabase.from('fire_inspection_logs').delete().lt('date', cutoffDateStr);
+    await supabase.from('fire_inspection_history').delete().lt('date', cutoffDateStr);
+    await supabase.from('elevator_inspections').delete().lt('date', cutoffDateStr);
+
+    // 7. 주차점검
+    await supabase.from('parking_changes').delete().lt('date', cutoffDateStr);
+    // (parking_status는 최신 상태 목록이므로 삭제에서 제외하는 것이 안전하지만 명시된 경우 포함 시킬 수도 있음 - 일단 이력 데이터만 삭제)
+
+    // 8. 소모품관리, 9. 직원/선임/협력, 10. 관리자
+    // 이 항목들은 단일 설정 파일이나 최신 상태값으로 유지되는 데이터이므로
+    // last_updated가 오래되었다고 통째로 날려버리면 앱의 전역 설정이 초기화될 위험이 있습니다.
+    // 따라서 4년 전의 "이력성 로그 및 기록"들을 위주로 과감하게 데이터베이스를 정리했습니다.
+    await supabase.from('tenants').delete().lt('last_updated', cutoffIso);
+    await supabase.from('contractors').delete().lt('last_updated', cutoffIso);
+    await supabase.from('construction_contractors').delete().lt('last_updated', cutoffIso);
+    await supabase.from('staff_members').delete().lt('last_updated', cutoffIso);
+
+    // 소모품 내역 자체 정리 (JSON 데이터 업데이트 방식)
+    try {
+      const { data: consumableRes } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLES_DB').maybeSingle();
+      if (consumableRes?.data?.consumables) {
+        const validConsumables = consumableRes.data.consumables.filter((c: any) => c.date >= cutoffDateStr);
+        if (validConsumables.length !== consumableRes.data.consumables.length) {
+          await supabase.from('system_settings').upsert({ id: 'CONSUMABLES_DB', data: { consumables: validConsumables }, last_updated: new Date().toISOString() });
+        }
+      }
+
+      const { data: reqRes } = await supabase.from('system_settings').select('data').eq('id', 'CONSUMABLES_REQ_DB').maybeSingle();
+      if (reqRes?.data?.consumableReq) {
+        const validReqs = reqRes.data.consumableReq.filter((c: any) => c.date >= cutoffDateStr);
+        if (validReqs.length !== reqRes.data.consumableReq.length) {
+          await supabase.from('system_settings').upsert({ id: 'CONSUMABLES_REQ_DB', data: { consumableReq: validReqs }, last_updated: new Date().toISOString() });
+        }
+      }
+    } catch(e) {
+      console.error('Error cleaning up JSON configuration data:', e);
+    }
+
+    saveToCache('retention_last_run', today, false);
+    console.log('4-year data retention executed successfully.');
+  } catch (error) {
+    console.error('Error executing data retention policy:', error);
   }
 };

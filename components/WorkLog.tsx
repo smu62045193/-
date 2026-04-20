@@ -477,13 +477,24 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       };
 
       const normalizeContent = (text: string) => (text || '').replace(/\s+/g, '').trim();
+      
+      const mergeTasks = (target: TaskItem[], candidates: TaskItem[]) => {
+        const result = [...(target || [])];
+        candidates.forEach(newTask => {
+          const normNew = normalizeContent(newTask.content);
+          if (normNew && !result.some(ext => ext.id === newTask.id || normalizeContent(ext.content) === normNew)) {
+            result.push(newTask);
+          }
+        });
+        return result;
+      };
 
       // 카테고리별 루프 (forEach 대신 for...of 사용하여 async 처리)
       for (const key of categories) {
         const cat = (finalWorkLog[key as keyof WorkLogData] as LogCategory) || { today: [], tomorrow: [] };
         
-        // 1. 자동화 작업 로드 (저장된 데이터가 없고, 내용이 하나도 없을 때만)
-        if (!hasSavedData) {
+        // 1. 자동화 작업 로드 (저장된 데이터가 없거나, [새로고침] 버튼을 눌렀을 때)
+        if (!hasSavedData || force) {
           // 카테고리 매핑 (DB의 category 컬럼과 일치시킴)
           const categoryMap: Record<string, string> = {
             electrical: 'elec',
@@ -499,30 +510,25 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
           if (dbCategory) {
             // DB 설정 로직 적용 (전기, 기계, 소방, 승강기, 주차, 경비, 미화)
-            if (!cat.today || cat.today.length === 0) {
-              const dbTasksToday = await getAutomatedTasksFromDB(dbCategory, dateKey);
-              // 금일작업내용은 기존 하드코딩된 자동항목(점검표 연동 등)과 합침
-              const hardcodedToday = automationMap[key] ? automationMap[key](dateKey) : [];
-              cat.today = [...hardcodedToday, ...dbTasksToday];
-            }
-            if (!cat.tomorrow || cat.tomorrow.length === 0) {
-              const dbTasksTomorrow = await getAutomatedTasksFromDB(dbCategory, tomorrowDateKey);
-              const hardcodedTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
-              // 익일예정사항은 체크 해제 상태로 설정
-              cat.tomorrow = [
-                ...hardcodedTomorrow.map(t => ({ ...t, status: undefined })),
-                ...dbTasksTomorrow.map(t => ({ ...t, status: undefined }))
-              ];
-            }
+            const dbTasksToday = await getAutomatedTasksFromDB(dbCategory, dateKey);
+            const hardcodedToday = automationMap[key] ? automationMap[key](dateKey) : [];
+            cat.today = mergeTasks(cat.today, [...hardcodedToday, ...dbTasksToday]);
+
+            const dbTasksTomorrow = await getAutomatedTasksFromDB(dbCategory, tomorrowDateKey);
+            const hardcodedTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
+            // 익일예정사항은 체크 해제 상태로 설정
+            const tomorrowItems = [
+              ...hardcodedTomorrow.map(t => ({ ...t, status: undefined })),
+              ...dbTasksTomorrow.map(t => ({ ...t, status: undefined }))
+            ];
+            cat.tomorrow = mergeTasks(cat.tomorrow, tomorrowItems);
           } else {
             // 기타 카테고리 (handover 등)
-            if (!cat.today || cat.today.length === 0) {
-              cat.today = automationMap[key] ? automationMap[key](dateKey) : [];
-            }
-            if (!cat.tomorrow || cat.tomorrow.length === 0) {
-              const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
-              cat.tomorrow = autoTasksTomorrow.map(t => ({ ...t, status: undefined }));
-            }
+            const autoTasksToday = automationMap[key] ? automationMap[key](dateKey) : [];
+            cat.today = mergeTasks(cat.today, autoTasksToday);
+
+            const autoTasksTomorrow = automationMap[key] ? automationMap[key](tomorrowDateKey) : [];
+            cat.tomorrow = mergeTasks(cat.tomorrow, autoTasksTomorrow.map(t => ({ ...t, status: undefined })));
           }
 
           // 2. 어제 날짜의 "익일 예정사항" 병합 (핵심 로직 - 무조건 어제로 고정됨)

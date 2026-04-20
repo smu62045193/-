@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ConsumableItem } from '../types';
 import { fetchConsumables, saveConsumables } from '../services/dataService';
-import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch, Lock, Plus } from 'lucide-react';
+import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch, Lock, Plus, Printer } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ConsumablesLedgerProps {
@@ -136,6 +136,149 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConsumablesPrint = () => {
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWindow) return;
+
+    // Filter only manual items and sort them
+    const printedItems = summaryItems.filter(item => item.isManual);
+
+    const getCategoryRank = (cat?: string) => {
+      if (cat === '전기') return 1;
+      if (cat === '기계') return 2;
+      if (cat === '공용') return 3;
+      return 99;
+    };
+
+    printedItems.sort((a, b) => {
+      const rankA = getCategoryRank(a.category);
+      const rankB = getCategoryRank(b.category);
+      if (rankA !== rankB) return rankA - rankB;
+      return a.itemName.localeCompare(b.itemName) || (a.modelName || '').localeCompare(b.modelName || '');
+    });
+
+    const html = `
+      <html>
+        <head>
+          <title>수기 소모품 관리대장 인쇄</title>
+          <style>
+            @page { 
+              size: A4 portrait; 
+              margin: 15mm 10mm; 
+            }
+            body { 
+              font-family: "Malgun Gothic", sans-serif; 
+              background-color: black; 
+              color: black; 
+              padding: 0;
+              margin: 0;
+              -webkit-print-color-adjust: exact;
+            }
+            .no-print {
+              display: flex;
+              justify-content: center;
+              padding: 20px;
+            }
+            .print-btn {
+              padding: 10px 24px;
+              background-color: #1e3a8a;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              font-size: 12pt;
+            }
+            @media print {
+              .no-print { display: none !important; }
+              body { background-color: white !important; }
+              .print-page { box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
+            }
+            .print-page {
+              width: 100%;
+              min-height: 297mm;
+              padding: 15mm 10mm;
+              margin: 20px auto;
+              background-color: white;
+              box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+              box-sizing: border-box;
+            }
+            h1 { 
+              text-align: center; 
+              font-size: 24pt; 
+              margin-bottom: 20px; 
+              font-weight: 900;
+              border-bottom: 2px solid black;
+              padding-bottom: 10px;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 20px; 
+            }
+            th, td { 
+              border: 1px solid black; 
+              padding: 8px 4px; 
+              text-align: center; 
+              font-size: 12px; 
+              height: 35px;
+            }
+            th { 
+              background-color: white; 
+              color: black;
+              font-weight: normal;
+            }
+            .text-left { text-align: left; padding-left: 8px; }
+          </style>
+        </head>
+        <body>
+          <div class="no-print">
+            <button class="print-btn" onclick="window.print()">인쇄하기</button>
+          </div>
+          <div class="print-page">
+            <table>
+              <thead>
+                <tr>
+                  <th colspan="6" style="border: none; padding: 0 0 20px 0;">
+                    <h1 style="margin: 0; border-bottom: 2px solid black; padding-bottom: 10px; font-size: 24pt; font-weight: 900; text-align: center;">수기 소모품 관리대장</h1>
+                  </th>
+                </tr>
+                <tr>
+                  <th style="width: 5%;">No</th>
+                  <th style="width: 10%;">구분</th>
+                  <th style="width: 20%;">품명</th>
+                  <th style="width: 20%;">모델명</th>
+                  <th style="width: 5%;">단위</th>
+                  <th style="width: 40%;">비고</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${printedItems.length > 0 ? printedItems.map((item, index) => `
+                  <tr>
+                    <td>${index + 1}</td>
+                    <td>${item.category || ''}</td>
+                    <td>${item.itemName || ''}</td>
+                    <td>${item.modelName || '-'}</td>
+                    <td>${item.unit || ''}</td>
+                    <td class="text-left">${item.note || ''}</td>
+                  </tr>
+                `).join('') : `
+                  <tr>
+                    <td colspan="6" style="height: 100px;">수기작업 소모품 내역이 없습니다.</td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   const openIndependentWindow = (id: string = 'new', initialData?: ConsumableItem) => {
@@ -522,6 +665,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative"
             >
               <Plus size={18} className="mr-1.5" /> {viewMode === 'ledger' ? '등록' : '사용'}
+            </button>
+            <button 
+              onClick={handleConsumablesPrint}
+              className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative"
+            >
+              <Printer size={18} className="mr-1.5" /> 인쇄
             </button>
           </div>
         </div>

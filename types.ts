@@ -868,3 +868,8 @@ export interface AppointmentItem {
   license: string;       // 자격증
   note: string;          // 비고
 }
+
+export interface OutdoorUnitRooftopItem {
+  id: string;
+  label: string;
+}

@@ -37,11 +37,17 @@ import EnergyCheck from './components/EnergyCheck';
 import LoadCurrentFormPopup from './components/LoadCurrentFormPopup';
 import { MenuId } from './types';
 import { Menu as MenuIcon, X } from 'lucide-react';
+import { enforceDataRetentionPolicy } from './services/dataService';
 
 const App: React.FC = () => {
   const [activeMenu, setActiveMenu] = useState<MenuId>(MenuId.DASHBOARD);
   const [currentDate, setCurrentDate] = useState<Date>(new Date()); 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    // 4년 보관 데이터 자동 삭제 로직 수행 (하루 1회)
+    enforceDataRetentionPolicy();
+  }, []);
   
   const [isPopupMode, setIsPopupMode] = useState<'appointment' | 'staff' | 'contractor' | 'consumable' | 'construction_contractor' | 'construction_log' | 'elevator_contractor' | 'fire_contractor' | 'integrated_contractor' | 'fire_extinguisher' | 'parking_status' | 'meter_photo' | 'tenant' | 'search' | 'weekly_import' | 'air_filter' | 'fancoil' | 'septic' | 'energy' | 'load_current_form' | 'archive_reg' | null>(() => {
     const params = new URLSearchParams(window.location.search);

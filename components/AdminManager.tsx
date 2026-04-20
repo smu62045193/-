@@ -13,15 +13,22 @@ import {
   fetchPasswordSettings,
   savePasswordSettings,
   uploadArchiveFile,
-  generateUUID
+  generateUUID,
+  fetchStaffList,
+  fetchUniformSettings,
+  saveUniformSettings,
+  fetchOutdoorUnitSettings,
+  saveOutdoorUnitSettings
 } from '../services/dataService';
-import { AutoRegRow, ArchiveItem } from '../types';
+import { AutoRegRow, ArchiveItem, OutdoorUnitRooftopItem } from '../types';
 
 const TABS = [
   { id: 'auto_reg', label: '자동등록' },
   { id: 'form', label: '자료실' },
   { id: 'network', label: '네트워크' },
   { id: 'password', label: '비밀번호' },
+  { id: 'uniform', label: '근무복' },
+  { id: 'outdoor_unit', label: '실외기' },
 ];
 
 const SUB_TABS_AUTO_REG = [
@@ -44,6 +51,13 @@ const SUB_TABS_PASSWORD = [
   { id: 'site', label: '사이트' },
   { id: 'building', label: '사옥' },
   { id: 'warehouse', label: '창고' },
+];
+
+const SUB_TABS_OUTDOOR_UNIT = [
+  { id: 'rooftop', label: '옥상' },
+  { id: 'outside_1f', label: '1F건물외곽' },
+  { id: 'garden_1f', label: '1F화단' },
+  { id: 'b2_b3', label: 'B2F~B3F' },
 ];
 
 const AdminManager: React.FC = () => {
@@ -69,11 +83,134 @@ const AdminManager: React.FC = () => {
   const [passwordWarehouseData, setPasswordWarehouseData] = useState<any[]>([
     { id: '1', category: '', deviceName: '', ipAddress: '', loginId: '', loginPw: '', note: '' }
   ]);
+  const [uniformData, setUniformData] = useState<any[]>([
+    { id: '1', category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' },
+    { id: '2', category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' },
+    { id: '3', category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' },
+    { id: '4', category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' },
+    { id: '5', category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' },
+    { id: '6', category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' },
+    { id: '7', category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' },
+  ]);
   const [isPasswordEditMode, setIsPasswordEditMode] = useState(false);
+  const [isUniformEditMode, setIsUniformEditMode] = useState(false);
+  const [uniformSaveSuccess, setUniformSaveSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isNetworkEditMode, setIsNetworkEditMode] = useState(false);
+  const [isOutdoorUnitEditMode, setIsOutdoorUnitEditMode] = useState(false);
+  const [activeOutdoorUnitSubTab, setActiveOutdoorUnitSubTab] = useState('rooftop');
+
+  const handleOutdoorUnitRefresh = async () => {
+    const data = await fetchOutdoorUnitSettings();
+    if (data) {
+      if (data.rooftop) setOutdoorUnitRooftopData(data.rooftop);
+      if (data.outside1F) setOutdoorUnitOutside1FData(data.outside1F);
+      if (data.garden1F) setOutdoorUnitGarden1FData(data.garden1F);
+      if (data.b1b2) setOutdoorUnitB1B2Data(data.b1b2);
+    } else {
+      // If no data in DB, we could optionally reset to defaults here 
+      // but usually the initial state already has defaults.
+    }
+  };
+
+  const handleOutdoorUnitSave = async () => {
+    setIsSaving(true);
+    setSaveSuccess(false);
+    try {
+      const success = await saveOutdoorUnitSettings({
+        rooftop: outdoorUnitRooftopData,
+        outside1F: outdoorUnitOutside1FData,
+        garden1F: outdoorUnitGarden1FData,
+        b1b2: outdoorUnitB1B2Data
+      });
+      
+      if (success) {
+        setSaveSuccess(true);
+        alert('실외기 설정이 저장되었습니다.');
+        setIsOutdoorUnitEditMode(false);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        alert('저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Outdoor unit save error:', error);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'outdoor_unit') {
+      handleOutdoorUnitRefresh();
+    }
+  }, [activeTab]);
+
+  const [outdoorUnitRooftopData, setOutdoorUnitRooftopData] = useState<OutdoorUnitRooftopItem[]>([
+    { id: '1', label: '삼성 / 6F / 이가자산' },
+    { id: '2', label: '삼성 / 6F / 이가자산' },
+    { id: '3', label: '삼성 / 6F / 이가자산' },
+    { id: '4', label: '' },
+    { id: '5', label: '삼성 / 9F / 유명' },
+    { id: '6', label: '삼성 / 9F / 유명' },
+    { id: '7', label: '' },
+    { id: '8', label: '삼성 / 8F / 얼머스' },
+    { id: '9', label: 'LG / 10F / 해주' },
+    { id: '10', label: 'LG / 10F / 이가ACM' },
+    { id: '11', label: '' },
+    { id: '12', label: '위니아 / E/L승강기 (중앙)' },
+    { id: '13', label: '위니아 / E/L승강기 (중앙)' },
+    { id: '14', label: 'LG / 8F / 승강기' },
+    { id: '15', label: '캐리어 / E/L승강기 (비상)' },
+  ]);
+
+  const handleOutdoorUnitRooftopChange = (id: string, value: string) => {
+    setOutdoorUnitRooftopData(prev => prev.map(item => item.id === id ? { ...item, label: value } : item));
+  };
+
+  const [outdoorUnitOutside1FData, setOutdoorUnitOutside1FData] = useState<OutdoorUnitRooftopItem[]>([
+    { id: '13', label: '삼성 / 1F / 이가' },
+    { id: '12', label: 'LG / 1F / 이가' },
+    { id: '11', label: '캐리어 / 1F / 이가' },
+    { id: '10', label: '캐리어 / 1F / 이가' },
+    { id: '9', label: 'LG / 3~5F / 이가건축' },
+    { id: '8', label: 'LG / 3~5F / 이가건축' },
+    { id: '7', label: 'LG / 3~5F / 이가건축' },
+    { id: '6', label: 'LG / 3~5F / 이가건축' },
+    { id: '5', label: '실외기 받침대 있음' },
+    { id: '4', label: 'LG / 3~5F / 이가건축' },
+    { id: '3', label: '캐리어 / 3~5F / 이가건축' },
+    { id: '2', label: '삼성 / 2F / 이가건축' },
+    { id: '1', label: 'LG / 1F / 관리사무실, 방재실, 1F 로비' },
+  ]);
+
+  const handleOutdoorUnitOutside1FChange = (id: string, value: string) => {
+    setOutdoorUnitOutside1FData(prev => prev.map(item => item.id === id ? { ...item, label: value } : item));
+  };
+
+  const [outdoorUnitGarden1FData, setOutdoorUnitGarden1FData] = useState<Record<string, string>>({
+    label1: '삼성 /\n1F/ 매머드커\n피',
+    label234: '삼성 / B1F / 이가마루',
+    label5: '삼성 / B1F / 티엠에너지',
+  });
+
+  const handleOutdoorUnitGarden1FChange = (key: string, value: string) => {
+    setOutdoorUnitGarden1FData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const [outdoorUnitB1B2Data, setOutdoorUnitB1B2Data] = useState<Record<string, string>>({
+    label1: '캐리어 / B2F / 식당',
+    label2: 'LG / B1F / 매점',
+    label3: 'LG / B2F / 식당',
+    label4: 'LG / B2F / 경비',
+    label5: '캐리어 / B2F / 미화',
+  });
+
+  const handleOutdoorUnitB1B2Change = (key: string, value: string) => {
+    setOutdoorUnitB1B2Data(prev => ({ ...prev, [key]: value }));
+  };
   
   // State for rows per sub-tab
   const [rowsData, setRowsData] = useState<Record<string, AutoRegRow[]>>({
@@ -439,6 +576,279 @@ const AdminManager: React.FC = () => {
               </div>
             </div>
           </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
+  const handleOutdoorUnitPrint = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1100');
+    if (!printWindow) return;
+
+    let contentHtml = '';
+    const activeTabText = SUB_TABS_OUTDOOR_UNIT.find(t => t.id === activeOutdoorUnitSubTab)?.label || '';
+
+    if (activeOutdoorUnitSubTab === 'rooftop') {
+      contentHtml = `
+        <div class="print-page">
+          <h1>실외기 설치 현황 (${activeTabText})</h1>
+          <div class="diagram-container">
+            ${outdoorUnitRooftopData.slice(0, 9).map((item, idx) => `
+              <div class="unit-box" style="top: ${idx * 45}px; left: 0px; width: 70px; height: 35px;">${item.id}</div>
+              <div class="label-text" style="top: ${idx * 45 + 10}px; left: 80px;">${item.label}</div>
+            `).join('')}
+            
+            <div class="border-box" style="top: 0px; left: 330px; width: 300px; height: 380px; flex-direction: column;">
+              <div class="red-label" style="font-size: 30pt; margin-bottom: 10px;">냉 각 탑</div>
+              <div class="red-label" style="font-size: 30pt;">2호기</div>
+            </div>
+
+            <div style="position: absolute; top: 480px; left: 0; right: 0; display: flex; justify-content: space-between;">
+              <div style="display: flex; gap: 25px;">
+                ${outdoorUnitRooftopData.slice(9, 14).map((item) => `
+                  <div style="display: flex; flex-direction: column; align-items: center; width: 80px;">
+                    <div class="unit-box" style="position: static; width: 70px; height: 35px; border-width: 2px;">${item.id}</div>
+                    <div class="label-text" style="position: static; text-align: center; margin-top: 5px;">${item.label.replace(/\n/g, '<br/>')}</div>
+                  </div>
+                `).join('')}
+              </div>
+              <div style="display: flex; flex-direction: column; align-items: center; width: 80px;">
+                <div class="unit-box" style="position: static; width: 70px; height: 35px; border-width: 2px;">${outdoorUnitRooftopData[14].id}</div>
+                <div class="label-text" style="position: static; text-align: center; margin-top: 5px;">${outdoorUnitRooftopData[14].label.replace(/\n/g, '<br/>')}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (activeOutdoorUnitSubTab === 'outside_1f') {
+      contentHtml = `
+        <div class="print-page">
+          <h1>실외기 설치 현황 (${activeTabText})</h1>
+          <div class="diagram-container" style="display: flex; justify-content: center; align-items: center;">
+            <div style="position: relative; width: 600px; height: 650px; border: 4px solid black;">
+              <div style="position: absolute; left: -140px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: space-around; items-center w-32;">
+                 <div style="text-align: center;">
+                    <div style="font-weight: bold; font-size: 14pt;">영동대로쪽</div>
+                    <div style="font-size: 24pt;">↑</div>
+                 </div>
+                 <div class="red-label" style="font-size: 32pt; transform: rotate(0deg);">새마을</div>
+                 <div style="text-align: center;">
+                    <div style="font-size: 24pt;">↓</div>
+                    <div style="font-weight: bold; font-size: 14pt;">주차<br/>정산소쪽</div>
+                 </div>
+              </div>
+              
+              <div style="display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px; border-left: 2px solid black; border-right: 2px solid black; height: 100%; margin: 0 80px;">
+                ${outdoorUnitOutside1FData.map(item => `
+                  <div style="display: flex; align-items: center; gap: 15px;">
+                    <div class="unit-box" style="position: static; width: 60px; height: 30px;">${item.id}</div>
+                    <div class="label-text" style="position: static;">${item.label}</div>
+                  </div>
+                `).join('')}
+              </div>
+
+              <div class="red-label" style="position: absolute; right: -120px; top: 50%; transform: translateY(-50%); font-size: 24pt; text-align: center; line-height: 1.2;">더채플앳<br/>대치</div>
+            </div>
+          </div>
+        </div>
+      `;
+    } else if (activeOutdoorUnitSubTab === 'garden_1f') {
+      contentHtml = `
+        <div class="print-page">
+          <h1>실외기 설치 현황 (${activeTabText})</h1>
+          <div class="diagram-container" style="display: flex; justify-content: center; align-items: center; flex-direction: column;">
+             <div style="display: flex; gap: 40px;">
+                <div style="width: 450px; height: 550px; border: 4px solid black; position: relative;">
+                   <div style="height: 80px; border-bottom: 4px solid black; display: flex; align-items: center; justify-content: center;">
+                      <span class="red-label" style="font-size: 20pt;">커피점테라스</span>
+                   </div>
+                   <div style="position: absolute; top: 100px; right: 40px; display: flex; flex-direction: column; align-items: center;">
+                      <div class="label-text" style="position: static; margin-bottom: 5px; text-align: center;">${outdoorUnitGarden1FData.label1.replace(/\n/g, '<br/>')}</div>
+                      <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">1</div>
+                   </div>
+                   <div style="position: absolute; top: 280px; left: 40px; display: flex; flex-direction: column; align-items: center;">
+                      <div style="display: flex; align-items: flex-end; gap: 15px;">
+                         <div style="display: flex; flex-direction: column;">
+                            <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">2</div>
+                            <div class="unit-box" style="position: static; width: 100px; height: 40px; border-top: 0; font-size: 20pt;">3</div>
+                         </div>
+                         <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">4</div>
+                      </div>
+                      <div class="label-text" style="position: static; margin-top: 10px;">${outdoorUnitGarden1FData.label234}</div>
+                   </div>
+                   <div class="red-label" style="position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; font-size: 40pt; letter-spacing: 0.5em;">화 단</div>
+                </div>
+                <div style="width: 250px; height: 550px; border: 4px solid black; position: relative;">
+                    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 200px; border-bottom: 4px solid black; display: flex; align-items: center; justify-content: center;">
+                       <span class="red-label" style="font-size: 30pt;">썬 큰</span>
+                    </div>
+                    <div style="height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 120px;">
+                        <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">5</div>
+                        <div class="label-text" style="position: static; margin-top: 10px; text-align: center;">${outdoorUnitGarden1FData.label5}</div>
+                    </div>
+                    <div class="red-label" style="position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; font-size: 30pt;">화 단</div>
+                </div>
+             </div>
+          </div>
+        </div>
+      `;
+    } else if (activeOutdoorUnitSubTab === 'b2_b3') {
+      contentHtml = `
+        <div class="print-page">
+          <h1>실외기 설치 현황 (${activeTabText})</h1>
+          <div class="diagram-container">
+             <div class="border-box" style="left: 0; top: 0; width: 200px; height: 350px;">
+                <span class="red-label" style="font-size: 28pt;">정압실</span>
+             </div>
+             <div class="border-box" style="left: 0; bottom: 30px; width: 200px; height: 100px;">
+                <span class="red-label" style="font-size: 28pt;">팬 룸</span>
+             </div>
+             <div class="red-label" style="position: absolute; left: 230px; top: 0; bottom: 0; display: flex; align-items: center; font-size: 40pt; text-align: center; letter-spacing: 0.2em; line-height: 1.5;">주<br/>차<br/>램<br/>프</div>
+             
+             <div style="position: absolute; left: 350px; top: 0; right: 0; bottom: 0;">
+                <div style="border: 4px solid black; height: 400px; position: relative; padding: 30px;">
+                   <div style="display: flex; justify-content: space-between;">
+                      <div style="display: flex; flex-direction: column; align-items: center; margin-top: 30px;">
+                         <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">1</div>
+                         <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label1}</div>
+                      </div>
+                      <div style="display: flex; flex-direction: column; align-items: center;">
+                         <div class="red-label" style="font-size: 24pt; margin-bottom: 20px;">미화대기실</div>
+                         <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">5</div>
+                         <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label5}</div>
+                      </div>
+                   </div>
+                   <div style="display: flex; flex-direction: column; align-items: center; width: fit-content; margin-top: 30px;">
+                      <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">2</div>
+                      <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label2}</div>
+                   </div>
+                   <div style="position: absolute; bottom: 30px; left: 40px; right: 40px; display: flex; justify-content: space-between;">
+                      <span class="red-label" style="font-size: 24pt;">식 당</span>
+                      <span class="red-label" style="font-size: 24pt;">경비대기실</span>
+                   </div>
+                </div>
+                <div style="display: flex; justify-content: center; gap: 100px; margin-top: 40px;">
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                      <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">3</div>
+                      <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label3}</div>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                      <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">4</div>
+                      <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label4}</div>
+                    </div>
+                </div>
+             </div>
+          </div>
+        </div>
+      `;
+    }
+
+    const html = `
+      <html>
+        <head>
+          <title>실외기 설치 현황 인쇄</title>
+          <style>
+            @page { 
+              size: A4 portrait; 
+              margin: 10mm; 
+            }
+            body { 
+              font-family: "Malgun Gothic", sans-serif; 
+              background-color: black; 
+              color: black; 
+              padding: 0;
+              margin: 0;
+            }
+            .no-print {
+              display: flex;
+              justify-content: center;
+              padding: 20px;
+              background-color: #111;
+              border-bottom: 1px solid #333;
+            }
+            .print-btn {
+              padding: 10px 24px;
+              background-color: #1e3a8a;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              font-size: 12pt;
+            }
+            @media print {
+              .no-print { display: none !important; }
+              body { background-color: white !important; }
+              .print-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; }
+            }
+            .print-page {
+              width: 190mm;
+              min-height: 277mm;
+              padding: 10mm;
+              margin: 20px auto;
+              background-color: white;
+              box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+              box-sizing: border-box;
+              position: relative;
+            }
+            h1 { 
+              text-align: center; 
+              font-size: 20pt; 
+              margin-bottom: 20px; 
+              font-weight: 900;
+              border-bottom: 2px solid black;
+              padding-bottom: 10px;
+            }
+            .section-title {
+              font-size: 16pt;
+              font-weight: bold;
+              margin-bottom: 15px;
+              padding-left: 10px;
+              border-left: 5px solid #1e3a8a;
+            }
+            
+            /* Diagram specific styles */
+            .diagram-container {
+              position: relative;
+              width: 100%;
+              min-height: 180mm;
+            }
+            .unit-box {
+              position: absolute;
+              border: 2px solid #0066CC;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+              background-color: white;
+            }
+            .label-text {
+              position: absolute;
+              font-size: 11pt;
+              font-weight: 500;
+              line-height: 1.2;
+            }
+            .red-label {
+              color: #ef4444;
+              font-weight: bold;
+            }
+            .border-box {
+              position: absolute;
+              border: 3px solid black;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print">
+            <button class="print-btn" onclick="window.print()">인쇄하기</button>
+          </div>
+          ${contentHtml}
         </body>
       </html>
     `;
@@ -1316,6 +1726,228 @@ const AdminManager: React.FC = () => {
     );
   };
 
+  const handleUniformAddRow = () => {
+    setUniformData(prev => [
+      ...prev,
+      { id: Date.now().toString(), category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' }
+    ]);
+  };
+
+  const handleUniformChange = (id: string, field: string, value: string) => {
+    setUniformData(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  const loadUniformDataWithStaff = useCallback(async () => {
+    try {
+      const [staffList, savedUniforms] = await Promise.all([
+        fetchStaffList(),
+        fetchUniformSettings()
+      ]);
+      // Exclude those with a resignDate (퇴사일)
+      const activeStaff = staffList.filter(s => !s.resignDate || s.resignDate.trim() === '');
+      
+      const getCategoryOrder = (cat?: string) => {
+        if (!cat) return 99;
+        if (cat.includes('현장대리인')) return 1;
+        if (cat.includes('시설')) return 2;
+        if (cat.includes('경비')) return 3;
+        if (cat.includes('미화')) return 4;
+        return 99;
+      };
+
+      const getPositionOrder = (pos?: string) => {
+        if (!pos) return 99;
+        if (pos.includes('과장')) return 1;
+        if (pos.includes('대리')) return 2;
+        if (pos.includes('주임') || pos.includes('반장')) return 3;
+        if (pos.includes('기사')) return 4;
+        if (pos.includes('대원A') || pos.includes('경비A')) return 5;
+        if (pos.includes('대원B') || pos.includes('경비B')) return 6;
+        if (pos.includes('대원') || pos.includes('경비')) return 7;
+        if (pos.includes('미화')) return 8;
+        return 99;
+      };
+
+      activeStaff.sort((a, b) => {
+        const catA = getCategoryOrder(a.category);
+        const catB = getCategoryOrder(b.category);
+        if (catA !== catB) return catA - catB;
+
+        const posA = getPositionOrder(a.jobTitle);
+        const posB = getPositionOrder(b.jobTitle);
+        return posA - posB;
+      });
+
+      // Update uniform data but preserve existing typed data if possible
+      setUniformData(() => {
+        return activeStaff.map(staff => {
+          const saved = savedUniforms.find((p: any) => p.id === staff.id);
+          return {
+            id: staff.id,
+            category: staff.category || '',
+            position: staff.jobTitle || '',
+            name: staff.name || '',
+            winterTop: saved ? saved.winterTop : '',
+            winterBottom: saved ? saved.winterBottom : '',
+            summerTop: saved ? saved.summerTop : '',
+            summerBottom: saved ? saved.summerBottom : '',
+            note: saved ? saved.note : ''
+          };
+        });
+      });
+    } catch (error) {
+      console.error("Failed to load staff list for uniform", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'uniform') {
+      loadUniformDataWithStaff();
+    }
+  }, [activeTab, loadUniformDataWithStaff]);
+
+  const handleUniformSave = async () => {
+    setIsSaving(true);
+    try {
+      const success = await saveUniformSettings(uniformData);
+      if (success) {
+        setUniformSaveSuccess(true);
+        setTimeout(() => setUniformSaveSuccess(false), 3000);
+      } else {
+        alert('저장에 실패했습니다.');
+      }
+    } catch (e) {
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUniformPrint = () => {
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWindow) return;
+
+    const html = `
+      <html>
+        <head>
+          <title>새마을운동중앙회 대치동사옥 근무복 현황 인쇄</title>
+          <style>
+            @page { 
+              size: A4 portrait; 
+              margin: 0; 
+            }
+            body { 
+              font-family: "Malgun Gothic", sans-serif; 
+              background-color: black; 
+              color: black; 
+              padding: 0;
+              margin: 0;
+              -webkit-print-color-adjust: exact;
+            }
+            .no-print {
+              display: flex;
+              justify-content: center;
+              padding: 20px;
+            }
+            .print-btn {
+              padding: 10px 24px;
+              background-color: #1e3a8a;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              font-size: 12pt;
+            }
+            @media print {
+              .no-print { display: none !important; }
+              body { background-color: white !important; }
+              .print-page { box-shadow: none !important; margin: 0 !important; }
+            }
+            .print-page {
+              width: 210mm;
+              min-height: 297mm;
+              padding: 15mm 10mm;
+              margin: 20px auto;
+              background-color: white;
+              box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+              box-sizing: border-box;
+            }
+            h1 { 
+              text-align: center; 
+              font-size: 24pt; 
+              margin-bottom: 20px; 
+              font-weight: 900;
+              border-bottom: 2px solid black;
+              padding-bottom: 10px;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 20px; 
+            }
+            th, td { 
+              border: 1px solid black; 
+              padding: 8px 4px; 
+              text-align: center; 
+              font-size: 12px; 
+              height: 35px;
+            }
+            th { 
+              background-color: white; 
+              color: black;
+              font-weight: normal;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print">
+            <button class="print-btn" onclick="window.print()">인쇄하기</button>
+          </div>
+          <div class="print-page">
+            <h1>새마을운동중앙회 대치동사옥 근무복 현황</h1>
+            <table>
+              <thead>
+                <tr>
+                  <th rowspan="2" style="width: 10%;">구 분</th>
+                  <th rowspan="2" style="width: 10%;">직 책</th>
+                  <th rowspan="2" style="width: 12%;">성 명</th>
+                  <th colspan="2" style="width: 24%;">동 계</th>
+                  <th colspan="2" style="width: 24%;">하 계</th>
+                  <th rowspan="2" style="width: 20%;">비 고</th>
+                </tr>
+                <tr>
+                  <th style="width: 12%;">상 의</th>
+                  <th style="width: 12%;">하 의</th>
+                  <th style="width: 12%;">상 의</th>
+                  <th style="width: 12%;">하 의</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${uniformData.map(row => `
+                  <tr>
+                    <td>${row.category || ''}</td>
+                    <td>${row.position || ''}</td>
+                    <td>${row.name || ''}</td>
+                    <td>${row.winterTop || ''}</td>
+                    <td>${row.winterBottom || ''}</td>
+                    <td>${row.summerTop || ''}</td>
+                    <td>${row.summerBottom || ''}</td>
+                    <td>${row.note || ''}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const renderPasswordContent = () => {
     if (activePasswordSubTab === 'site') {
       return renderPasswordSiteTable();
@@ -1325,6 +1957,542 @@ const AdminManager: React.FC = () => {
       return renderPasswordDeviceTable(passwordWarehouseData, setPasswordWarehouseData);
     }
     return null;
+  };
+
+  const renderOutdoorUnitRooftopContent = () => {
+    const mainItems = outdoorUnitRooftopData.slice(0, 9);
+    const bottomItems = outdoorUnitRooftopData.slice(9, 14);
+    const lastItem = outdoorUnitRooftopData[14];
+
+    return (
+      <div className="bg-white p-8 overflow-auto">
+        <div className="max-w-4xl mx-auto relative min-h-[700px]">
+          {/* Left Column (1-9) */}
+          <div className="flex flex-col space-y-6 w-[350px]">
+            {mainItems.map((item) => (
+              <div key={item.id} className="flex items-center space-x-6">
+                <div className="w-20 h-10 border-2 border-[#0066CC] flex items-center justify-center font-bold text-lg bg-white shrink-0">
+                  {item.id}
+                </div>
+                {isOutdoorUnitEditMode ? (
+                  <input
+                    type="text"
+                    value={item.label}
+                    onChange={(e) => handleOutdoorUnitRooftopChange(item.id, e.target.value)}
+                    className="flex-1 border border-orange-300 p-1 text-[15px] font-medium rounded"
+                  />
+                ) : (
+                  <span className="text-[15px] font-medium whitespace-nowrap">{item.label}</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Central Cooling Tower Box */}
+          <div className="absolute top-0 left-[450px] w-[350px] h-[450px] border-4 border-black flex flex-col items-center justify-center p-4">
+            <div className="text-red-500 font-bold text-4xl mb-4">냉 각 탑</div>
+            <div className="text-red-500 font-bold text-4xl">2호기</div>
+          </div>
+
+          {/* Bottom Row (10-15) */}
+          <div className="mt-6 flex items-start justify-between">
+            <div className="flex space-x-6">
+              {bottomItems.map((item) => (
+                <div key={item.id} className="flex flex-col items-center space-y-2 w-24">
+                  <div className="w-full h-10 border-2 border-[#0066CC] flex items-center justify-center font-bold text-lg bg-white">
+                    {item.id}
+                  </div>
+                  {isOutdoorUnitEditMode ? (
+                    <textarea
+                      value={item.label}
+                      onChange={(e) => handleOutdoorUnitRooftopChange(item.id, e.target.value)}
+                      rows={2}
+                      className="w-full border border-orange-300 p-1 text-[13px] font-medium text-center leading-tight rounded resize-none"
+                    />
+                  ) : (
+                    <div className="text-[13px] font-medium text-center leading-tight min-h-[32px] flex items-center justify-center">
+                      {item.label.split('\n').map((line, i) => (
+                        <div key={i}>{line}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col items-center space-y-2 w-24">
+              <div className="w-full h-10 border-2 border-[#0066CC] flex items-center justify-center font-bold text-lg bg-white">
+                {lastItem.id}
+              </div>
+              {isOutdoorUnitEditMode ? (
+                <textarea
+                  value={lastItem.label}
+                  onChange={(e) => handleOutdoorUnitRooftopChange(lastItem.id, e.target.value)}
+                  rows={2}
+                  className="w-full border border-orange-300 p-1 text-[13px] font-medium text-center leading-tight rounded resize-none"
+                />
+              ) : (
+                <div className="text-[13px] font-medium text-center leading-tight min-h-[32px] flex items-center justify-center">
+                  {lastItem.label.split('\n').map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Labels */}
+          <div className="mt-8 pt-4 border-t-2 border-black flex justify-between items-center">
+            <div className="text-red-500 font-bold text-2xl px-4">전실입구</div>
+            <div className="text-red-500 font-bold text-2xl px-4">EPS실</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderOutdoorUnitOutside1FContent = () => {
+    return (
+      <div className="bg-white p-8 overflow-auto">
+        <div className="max-w-4xl mx-auto relative flex justify-center min-h-[750px]">
+          {/* Left Annotations */}
+          <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-around py-20 items-center w-32">
+            <div className="flex flex-col items-center">
+              <div className="text-black font-bold text-xl">영동대로쪽</div>
+              <div className="text-black text-4xl">↑</div>
+            </div>
+            <div className="text-red-500 font-bold text-4xl -rotate-0">새마을</div>
+            <div className="flex flex-col items-center">
+              <div className="text-black text-4xl">↓</div>
+              <div className="text-black font-bold text-xl text-center">주차<br/>정산소쪽</div>
+            </div>
+          </div>
+
+          {/* Central Vertical Layout */}
+          <div className="flex flex-col space-y-4 w-full max-w-lg px-12 items-center">
+            <div className="w-full border-l-2 border-l-black border-r-2 border-r-black px-12 flex flex-col space-y-4 items-center h-fit pb-8">
+              {outdoorUnitOutside1FData.map((item) => (
+                <div key={item.id} className="flex items-center space-x-4 w-full">
+                  <div className="w-16 h-8 border-2 border-[#0066CC] flex items-center justify-center font-bold text-base bg-white shrink-0">
+                    {item.id}
+                  </div>
+                  {isOutdoorUnitEditMode ? (
+                    <input
+                      type="text"
+                      value={item.label}
+                      onChange={(e) => handleOutdoorUnitOutside1FChange(item.id, e.target.value)}
+                      className="flex-1 border border-orange-300 p-1 text-[14px] font-medium rounded"
+                    />
+                  ) : (
+                    <span className="text-[14px] font-medium whitespace-pre-wrap">{item.label}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Annotations */}
+          <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center items-center w-32">
+            <div className="text-red-500 font-bold text-4xl text-center leading-tight">더채플앳<br/>대치</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderOutdoorUnitGarden1FContent = () => {
+    return (
+      <div className="bg-white p-8 overflow-auto">
+        <div className="max-w-6xl mx-auto flex justify-between space-x-12 min-h-[600px]">
+          {/* Left Garden (화단) */}
+          <div className="flex-1 border-4 border-black relative flex flex-col min-h-[600px]">
+            {/* Top Area: 커피점테라스 */}
+            <div className="w-full h-24 border-b-4 border-black flex items-center justify-center">
+              <span className="text-red-500 font-bold text-3xl">커피점테라스</span>
+            </div>
+
+            {/* Content Area Inside Left Garden */}
+            <div className="flex-1 relative p-8">
+              {/* Unit 1 Block */}
+              <div className="absolute top-8 right-16 flex flex-col items-center">
+                <div className="mb-2 text-center">
+                  {isOutdoorUnitEditMode ? (
+                    <textarea
+                      value={outdoorUnitGarden1FData.label1}
+                      onChange={(e) => handleOutdoorUnitGarden1FChange('label1', e.target.value)}
+                      className="border border-orange-300 p-1 text-[13px] font-medium text-center w-64 leading-tight rounded resize-none"
+                      rows={2}
+                    />
+                  ) : (
+                    <div className="text-[13px] font-medium leading-tight whitespace-pre-wrap">
+                      {outdoorUnitGarden1FData.label1}
+                    </div>
+                  )}
+                </div>
+                <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
+                  1
+                </div>
+              </div>
+
+              {/* Units 2, 3, 4 Cluster */}
+              <div className="absolute top-48 left-12 flex flex-col items-center">
+                <div className="flex items-end">
+                  <div className="flex flex-col">
+                    <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
+                      2
+                    </div>
+                    <div className="w-32 h-12 border-2 border-[#0066CC] border-t-0 flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
+                      3
+                    </div>
+                  </div>
+                  <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm mb-0 ml-4">
+                    4
+                  </div>
+                </div>
+                {/* Cluster Label */}
+                <div className="mt-4 text-center">
+                  {isOutdoorUnitEditMode ? (
+                    <input
+                      type="text"
+                      value={outdoorUnitGarden1FData.label234}
+                      onChange={(e) => handleOutdoorUnitGarden1FChange('label234', e.target.value)}
+                      className="border border-orange-300 p-1 text-[15px] font-medium text-center w-64 rounded"
+                    />
+                  ) : (
+                    <div className="text-[15px] font-medium">{outdoorUnitGarden1FData.label234}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom "화 단" label */}
+              <div className="absolute bottom-8 left-0 right-0 text-center">
+                <span className="text-red-500 font-bold text-5xl tracking-[0.5em] ml-[0.5em]">화 단</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Garden (화단) */}
+          <div className="flex-1 border-4 border-black relative flex flex-col min-h-[600px]">
+            {/* 썬 큰 label box */}
+            <div className="absolute top-0 left-0 w-3/4 h-[240px] border-b-4 border-r-4 border-black flex items-center justify-center bg-white z-10">
+              <span className="text-red-500 font-bold text-5xl">썬 큰</span>
+            </div>
+
+            <div className="flex-1 relative p-8 mt-[240px]">
+              {/* Unit 5 Block */}
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="flex flex-col items-center ml-24">
+                  <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
+                    5
+                  </div>
+                  <div className="mt-4 text-center">
+                    {isOutdoorUnitEditMode ? (
+                      <input
+                        type="text"
+                        value={outdoorUnitGarden1FData.label5}
+                        onChange={(e) => handleOutdoorUnitGarden1FChange('label5', e.target.value)}
+                        className="border border-orange-300 p-1 text-[15px] font-medium text-center w-72 rounded"
+                      />
+                    ) : (
+                      <div className="text-[15px] font-medium whitespace-nowrap">{outdoorUnitGarden1FData.label5}</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom "화 단" label */}
+                <div className="mt-auto pt-12">
+                  <span className="text-red-500 font-bold text-5xl tracking-[0.5em] ml-[0.5em]">화 단</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderOutdoorUnitB1B2Content = () => {
+    return (
+      <div className="bg-white p-8 overflow-auto">
+        <div className="max-w-6xl mx-auto relative min-h-[650px] bg-white">
+          {/* Left Area: 정압실 and 팬룸 */}
+          <div className="absolute left-0 top-0 w-56 h-[400px] border-4 border-black flex items-center justify-center">
+            <span className="text-red-500 font-bold text-4xl">정압실</span>
+          </div>
+          
+          <div className="absolute left-0 bottom-4 w-56 h-28 border-4 border-black flex items-center justify-center">
+            <span className="text-red-500 font-bold text-4xl">팬 룸</span>
+          </div>
+
+          {/* 주차램프 Label */}
+          <div className="absolute left-64 top-10 bottom-4 flex flex-col justify-center items-center w-24">
+            <div className="text-red-500 font-bold text-5xl leading-[1.3] whitespace-pre-wrap text-center tracking-widest">
+              {"주\n차\n램\n프"}
+            </div>
+          </div>
+
+          {/* Right Main Content Area */}
+          <div className="ml-96">
+            {/* Main Box Area */}
+            <div className="border-4 border-black p-8 min-h-[480px] relative">
+              {/* Top Row inside box */}
+              <div className="flex justify-between items-start">
+                {/* Unit 1 & Label */}
+                <div className="flex flex-col items-center mt-12 ml-4">
+                  <div className="w-28 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-xl bg-white shadow-sm">
+                    1
+                  </div>
+                  <div className="mt-2 text-center">
+                    {isOutdoorUnitEditMode ? (
+                      <input
+                        type="text"
+                        value={outdoorUnitB1B2Data.label1}
+                        onChange={(e) => handleOutdoorUnitB1B2Change('label1', e.target.value)}
+                        className="border border-orange-300 p-1 text-[13px] font-medium text-center w-36 rounded shadow-inner"
+                      />
+                    ) : (
+                      <div className="text-[13px] font-medium leading-tight">{outdoorUnitB1B2Data.label1}</div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 미화대기실 & Unit 5 */}
+                <div className="flex flex-col items-center mr-4">
+                  <span className="text-red-500 font-bold text-4xl mb-6">미화대기실</span>
+                  <div className="w-28 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-xl bg-white shadow-sm">
+                    5
+                  </div>
+                  <div className="mt-2 text-center">
+                    {isOutdoorUnitEditMode ? (
+                      <input
+                        type="text"
+                        value={outdoorUnitB1B2Data.label5}
+                        onChange={(e) => handleOutdoorUnitB1B2Change('label5', e.target.value)}
+                        className="border border-orange-300 p-1 text-[13px] font-medium text-center w-36 rounded shadow-inner"
+                      />
+                    ) : (
+                      <div className="text-[13px] font-medium leading-tight">{outdoorUnitB1B2Data.label5}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Middle Row inside box */}
+              <div className="mt-4 ml-4">
+                {/* Unit 2 & Label */}
+                <div className="flex flex-col items-center w-fit">
+                  <div className="w-28 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-xl bg-white shadow-sm">
+                    2
+                  </div>
+                  <div className="mt-2 text-center">
+                    {isOutdoorUnitEditMode ? (
+                      <input
+                        type="text"
+                        value={outdoorUnitB1B2Data.label2}
+                        onChange={(e) => handleOutdoorUnitB1B2Change('label2', e.target.value)}
+                        className="border border-orange-300 p-1 text-[13px] font-medium text-center w-36 rounded shadow-inner"
+                      />
+                    ) : (
+                      <div className="text-[13px] font-medium leading-tight">{outdoorUnitB1B2Data.label2}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Labels inside box */}
+              <div className="absolute bottom-10 left-12 right-12 flex justify-between items-end">
+                <span className="text-red-500 font-bold text-4xl">식 당</span>
+                <span className="text-red-500 font-bold text-4xl">경비대기실</span>
+              </div>
+            </div>
+
+            {/* Bottom Content (Outside box) */}
+            <div className="mt-12 flex justify-center space-x-24 pr-12">
+              {/* Unit 3 & Label */}
+              <div className="flex flex-col items-center">
+                <div className="w-28 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-xl bg-white shadow-sm">
+                  3
+                </div>
+                <div className="mt-2 text-center">
+                  {isOutdoorUnitEditMode ? (
+                    <input
+                      type="text"
+                      value={outdoorUnitB1B2Data.label3}
+                      onChange={(e) => handleOutdoorUnitB1B2Change('label3', e.target.value)}
+                      className="border border-orange-300 p-1 text-[13px] font-medium text-center w-40 rounded shadow-inner"
+                    />
+                  ) : (
+                    <div className="text-[13px] font-medium leading-tight">{outdoorUnitB1B2Data.label3}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Unit 4 & Label */}
+              <div className="flex flex-col items-center">
+                <div className="w-28 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-xl bg-white shadow-sm">
+                  4
+                </div>
+                <div className="mt-2 text-center">
+                  {isOutdoorUnitEditMode ? (
+                    <input
+                      type="text"
+                      value={outdoorUnitB1B2Data.label4}
+                      onChange={(e) => handleOutdoorUnitB1B2Change('label4', e.target.value)}
+                      className="border border-orange-300 p-1 text-[13px] font-medium text-center w-40 rounded shadow-inner"
+                    />
+                  ) : (
+                    <div className="text-[13px] font-medium leading-tight">{outdoorUnitB1B2Data.label4}</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderOutdoorUnitContent = () => {
+    switch (activeOutdoorUnitSubTab) {
+      case 'rooftop':
+        return renderOutdoorUnitRooftopContent();
+      case 'outside_1f':
+        return renderOutdoorUnitOutside1FContent();
+      case 'garden_1f':
+        return renderOutdoorUnitGarden1FContent();
+      case 'b2_b3':
+        return renderOutdoorUnitB1B2Content();
+      default:
+        return (
+          <div className="flex items-center justify-center h-full min-h-[400px]">
+            <div className="text-center">
+              <h2 className="text-xl font-bold text-gray-800 mb-2">
+                {SUB_TABS_OUTDOOR_UNIT.find(t => t.id === activeOutdoorUnitSubTab)?.label}
+              </h2>
+              <p className="text-gray-500">이 메뉴는 현재 준비 중입니다.</p>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  const renderUniformContent = () => {
+    return (
+      <div className="w-full max-w-7xl mx-auto bg-white mt-4 overflow-x-auto print-page">
+        <table className="w-full text-center border border-black border-collapse">
+          <thead>
+            <tr className="border-b border-black">
+              <th rowSpan={2} className="border border-black font-normal text-[13px] px-2 w-[80px] h-[40px]">구 분</th>
+              <th rowSpan={2} className="border border-black font-normal text-[13px] px-2 w-[80px]">직 책</th>
+              <th rowSpan={2} className="border border-black font-normal text-[13px] px-2 w-[80px]">성 명</th>
+              <th colSpan={2} className="border border-black font-normal text-[13px] px-2 h-[40px]">동 계</th>
+              <th colSpan={2} className="border border-black font-normal text-[13px] px-2">하 계</th>
+              <th rowSpan={2} className="border border-black font-normal text-[13px] px-2 w-[200px]">비 고</th>
+            </tr>
+            <tr className="border-b border-black">
+              <th className="border border-black font-normal text-[13px] px-2 w-[120px] h-[40px]">상 의</th>
+              <th className="border border-black font-normal text-[13px] px-2 w-[120px]">하 의</th>
+              <th className="border border-black font-normal text-[13px] px-2 w-[120px]">상 의</th>
+              <th className="border border-black font-normal text-[13px] px-2 w-[120px]">하 의</th>
+            </tr>
+          </thead>
+          <tbody>
+            {uniformData.map((row) => (
+              <tr key={row.id} className="border-b border-black h-[40px]">
+                <td className="border border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">
+                    <input
+                      type="text"
+                      value={row.category}
+                      onChange={(e) => handleUniformChange(row.id, 'category', e.target.value)}
+                      readOnly={!isUniformEditMode}
+                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center"
+                    />
+                  </div>
+                </td>
+                <td className="border border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">
+                    <input
+                      type="text"
+                      value={row.position}
+                      onChange={(e) => handleUniformChange(row.id, 'position', e.target.value)}
+                      readOnly={!isUniformEditMode}
+                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center"
+                    />
+                  </div>
+                </td>
+                <td className="border border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">
+                    <input
+                      type="text"
+                      value={row.name}
+                      onChange={(e) => handleUniformChange(row.id, 'name', e.target.value)}
+                      readOnly={!isUniformEditMode}
+                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center"
+                    />
+                  </div>
+                </td>
+                <td className="border border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">
+                    <input
+                      type="text"
+                      value={row.winterTop}
+                      onChange={(e) => handleUniformChange(row.id, 'winterTop', e.target.value)}
+                      readOnly={!isUniformEditMode}
+                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center"
+                    />
+                  </div>
+                </td>
+                <td className="border border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">
+                    <input
+                      type="text"
+                      value={row.winterBottom}
+                      onChange={(e) => handleUniformChange(row.id, 'winterBottom', e.target.value)}
+                      readOnly={!isUniformEditMode}
+                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center"
+                    />
+                  </div>
+                </td>
+                <td className="border border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">
+                    <input
+                      type="text"
+                      value={row.summerTop}
+                      onChange={(e) => handleUniformChange(row.id, 'summerTop', e.target.value)}
+                      readOnly={!isUniformEditMode}
+                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center"
+                    />
+                  </div>
+                </td>
+                <td className="border border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">
+                    <input
+                      type="text"
+                      value={row.summerBottom}
+                      onChange={(e) => handleUniformChange(row.id, 'summerBottom', e.target.value)}
+                      readOnly={!isUniformEditMode}
+                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center"
+                    />
+                  </div>
+                </td>
+                <td className="border border-black p-0">
+                  <div className="flex items-center justify-center h-full px-2">
+                    <input
+                      type="text"
+                      value={row.note}
+                      onChange={(e) => handleUniformChange(row.id, 'note', e.target.value)}
+                      readOnly={!isUniformEditMode}
+                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal text-center"
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   return (
@@ -1349,6 +2517,56 @@ const AdminManager: React.FC = () => {
             </div>
           ))}
         </div>
+
+        {/* 근무복 탭일 때만 표시되는 구분선과 버튼들 */}
+        {activeTab === 'uniform' && (
+          <>
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-px h-6 bg-black"></div>
+            </div>
+            <div className="flex items-center shrink-0">
+              <button 
+                onClick={loadUniformDataWithStaff}
+                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+              >
+                <RefreshCw size={18} className="mr-1.5" />
+                새로고침
+              </button>
+              <button 
+                onClick={() => setIsUniformEditMode(!isUniformEditMode)}
+                className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
+                  isUniformEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                <Edit size={18} className="mr-1.5" />
+                {isUniformEditMode ? '수정완료' : '수정'}
+              </button>
+              <button 
+                onClick={handleUniformSave}
+                disabled={isSaving || uniformSaveSuccess}
+                className={`flex items-center shrink-0 px-4 py-3 bg-transparent text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                  uniformSaveSuccess ? 'text-orange-600 font-extrabold' : 'text-gray-500 hover:text-black font-bold'
+                }`}
+              >
+                {isSaving ? (
+                  <Loader2 size={18} className="mr-1.5 animate-spin" />
+                ) : uniformSaveSuccess ? (
+                  <CheckCircle2 size={18} className="mr-1.5" />
+                ) : (
+                  <Save size={18} className="mr-1.5" />
+                )}
+                {uniformSaveSuccess ? '저장완료' : '저장'}
+              </button>
+              <button 
+                onClick={handleUniformPrint}
+                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+              >
+                <Printer size={18} className="mr-1.5" />
+                인쇄
+              </button>
+            </div>
+          </>
+        )}
 
         {/* 자료실 탭일 때만 표시되는 구분선과 등록 버튼 */}
         {activeTab === 'form' && (
@@ -1618,6 +2836,78 @@ const AdminManager: React.FC = () => {
         </div>
       )}
 
+      {/* 서브탭메뉴 (실외기일 때 표시) */}
+      {activeTab === 'outdoor_unit' && (
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          <div className="flex items-center shrink-0">
+            {SUB_TABS_OUTDOOR_UNIT.map(subTab => (
+              <div
+                key={subTab.id}
+                onClick={() => setActiveOutdoorUnitSubTab(subTab.id)}
+                className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                  activeOutdoorUnitSubTab === subTab.id 
+                    ? 'text-orange-600' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {subTab.label}
+                {activeOutdoorUnitSubTab === subTab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-px h-6 bg-black"></div>
+          </div>
+
+          {/* 액션 버튼들 */}
+          <div className="flex items-center shrink-0">
+            <button 
+              onClick={handleOutdoorUnitRefresh}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <RefreshCw size={18} className="mr-1.5" />
+              새로고침
+            </button>
+            <button 
+              onClick={() => setIsOutdoorUnitEditMode(!isOutdoorUnitEditMode)}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
+                isOutdoorUnitEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              <Edit size={18} className="mr-1.5" />
+              {isOutdoorUnitEditMode ? '수정완료' : '수정'}
+            </button>
+            <button 
+              onClick={handleOutdoorUnitSave} 
+              disabled={isSaving}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
+                saveSuccess ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              {isSaving ? (
+                <Loader2 size={18} className="mr-1.5 animate-spin" />
+              ) : saveSuccess ? (
+                <CheckCircle2 size={18} className="mr-1.5" />
+              ) : (
+                <Save size={18} className="mr-1.5" />
+              )}
+              {saveSuccess ? '저장완료' : '저장'}
+            </button>
+            <button 
+              onClick={handleOutdoorUnitPrint}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <Printer size={18} className="mr-1.5" />
+              인쇄
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Content Area */}
       <div className="min-h-[400px]">
         {activeTab === 'auto_reg' ? (
@@ -1628,6 +2918,10 @@ const AdminManager: React.FC = () => {
           renderNetworkContent()
         ) : activeTab === 'password' ? (
           renderPasswordContent()
+        ) : activeTab === 'uniform' ? (
+          renderUniformContent()
+        ) : activeTab === 'outdoor_unit' ? (
+          renderOutdoorUnitContent()
         ) : (
           <div className="flex items-center justify-center h-full min-h-[400px]">
             <div className="text-center">
