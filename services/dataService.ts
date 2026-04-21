@@ -2284,6 +2284,37 @@ export const saveOutdoorUnitSettings = async (settings: any): Promise<boolean> =
 };
 
 /**
+ * 비상연락망 설정 가져오기
+ */
+export const fetchEmergencySettings = async (): Promise<any[] | null> => {
+  try {
+    const { data, error } = await supabase.from('system_settings').select('data').eq('id', 'EMERGENCY_CONTACT').maybeSingle();
+    if (error) throw error;
+    return data?.data || null;
+  } catch (e) {
+    console.error('fetchEmergencySettings error:', e);
+    return null;
+  }
+};
+
+/**
+ * 비상연락망 설정 저장
+ */
+export const saveEmergencySettings = async (rows: any[]): Promise<boolean> => {
+  try {
+    const { error = null } = await supabase.from('system_settings').upsert({ 
+      id: 'EMERGENCY_CONTACT', 
+      data: rows, 
+      last_updated: new Date().toISOString() 
+    });
+    return !error;
+  } catch (e) {
+    console.error('saveEmergencySettings error:', e);
+    return false;
+  }
+};
+
+/**
  * 4년 경과 데이터 자동 삭제 (Retention Policy)
  * App이 로드될 때 하루에 한 번만 실행되어 오래된 데이터를 삭제하여 저장공간을 최적화.
  */

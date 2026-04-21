@@ -18,7 +18,9 @@ import {
   fetchUniformSettings,
   saveUniformSettings,
   fetchOutdoorUnitSettings,
-  saveOutdoorUnitSettings
+  saveOutdoorUnitSettings,
+  fetchEmergencySettings,
+  saveEmergencySettings
 } from '../services/dataService';
 import { AutoRegRow, ArchiveItem, OutdoorUnitRooftopItem } from '../types';
 
@@ -29,6 +31,7 @@ const TABS = [
   { id: 'password', label: '비밀번호' },
   { id: 'uniform', label: '근무복' },
   { id: 'outdoor_unit', label: '실외기' },
+  { id: 'emergency', label: '비상연락망' },
 ];
 
 const SUB_TABS_AUTO_REG = [
@@ -77,6 +80,16 @@ const SUB_TABS_UNIFORM = [
   { id: 'cleaning', label: '미화' },
 ];
 
+const SUB_TABS_EMERGENCY = [
+  { id: 'all', label: '전체' },
+  { id: 'saemaul', label: '새마을' },
+  { id: 'dispatch', label: '용역' },
+  { id: 'facility', label: '시설' },
+  { id: 'security', label: '경비' },
+  { id: 'cleaning', label: '미화' },
+  { id: 'tenant', label: '입주사' },
+];
+
 const AdminManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState('auto_reg');
   const [activeSubTab, setActiveSubTab] = useState('elec');
@@ -120,6 +133,12 @@ const AdminManager: React.FC = () => {
   const [isNetworkEditMode, setIsNetworkEditMode] = useState(false);
   const [isOutdoorUnitEditMode, setIsOutdoorUnitEditMode] = useState(false);
   const [activeOutdoorUnitSubTab, setActiveOutdoorUnitSubTab] = useState('rooftop');
+  const [activeEmergencySubTab, setActiveEmergencySubTab] = useState('all');
+  const [isEmergencyEditMode, setIsEmergencyEditMode] = useState(false);
+  const [emergencySaveSuccess, setEmergencySaveSuccess] = useState(false);
+  const [emergencyData, setEmergencyData] = useState<any[]>([
+    { id: '1', category: '새마을', position: '', name: '', location: '', extensionNumber: '', phone: '' }
+  ]);
 
   const handleOutdoorUnitRefresh = async () => {
     const data = await fetchOutdoorUnitSettings();
@@ -878,6 +897,77 @@ const AdminManager: React.FC = () => {
     printWindow.document.close();
   };
 
+  const loadEmergencyDataWithStaff = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [staffListRaw, savedEmergency] = await Promise.all([
+        fetchStaffList(),
+        fetchEmergencySettings()
+      ]);
+      
+      // Filter out resigned staff
+      const staffList = staffListRaw.filter(s => !s.resignDate || s.resignDate.trim() === '');
+      
+      const savedRows = savedEmergency || [];
+      
+      // Separate non-linked categories (새마을, 용역 등)
+      const nonLinkedData = savedRows.filter((r: any) => 
+        !['시설', '경비', '미화'].includes(r.category)
+      );
+
+      // Facility (현장대리인 + 시설)
+      const facilityStaff = staffList.filter(s => s.category === '현장대리인' || s.category === '시설');
+      const facilityRows = facilityStaff.map(staff => {
+        const saved = savedRows.find((r: any) => r.name === staff.name && (r.category === '시설' || r.category === '현장대리인'));
+        return {
+          id: staff.id,
+          category: '시설',
+          position: staff.jobTitle,
+          name: staff.name,
+          location: saved ? saved.location : '',
+          extensionNumber: saved ? saved.extensionNumber : '',
+          phone: staff.phone
+        };
+      });
+
+      // Security
+      const securityStaff = staffList.filter(s => s.category === '경비');
+      const securityRows = securityStaff.map(staff => {
+        const saved = savedRows.find((r: any) => r.name === staff.name && r.category === '경비');
+        return {
+          id: staff.id,
+          category: '경비',
+          position: staff.jobTitle,
+          name: staff.name,
+          location: saved ? saved.location : '',
+          extensionNumber: saved ? saved.extensionNumber : '',
+          phone: staff.phone
+        };
+      });
+
+      // Cleaning
+      const cleaningStaff = staffList.filter(s => s.category === '미화');
+      const cleaningRows = cleaningStaff.map(staff => {
+        const saved = savedRows.find((r: any) => r.name === staff.name && r.category === '미화');
+        return {
+          id: staff.id,
+          category: '미화',
+          position: staff.jobTitle,
+          name: staff.name,
+          location: saved ? saved.location : '',
+          extensionNumber: saved ? saved.extensionNumber : '',
+          phone: staff.phone
+        };
+      });
+
+      setEmergencyData([...nonLinkedData, ...facilityRows, ...securityRows, ...cleaningRows]);
+    } catch (error) {
+      console.error('Failed to load emergency data with staff:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -922,16 +1012,18 @@ const AdminManager: React.FC = () => {
         if (site.length > 0) setPasswordSiteData(site);
         if (building.length > 0) setPasswordBuildingData(building);
         if (warehouse.length > 0) setPasswordWarehouseData(warehouse);
+      } else if (activeTab === 'emergency') {
+        loadEmergencyDataWithStaff();
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [activeTab, activeSubTab]);
+  }, [activeTab, activeSubTab, loadEmergencyDataWithStaff]);
 
   useEffect(() => {
-    if (activeTab === 'auto_reg' || activeTab === 'form' || activeTab === 'network' || activeTab === 'password') {
+    if (activeTab === 'auto_reg' || activeTab === 'form' || activeTab === 'network' || activeTab === 'password' || activeTab === 'emergency') {
       loadData();
     }
 
@@ -1047,6 +1139,26 @@ const AdminManager: React.FC = () => {
         const newRow = { id: generateUUID(), category: '', deviceName: '', ipAddress: '', loginId: '', loginPw: '', note: '' };
         setPasswordWarehouseData(prev => [...prev, newRow]);
       }
+    } else if (activeTab === 'emergency') {
+      const categoryMap: Record<string, string> = {
+        saemaul: '새마을',
+        dispatch: '용역',
+        facility: '시설',
+        security: '경비',
+        cleaning: '미화',
+        tenant: '입주사'
+      };
+      const newRow = { 
+        id: generateUUID(), 
+        category: activeEmergencySubTab !== 'all' ? categoryMap[activeEmergencySubTab] : '', 
+        position: '', 
+        name: '', 
+        location: '', 
+        extensionNumber: '', 
+        phone: '',
+        employeeCount: '' 
+      };
+      setEmergencyData(prev => [...prev, newRow]);
     }
   };
 
@@ -1058,6 +1170,8 @@ const AdminManager: React.FC = () => {
       }));
     } else if (activeTab === 'form') {
       setArchiveRows(prev => prev.filter(row => row.id !== id));
+    } else if (activeTab === 'emergency') {
+      setEmergencyData(prev => prev.filter(row => row.id !== id));
     }
   };
 
@@ -1891,6 +2005,116 @@ const AdminManager: React.FC = () => {
     }
   };
 
+  const handleEmergencyPrint = () => {
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWindow) return;
+
+    const printContent = document.querySelector('.print-page');
+    if (!printContent) {
+      printWindow.close();
+      return;
+    }
+
+    const title = SUB_TABS_EMERGENCY.find(t => t.id === activeEmergencySubTab)?.label || '비상연락망';
+
+    const html = `
+      <html>
+        <head>
+          <title>${title} 비상연락망 인쇄</title>
+          <style>
+            @page { 
+              size: A4 portrait; 
+              margin: 15mm 10mm; 
+            }
+            body { 
+              font-family: "Malgun Gothic", sans-serif; 
+              background-color: black; 
+              color: black; 
+              padding: 0;
+              margin: 0;
+              -webkit-print-color-adjust: exact;
+            }
+            .no-print {
+              display: flex;
+              justify-content: center;
+              padding: 20px;
+            }
+            .print-btn {
+              padding: 10px 24px;
+              background-color: #1e3a8a;
+              color: white;
+              border: none;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+              font-size: 12pt;
+            }
+            @media print {
+              .no-print { display: none !important; }
+              body { background-color: white !important; }
+              .print-page { box-shadow: none !important; margin: 0 !important; }
+            }
+            .print-page {
+              width: 210mm;
+              min-height: 297mm;
+              padding: 15mm 10mm;
+              margin: 20px auto;
+              background-color: white;
+              box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+              box-sizing: border-box;
+            }
+            h1 { 
+              text-align: center; 
+              font-size: 24pt; 
+              margin-bottom: 20px; 
+              font-weight: 900;
+              border-bottom: 2px solid black;
+              padding-bottom: 10px;
+            }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin-bottom: 20px; 
+            }
+            th, td { 
+              border: 1px solid black; 
+              padding: 8px 4px; 
+              text-align: center; 
+              font-size: 10pt; 
+              height: 35px;
+            }
+            th { 
+              background-color: white !important; 
+              color: black;
+            }
+            input {
+              width: 100%;
+              text-align: center;
+              border: none;
+              background: transparent;
+              font-size: 10pt;
+            }
+            .group-hover\\:opacity-100 {
+              display: none !important; /* Hide delete buttons */
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print">
+            <button class="print-btn" onclick="window.print()">인쇄하기</button>
+          </div>
+          <div class="print-page">
+            <h1>${title} 비상연락망</h1>
+            ${printContent.innerHTML.replace(/<button[^>]*>.*?<\/button>/gi, '')}
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const handleUniformPrint = () => {
     const printWindow = window.open('', '_blank', 'width=1000,height=800');
     if (!printWindow) return;
@@ -2439,6 +2663,292 @@ const AdminManager: React.FC = () => {
           </div>
         );
     }
+  };
+
+  const handleEmergencyRefresh = async () => {
+    await loadEmergencyDataWithStaff();
+  };
+
+  const handleEmergencySave = async () => {
+    setIsSaving(true);
+    setSaveSuccess(false);
+    setEmergencySaveSuccess(false);
+    try {
+      const success = await saveEmergencySettings(emergencyData);
+      if (success) {
+        setEmergencySaveSuccess(true);
+        setSaveSuccess(true);
+        alert('저장되었습니다.');
+        setIsEmergencyEditMode(false);
+        setTimeout(() => {
+          setEmergencySaveSuccess(false);
+          setSaveSuccess(false);
+        }, 3000);
+      } else {
+        alert('저장에 실패했습니다.');
+      }
+    } catch (e) {
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const renderEmergencyContent = () => {
+    const categorySortOrder: Record<string, number> = {
+      '새마을': 1,
+      '용역': 2,
+      '시설': 3,
+      '경비': 4,
+      '미화': 5,
+      '입주사': 6
+    };
+
+    const getPositionOrder = (category: string, position: string) => {
+      const pos = position || '';
+      if (category === '시설') {
+        if (pos.includes('과장')) return 1;
+        if (pos.includes('대리')) return 2;
+        if (pos.includes('주임')) return 3;
+        if (pos.includes('기사')) return 4;
+      } else if (category === '경비') {
+        if (pos.includes('반장')) return 1;
+        if (pos.includes('대원A')) return 2;
+        if (pos.includes('대원B')) return 3;
+        if (pos.includes('대원')) return 4;
+      } else if (category === '미화') {
+        if (pos.includes('반장')) return 1;
+        if (pos.includes('미화')) return 2;
+      }
+      return 99;
+    };
+
+    const parseFloor = (floorStr: string) => {
+      if (!floorStr) return -999;
+      const f = floorStr.toString().trim();
+      if (f.startsWith('지하') || f.toUpperCase().startsWith('B')) {
+        const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+        return -num;
+      }
+      return parseInt(f.replace(/[^0-9]/g, '')) || 0;
+    };
+
+    const filteredData = [...emergencyData]
+      .filter(row => {
+        if (activeEmergencySubTab === 'all') return row.category !== '입주사';
+        const categoryMap: Record<string, string> = {
+          saemaul: '새마을',
+          dispatch: '용역',
+          facility: '시설',
+          security: '경비',
+          cleaning: '미화',
+          tenant: '입주사'
+        };
+        return row.category === categoryMap[activeEmergencySubTab];
+      })
+      .sort((a, b) => {
+        // 입주사 전용 정렬: 층 내림차순 (10층 -> 지하2층)
+        if (activeEmergencySubTab === 'tenant' || (a.category === '입주사' && b.category === '입주사')) {
+          const floorA = parseFloor(a.location);
+          const floorB = parseFloor(b.location);
+          if (floorA !== floorB) return floorB - floorA; 
+          return (a.extensionNumber || '').localeCompare(b.extensionNumber || ''); 
+        }
+
+        // First level: Category order
+        const orderA = categorySortOrder[a.category] || 99;
+        const orderB = categorySortOrder[b.category] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+
+        // Second level: Position order
+        const posOrderA = getPositionOrder(a.category, a.position);
+        const posOrderB = getPositionOrder(b.category, b.position);
+        return posOrderA - posOrderB;
+      });
+
+    if (activeEmergencySubTab === 'tenant') {
+      return (
+        <div className="w-full max-w-7xl mx-auto bg-white mt-4 overflow-x-auto print-page">
+          <table className="w-full text-center border border-black border-collapse">
+            <thead>
+              <tr className="h-[40px] bg-white">
+                <th className="border border-black font-normal text-[14px] px-2 w-[80px]">층</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[240px]">회사명</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[100px]">직책</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[100px]">성명</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[110px]">근무인원</th>
+                <th className="border border-black font-normal text-[14px] px-2">전화번호</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredData.map((row) => (
+                <tr key={row.id} className="h-[40px] border-b border-black">
+                  <td className="border border-black text-[13px] font-normal px-2">
+                    <input 
+                      type="text" 
+                      value={row.location}
+                      onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, location: e.target.value } : r))}
+                      readOnly={!isEmergencyEditMode}
+                      className={`w-full text-center focus:outline-none ${isEmergencyEditMode ? 'bg-orange-50' : 'bg-transparent'}`}
+                    />
+                  </td>
+                  <td className="border border-black text-[13px] font-normal px-2">
+                    <input 
+                      type="text" 
+                      value={row.extensionNumber}
+                      onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, extensionNumber: e.target.value } : r))}
+                      readOnly={!isEmergencyEditMode}
+                      className={`w-full text-center focus:outline-none ${isEmergencyEditMode ? 'bg-orange-50' : 'bg-transparent'}`}
+                      placeholder={isEmergencyEditMode ? "회사명" : ""}
+                    />
+                  </td>
+                  <td className="border border-black text-[13px] font-normal px-2">
+                    <input 
+                      type="text" 
+                      value={row.position}
+                      onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, position: e.target.value } : r))}
+                      readOnly={!isEmergencyEditMode}
+                      className={`w-full text-center focus:outline-none ${isEmergencyEditMode ? 'bg-orange-50' : 'bg-transparent'}`}
+                    />
+                  </td>
+                  <td className="border border-black text-[13px] font-normal px-2">
+                    <input 
+                      type="text" 
+                      value={row.name}
+                      onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, name: e.target.value } : r))}
+                      readOnly={!isEmergencyEditMode}
+                      className={`w-full text-center focus:outline-none ${isEmergencyEditMode ? 'bg-orange-50' : 'bg-transparent'}`}
+                    />
+                  </td>
+                  <td className="border border-black text-[13px] font-normal px-2">
+                    <input 
+                      type="text" 
+                      value={row.employeeCount || ''}
+                      onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, employeeCount: e.target.value } : r))}
+                      readOnly={!isEmergencyEditMode}
+                      className={`w-full text-center focus:outline-none ${isEmergencyEditMode ? 'bg-orange-50' : 'bg-transparent'}`}
+                    />
+                  </td>
+                  <td className="border border-black text-[13px] font-normal px-2 relative group">
+                    <input 
+                      type="text" 
+                      value={row.phone}
+                      onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, phone: e.target.value } : r))}
+                      readOnly={!isEmergencyEditMode}
+                      className={`w-full text-center focus:outline-none ${isEmergencyEditMode ? 'bg-orange-50' : 'bg-transparent'}`}
+                    />
+                    {isEmergencyEditMode && (
+                      <button 
+                        onClick={() => handleDeleteRow(row.id)}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 text-red-500 hover:bg-red-50 rounded"
+                        title="삭제"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {filteredData.length === 0 && (
+                <tr className="h-[100px]">
+                  <td colSpan={6} className="border border-black text-gray-400">데이터가 없습니다.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    return (
+      <div className="w-full max-w-7xl mx-auto bg-white mt-4 overflow-x-auto print-page">
+        <table className="w-full text-center border border-black border-collapse">
+          <thead>
+            <tr className="h-[40px] bg-white">
+              <th className="border border-black font-normal text-[14px] px-2 w-[100px]">구분</th>
+              <th className="border border-black font-normal text-[14px] px-2 w-[120px]">직책</th>
+              <th className="border border-black font-normal text-[14px] px-2 w-[120px]">성명</th>
+              <th className="border border-black font-normal text-[14px] px-2 w-[120px]">위치</th>
+              <th className="border border-black font-normal text-[14px] px-2">구내번호</th>
+              <th className="border border-black font-normal text-[14px] px-2">핸드폰</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredData.map((row) => (
+              <tr key={row.id} className="h-[40px] border-b border-black">
+                <td className="border border-black text-[13px] font-normal px-2 relative group">
+                  <input 
+                    type="text" 
+                    value={row.category}
+                    onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, category: e.target.value } : r))}
+                    readOnly={!isEmergencyEditMode}
+                    className={`w-full bg-transparent border-none outline-none text-center ${!isEmergencyEditMode ? 'cursor-default' : ''}`}
+                  />
+                  {isEmergencyEditMode && (
+                    <button 
+                      onClick={() => handleDeleteRow(row.id)}
+                      className="absolute left-1 top-1/2 -translate-y-1/2 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </td>
+                <td className="border border-black text-[13px] font-normal px-2">
+                  <input 
+                    type="text" 
+                    value={row.position}
+                    onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, position: e.target.value } : r))}
+                    readOnly={!isEmergencyEditMode}
+                    className={`w-full bg-transparent border-none outline-none text-center ${!isEmergencyEditMode ? 'cursor-default' : ''}`}
+                  />
+                </td>
+                <td className="border border-black text-[13px] font-normal px-2">
+                  <input 
+                    type="text" 
+                    value={row.name}
+                    onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, name: e.target.value } : r))}
+                    readOnly={!isEmergencyEditMode}
+                    className={`w-full bg-transparent border-none outline-none text-center ${!isEmergencyEditMode ? 'cursor-default' : ''}`}
+                  />
+                </td>
+                <td className="border border-black text-[13px] font-normal px-2">
+                  <input 
+                    type="text" 
+                    value={row.location}
+                    onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, location: e.target.value } : r))}
+                    readOnly={!isEmergencyEditMode}
+                    className={`w-full bg-transparent border-none outline-none text-center ${!isEmergencyEditMode ? 'cursor-default' : ''}`}
+                  />
+                </td>
+                <td className="border border-black text-[13px] font-normal px-2">
+                  <input 
+                    type="text" 
+                    value={row.extensionNumber}
+                    onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, extensionNumber: e.target.value } : r))}
+                    readOnly={!isEmergencyEditMode}
+                    className={`w-full bg-transparent border-none outline-none text-center ${!isEmergencyEditMode ? 'cursor-default' : ''}`}
+                  />
+                </td>
+                <td className="border border-black text-[13px] font-normal px-2">
+                  <input 
+                    type="text" 
+                    value={row.phone}
+                    onChange={(e) => setEmergencyData(prev => prev.map(r => r.id === row.id ? { ...r, phone: e.target.value } : r))}
+                    readOnly={!isEmergencyEditMode}
+                    className={`w-full bg-transparent border-none outline-none text-center ${!isEmergencyEditMode ? 'cursor-default' : ''}`}
+                  />
+                </td>
+              </tr>
+            ))}
+            {filteredData.length === 0 && (
+              <tr className="h-[40px]">
+                <td colSpan={6} className="border border-black text-[13px] text-gray-400">데이터가 없습니다.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   const renderUniformContent = () => {
@@ -3047,6 +3557,86 @@ const AdminManager: React.FC = () => {
         </div>
       )}
 
+      {/* 서브탭메뉴 (비상연락망일 때 표시) */}
+      {activeTab === 'emergency' && (
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          {/* 서브탭 */}
+          <div className="flex items-stretch shrink-0">
+            {SUB_TABS_EMERGENCY.map(subTab => (
+              <div
+                key={subTab.id}
+                onClick={() => setActiveEmergencySubTab(subTab.id)}
+                className={`flex items-center px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                  activeEmergencySubTab === subTab.id 
+                    ? 'text-orange-600' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {subTab.label}
+                {activeEmergencySubTab === subTab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-px h-6 bg-black"></div>
+          </div>
+
+          {/* 액션 버튼들 */}
+          <div className="flex items-stretch shrink-0">
+            <button 
+              onClick={handleAddRow}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <Plus size={18} className="mr-1.5" />
+              연락처추가
+            </button>
+            <button 
+              onClick={handleEmergencyRefresh} 
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <RefreshCw size={18} className="mr-1.5" />
+              새로고침
+            </button>
+            <button 
+              onClick={() => setIsEmergencyEditMode(!isEmergencyEditMode)}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
+                isEmergencyEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              <Edit size={18} className="mr-1.5" />
+              {isEmergencyEditMode ? '수정완료' : '수정'}
+            </button>
+            <button 
+              onClick={handleEmergencySave} 
+              disabled={isSaving}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                emergencySaveSuccess ? 'text-orange-600 font-extrabold' : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              {isSaving ? (
+                <Loader2 size={18} className="mr-1.5 animate-spin" />
+              ) : emergencySaveSuccess ? (
+                <CheckCircle2 size={18} className="mr-1.5" />
+              ) : (
+                <Save size={18} className="mr-1.5" />
+              )}
+              {emergencySaveSuccess ? '저장완료' : '저장'}
+            </button>
+            <button 
+              onClick={handleEmergencyPrint} 
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <Printer size={18} className="mr-1.5" />
+              인쇄
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Content Area */}
       <div className="min-h-[400px]">
         {activeTab === 'auto_reg' ? (
@@ -3061,6 +3651,8 @@ const AdminManager: React.FC = () => {
           renderUniformContent()
         ) : activeTab === 'outdoor_unit' ? (
           renderOutdoorUnitContent()
+        ) : activeTab === 'emergency' ? (
+          renderEmergencyContent()
         ) : (
           <div className="flex items-center justify-center h-full min-h-[400px]">
             <div className="text-center">
