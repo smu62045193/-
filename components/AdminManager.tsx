@@ -57,12 +57,31 @@ const SUB_TABS_OUTDOOR_UNIT = [
   { id: 'rooftop', label: '옥상' },
   { id: 'outside_1f', label: '1F건물외곽' },
   { id: 'garden_1f', label: '1F화단' },
-  { id: 'b2_b3', label: 'B2F~B3F' },
+  { id: 'b2_b3', label: 'B2F주차장' },
+];
+
+const SUB_TABS_ARCHIVE = [
+  { id: 'all', label: '전체' },
+  { id: 'elec', label: '전기' },
+  { id: 'mech', label: '기계' },
+  { id: 'fire', label: '소방' },
+  { id: 'elevator', label: '승강기' },
+  { id: 'parking', label: '주차' },
+  { id: 'etc', label: '기타' },
+];
+
+const SUB_TABS_UNIFORM = [
+  { id: 'all', label: '전체' },
+  { id: 'facilities', label: '시설' },
+  { id: 'security', label: '경비' },
+  { id: 'cleaning', label: '미화' },
 ];
 
 const AdminManager: React.FC = () => {
   const [activeTab, setActiveTab] = useState('auto_reg');
   const [activeSubTab, setActiveSubTab] = useState('elec');
+  const [activeArchiveSubTab, setActiveArchiveSubTab] = useState('all');
+  const [activeUniformSubTab, setActiveUniformSubTab] = useState('all');
   const [activeNetworkSubTab, setActiveNetworkSubTab] = useState('general');
   const [networkGeneralData, setNetworkGeneralData] = useState<any[]>([
     { id: '1', category: 'IP 주소(PC)', ipAddress: '', gateway: '', primaryDns: '', secondaryDns: '' }
@@ -628,20 +647,20 @@ const AdminManager: React.FC = () => {
         <div class="print-page">
           <h1>실외기 설치 현황 (${activeTabText})</h1>
           <div class="diagram-container" style="display: flex; justify-content: center; align-items: center;">
-            <div style="position: relative; width: 600px; height: 650px; border: 4px solid black;">
-              <div style="position: absolute; left: -140px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: space-around; items-center w-32;">
+            <div style="position: relative; width: 450px; height: 650px;">
+              <div style="position: absolute; left: -125px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: space-around; align-items: center; width: 120px;">
                  <div style="text-align: center;">
                     <div style="font-weight: bold; font-size: 14pt;">영동대로쪽</div>
                     <div style="font-size: 24pt;">↑</div>
                  </div>
-                 <div class="red-label" style="font-size: 32pt; transform: rotate(0deg);">새마을</div>
+                 <div class="red-label" style="font-size: 24pt; transform: rotate(0deg);">새마을</div>
                  <div style="text-align: center;">
                     <div style="font-size: 24pt;">↓</div>
                     <div style="font-weight: bold; font-size: 14pt;">주차<br/>정산소쪽</div>
                  </div>
               </div>
               
-              <div style="display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px; border-left: 2px solid black; border-right: 2px solid black; height: 100%; margin: 0 80px;">
+              <div style="display: flex; flex-direction: column; align-items: flex-start; padding: 20px; gap: 12px; border-left: 2px solid black; border-right: 2px solid black; height: 100%; margin: 0 40px;">
                 ${outdoorUnitOutside1FData.map(item => `
                   <div style="display: flex; align-items: center; gap: 15px;">
                     <div class="unit-box" style="position: static; width: 60px; height: 30px;">${item.id}</div>
@@ -650,7 +669,7 @@ const AdminManager: React.FC = () => {
                 `).join('')}
               </div>
 
-              <div class="red-label" style="position: absolute; right: -120px; top: 50%; transform: translateY(-50%); font-size: 24pt; text-align: center; line-height: 1.2;">더채플앳<br/>대치</div>
+              <div class="red-label" style="position: absolute; right: -115px; top: 50%; transform: translateY(-50%); font-size: 24pt; text-align: center; line-height: 1.2;">더채플앳<br/>대치</div>
             </div>
           </div>
         </div>
@@ -660,16 +679,16 @@ const AdminManager: React.FC = () => {
         <div class="print-page">
           <h1>실외기 설치 현황 (${activeTabText})</h1>
           <div class="diagram-container" style="display: flex; justify-content: center; align-items: center; flex-direction: column;">
-             <div style="display: flex; gap: 40px;">
-                <div style="width: 450px; height: 550px; border: 4px solid black; position: relative;">
+             <div style="display: flex; gap: 30px;">
+                <div style="width: 420px; height: 550px; border: 4px solid black; position: relative;">
                    <div style="height: 80px; border-bottom: 4px solid black; display: flex; align-items: center; justify-content: center;">
                       <span class="red-label" style="font-size: 20pt;">커피점테라스</span>
                    </div>
-                   <div style="position: absolute; top: 100px; right: 40px; display: flex; flex-direction: column; align-items: center;">
+                   <div style="position: absolute; top: 100px; right: 30px; display: flex; flex-direction: column; align-items: center;">
                       <div class="label-text" style="position: static; margin-bottom: 5px; text-align: center;">${outdoorUnitGarden1FData.label1.replace(/\n/g, '<br/>')}</div>
                       <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">1</div>
                    </div>
-                   <div style="position: absolute; top: 280px; left: 40px; display: flex; flex-direction: column; align-items: center;">
+                   <div style="position: absolute; top: 280px; left: 30px; display: flex; flex-direction: column; align-items: center;">
                       <div style="display: flex; align-items: flex-end; gap: 15px;">
                          <div style="display: flex; flex-direction: column;">
                             <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">2</div>
@@ -681,11 +700,11 @@ const AdminManager: React.FC = () => {
                    </div>
                    <div class="red-label" style="position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; font-size: 40pt; letter-spacing: 0.5em;">화 단</div>
                 </div>
-                <div style="width: 250px; height: 550px; border: 4px solid black; position: relative;">
+                <div style="width: 230px; height: 550px; border: 4px solid black; position: relative;">
                     <div style="position: absolute; top: 0; left: 0; width: 100%; height: 200px; border-bottom: 4px solid black; display: flex; align-items: center; justify-content: center;">
                        <span class="red-label" style="font-size: 30pt;">썬 큰</span>
                     </div>
-                    <div style="height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 120px;">
+                    <div style="position: absolute; top: 250px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center;">
                         <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">5</div>
                         <div class="label-text" style="position: static; margin-top: 10px; text-align: center;">${outdoorUnitGarden1FData.label5}</div>
                     </div>
@@ -700,37 +719,39 @@ const AdminManager: React.FC = () => {
         <div class="print-page">
           <h1>실외기 설치 현황 (${activeTabText})</h1>
           <div class="diagram-container">
-             <div class="border-box" style="left: 0; top: 0; width: 200px; height: 350px;">
-                <span class="red-label" style="font-size: 28pt;">정압실</span>
+             <div class="border-box" style="left: 0; top: 0; width: 130px; height: 350px;">
+                <span class="red-label" style="font-size: 24pt;">정압실</span>
              </div>
-             <div class="border-box" style="left: 0; bottom: 30px; width: 200px; height: 100px;">
-                <span class="red-label" style="font-size: 28pt;">팬 룸</span>
+             <div class="border-box" style="left: 0; bottom: 30px; width: 130px; height: 100px;">
+                <span class="red-label" style="font-size: 24pt;">팬 룸</span>
              </div>
-             <div class="red-label" style="position: absolute; left: 230px; top: 0; bottom: 0; display: flex; align-items: center; font-size: 40pt; text-align: center; letter-spacing: 0.2em; line-height: 1.5;">주<br/>차<br/>램<br/>프</div>
+             <div class="red-label" style="position: absolute; left: 130px; width: 150px; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; font-size: 24pt; text-align: center; letter-spacing: 0.2em; line-height: 1.5;">주<br/>차<br/>램<br/>프</div>
              
-             <div style="position: absolute; left: 350px; top: 0; right: 0; bottom: 0;">
-                <div style="border: 4px solid black; height: 400px; position: relative; padding: 30px;">
-                   <div style="display: flex; justify-content: space-between;">
-                      <div style="display: flex; flex-direction: column; align-items: center; margin-top: 30px;">
-                         <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">1</div>
-                         <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label1}</div>
+             <div style="position: absolute; left: 280px; top: 0; right: 0; bottom: 0;">
+                <div style="border: 4px solid black; height: 400px; position: relative; padding: 30px 20px;">
+                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                      <div style="display: flex; flex-direction: column; gap: 30px;">
+                         <div style="display: flex; flex-direction: column; align-items: center;">
+                            <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">1</div>
+                            <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label1}</div>
+                         </div>
+                         <div style="display: flex; flex-direction: column; align-items: center;">
+                            <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">2</div>
+                            <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label2}</div>
+                         </div>
                       </div>
-                      <div style="display: flex; flex-direction: column; align-items: center;">
+                      <div style="display: flex; flex-direction: column; align-items: center; margin-top: -15px;">
                          <div class="red-label" style="font-size: 24pt; margin-bottom: 20px;">미화대기실</div>
                          <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">5</div>
                          <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label5}</div>
                       </div>
                    </div>
-                   <div style="display: flex; flex-direction: column; align-items: center; width: fit-content; margin-top: 30px;">
-                      <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">2</div>
-                      <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label2}</div>
-                   </div>
-                   <div style="position: absolute; bottom: 30px; left: 40px; right: 40px; display: flex; justify-content: space-between;">
+                   <div style="position: absolute; bottom: 30px; left: 20px; right: 20px; display: flex; justify-content: space-between;">
                       <span class="red-label" style="font-size: 24pt;">식 당</span>
                       <span class="red-label" style="font-size: 24pt;">경비대기실</span>
                    </div>
                 </div>
-                <div style="display: flex; justify-content: center; gap: 100px; margin-top: 40px;">
+                <div style="display: flex; justify-content: space-between; padding: 0 20px; margin-top: 40px;">
                     <div style="display: flex; flex-direction: column; align-items: center;">
                       <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">3</div>
                       <div class="label-text" style="position: static; margin-top: 5px;">${outdoorUnitB1B2Data.label3}</div>
@@ -1074,6 +1095,40 @@ const AdminManager: React.FC = () => {
     }
   };
 
+  const handleFileDownload = async (url: string, title: string, originalFileName: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      
+      // 원본 파일명에서 확장자 추출
+      let extension = '';
+      const parts = originalFileName.split('.');
+      if (parts.length > 1) {
+        extension = `.${parts.pop()}`;
+      } else {
+        // URL에서 확장자 추출 시도
+        const urlParts = url.split('.');
+        if (urlParts.length > 1) {
+          extension = `.${urlParts.pop()?.split('?')[0]}`;
+        }
+      }
+
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      // 제목을 파일명으로 설정
+      link.download = `${title}${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Download error:', error);
+      // 실패 시 기본 브라우저 다운로드/열기 시도
+      window.open(url, '_blank');
+    }
+  };
+
   const renderPagination = (totalItems: number) => {
     const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
     const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
@@ -1127,10 +1182,25 @@ const AdminManager: React.FC = () => {
   };
 
   const renderArchiveTable = () => {
-    const filteredRows = archiveRows.filter(row => 
-      row.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredRows = archiveRows.filter(row => {
+      const matchesSearch = row.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           row.category.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const categoryMap: Record<string, string> = {
+        all: '전체',
+        elec: '전기',
+        mech: '기계',
+        fire: '소방',
+        elevator: '승강기',
+        parking: '주차',
+        etc: '기타'
+      };
+      
+      const targetCategory = categoryMap[activeArchiveSubTab];
+      const matchesTab = activeArchiveSubTab === 'all' ? true : row.category === targetCategory;
+      
+      return matchesSearch && matchesTab;
+    });
 
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -1179,16 +1249,14 @@ const AdminManager: React.FC = () => {
                   <td className="border border-black text-[13px] font-normal px-2">
                     <div className="flex items-center justify-center h-full gap-2">
                       {row.attachment ? (
-                        <a 
-                          href={row.attachment} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1"
+                        <button 
+                          onClick={() => handleFileDownload(row.attachment!, row.title, row.fileName || '파일')}
+                          className="text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
                           title={row.fileName || '다운로드'}
                         >
                           <Download size={16} />
                           <span className="text-[11px] truncate max-w-[60px]">{row.fileName || '파일'}</span>
-                        </a>
+                        </button>
                       ) : (
                         <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors">
                           <Paperclip size={16} />
@@ -2108,7 +2176,7 @@ const AdminManager: React.FC = () => {
           <div className="flex-1 border-4 border-black relative flex flex-col min-h-[600px]">
             {/* Top Area: 커피점테라스 */}
             <div className="w-full h-24 border-b-4 border-black flex items-center justify-center">
-              <span className="text-red-500 font-bold text-3xl">커피점테라스</span>
+              <span className="text-red-500 font-bold text-4xl">커피점테라스</span>
             </div>
 
             {/* Content Area Inside Left Garden */}
@@ -2164,9 +2232,8 @@ const AdminManager: React.FC = () => {
                 </div>
               </div>
 
-              {/* Bottom "화 단" label */}
               <div className="absolute bottom-8 left-0 right-0 text-center">
-                <span className="text-red-500 font-bold text-5xl tracking-[0.5em] ml-[0.5em]">화 단</span>
+                <span className="text-red-500 font-bold text-4xl">화 단</span>
               </div>
             </div>
           </div>
@@ -2174,35 +2241,33 @@ const AdminManager: React.FC = () => {
           {/* Right Garden (화단) */}
           <div className="flex-1 border-4 border-black relative flex flex-col min-h-[600px]">
             {/* 썬 큰 label box */}
-            <div className="absolute top-0 left-0 w-3/4 h-[240px] border-b-4 border-r-4 border-black flex items-center justify-center bg-white z-10">
-              <span className="text-red-500 font-bold text-5xl">썬 큰</span>
+            <div className="w-full h-[240px] border-b-4 border-black flex items-center justify-center bg-white">
+              <span className="text-red-500 font-bold text-4xl">썬 큰</span>
             </div>
 
-            <div className="flex-1 relative p-8 mt-[240px]">
+            <div className="flex-1 relative flex flex-col items-center justify-center p-8">
               {/* Unit 5 Block */}
-              <div className="flex flex-col items-center justify-center h-full">
-                <div className="flex flex-col items-center ml-24">
-                  <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
-                    5
-                  </div>
-                  <div className="mt-4 text-center">
-                    {isOutdoorUnitEditMode ? (
-                      <input
-                        type="text"
-                        value={outdoorUnitGarden1FData.label5}
-                        onChange={(e) => handleOutdoorUnitGarden1FChange('label5', e.target.value)}
-                        className="border border-orange-300 p-1 text-[15px] font-medium text-center w-72 rounded"
-                      />
-                    ) : (
-                      <div className="text-[15px] font-medium whitespace-nowrap">{outdoorUnitGarden1FData.label5}</div>
-                    )}
-                  </div>
+              <div className="flex flex-col items-center mt-4">
+                <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
+                  5
                 </div>
+                <div className="mt-4 text-center">
+                  {isOutdoorUnitEditMode ? (
+                    <input
+                      type="text"
+                      value={outdoorUnitGarden1FData.label5}
+                      onChange={(e) => handleOutdoorUnitGarden1FChange('label5', e.target.value)}
+                      className="border border-orange-300 p-1 text-[15px] font-medium text-center w-72 rounded"
+                    />
+                  ) : (
+                    <div className="text-[15px] font-medium whitespace-nowrap">{outdoorUnitGarden1FData.label5}</div>
+                  )}
+                </div>
+              </div>
 
-                {/* Bottom "화 단" label */}
-                <div className="mt-auto pt-12">
-                  <span className="text-red-500 font-bold text-5xl tracking-[0.5em] ml-[0.5em]">화 단</span>
-                </div>
+              {/* Bottom "화 단" label */}
+              <div className="mt-8">
+                <span className="text-red-500 font-bold text-4xl">화 단</span>
               </div>
             </div>
           </div>
@@ -2377,6 +2442,22 @@ const AdminManager: React.FC = () => {
   };
 
   const renderUniformContent = () => {
+    const filteredData = uniformData.filter(row => {
+      if (activeUniformSubTab === 'all') return true;
+      const categoryMap: Record<string, string> = {
+        facilities: '시설',
+        security: '경비',
+        cleaning: '미화'
+      };
+      const targetCategory = categoryMap[activeUniformSubTab];
+      
+      if (activeUniformSubTab === 'facilities') {
+        return row.category === '시설' || row.category === '현장대리인';
+      }
+      
+      return row.category === targetCategory;
+    });
+
     return (
       <div className="w-full max-w-7xl mx-auto bg-white mt-4 overflow-x-auto print-page">
         <table className="w-full text-center border border-black border-collapse">
@@ -2397,7 +2478,7 @@ const AdminManager: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {uniformData.map((row) => (
+            {filteredData.map((row) => (
               <tr key={row.id} className="border-b border-black h-[40px]">
                 <td className="border border-black p-0">
                   <div className="flex items-center justify-center h-full px-2">
@@ -2518,102 +2599,160 @@ const AdminManager: React.FC = () => {
           ))}
         </div>
 
-        {/* 근무복 탭일 때만 표시되는 구분선과 버튼들 */}
+        {/* 근무복 탭일 때만 표시되는 구분선과 버튼들 (서브탭 메뉴로 이동함) */}
         {activeTab === 'uniform' && (
-          <>
-            <div className="flex items-center shrink-0 px-2">
-              <div className="w-px h-6 bg-black"></div>
-            </div>
-            <div className="flex items-center shrink-0">
-              <button 
-                onClick={loadUniformDataWithStaff}
-                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
-              >
-                <RefreshCw size={18} className="mr-1.5" />
-                새로고침
-              </button>
-              <button 
-                onClick={() => setIsUniformEditMode(!isUniformEditMode)}
-                className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
-                  isUniformEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
-                }`}
-              >
-                <Edit size={18} className="mr-1.5" />
-                {isUniformEditMode ? '수정완료' : '수정'}
-              </button>
-              <button 
-                onClick={handleUniformSave}
-                disabled={isSaving || uniformSaveSuccess}
-                className={`flex items-center shrink-0 px-4 py-3 bg-transparent text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
-                  uniformSaveSuccess ? 'text-orange-600 font-extrabold' : 'text-gray-500 hover:text-black font-bold'
-                }`}
-              >
-                {isSaving ? (
-                  <Loader2 size={18} className="mr-1.5 animate-spin" />
-                ) : uniformSaveSuccess ? (
-                  <CheckCircle2 size={18} className="mr-1.5" />
-                ) : (
-                  <Save size={18} className="mr-1.5" />
-                )}
-                {uniformSaveSuccess ? '저장완료' : '저장'}
-              </button>
-              <button 
-                onClick={handleUniformPrint}
-                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
-              >
-                <Printer size={18} className="mr-1.5" />
-                인쇄
-              </button>
-            </div>
-          </>
+          <div className="flex-1"></div>
         )}
 
-        {/* 자료실 탭일 때만 표시되는 구분선과 등록 버튼 */}
+        {/* 자료실 탭일 때만 표시되는 구분선과 등록 버튼 (서브탭 메뉴로 이동함) */}
         {activeTab === 'form' && (
-          <>
-            <div className="flex items-center shrink-0 px-2">
-              <div className="w-px h-6 bg-black"></div>
-            </div>
-            <div className="flex items-center shrink-0">
-              <button 
-                onClick={loadData}
-                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
-              >
-                <RefreshCw size={18} className="mr-1.5" />
-                새로고침
-              </button>
-
-              <button 
-                onClick={handleAddRow}
-                className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
-              >
-                <Plus size={18} className="mr-1.5" />
-                등록
-              </button>
-            </div>
-
-            <div className="flex items-center shrink-0 px-2">
-              <div className="w-px h-6 bg-black"></div>
-            </div>
-
-            <div className="flex items-center flex-1 px-4">
-              <div className="relative w-full sm:w-[250px]">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
-                <input 
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder="자료 검색..."
-                  className="w-full pl-10 pr-4 py-3 bg-white border-none rounded-none text-[14px] font-bold text-black outline-none transition-all"
-                />
-              </div>
-            </div>
-          </>
+          <div className="flex-1"></div>
         )}
       </div>
+
+      {/* 서브탭메뉴 (근무복일 때만 표시) */}
+      {activeTab === 'uniform' && (
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          {/* 서브탭 */}
+          <div className="flex items-stretch shrink-0">
+            {SUB_TABS_UNIFORM.map(subTab => (
+              <div
+                key={subTab.id}
+                onClick={() => setActiveUniformSubTab(subTab.id)}
+                className={`flex items-center px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                  activeUniformSubTab === subTab.id 
+                    ? 'text-orange-600' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {subTab.label}
+                {activeUniformSubTab === subTab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-px h-6 bg-black"></div>
+          </div>
+
+          {/* 액션 버튼들 */}
+          <div className="flex items-stretch shrink-0">
+            <button 
+              onClick={loadUniformDataWithStaff}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <RefreshCw size={18} className="mr-1.5" />
+              새로고침
+            </button>
+            <button 
+              onClick={() => setIsUniformEditMode(!isUniformEditMode)}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
+                isUniformEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              <Edit size={18} className="mr-1.5" />
+              {isUniformEditMode ? '수정완료' : '수정'}
+            </button>
+            <button 
+              onClick={handleUniformSave}
+              disabled={isSaving || uniformSaveSuccess}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                uniformSaveSuccess ? 'text-orange-600 font-extrabold' : 'text-gray-500 hover:text-black font-bold'
+              }`}
+            >
+              {isSaving ? (
+                <Loader2 size={18} className="mr-1.5 animate-spin" />
+              ) : uniformSaveSuccess ? (
+                <CheckCircle2 size={18} className="mr-1.5" />
+              ) : (
+                <Save size={18} className="mr-1.5" />
+              )}
+              {uniformSaveSuccess ? '저장완료' : '저장'}
+            </button>
+            <button 
+              onClick={handleUniformPrint}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <Printer size={18} className="mr-1.5" />
+              인쇄
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 서브탭메뉴 (자료실일 때만 표시) */}
+      {activeTab === 'form' && (
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          {/* 검색창 */}
+          <div className="flex items-center shrink-0 w-full sm:w-[250px]">
+            <div className="relative w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
+              <input 
+                type="text"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="자료 검색..."
+                className="w-full pl-10 pr-4 py-3 bg-white border-none rounded-none text-[14px] font-bold text-black outline-none transition-all"
+              />
+            </div>
+          </div>
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-px h-6 bg-black"></div>
+          </div>
+
+          {/* 서브탭 */}
+          <div className="flex items-stretch shrink-0">
+            {SUB_TABS_ARCHIVE.map(subTab => (
+              <div
+                key={subTab.id}
+                onClick={() => setActiveArchiveSubTab(subTab.id)}
+                className={`flex items-center px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                  activeArchiveSubTab === subTab.id 
+                    ? 'text-orange-600' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {subTab.label}
+                {activeArchiveSubTab === subTab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-px h-6 bg-black"></div>
+          </div>
+
+          {/* 액션 버튼들 */}
+          <div className="flex items-stretch shrink-0">
+            <button 
+              onClick={loadData}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <RefreshCw size={18} className="mr-1.5" />
+              새로고침
+            </button>
+
+            <button 
+              onClick={handleAddRow}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+            >
+              <Plus size={18} className="mr-1.5" />
+              등록
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 서브탭메뉴 (자동등록일 때만 표시) */}
       {activeTab === 'auto_reg' && (
