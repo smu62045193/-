@@ -2052,7 +2052,12 @@ const AdminManager: React.FC = () => {
             @media print {
               .no-print { display: none !important; }
               body { background-color: white !important; }
-              .print-page { box-shadow: none !important; margin: 0 !important; }
+              .print-page { 
+                box-shadow: none !important; 
+                margin: 0 !important; 
+                padding: 0 !important;
+                min-height: auto !important;
+              }
             }
             .print-page {
               width: 210mm;
@@ -2078,7 +2083,7 @@ const AdminManager: React.FC = () => {
             }
             th, td { 
               border: 1px solid black; 
-              padding: 8px 4px; 
+              padding: 4px 4px; 
               text-align: center; 
               font-size: 10pt; 
               height: 35px;
@@ -2094,6 +2099,12 @@ const AdminManager: React.FC = () => {
               background: transparent;
               font-size: 10pt;
             }
+            /* Enforce specific widths for print as previously requested */
+            table th:nth-child(1) { width: 80px !important; }
+            table th:nth-child(2) { width: 150px !important; }
+            table th:nth-child(3) { width: 100px !important; }
+            table th:nth-child(4) { width: 100px !important; }
+            table th:nth-child(5) { width: 100px !important; }
             .group-hover\\:opacity-100 {
               display: none !important; /* Hide delete buttons */
             }
@@ -2119,10 +2130,29 @@ const AdminManager: React.FC = () => {
     const printWindow = window.open('', '_blank', 'width=1000,height=800');
     if (!printWindow) return;
 
+    const filteredData = uniformData.filter(row => {
+      if (activeUniformSubTab === 'all') {
+        const categories = ['시설', '경비', '미화', '현장대리인'];
+        return categories.includes(row.category);
+      }
+      const categoryMap: Record<string, string> = {
+        facilities: '시설',
+        security: '경비',
+        cleaning: '미화'
+      };
+      const targetCategory = categoryMap[activeUniformSubTab];
+      
+      if (activeUniformSubTab === 'facilities') {
+        return row.category === '시설' || row.category === '현장대리인';
+      }
+      
+      return row.category === targetCategory;
+    });
+
     const html = `
       <html>
         <head>
-          <title>새마을운동중앙회 대치동사옥 근무복 현황 인쇄</title>
+          <title>${activeUniformSubTab === 'all' ? '전체' : (activeUniformSubTab === 'facilities' ? '시설' : (activeUniformSubTab === 'security' ? '경비' : '미화'))} 근무복 현황 인쇄</title>
           <style>
             @page { 
               size: A4 portrait; 
@@ -2197,7 +2227,7 @@ const AdminManager: React.FC = () => {
             <button class="print-btn" onclick="window.print()">인쇄하기</button>
           </div>
           <div class="print-page">
-            <h1>새마을운동중앙회 대치동사옥 근무복 현황</h1>
+            <h1>새마을운동중앙회 대치동사옥 근무복 현황 (${activeUniformSubTab === 'all' ? '전체' : (activeUniformSubTab === 'facilities' ? '시설' : (activeUniformSubTab === 'security' ? '경비' : '미화'))})</h1>
             <table>
               <thead>
                 <tr>
@@ -2216,7 +2246,7 @@ const AdminManager: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                ${uniformData.map(row => `
+                ${filteredData.map(row => `
                   <tr>
                     <td>${row.category || ''}</td>
                     <td>${row.position || ''}</td>
@@ -2228,6 +2258,7 @@ const AdminManager: React.FC = () => {
                     <td>${row.note || ''}</td>
                   </tr>
                 `).join('')}
+                ${filteredData.length === 0 ? '<tr><td colspan="8">데이터가 없습니다.</td></tr>' : ''}
               </tbody>
             </table>
           </div>
@@ -2772,11 +2803,11 @@ const AdminManager: React.FC = () => {
           <table className="w-full text-center border border-black border-collapse">
             <thead>
               <tr className="h-[40px] bg-white">
-                <th className="border border-black font-normal text-[14px] px-2 w-[80px]">층</th>
-                <th className="border border-black font-normal text-[14px] px-2 w-[240px]">회사명</th>
-                <th className="border border-black font-normal text-[14px] px-2 w-[100px]">직책</th>
-                <th className="border border-black font-normal text-[14px] px-2 w-[100px]">성명</th>
-                <th className="border border-black font-normal text-[14px] px-2 w-[110px]">근무인원</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[80px]" style={{ width: '80px' }}>층</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[200px]" style={{ width: '200px' }}>회사명</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[150px]" style={{ width: '150px' }}>직책</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[150px]" style={{ width: '150px' }}>성명</th>
+                <th className="border border-black font-normal text-[14px] px-2 w-[150px]" style={{ width: '150px' }}>근무인원</th>
                 <th className="border border-black font-normal text-[14px] px-2">전화번호</th>
               </tr>
             </thead>

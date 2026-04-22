@@ -142,27 +142,35 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     const printWindow = window.open('', '_blank', 'width=1000,height=800');
     if (!printWindow) return;
 
-    // Filter only manual items and sort them
-    const printedItems = summaryItems.filter(item => item.isManual);
+    // Use the filtered list based on the current view and search term
+    let printedItems = [...processedList];
 
-    const getCategoryRank = (cat?: string) => {
-      if (cat === '전기') return 1;
-      if (cat === '기계') return 2;
-      if (cat === '공용') return 3;
-      return 99;
-    };
+    // Ledger specific filters and sorting
+    if (viewMode === 'ledger') {
+      // Filter only manual items for ledger print
+      printedItems = printedItems.filter(item => item.isManual);
 
-    printedItems.sort((a, b) => {
-      const rankA = getCategoryRank(a.category);
-      const rankB = getCategoryRank(b.category);
-      if (rankA !== rankB) return rankA - rankB;
-      return a.itemName.localeCompare(b.itemName) || (a.modelName || '').localeCompare(b.modelName || '');
-    });
+      const getCategoryRank = (cat?: string) => {
+        if (cat === '전기') return 1;
+        if (cat === '기계') return 2;
+        if (cat === '공용') return 3;
+        return 99;
+      };
+
+      printedItems.sort((a, b) => {
+        const rankA = getCategoryRank(a.category);
+        const rankB = getCategoryRank(b.category);
+        if (rankA !== rankB) return rankA - rankB;
+        return a.itemName.localeCompare(b.itemName) || (a.modelName || '').localeCompare(b.modelName || '');
+      });
+    }
+
+    const title = viewMode === 'ledger' ? '소모품관리대장목록표' : '소모품 사용내역 목록표';
 
     const html = `
       <html>
         <head>
-          <title>수기 소모품 관리대장 인쇄</title>
+          <title>${title} 인쇄</title>
           <style>
             @page { 
               size: A4 portrait; 
@@ -194,10 +202,16 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
             @media print {
               .no-print { display: none !important; }
               body { background-color: white !important; }
-              .print-page { box-shadow: none !important; margin: 0 !important; padding: 0 !important; }
+              .print-page { 
+                box-shadow: none !important; 
+                margin: 0 !important; 
+                padding: 0 !important;
+                width: 100% !important;
+                min-height: auto !important;
+              }
             }
             .print-page {
-              width: 100%;
+              width: 210mm;
               min-height: 297mm;
               padding: 15mm 10mm;
               margin: 20px auto;
@@ -220,10 +234,10 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
             }
             th, td { 
               border: 1px solid black; 
-              padding: 8px 4px; 
+              padding: 6px 4px; 
               text-align: center; 
-              font-size: 12px; 
-              height: 35px;
+              font-size: 11px; 
+              height: 30px;
             }
             th { 
               background-color: white; 
@@ -231,6 +245,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               font-weight: normal;
             }
             .text-left { text-align: left; padding-left: 8px; }
+            .text-right { text-align: right; padding-right: 8px; }
           </style>
         </head>
         <body>
@@ -241,32 +256,57 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
             <table>
               <thead>
                 <tr>
-                  <th colspan="6" style="border: none; padding: 0 0 20px 0;">
-                    <h1 style="margin: 0; border-bottom: 2px solid black; padding-bottom: 10px; font-size: 24pt; font-weight: 900; text-align: center;">수기 소모품 관리대장</h1>
+                  <th colspan="${viewMode === 'ledger' ? '5' : '9'}" style="border: none; padding: 0 0 20px 0; background-color: white;">
+                    <h1 style="margin: 0; border-bottom: 2px solid black; padding-bottom: 10px; font-size: 24pt; font-weight: 900; text-align: center;">${title}</h1>
                   </th>
                 </tr>
                 <tr>
-                  <th style="width: 5%;">No</th>
-                  <th style="width: 10%;">구분</th>
-                  <th style="width: 20%;">품명</th>
-                  <th style="width: 20%;">모델명</th>
-                  <th style="width: 5%;">단위</th>
-                  <th style="width: 40%;">비고</th>
+                  ${viewMode === 'ledger' ? `
+                    <th style="width: 50px;">No</th>
+                    <th style="width: 60px;">구분</th>
+                    <th style="width: 180px;">품명</th>
+                    <th style="width: 150px;">모델명</th>
+                    <th style="width: auto;">비고</th>
+                  ` : `
+                    <th style="width: 40px;">No</th>
+                    <th style="width: 85px;">날짜</th>
+                    <th style="width: 50px;">구분</th>
+                    <th style="width: 120px;">품명</th>
+                    <th style="width: 110px;">모델명</th>
+                    <th style="width: 40px;">입고</th>
+                    <th style="width: 40px;">사용</th>
+                    <th style="width: 45px;">재고</th>
+                    <th style="width: auto;">상세내역</th>
+                  `}
                 </tr>
               </thead>
               <tbody>
-                ${printedItems.length > 0 ? printedItems.map((item, index) => `
+                ${printedItems.length > 0 ? printedItems.map((item, index) => {
+                  const globalIdx = printedItems.length - index;
+                  return viewMode === 'ledger' ? `
+                    <tr>
+                      <td>${index + 1}</td>
+                      <td>${item.category || ''}</td>
+                      <td>${item.itemName || ''}</td>
+                      <td>${item.modelName || '-'}</td>
+                      <td>${item.note || ''}</td>
+                    </tr>
+                  ` : `
+                    <tr>
+                      <td>${index + 1}</td>
+                      <td>${item.date || ''}</td>
+                      <td>${item.category || ''}</td>
+                      <td>${item.itemName || ''}</td>
+                      <td class="text-left">${item.modelName || ''}</td>
+                      <td>${item.inQty !== '0' && item.inQty ? item.inQty : ''}</td>
+                      <td>${item.outQty !== '0' && item.outQty ? item.outQty : ''}</td>
+                      <td>${item.stockQty || ''}</td>
+                      <td>${item.details || ''}</td>
+                    </tr>
+                  `;
+                }).join('') : `
                   <tr>
-                    <td>${index + 1}</td>
-                    <td>${item.category || ''}</td>
-                    <td>${item.itemName || ''}</td>
-                    <td>${item.modelName || '-'}</td>
-                    <td>${item.unit || ''}</td>
-                    <td class="text-left">${item.note || ''}</td>
-                  </tr>
-                `).join('') : `
-                  <tr>
-                    <td colspan="6" style="height: 100px;">수기작업 소모품 내역이 없습니다.</td>
+                    <td colspan="${viewMode === 'ledger' ? '6' : '9'}" style="height: 100px;">조회된 내역이 없습니다.</td>
                   </tr>
                 `}
               </tbody>
