@@ -15,6 +15,7 @@ interface SubstationLogProps {
 const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded = false, onUsageChange }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [isPrintEnabled, setIsPrintEnabled] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   
   const [data, setData] = useState<SubstationLogData>(getInitialSubstationLog(dateKey));
@@ -144,6 +145,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
     setLoading(true);
     isInitialLoad.current = true;
     setSaveStatus('idle');
+    setIsPrintEnabled(false);
 
     try {
       const monthStartStr = format(startOfMonth(currentDate), 'yyyy-MM-dd');
@@ -204,6 +206,7 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       const success = await saveSubstationLog(data);
       if (success) {
         setSaveStatus('success');
+        setIsPrintEnabled(true);
         // alert() 제거 (LogSheetLayout에서 모달로 처리)
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
@@ -387,7 +390,10 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
               {activeSubTab === 'vcb' && (
                 <button 
                   onClick={handlePrint} 
-                  className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
+                  disabled={!isPrintEnabled}
+                  className={`flex items-center shrink-0 px-4 py-3 font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                    !isPrintEnabled ? 'text-gray-300' : 'bg-transparent text-gray-500 hover:text-black'
+                  }`}
                 >
                   <Printer size={18} className="mr-1.5" />
                   인쇄

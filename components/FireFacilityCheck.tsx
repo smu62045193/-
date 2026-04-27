@@ -20,6 +20,14 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
     loadData(); 
   }, [dateKey]);
 
+  useEffect(() => {
+    const handleGlobalSave = () => {
+      if (data) saveFireFacilityLog(data);
+    };
+    window.addEventListener('checklist-save', handleGlobalSave);
+    return () => window.removeEventListener('checklist-save', handleGlobalSave);
+  }, [data]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -53,7 +61,9 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
   const updateItemResult = (id: string, result: '양호' | '불량' | '') => {
     if (!data) return;
     const newItems = data.items.map(item => item.id === id ? { ...item, result } : item);
-    setData({ ...data, items: newItems });
+    const newData = { ...data, items: newItems };
+    setData(newData);
+    saveFireFacilityLog(newData);
   };
 
   const toggleResult = (item: FireFacilityCheckItem) => {
@@ -63,6 +73,10 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
 
   const handleRemarksChange = (val: string) => {
     setData(prev => ({ ...prev, remarks: val }));
+  };
+
+  const handleRemarksBlur = () => {
+    if (data) saveFireFacilityLog(data);
   };
 
   const categories = ['소방시설', '피난방화시설', '화재예방조치', '화기취급감독', '기타'];
@@ -142,6 +156,7 @@ const FireFacilityCheck: React.FC<FireFacilityCheckProps> = ({ currentDate = new
                   <textarea 
                     value={data.remarks || ''} 
                     onChange={(e) => handleRemarksChange(e.target.value)}
+                    onBlur={handleRemarksBlur}
                     placeholder="특이사항 입력"
                     className="w-full h-full p-2 resize-none outline-none text-black text-[13px] leading-relaxed font-normal bg-transparent !text-center scrollbar-hide border-none shadow-none appearance-none"
                   />

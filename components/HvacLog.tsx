@@ -52,6 +52,8 @@ const HvacLog: React.FC<HvacLogProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [isPrintEnabledHvac, setIsPrintEnabledHvac] = useState(false);
+  const [isPrintEnabledAirEnv, setIsPrintEnabledAirEnv] = useState(false);
   const dateKey = format(currentDate, 'yyyy-MM-dd');
   
   const [internalHvacData, setInternalHvacData] = useState<HvacLogData>(getInitialHvacLog(dateKey));
@@ -159,6 +161,8 @@ const HvacLog: React.FC<HvacLogProps> = ({
   }, [dateKey, currentDate]);
 
   const loadData = useCallback(async (isRefresh = false) => {
+    setIsPrintEnabledHvac(false);
+    setIsPrintEnabledAirEnv(false);
     if (activeSubTab === 'air_env' && isRefresh) {
       if (airEnvRef.current) {
         await airEnvRef.current.handleSyncData();
@@ -259,6 +263,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
     if (activeSubTab === 'air_env') {
       if (airEnvRef.current) {
         await airEnvRef.current.handleSave();
+        setIsPrintEnabledAirEnv(true);
       }
       return;
     }
@@ -274,7 +279,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
         const success = await saveChemicalLog(chemicalData);
         if (success) {
           setSaveStatus('success');
-          alert('종균제/소독제 기록부가 저장되었습니다.');
+          alert('종균제/소독제가 저장이되었습니다.');
           setTimeout(() => setSaveStatus('idle'), 3000);
         } else {
           setSaveStatus('error');
@@ -294,6 +299,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
       
       if (success) {
         setSaveStatus('success');
+        setIsPrintEnabledHvac(true);
         alert('냉온수기/보일러 일지가 저장되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
@@ -564,7 +570,10 @@ const HvacLog: React.FC<HvacLogProps> = ({
             {activeSubTab !== 'chemicals' && activeSubTab !== 'boiler' && (
               <button 
                 onClick={handlePrint} 
-                className="relative px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black transition-colors whitespace-nowrap flex items-center shrink-0"
+                disabled={(activeSubTab === 'hvac' && !isPrintEnabledHvac) || (activeSubTab === 'air_env' && !isPrintEnabledAirEnv)}
+                className={`relative px-4 py-3 font-bold transition-colors whitespace-nowrap flex items-center shrink-0 disabled:opacity-50 text-[14px] ${
+                  ((activeSubTab === 'hvac' && !isPrintEnabledHvac) || (activeSubTab === 'air_env' && !isPrintEnabledAirEnv)) ? 'text-gray-300' : 'text-gray-500 hover:text-black'
+                }`}
               >
                 <Printer size={16} className="mr-1.5" />
                 인쇄
@@ -584,7 +593,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
                         <tr className="border-b border-black h-[32px]">
                             <th rowSpan={2} className={`${thClass} w-48`}>점검 항목</th>
                             <th colSpan={2} className={`${thClass} h-[32px] text-[13px] font-normal text-black`}>
-                                냉,온수기 (<span className="hidden print:inline-block">{data.unitNo || ''}</span><select value={data.unitNo || ''} onChange={(e) => setData(prev => ({...prev, unitNo: e.target.value}))} className="bg-transparent text-black font-normal outline-none cursor-pointer px-1 appearance-none border-none text-[13px] print:hidden"><option value=""> </option><option value="1">1</option><option value="2">2</option></select>) 호기
+                                냉,온수기 (<span className="hidden print:inline-block">{data.unitNo || '\u00A0\u00A0\u00A0'}</span><select value={data.unitNo || ''} onChange={(e) => setData(prev => ({...prev, unitNo: e.target.value}))} className="bg-transparent text-black font-normal outline-none cursor-pointer px-1 appearance-none border-none text-[13px] print:hidden"><option value=""> </option><option value="1">1</option><option value="2">2</option></select>) 호기
                             </th>
                         </tr>
                         <tr className="border-b border-black h-[32px]"><th className={thClass}>10:00</th><th className={thClass}>15:00</th></tr>

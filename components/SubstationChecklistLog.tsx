@@ -19,6 +19,14 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
     loadData();
   }, [dateKey]);
 
+  useEffect(() => {
+    const handleGlobalSave = () => {
+      if (data) saveSubstationChecklist(data);
+    };
+    window.addEventListener('checklist-save', handleGlobalSave);
+    return () => window.removeEventListener('checklist-save', handleGlobalSave);
+  }, [data]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -41,7 +49,9 @@ const SubstationChecklistLog: React.FC<SubstationChecklistLogProps> = ({ current
       }
       return item;
     });
-    setData({ ...data, items: newItems });
+    const newData = { ...data, items: newItems };
+    setData(newData);
+    saveSubstationChecklist(newData);
   };
 
   const safeItems = data?.items || [];

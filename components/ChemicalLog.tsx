@@ -35,8 +35,8 @@ const ChemicalLog: React.FC<ChemicalLogProps> = ({ currentDate }) => {
   const handleSave = async () => {
     if (!data) return;
     const success = await saveChemicalLog(data);
-    if (success) alert('저장되었습니다.');
-    else alert('저장 실패');
+    if (success) alert('종균제/소독제가 저장이되었습니다.');
+    else alert('데이터 저장에 실패했습니다.');
   };
 
   const updateItem = (id: string, field: keyof ChemicalLogItem, value: string) => {

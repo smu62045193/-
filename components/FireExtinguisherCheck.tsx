@@ -204,11 +204,18 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
         (it.manageNo || '').toLowerCase().includes(lower) ||
         (it.floor || '').toLowerCase().includes(lower) ||
         (it.company || '').toLowerCase().includes(lower) ||
-        (it.serialNo || '').toLowerCase().includes(lower)
+        (it.serialNo || '').toLowerCase().includes(lower) ||
+        (it.date && it.date.substring(0, 4).includes(lower))
       );
     }
 
-    if (activeFloor === '옥탑') filtered = filtered.filter(item => isRooftopFloor(item.floor));
+    if (activeFloor === '10년') {
+      const currentYear = new Date().getFullYear();
+      filtered = filtered.filter(item => {
+        const mfgYear = item.date ? parseInt(item.date.substring(0, 4), 10) : 0;
+        return mfgYear > 0 && (currentYear - mfgYear) >= 9 && item.type === 'ABC분말(3.3kg)';
+      });
+    } else if (activeFloor === '옥탑') filtered = filtered.filter(item => isRooftopFloor(item.floor));
     else if (activeFloor === '창고') filtered = filtered.filter(item => isStorageFloor(item.floor));
     else if (activeFloor !== '전체') filtered = filtered.filter(item => item.floor === activeFloor);
 
@@ -246,7 +253,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
     const hasRooftop = uniqueFloors.some((f: string) => isRooftopFloor(f));
     const hasStorage = uniqueFloors.some((f: string) => isStorageFloor(f));
     
-    const btns = ['전체'];
+    const btns = ['전체', '10년'];
     if (hasRooftop) btns.push('옥탑');
     btns.push(...aboveGround);
     
@@ -564,6 +571,10 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
                    </td>
                  </tr>
               ) : paginatedFlatItems.map((item: FireExtinguisherItem, index) => {
+                const mfgYear = item.date ? parseInt(item.date.substring(0, 4), 10) : 0;
+                const currentYear = new Date().getFullYear();
+                const isOld = mfgYear > 0 && (currentYear - mfgYear) >= 9;
+                const dateColorClass = isOld ? "text-red-500 font-bold" : "text-blue-600";
                 return (
                   <tr key={item.id} className="h-[40px] border-b border-black last:border-b-0 hover:bg-blue-50/30 transition-colors group">
                     <td className="border-r border-black p-0">
@@ -607,7 +618,7 @@ const FireExtinguisherCheck: React.FC<FireExtinguisherCheckProps> = ({ isPopupMo
                       </div>
                     </td>
                     <td className="border-r border-black p-0">
-                      <div className="flex items-center justify-center h-full px-2 text-[13px] font-normal text-blue-600">
+                      <div className={`flex items-center justify-center h-full px-2 text-[13px] font-normal ${dateColorClass}`}>
                         {formatToYYMM(item.date || '')}
                       </div>
                     </td>

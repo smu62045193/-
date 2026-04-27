@@ -20,6 +20,14 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate, isEmbedded = fal
     loadData();
   }, [dateKey]);
 
+  useEffect(() => {
+    const handleGlobalSave = () => {
+      if (data) saveElevatorLog(data);
+    };
+    window.addEventListener('checklist-save', handleGlobalSave);
+    return () => window.removeEventListener('checklist-save', handleGlobalSave);
+  }, [data]);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -52,21 +60,29 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate, isEmbedded = fal
   };
 
   const updateResult = (itemId: string, elevatorKey: keyof ElevatorLogItem['results']) => {
-    setData(prev => ({
-      ...prev,
-      items: prev.items.map(item => {
-        if (item.id === itemId) {
-          const current = item.results[elevatorKey];
-          const next: ElevatorResult = current === '양호' ? '불량' : '양호';
-          return { ...item, results: { ...item.results, [elevatorKey]: next } };
-        }
-        return item;
-      })
-    }));
+    setData(prev => {
+      const newData = {
+        ...prev,
+        items: prev.items.map(item => {
+          if (item.id === itemId) {
+            const current = item.results[elevatorKey];
+            const next: ElevatorResult = current === '양호' ? '불량' : '양호';
+            return { ...item, results: { ...item.results, [elevatorKey]: next } };
+          }
+          return item;
+        })
+      };
+      saveElevatorLog(newData);
+      return newData;
+    });
   };
 
   const updateRemarks = (val: string) => {
     setData(prev => ({ ...prev, remarks: val }));
+  };
+
+  const handleRemarksBlur = () => {
+    if (data) saveElevatorLog(data);
   };
 
   const elevators = ['ev1', 'ev2', 'ev3', 'ev4', 'ev5'] as const;
@@ -131,6 +147,7 @@ const ElevatorLog: React.FC<ElevatorLogProps> = ({ currentDate, isEmbedded = fal
                   <textarea 
                     value={data.remarks || ''} 
                     onChange={(e) => updateRemarks(e.target.value)}
+                    onBlur={handleRemarksBlur}
                     placeholder="특이사항 입력"
                     className="w-full h-full p-2 resize-none outline-none text-black text-[13px] leading-relaxed font-normal bg-transparent !text-center scrollbar-hide border-none shadow-none appearance-none"
                   />

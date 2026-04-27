@@ -138,9 +138,10 @@ interface DetailedLogSectionProps {
   onSave?: () => void;
   saveStatus?: 'idle' | 'loading' | 'success' | 'error';
   hideBox?: boolean;
+  isPrintEnabled?: boolean;
 }
 
-const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, data, onUpdate, onPrint, onRefresh, onSave, saveStatus = 'idle', hideBox }) => {
+const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, data, onUpdate, onPrint, onRefresh, onSave, saveStatus = 'idle', hideBox, isPrintEnabled = true }) => {
   const safeData: LogCategory = {
     today: data?.today || [],
     tomorrow: data?.tomorrow || []
@@ -267,7 +268,10 @@ const DetailedLogSection: React.FC<DetailedLogSectionProps> = ({ title, icon, da
           {onPrint && (
             <button 
               onClick={onPrint}
-              className="flex items-center justify-center px-6 py-2.5 bg-amber-600 text-white rounded-xl hover:bg-amber-700 font-bold shadow-md transition-all text-sm active:scale-95"
+              disabled={!isPrintEnabled}
+              className={`flex items-center justify-center px-6 py-2.5 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 ${
+                !isPrintEnabled ? 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-70' : 'bg-amber-600 text-white hover:bg-amber-700'
+              }`}
             >
               <Printer size={18} className="mr-2" />
               인쇄
@@ -287,6 +291,11 @@ interface WorkLogProps {
 const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [isPrintEnabledLog, setIsPrintEnabledLog] = useState({
+    electrical: false,
+    mechanical: false,
+    checklist: false
+  });
   const [facilityDuty, setFacilityDuty] = useState<DutyStatus>(DEFAULT_DUTY);
   const [securityDuty, setSecurityDuty] = useState<DutyStatus>(DEFAULT_DUTY);
   const [utility, setUtility] = useState<UtilityUsage>(DEFAULT_UTILITY);
@@ -589,6 +598,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
   useEffect(() => {
     let cancelled = false;
+    setIsPrintEnabledLog({ electrical: false, mechanical: false, checklist: false });
     loadData(() => cancelled);
     return () => { cancelled = true; };
   }, [dateKey, loadData]);
@@ -599,7 +609,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       const success = await saveMechanicalChemicals(dateKey, logData.mechanicalChemicals || INITIAL_CHEMICALS);
       if (success) {
         setSaveStatus('success');
-        alert('저장이 완료되었습니다.');
+        // No specific print for chemicals from WorkLog now
+        alert('종균제/소독제가 저장이되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
@@ -630,6 +641,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       });
 
       if (activeTab === 'mechanical' || activeTab === 'mech_facility' || activeTab === 'checklist') {
+        window.dispatchEvent(new CustomEvent('checklist-save'));
         await Promise.all([
           saveGasLog(gasLog),
           saveSepticLog(septicLog),
@@ -639,6 +651,18 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
       if (success) { 
         setSaveStatus('success'); 
+        setIsPrintEnabledLog(prev => {
+          const updates = { ...prev };
+          if (activeTab === 'electrical') {
+            if (activeWorkLogSubTab === 'electrical') updates.electrical = true;
+            if (activeWorkLogSubTab === 'mechanical') updates.mechanical = true;
+          } else if (activeTab === 'mechanical') {
+             updates.mechanical = true;
+          } else if (activeTab === 'checklist') {
+            updates.checklist = true;
+          }
+          return updates;
+        });
         alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000); 
       } else { 
@@ -712,14 +736,14 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
         bodyHtml = `
           <div class="print-page">
-            <style>th, td { height: 30px !important; line-height: 30px !important; } .remarks-cell { height: 110px !important; line-height: 1.5 !important; padding: 8px !important; vertical-align: middle !important; text-align: center !important; } .text-left { text-align: left !important; padding-left: 10px !important; }</style>
+            <style>th, td { height: 30px !important; line-height: 30px !important; } .remarks-head { height: 110px !important; line-height: 1.5 !important; padding: 8px !important; vertical-align: middle !important; text-align: center !important; } .remarks-body { height: 110px !important; line-height: 1.5 !important; padding: 12px 10px !important; vertical-align: top !important; text-align: left !important; } .text-left { text-align: left !important; padding-left: 10px !important; }</style>
             <div class="section-header" style="margin-top:0;">1. 소방 시설 점검</div>
             <table><thead><tr><th style="width:130px;">구 분</th><th>점 검 내 용</th><th style="width:80px;">결 과</th></tr></thead>
-              <tbody>${safeFire.items.map((item, idx, arr) => { const firstInCat = arr.findIndex(i => i.category === item.category) === idx; const catCount = arr.filter(i => i.category === item.category).length; return `<tr>${firstInCat ? `<td rowspan="${catCount}" style="font-weight:normal; background-color:white;">${item.category}</td>` : ''}<td class="text-left">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || '-'}</td></tr>`; }).join('')}<tr><td class="remarks-cell" style="font-weight:normal; background-color:white;">특이사항</td><td colspan="2" class="remarks-cell" style="white-space: pre-wrap; text-align: center !important;">${safeFire.remarks || ''}</td></tr></tbody>
+              <tbody>${safeFire.items.map((item, idx, arr) => { const firstInCat = arr.findIndex(i => i.category === item.category) === idx; const catCount = arr.filter(i => i.category === item.category).length; return `<tr>${firstInCat ? `<td rowspan="${catCount}" style="font-weight:normal; background-color:white;">${item.category}</td>` : ''}<td class="text-left">• ${item.content}</td><td class="${item.result === '양호' ? 'result-ok' : 'result-bad'}">${item.result || '-'}</td></tr>`; }).join('')}<tr><td class="remarks-head" style="font-weight:normal; background-color:white;">특이사항</td><td colspan="2" class="remarks-body" style="white-space: pre-wrap;">${safeFire.remarks || ''}</td></tr></tbody>
             </table>
             <div class="section-header">2. 승강기 일상 점검</div>
             <table><thead><tr><th style="width:130px;">점 검 항 목</th>${elvLabels.map(l => `<th style="width:65px;">${l}</th>`).join('')}</tr></thead>
-              <tbody>${safeElv.items.map(item => `<tr><td style="font-weight:normal; text-align:center !important;">${item.content}</td>${elvKeys.map(k => `<td class="${item.results[k] === '양호' ? 'result-ok' : 'result-bad'}">${item.results[k] || '-'}</td>`).join('')}</tr>`).join('')}<tr><td class="remarks-cell" style="font-weight:normal; background-color:white;">특이사항</td><td colspan="5" class="remarks-cell" style="white-space: pre-wrap; text-align: center !important;">${safeElv.remarks || ''}</td></tr></tbody>
+              <tbody>${safeElv.items.map(item => `<tr><td style="font-weight:normal; text-align:center !important;">${item.content}</td>${elvKeys.map(k => `<td class="${item.results[k] === '양호' ? 'result-ok' : 'result-bad'}">${item.results[k] || '-'}</td>`).join('')}</tr>`).join('')}<tr><td class="remarks-head" style="font-weight:normal; background-color:white;">특이사항</td><td colspan="5" class="remarks-body" style="white-space: pre-wrap;">${safeElv.remarks || ''}</td></tr></tbody>
             </table>
           </div>
         `;
@@ -991,8 +1015,10 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                 {!(activeChecklistTab === 'substation' || activeChecklistTab === 'gas' || activeChecklistTab === 'septic' || activeChecklistTab === 'elevator') && (
                   <button 
                     onClick={() => handlePrintCategory('checklist')}
-                    disabled={loading}
-                    className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+                    disabled={loading || !isPrintEnabledLog.checklist}
+                    className={`flex items-center shrink-0 px-4 py-3 font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                      !isPrintEnabledLog.checklist ? 'text-gray-300' : 'text-gray-500 hover:text-black'
+                    }`}
                   >
                     <Printer size={18} className="mr-1.5" />
                     인쇄
@@ -1099,6 +1125,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             onRefresh={() => loadData(() => false, true)}
             onSave={handleSaveAll}
             saveStatus={saveStatus}
+            isPrintEnabled={(activeWorkLogSubTab === 'electrical') ? isPrintEnabledLog.electrical : isPrintEnabledLog.mechanical}
           />
         </div>
       );
@@ -1164,8 +1191,10 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
                 {(activeWorkLogSubTab === 'electrical' || activeWorkLogSubTab === 'mechanical') && (
                   <button 
                     onClick={() => handlePrintCategory(activeWorkLogSubTab)}
-                    disabled={loading}
-                    className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+                    disabled={loading || (activeWorkLogSubTab === 'electrical' ? !isPrintEnabledLog.electrical : !isPrintEnabledLog.mechanical)}
+                    className={`flex items-center shrink-0 px-4 py-3 font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                      (activeWorkLogSubTab === 'electrical' ? !isPrintEnabledLog.electrical : !isPrintEnabledLog.mechanical) ? 'text-gray-300' : 'text-gray-500 hover:text-black'
+                    }`}
                   >
                     <Printer size={18} className="mr-1.5" />
                     인쇄
