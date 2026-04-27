@@ -1120,7 +1120,7 @@ export const saveAutoRegSettings = async (category: string, rows: any[]): Promis
 export const saveMechanicalChemicals = async (date: string, chemicals: MechanicalChemicals): Promise<boolean> => {
   try {
     // 1. Save to daily_reports
-    const { data: existing } = await supabase.from('daily_reports').select('work_log').eq('id', date).single();
+    const { data: existing } = await supabase.from('daily_reports').select('work_log').eq('id', date).maybeSingle();
     const workLog = existing?.work_log || {};
     workLog.mechanicalChemicals = chemicals;
     const { error: reportError } = await supabase.from('daily_reports').upsert({
@@ -1132,38 +1132,33 @@ export const saveMechanicalChemicals = async (date: string, chemicals: Mechanica
     if (reportError) throw reportError;
 
     // 2. Save to chemical_logs for consistency
-    const chemicalLogData: ChemicalLogData = {
-      date,
-      items: [
-        {
-          id: 'seed',
-          name: '종균제',
-          unit: 'l',
-          prevStock: chemicals.seed.prev,
-          received: chemicals.seed.incoming,
-          used: chemicals.seed.used,
-          currentStock: chemicals.seed.stock,
-          remark: ''
-        },
-        {
-          id: 'sterilizer',
-          name: '소독제',
-          unit: 'kg',
-          prevStock: chemicals.sterilizer.prev,
-          received: chemicals.sterilizer.incoming,
-          used: chemicals.sterilizer.used,
-          currentStock: chemicals.sterilizer.stock,
-          remark: ''
-        }
-      ],
-      lastUpdated: new Date().toISOString()
-    };
-
     const { error: chemError } = await supabase
       .from('chemical_logs')
       .upsert({
+        id: `CHEM_LOG_${date}`,
         date,
-        data: chemicalLogData,
+        items: [
+          {
+            id: 'seed',
+            name: '종균제',
+            unit: 'l',
+            prevStock: chemicals.seed.prev,
+            received: chemicals.seed.incoming,
+            used: chemicals.seed.used,
+            currentStock: chemicals.seed.stock,
+            remark: ''
+          },
+          {
+            id: 'sterilizer',
+            name: '소독제',
+            unit: 'kg',
+            prevStock: chemicals.sterilizer.prev,
+            received: chemicals.sterilizer.incoming,
+            used: chemicals.sterilizer.used,
+            currentStock: chemicals.sterilizer.stock,
+            remark: ''
+          }
+        ],
         last_updated: new Date().toISOString()
       });
 

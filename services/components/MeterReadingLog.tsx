@@ -1,0 +1,1058 @@
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { MeterReadingData, MeterReadingItem, Tenant, MeterPhotoItem, StaffMember, MeterPhotoData } from '../types';
+import { fetchMeterReading, saveMeterReading, getInitialMeterReading, fetchTenants, fetchMeterPhotos, fetchStaffList, fetchLogoSealSettings } from '../services/dataService';
+import { format, subMonths, addMonths, parseISO } from 'date-fns';
+import { Save, Printer, Plus, Trash2, RefreshCw, CheckCircle2, X, Cloud, FileText, ChevronLeft, ChevronRight, Calculator, Download, Building2, Edit2, Lock, ArrowRight } from 'lucide-react';
+
+interface MeterReadingLogProps {
+  currentDate: Date;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
+  tabs?: { id: string; label: string }[];
+  currentMonth: string;
+  setCurrentMonth: (month: string) => void;
+  onPrevMonth: () => void;
+  onNextMonth: () => void;
+}
+
+const generateId = () => Math.random().toString(36).substr(2, 9);
+
+const formatNumber = (val: string | number | undefined) => {
+  if (val === undefined || val === null || val === '') return '';
+  const str = val.toString().replace(/,/g, '');
+  if (str === '.') return '.';
+  const parts = str.split('.');
+  const integerPart = parts[0];
+  const decimalPart = parts[1];
+  const formattedInteger = integerPart === '' ? '' : (integerPart === '-' ? '-' : Number(integerPart).toLocaleString());
+  if (str.includes('.')) {
+    return formattedInteger + '.' + (decimalPart !== undefined ? decimalPart.substring(0, 2) : '');
+  }
+  return formattedInteger;
+};
+
+const unformatNumber = (val: string) => val.replace(/,/g, '');
+
+const getFloorWeight = (floor: string) => {
+  const f = floor.trim().toUpperCase();
+  if (!f) return 9999;
+  if (f.startsWith('B') || f.includes('지하')) {
+    const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+    return 1000 + num;
+  }
+  if (f === 'RF' || f === '옥상' || f.includes('옥탑')) return 999;
+  const num = parseInt(f.replace(/[^0-9]/g, '')) || 0;
+  return num;
+};
+
+const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ 
+  currentDate, 
+  activeTab, 
+  setActiveTab, 
+  tabs,
+  currentMonth,
+  setCurrentMonth,
+  onPrevMonth,
+  onNextMonth
+}) => {
+  const [loading, setLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  
+  // 수정 모드 분리
+  const [isSummaryEditMode, setIsSummaryEditMode] = useState(false);
+
+  const [data, setData] = useState<MeterReadingData>(getInitialMeterReading(currentMonth));
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [brandSettings, setBrandSettings] = useState<{ logo?: string; seal?: string } | null>(null);
+
+  useEffect(() => {
+    loadData(currentMonth);
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data?.type === 'METER_PHOTO_SAVED') {
+        loadData(currentMonth);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [currentMonth]);
+
+  const loadData = async (monthStr: string) => {
+    setLoading(true);
+    setIsSummaryEditMode(false);
+    try {
+      // 1. 기본 검침 기록과 사진첩 데이터를 동시에 가져옴
+      const [fetched, photoData, staff, settings] = await Promise.all([
+        fetchMeterReading(monthStr),
+        fetchMeterPhotos(monthStr),
+        fetchStaffList(),
+        fetchLogoSealSettings()
+      ]);
+
+      setStaffList(staff || []);
+      setBrandSettings(settings);
+
+      const photos = photoData?.items || [];
+
+      if (fetched) {
+        // 이미 서버에 데이터가 있는 경우
+        const normalize = (str: string) => (str || '').replace(/\s+/g, '');
+        const updatedItems = (fetched.items || []).map(item => {
+          const matchedPhoto = photos.find(p => 
+            normalize(p.tenant) === normalize(item.tenant) && 
+            normalize(p.floor) === normalize(item.floor) && 
+            normalize(p.type) === normalize(item.note)
+          );
+          if (matchedPhoto && matchedPhoto.reading) {
+            return { ...item, currentReading: matchedPhoto.reading };
+          }
+          return item;
+        });
+
+        // 마스터 DB(tenants)와 비교하여 새로 추가된 입주사가 있으면 병합
+        const masterTenants = await fetchTenants();
+        if (masterTenants && masterTenants.length > 0) {
+          masterTenants.forEach(t => {
+            const existsNormal = updatedItems.find(it => normalize(it.tenant) === normalize(t.name) && normalize(it.floor) === normalize(t.floor) && normalize(it.note) === '일반');
+            if (!existsNormal) {
+              updatedItems.push({
+                id: generateId(),
+                floor: t.floor,
+                tenant: t.name,
+                area: t.area || '0',
+                refPower: t.refPower || '2380',
+                multiplier: '1',
+                note: '일반',
+                prevReading: '',
+                currentReading: ''
+              });
+            }
+            const existsSpecial = updatedItems.find(it => normalize(it.tenant) === normalize(t.name) && normalize(it.floor) === normalize(t.floor) && normalize(it.note) === '특수');
+            if (!existsSpecial) {
+              updatedItems.push({
+                id: generateId(),
+                floor: t.floor,
+                tenant: t.name,
+                area: t.area || '0',
+                refPower: '0',
+                multiplier: '1',
+                note: '특수',
+                prevReading: '',
+                currentReading: ''
+              });
+            }
+          });
+        }
+
+        // 층별 정렬
+        updatedItems.sort((a, b) => {
+          const weightA = getFloorWeight(a.floor);
+          const weightB = getFloorWeight(b.floor);
+          if (weightA !== weightB) return weightA - weightB;
+          if (a.tenant !== b.tenant) return a.tenant.localeCompare(b.tenant);
+          return a.note === '일반' ? -1 : 1;
+        });
+
+        setData({
+          ...fetched,
+          items: updatedItems,
+          // 중요: 서버 전용 컬럼에서 가져온 작성일(creationDate)을 상태에 세팅
+          creationDate: fetched.creationDate || format(new Date(), 'yyyy-MM-dd')
+        });
+      } else {
+        // 기록이 아예 없는 경우 (신규 생성)
+        const prevMonthDate = subMonths(parseISO(`${monthStr}-01`), 1);
+        const prevMonthStr = format(prevMonthDate, 'yyyy-MM');
+        const prevData = await fetchMeterReading(prevMonthStr);
+        
+        let initialItems: MeterReadingItem[] = [];
+
+        if (prevData && prevData.items && prevData.items.length > 0) {
+          // 전월 데이터에서 복사
+          initialItems = prevData.items.map(item => ({
+            id: generateId(),
+            floor: item.floor,
+            tenant: item.tenant,
+            area: item.area,
+            refPower: item.refPower || '2380',
+            multiplier: item.multiplier,
+            note: item.note,
+            prevReading: item.currentReading,
+            currentReading: ''
+          }));
+
+          // 마스터 DB(tenants)와 비교하여 새로 추가된 입주사가 있으면 병합
+          const masterTenants = await fetchTenants();
+          if (masterTenants && masterTenants.length > 0) {
+            masterTenants.forEach(t => {
+              const existsNormal = initialItems.find(it => it.tenant === t.name && it.floor === t.floor && it.note === '일반');
+              if (!existsNormal) {
+                initialItems.push({
+                  id: generateId(),
+                  floor: t.floor,
+                  tenant: t.name,
+                  area: t.area || '0',
+                  refPower: t.refPower || '2380',
+                  multiplier: '1',
+                  note: '일반',
+                  prevReading: '',
+                  currentReading: ''
+                });
+              }
+              const existsSpecial = initialItems.find(it => it.tenant === t.name && it.floor === t.floor && it.note === '특수');
+              if (!existsSpecial) {
+                initialItems.push({
+                  id: generateId(),
+                  floor: t.floor,
+                  tenant: t.name,
+                  area: t.area || '0',
+                  refPower: '0',
+                  multiplier: '1',
+                  note: '특수',
+                  prevReading: '',
+                  currentReading: ''
+                });
+              }
+            });
+          }
+        } else {
+          // 마스터 DB에서 생성
+          const masterTenants = await fetchTenants();
+          if (masterTenants && masterTenants.length > 0) {
+            initialItems = masterTenants.flatMap(t => [
+              {
+                id: generateId(),
+                floor: t.floor,
+                tenant: t.name,
+                area: t.area || '0',
+                refPower: t.refPower || '2380',
+                multiplier: '1',
+                note: '일반',
+                prevReading: '',
+                currentReading: ''
+              },
+              {
+                id: generateId(),
+                floor: t.floor,
+                tenant: t.name,
+                area: t.area || '0',
+                refPower: '0',
+                multiplier: '1',
+                note: '특수',
+                prevReading: '',
+                currentReading: ''
+              }
+            ]);
+          }
+        }
+
+        // 초기 생성된 리스트에 사진첩 데이터가 있다면 즉시 반영
+        const normalize = (str: string) => (str || '').replace(/\s+/g, '');
+        const syncedItems = initialItems.map(item => {
+          const matchedPhoto = photos.find(p => 
+            normalize(p.tenant) === normalize(item.tenant) && 
+            normalize(p.floor) === normalize(item.floor) && 
+            normalize(p.type) === normalize(item.note)
+          );
+          if (matchedPhoto && matchedPhoto.reading) {
+            return { ...item, currentReading: matchedPhoto.reading };
+          }
+          return item;
+        });
+
+        // 층별 정렬
+        syncedItems.sort((a, b) => {
+          const weightA = getFloorWeight(a.floor);
+          const weightB = getFloorWeight(b.floor);
+          if (weightA !== weightB) return weightA - weightB;
+          if (a.tenant !== b.tenant) return a.tenant.localeCompare(b.tenant);
+          return a.note === '일반' ? -1 : 1;
+        });
+
+        setData({ 
+          month: monthStr, 
+          unitPrice: prevData?.unitPrice || '228',
+          // 요청사항: 기본값은 0으로 설정
+          totalBillInput: '0',
+          totalUsageInput: '0',
+          creationDate: format(new Date(), 'yyyy-MM-dd'),
+          items: syncedItems 
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setData({ 
+        ...getInitialMeterReading(monthStr), 
+        unitPrice: '228',
+        creationDate: format(new Date(), 'yyyy-MM-dd')
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handlePrevMonth = onPrevMonth;
+  const handleNextMonth = onNextMonth;
+
+  const handleSave = async () => {
+    if (!data) return;
+    setSaveStatus('loading');
+    try {
+      const success = await saveMeterReading(data);
+      if (success) {
+        setSaveStatus('success');
+        setIsSummaryEditMode(false);
+        alert('저장이 완료되었습니다.');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } else {
+        setSaveStatus('error');
+        alert('저장에 실패했습니다.');
+      }
+    } catch (error) { 
+      setSaveStatus('error'); 
+      alert('저장 중 통신 오류가 발생했습니다.');
+    }
+  };
+
+  const updateItemField = (id: string, field: keyof MeterReadingItem, value: string) => {
+    const unformatted = unformatNumber(value);
+    setData(prev => ({
+      ...prev,
+      items: prev.items.map(it => it.id === id ? { ...it, [field]: unformatted } : it)
+    }));
+  };
+
+  const toggleExcludeFromInvoice = (id: string) => {
+    setData(prev => ({
+      ...prev,
+      items: prev.items.map(it => it.id === id ? { ...it, excludeFromInvoice: !it.excludeFromInvoice } : it)
+    }));
+  };
+
+  const getCalculations = (item: MeterReadingItem) => {
+    const prev = parseFloat((item.prevReading || '0').toString().replace(/,/g, ''));
+    const curr = parseFloat((item.currentReading || '0').toString().replace(/,/g, ''));
+    const mult = parseFloat((item.multiplier || '1').toString().replace(/,/g, ''));
+    let diff = 0;
+    if (curr < prev) {
+      const rolloverBase = prev < 100000 ? 100000 : 1000000;
+      diff = (rolloverBase + curr) - prev;
+    } else { diff = curr - prev; }
+    const usage = Math.round(diff * mult);
+    const ref = parseFloat((item.refPower || '0').toString().replace(/,/g, ''));
+    const unitPrice = parseFloat((data.unitPrice || '0').toString().replace(/,/g, ''));
+    const billableUsage = item.note === '특수' ? usage : usage - ref;
+    const bill = Math.round(billableUsage * unitPrice);
+    const excess = item.note === '특수' ? null : usage - ref;
+    return { diff, usage, bill, excess };
+  };
+
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, MeterReadingItem[]> = {};
+    data.items.forEach(it => {
+      const key = `${it.tenant}_${it.floor}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(it);
+    });
+    return groups;
+  }, [data.items]);
+
+  const totalCalculatedBill = useMemo(() => {
+    return data.items.reduce((sum, it) => {
+      const bill = getCalculations(it).bill;
+      return sum + (bill > 0 ? bill : 0);
+    }, 0);
+  }, [data.items, data.unitPrice]);
+
+  const totalCalculatedUsage = useMemo(() => data.items.reduce((sum, it) => sum + getCalculations(it).usage, 0), [data.items]);
+  const totalArea = useMemo(() => Object.keys(groupedItems).reduce((sum, key) => sum + (parseFloat(groupedItems[key][0]?.area?.toString().replace(/,/g, '') || '0') || 0), 0), [groupedItems]);
+
+  const handleSummaryChange = (field: 'totalBillInput' | 'totalUsageInput' | 'unitPrice' | 'creationDate', value: string) => {
+    if (field === 'creationDate') {
+      setData({ ...data, creationDate: value });
+      return;
+    }
+    const unformatted = unformatNumber(value);
+    
+    if (field === 'unitPrice') {
+      setData(prev => ({ ...prev, unitPrice: unformatted }));
+      return;
+    }
+
+    const bill = field === 'totalBillInput' ? parseFloat(unformatted) : parseFloat(data.totalBillInput || totalCalculatedBill.toString());
+    const usage = field === 'totalUsageInput' ? parseFloat(unformatted) : parseFloat(data.totalUsageInput || totalCalculatedUsage.toString());
+    let nextPrice = data.unitPrice;
+    if (!isNaN(bill) && !isNaN(usage) && usage > 0) nextPrice = Math.round(bill / usage).toString();
+    setData({ ...data, [field]: unformatted, unitPrice: nextPrice });
+  };
+
+  const handlePrintMain = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=1000');
+    if (!printWindow) return;
+    const [y, m] = currentMonth.split('-');
+    const title = `${y}년 ${parseInt(m)}월 층별 계량기 검침내역`;
+    
+    // 결재란 정보
+    const manager = staffList.find(s => s.jobTitle && s.jobTitle.includes('소장'));
+    const checker = staffList.find(s => s.jobTitle && s.jobTitle.includes('과장')) || staffList.find(s => s.jobTitle && s.jobTitle.includes('대리'));
+    const managerName = manager ? manager.name : '';
+    const checkerName = checker ? checker.name : '';
+    const sealImg = brandSettings?.seal || '';
+
+    // 요약 정보
+    const displayTotalBill = data.totalBillInput || totalCalculatedBill.toString();
+    const displayTotalUsage = data.totalUsageInput || totalCalculatedUsage.toString();
+    const displayUnitPrice = data.unitPrice || '228';
+    const displayCreationDate = data.creationDate ? format(parseISO(data.creationDate), 'yyyy년 MM월 dd일') : format(new Date(), 'yyyy년 MM월 dd일');
+
+    let tableRowsHtml = '';
+    Object.keys(groupedItems).forEach(groupKey => {
+      const items = groupedItems[groupKey];
+      items.forEach((item, idx) => {
+        const { diff, usage, bill, excess } = getCalculations(item);
+        tableRowsHtml += `
+          <tr>
+            ${idx === 0 ? `<td rowspan="${items.length}" style="text-align:left; padding-left:10px;">${item.tenant}</td>` : ''}
+            ${idx === 0 ? `<td rowspan="${items.length}">${item.floor}</td>` : ''}
+            ${idx === 0 ? `<td rowspan="${items.length}">${formatNumber(item.refPower)}</td>` : ''}
+            <td style="text-align:right; padding-right:8px;">${bill.toLocaleString()}</td>
+            <td>${formatNumber(item.currentReading)}</td>
+            <td>${formatNumber(item.prevReading)}</td>
+            <td>${usage.toLocaleString()}</td>
+            <td>${excess !== null ? excess.toLocaleString() : ''}</td>
+            <td style="font-size:7pt;">${item.note}</td>
+          </tr>
+        `;
+      });
+    });
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+            @page { size: A4 portrait; margin: 0; }
+            body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.2; -webkit-print-color-adjust: exact; }
+            .no-print { display: flex; justify-content: center; padding: 20px; }
+            @media print { .no-print { display: none !important; } body { background: white !important; } }
+            .print-page { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; padding: 10mm; }
+            @media print { .print-page { width: 100%; margin: 0; padding: 10mm; box-shadow: none; } }
+            
+            .header-container { display: flex; justify-content: center; align-items: flex-start; margin-bottom: 20px; }
+            .title-section { flex: 1; text-align: center; }
+            .doc-title { font-size: 24pt; font-weight: 900; text-decoration: underline; text-underline-offset: 8px; margin: 0; margin-bottom: 15px; text-align: center; }
+            
+            .summary-info { display: flex; gap: 20px; font-size: 10pt; font-weight: bold; color: #374151; justify-content: center; }
+            .summary-item { background: #f9fafb; padding: 5px 12px; border: 1px solid #e5e7eb; border-radius: 4px; }
+            
+            table.main-table { width: 100%; border-collapse: collapse; border: 1.5px solid black; }
+            table.main-table th, table.main-table td { border: 1px solid black; padding: 4px 2px; text-align: center; font-size: 9px; font-weight: normal; color: black; height: 22px; }
+            table.main-table th { background: #ffffff; font-weight: normal; }
+            .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+          </style>
+        </head>
+        <body>
+          <div class="no-print"><button onclick="window.print()">인쇄하기</button></div>
+          <div class="print-page">
+            <div class="header-container">
+              <div class="title-section">
+                <h1 class="doc-title">${y}년 ${parseInt(m)}월 계량기 검침내역</h1>
+              </div>
+            </div>
+            <table class="main-table">
+              <thead>
+                <tr>
+                  <th style="width:150px;">입주사명</th><th style="width:50px;">층</th><th style="width:80px;">기준전력</th>
+                  <th style="width:100px;">전기요금</th><th style="width:100px;">당월지침</th><th style="width:100px;">전월지침</th>
+                  <th style="width:80px;">사용량</th><th style="width:80px;">초과전력</th><th style="width:60px;">비고</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${tableRowsHtml}
+                <tr style="background:#ffffff; height:25px;">
+                  <td colspan="2">합 계</td><td></td>
+                  <td style="text-align:right; padding-right:8px;">${totalCalculatedBill.toLocaleString()}</td>
+                  <td colspan="2"></td>
+                  <td>${totalCalculatedUsage.toLocaleString()}</td>
+                  <td colspan="2"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handlePrintInvoiceSummary = () => {
+    const printWindow = window.open('', '_blank', 'width=1100,height=900');
+    if (!printWindow) return;
+
+    const manager = staffList.find(s => s.jobTitle && s.jobTitle.includes('소장'));
+    const managerName = manager ? manager.name : '김용만';
+    const sealImg = brandSettings?.seal || '';
+
+    const [y, m] = currentMonth.split('-');
+    const title = `${y}년 ${parseInt(m)}월 대치사옥 추가전기요금 총괄표(계산서발행)`;
+    const formatValue = (val: number) => val === 0 ? '-' : val.toLocaleString();
+    
+    const invoiceData = Object.keys(groupedItems).map((key, idx) => {
+      const items = groupedItems[key];
+      const subtotal = items.reduce((sum, it) => {
+        if (it.excludeFromInvoice) return sum;
+        const b = getCalculations(it).bill;
+        return sum + (b > 0 ? b : 0);
+      }, 0);
+      const supplyValue = Math.round(subtotal / 1.1);
+      const tax = subtotal - supplyValue;
+      return { index: idx + 1, floor: items[0].floor, tenant: items[0].tenant, subtotal, supplyValue, tax };
+    });
+
+    const grandSubtotal = invoiceData.reduce((sum, d) => sum + d.subtotal, 0);
+    const grandSupply = invoiceData.reduce((sum, d) => sum + d.supplyValue, 0);
+    const grandTax = invoiceData.reduce((sum, d) => sum + d.tax, 0);
+    
+    const tableRows = invoiceData.map(d => `
+      <tr>
+        <td>${d.index}</td>
+        <td>${d.floor}</td>
+        <td style="text-align:left; padding-left:15px;">${d.tenant}</td>
+        <td class="text-right">${formatValue(d.subtotal)}</td>
+        <td class="text-right">${formatValue(d.supplyValue)}</td>
+        <td class="text-right">${formatValue(d.tax)}</td>
+        <td></td>
+      </tr>
+    `).join('');
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>${title}</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+          @page { size: A4 portrait; margin: 0; }
+          body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.4; -webkit-print-color-adjust: exact; }
+          .no-print { display: flex; justify-content: center; padding: 20px; }
+          @media print { .no-print { display: none !important; } body { background: white !important; } }
+          .container { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; padding: 15mm 15mm; }
+          @media print { .container { width: 100%; margin: 0; padding: 15mm; box-shadow: none; } }
+          h1 { text-align: center; font-size: 18px; font-weight: 900; margin-bottom: 15px; margin-top: 20px; letter-spacing: -0.5px; }
+          .unit-label { text-align: right; font-size: 10pt; font-weight: bold; margin-bottom: 5px; padding-right: 2px; }
+          table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; }
+          th, td { border: 1px solid black; padding: 6px 4px; font-size: 11px; font-weight: normal; text-align: center; height: 20px; }
+          thead th { background-color: #ffffff; font-weight: normal; }
+          .bg-light-blue { background-color: #eef2ff !important; }
+          .font-bold { font-weight: bold; }
+          .text-right { text-align: right; padding-right: 12px; }
+          .footer { margin-top: 20px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16pt; gap: 5px; }
+          .seal-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 50px; height: 50px; margin: 0 5px; }
+          .seal-img { width: 100%; height: 100%; object-fit: contain; }
+          .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+          .no-print button:hover { background: #172554; transform: translateY(-1px); }
+        </style>
+      </head>
+      <body>
+        <div class="no-print"><button onclick="window.print()">인쇄하기</button></div>
+        <div class="container">
+          <h1>${title}</h1>
+          <div class="unit-label">(단위 : 원)</div>
+          <table>
+            <thead>
+              <tr>
+                <th rowspan="2" style="width:5%;">NO</th>
+                <th rowspan="2" style="width:7%;">층</th>
+                <th rowspan="2" style="width:33%;">업 체 명</th>
+                <th colspan="3">추가전기요금</th>
+                <th rowspan="2" style="width:12%;">비고</th>
+              </tr>
+              <tr>
+                <th style="width:15%;">소 계</th>
+                <th style="width:15%;">공급가액</th>
+                <th style="width:13%;">세 액</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="font-bold">
+                <td colspan="3">계</td>
+                <td class="text-right">${formatValue(grandSubtotal)}</td>
+                <td class="text-right">${formatValue(grandSupply)}</td>
+                <td class="text-right">${formatValue(grandTax)}</td>
+                <td></td>
+              </tr>
+              <tr class="font-bold">
+                <td colspan="3">소계[세금계산서 청구]</td>
+                <td class="text-right">${formatValue(grandSubtotal)}</td>
+                <td class="text-right">${formatValue(grandSupply)}</td>
+                <td class="text-right">${formatValue(grandTax)}</td>
+                <td></td>
+              </tr>
+              ${tableRows}
+            </tbody>
+          </table>
+          <div class="footer">
+            <span>관리소장 : ${managerName}</span>
+            ${sealImg ? `<div class="seal-wrapper"><img src="${sealImg}" class="seal-img" /></div>` : ''}
+            <span>(인)</span>
+          </div>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const generateTenantBillHtml = (tenantName: string, floor: string, isLast: boolean, photos: MeterPhotoItem[], brandSettings: { logo?: string; seal?: string } | null, staffList: StaffMember[]) => {
+    const tenantItems = data.items.filter(it => it.tenant === tenantName && it.floor === floor);
+    const normalItem = tenantItems.find(it => it.note === '일반');
+    const specialItem = tenantItems.find(it => it.note === '특수');
+    
+    const manager = staffList.find(s => s.jobTitle && s.jobTitle.includes('소장'));
+    const managerName = manager ? manager.name : '김용만';
+    const sealImg = brandSettings?.seal || '';
+
+    // 특수계량기 데이터가 있는지 확인 (지침값이 있는 경우만 표시)
+    const hasSpecialData = specialItem && specialItem.currentReading && specialItem.currentReading.trim() !== '';
+    
+    const [y, m] = currentMonth.split('-');
+    const prevMonthDate = subMonths(parseISO(`${currentMonth}-01`), 1);
+    const py = format(prevMonthDate, 'yyyy');
+    const pm = format(prevMonthDate, 'MM');
+    const periodStr = `${py}년 ${pm}월 17일 ~ ${y}년 ${m}월 16일`;
+    
+    const reportDateObj = data.creationDate ? parseISO(data.creationDate) : new Date();
+    const todayStr = format(reportDateObj, 'yyyy년 MM월 dd일');
+    
+    const unitPrice = data.unitPrice || '228';
+    const normalCalc = normalItem ? getCalculations(normalItem) : { usage: 0, bill: 0 };
+    const specialCalc = hasSpecialData ? getCalculations(specialItem) : { usage: 0, bill: 0 };
+    
+    // 총 요금 계산 (특수계량기 데이터가 있을 때만 합산, 음수 요금은 0으로 처리하여 청구 요금에 더하지 않음)
+    const normalBillForTotal = normalCalc.bill > 0 ? normalCalc.bill : 0;
+    const specialBillForTotal = (hasSpecialData && specialCalc.bill > 0) ? specialCalc.bill : 0;
+    const totalBill = normalBillForTotal + specialBillForTotal;
+
+    const normalPhoto = photos.find(p => p.tenant === tenantName && p.floor === floor && p.type === '일반');
+    const specialPhoto = hasSpecialData ? photos.find(p => p.tenant === tenantName && p.floor === floor && p.type === '특수') : null;
+
+    let photosHtml = '';
+    if (normalPhoto || specialPhoto) {
+      photosHtml = `<div class="photo-evidence-container">`;
+      if (normalPhoto) {
+        photosHtml += `<div class="photo-item"><img src="${normalPhoto.photo}" /><div class="photo-label">[ 일반 지침 사진 ]</div></div>`;
+      }
+      if (specialPhoto) {
+        photosHtml += `<div class="photo-item"><img src="${specialPhoto.photo}" /><div class="photo-label">[ 특수 지침 사진 ]</div></div>`;
+      }
+      photosHtml += `</div>`;
+    }
+
+    const logoUrl = brandSettings?.logo || "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABACAYAAABfv994AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAWElEQVR4nO3BMQEAAADCoPVPbQwfoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4GMRAAAG34i8zAAAAAElFTkSuQmCC";
+    const headerBgColor = '#bfdbfe';
+
+    return `
+      <div class="bill-page ${!isLast ? 'page-break' : ''}">
+        <div class="bill-container">
+          <h1 class="header-title">입주사 전기요금 사용내역서(${parseInt(m)}월)</h1>
+          <div class="write-date">작성일 : ${todayStr}</div>
+          <table>
+            <tr class="tenant-title-row" style="background-color: ${headerBgColor} !important;">
+              <th colspan="3">${tenantName} ( ${floor} )</th>
+            </tr>
+            <tr>
+              <th class="label-cell">사용기간</th>
+              <td colspan="2">${periodStr}</td>
+            </tr>
+            <tr>
+              <th class="label-cell" rowspan="2">계량기검침</th>
+              <td colspan="1" style="width:35%; font-weight:bold; background:#f9f9f9;">당월지침</td>
+              <td colspan="1" style="width:35%; font-weight:bold; background:#f9f9f9;">전월지침</td>
+            </tr>
+            <tr>
+              <td colspan="1" class="bold-text">${formatNumber(normalItem?.currentReading) || '-'}</td>
+              <td colspan="1" class="bold-text">${formatNumber(normalItem?.prevReading) || '-'}</td>
+            </tr>
+            <tr>
+              <th class="label-cell">전력 사용량</th>
+              <td colspan="2"><span class="bold-text" style="font-size:14pt;">${normalCalc.usage.toLocaleString()}</span> - (KWH)</td>
+            </tr>
+            <tr>
+              <th class="label-cell">kWh당 단가</th>
+              <td colspan="2">￦ ${parseInt(unitPrice).toLocaleString()} 원</td>
+            </tr>
+            <tr>
+              <th class="label-cell">기준전력(KWH)</th>
+              <td colspan="2">${formatNumber(normalItem?.refPower) || '2,380'} - (KWH)</td>
+            </tr>
+            <tr>
+              <th class="label-cell">전기요금</th>
+              <td colspan="2" class="formula-cell">(사용량 ${normalCalc.usage.toLocaleString()} - 기준 ${formatNumber(normalItem?.refPower) || '2,380'}) X ${parseInt(unitPrice).toLocaleString()} = <span class="bold-text" style="font-size:14pt; color:${normalCalc.bill < 0 ? 'red' : 'black'};">￦ ${normalCalc.bill.toLocaleString()} 원</span></td>
+            </tr>
+            
+            ${hasSpecialData ? `
+            <tr class="sub-header">
+              <th colspan="3">특수 전력 사용요금(에어컨, 전열)</th>
+            </tr>
+            <tr>
+              <th class="label-cell" rowspan="2">계량기 검침</th>
+              <td colspan="1" style="width:35%; font-weight:bold; background:#f9f9f9;">당월지침</td>
+              <td colspan="1" style="width:35%; font-weight:bold; background:#f9f9f9;">전월지침</td>
+            </tr>
+            <tr>
+              <td colspan="1" class="bold-text">${formatNumber(specialItem?.currentReading) || '-'}</td>
+              <td colspan="1" class="bold-text">${formatNumber(specialItem?.prevReading) || '-'}</td>
+            </tr>
+            <tr>
+              <th class="label-cell">전력 사용량</th>
+              <td colspan="2"><span class="bold-text" style="font-size:14pt;">${specialCalc.usage.toLocaleString()}</span> - (KWH)</td>
+            </tr>
+            <tr>
+              <th class="label-cell">kWh당 단가</th>
+              <td colspan="2">￦ ${parseInt(unitPrice).toLocaleString()} 원</td>
+            </tr>
+            <tr>
+              <th class="label-cell">전기요금</th>
+              <td colspan="2" class="formula-cell">${specialCalc.usage.toLocaleString()} X ${parseInt(unitPrice).toLocaleString()} = <span class="bold-text" style="font-size:14pt; color:${specialCalc.bill < 0 ? 'red' : 'black'};">￦ ${specialCalc.bill.toLocaleString()} 원</span></td>
+            </tr>
+            ` : ''}
+
+            <tr class="total-row">
+              <th class="total-label">청구 요금</th>
+              <td colspan="2" class="bold-text" style="font-size:24pt; color:${totalBill < 0 ? 'red' : 'black'};">￦ ${totalBill.toLocaleString()} 원</td>
+            </tr>
+          </table>
+          ${photosHtml}
+          <div class="footer-info">입금계좌안내 : 우리은행 1006-401-220508 (새마을운동중앙회)</div>
+          <div class="footer-bottom-container">
+            <div class="footer-logo">
+              <img src="${logoUrl}" />
+            </div>
+          </div>
+        </div>
+      </div>`;
+  };
+
+  const billStyles = `<style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+    @page { size: A4 portrait; margin: 0; }
+    body { font-family: 'Noto Sans KR', sans-serif; padding: 0; margin: 0; background: black !important; color: black; line-height: 1.4; -webkit-print-color-adjust: exact; }
+    .no-print { display: flex; justify-content: center; padding: 20px; }
+    @media print { .no-print { display: none !important; } body { background: white !important; } .page-break { page-break-after: always; } }
+    .bill-page { width: 210mm; min-height: 297mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; padding: 15mm 15mm; }
+    @media print { .bill-page { box-shadow: none !important; margin: 0 !important; width: 100% !important; padding: 10mm 15mm; } }
+    .bill-container { width: 100%; }
+    .header-title { text-align: center; font-size: 32pt; font-weight: 900; margin-bottom: 10px; margin-top: 40px; letter-spacing: -1px; }
+    .write-date { text-align: right; font-weight: bold; font-size: 13pt; margin-bottom: 25px; padding-right: 5px; }
+    table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; margin-bottom: 5px; }
+    th, td { border: 1px solid black; padding: 2px 4px; font-size: 12.5pt; text-align: center; height: 30px; }
+    .tenant-title-row { font-weight: 900; font-size: 16pt; height: 30px; }
+    .label-cell { background-color: #ffffff; font-weight: bold; width: 30%; }
+    .formula-cell { text-align: center; font-size: 11pt; }
+    .bold-text { font-weight: 900; }
+    .sub-header { background-color: #ffffff; font-weight: 900; font-size: 13pt; height: 30px; border-top: 2px solid black; }
+    .total-row { height: 30px; font-size: 20pt; font-weight: 900; }
+    .total-label { width: 30%; font-size: 18pt; background: #ffffff; }
+    .photo-evidence-container { display: flex; justify-content: center; gap: 10mm; margin-top: 5mm; margin-bottom: 5mm; }
+    .photo-item { text-align: center; width: 85mm; }
+    .photo-item img { width: 100%; height: 40mm; object-fit: contain; border: 1px solid black; background: #fafafa; }
+    .photo-label { font-size: 9pt; font-weight: bold; margin-top: 3px; }
+    .footer-info { margin-top: 20px; font-weight: bold; font-size: 12pt; text-align: center; border-top: 1px solid #eee; padding-top: 15px; }
+    .footer-bottom-container { margin-top: 30px; display: flex; justify-content: center; align-items: center; width: 100%; padding-top: 20px; }
+    .footer-logo { display: flex; justify-content: center; }
+    .footer-logo img { height: 90px; width: auto; object-fit: contain; }
+    .footer-seal-area { flex: 1; display: flex; justify-content: flex-end; align-items: center; font-weight: 900; font-size: 16pt; gap: 10px; }
+    .seal-wrapper { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; }
+    .seal-wrapper img { width: 100%; height: 100%; object-fit: contain; }
+    .no-print button { padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: all 0.2s; }
+    .no-print button:hover { background: #172554; transform: translateY(-1px); }
+  </style>`;
+
+  const handlePrintTenantBill = async (tenantName: string, floor: string) => {
+    const photosData = await fetchMeterPhotos(currentMonth);
+    const photos = photosData?.items || [];
+    const printWindow = window.open('', '_blank', 'width=900,height=950');
+    if (!printWindow) return;
+    printWindow.document.write(`<html><head><title>전기요금 사용내역서 - ${tenantName}</title>${billStyles}</head><body><div class="no-print"><button onclick="window.print()">인쇄하기</button></div>${generateTenantBillHtml(tenantName, floor, true, photos, brandSettings, staffList)}</body></html>`);
+    printWindow.document.close();
+  };
+
+  const handlePrintAllTenantBills = async () => {
+    const photosData = await fetchMeterPhotos(currentMonth);
+    const photos = photosData?.items || [];
+    const printWindow = window.open('', '_blank', 'width=1000,height=950');
+    if (!printWindow) return;
+    const groupKeys = Object.keys(groupedItems);
+    const allBillsHtml = groupKeys.map((key, index) => {
+      const [tenantName, floor] = key.split('_');
+      return generateTenantBillHtml(tenantName, floor, index === groupKeys.length - 1, photos, brandSettings, staffList);
+    }).join('');
+    printWindow.document.write(`<html><head><title>전체 입주사 전기요금 사용내역서</title>${billStyles}</head><body><div class="no-print"><button onClick="window.print()" style="padding: 12px 30px; background: #1e3a8a; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13pt;">전체 인쇄하기</button></div>${allBillsHtml}</body></html>`);
+    printWindow.document.close();
+  };
+
+  const thClass = "bg-white border-b border-r last:border-r-0 border-black p-0 h-[40px] text-center text-[13px] font-normal text-black align-middle";
+  const tdClass = "border-b border-r last:border-r-0 border-black p-0 h-[40px] text-[13px] font-normal text-black text-center align-middle transition-colors";
+  const inputClass = "w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none font-normal text-[13px] text-black flex items-center px-2";
+
+  return (
+    <div className="pb-20">
+      <div className="space-y-2 animate-fade-in pb-10 max-w-7xl mx-auto">
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          {/* 1. 날짜 선택 영역 (월 네비게이션) */}
+          <div className="flex items-center shrink-0">
+            <button 
+              onClick={handlePrevMonth} 
+              className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <div className="px-2 py-3 text-[14px] font-bold text-black min-w-[100px] text-center">
+              {currentMonth.split('-')[0]}년 {currentMonth.split('-')[1]}월
+            </div>
+            <button 
+              onClick={handleNextMonth} 
+              className="px-2 py-3 text-gray-500 hover:text-black transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          {/* 2. 서브탭 메뉴 */}
+          <div className="flex shrink-0">
+            {tabs && setActiveTab && tabs.map(tab => (
+              <div
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer bg-white ${activeTab === tab.id ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          <div className="flex items-center print:hidden shrink-0">
+            <button 
+              onClick={() => loadData(currentMonth)} 
+              disabled={loading} 
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+              title="새로고침"
+            >
+              <RefreshCw size={18} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
+              새로고침
+            </button>
+            <button 
+              onClick={() => setIsSummaryEditMode(!isSummaryEditMode)} 
+              disabled={loading}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-all relative whitespace-nowrap disabled:opacity-50 ${isSummaryEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+            >
+              {isSummaryEditMode ? <Lock size={18} className="mr-1.5" /> : <Edit2 size={18} className="mr-1.5" />}
+              {isSummaryEditMode ? '수정완료' : '수정'}
+            </button>
+            <button 
+              onClick={handlePrintAllTenantBills} 
+              disabled={loading}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            >
+              <Printer size={18} className="mr-1.5" />
+              내역서
+            </button>
+            <button 
+              onClick={handlePrintInvoiceSummary} 
+              disabled={loading}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            >
+              <Calculator size={18} className="mr-1.5" />
+              계산서
+            </button>
+            <button 
+              onClick={handleSave} 
+              disabled={saveStatus === 'loading' || loading} 
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'}`}
+            >
+              {saveStatus === 'loading' ? (
+                <RefreshCw size={18} className="animate-spin mr-1.5" />
+              ) : saveStatus === 'success' ? (
+                <CheckCircle2 size={18} className="mr-1.5" />
+              ) : (
+                <Save size={18} className="mr-1.5" />
+              )}
+              {saveStatus === 'success' ? '저장완료' : '저장'}
+            </button>
+            <button 
+              onClick={handlePrintMain} 
+              disabled={loading}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50"
+            >
+              <Printer size={18} className="mr-1.5" />
+              인쇄
+            </button>
+          </div>
+        </div>
+        <div className="w-full max-w-7xl mx-auto flex items-stretch overflow-x-auto scrollbar-hide bg-white print:hidden border-b border-black">
+          <div className="flex items-center shrink-0 gap-2">
+            <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+              <span className="text-[14px] font-bold text-gray-500 uppercase">전기요금총액 (원) :</span>
+              <input 
+                type="text" 
+                readOnly={!isSummaryEditMode}
+                value={formatNumber(data.totalBillInput || totalCalculatedBill.toString())} 
+                onChange={e => handleSummaryChange('totalBillInput', e.target.value)} 
+                className={`border-b-2 ${isSummaryEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-transparent'} w-28 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none`} 
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+              <span className="text-[14px] font-bold text-gray-500 uppercase">총사용량 (kWh) :</span>
+              <input 
+                type="text" 
+                readOnly={!isSummaryEditMode}
+                value={formatNumber(data.totalUsageInput || totalCalculatedUsage.toString())} 
+                onChange={e => handleSummaryChange('totalUsageInput', e.target.value)} 
+                className={`border-b-2 ${isSummaryEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-transparent'} w-24 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none`} 
+              />
+            </div>
+
+            <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+              <span className="text-[14px] font-bold text-gray-500 uppercase">kWh당 단가 (원) :</span>
+              <input 
+                type="text" 
+                readOnly={!isSummaryEditMode}
+                value={formatNumber(data.unitPrice || '228')} 
+                onChange={e => handleSummaryChange('unitPrice', e.target.value)} 
+                className={`border-b-2 ${isSummaryEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-transparent'} w-20 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none`} 
+              />
+            </div>
+
+            <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
+              <span className="text-[14px] font-bold text-gray-500 uppercase">내역서 작성일 :</span>
+              {isSummaryEditMode ? (
+                <input 
+                  type="date" 
+                  value={data.creationDate || format(new Date(), 'yyyy-MM-dd')} 
+                  onChange={e => handleSummaryChange('creationDate', e.target.value)} 
+                  className="border-b-2 border-blue-500 bg-blue-50/30 outline-none text-sm font-bold text-black py-0.5 px-2 transition-all rounded-none"
+                />
+              ) : (
+                <span className="text-sm font-bold text-black">{data.creationDate ? format(parseISO(data.creationDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')}</span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="bg-white border border-black w-full max-w-7xl mx-auto">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse table-fixed min-w-full bg-white text-center">
+              <thead>
+                <tr className="bg-white">
+                  <th className={`${thClass} w-60`}><div className="flex items-center justify-center h-full px-2">입주사명</div></th>
+                  <th className={`${thClass} w-16`}><div className="flex items-center justify-center h-full px-2">층 별</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">기준전력(월)</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">전기요금</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">당월지침</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">전월지침</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">사용량(kwh)</div></th>
+                  <th className={`${thClass} w-20`}><div className="flex items-center justify-center h-full px-2">초과전력량</div></th>
+                  <th className={`${thClass} w-14`}><div className="flex items-center justify-center h-full px-2">비 고</div></th>
+                  <th className={`${thClass} w-14`}><div className="flex items-center justify-center h-full px-2">계산서제외</div></th>
+                </tr>
+              </thead>
+              <tbody className="bg-white">
+                {Object.keys(groupedItems).map(groupKey => {
+                  const items = groupedItems[groupKey];
+                  return items.map((item, idx) => {
+                    const { diff, usage, bill, excess } = getCalculations(item);
+                    return (
+                      <tr key={item.id} className="hover:bg-gray-50/50 transition-colors text-center group">
+                        {idx === 0 && (
+                          <>
+                            <td rowSpan={items.length} className={`${tdClass} text-left`}>
+                              <div className="flex items-center justify-between h-full w-full px-2">
+                                <input type="text" readOnly className="w-full h-full text-left bg-transparent border-none outline-none shadow-none appearance-none font-normal text-black text-[13px] truncate" value={item.tenant} />
+                                <FileText size={18} className="text-blue-500 shrink-0 ml-1 cursor-pointer hover:text-blue-700 transition-colors" onClick={() => handlePrintTenantBill(item.tenant, item.floor)} />
+                              </div>
+                            </td>
+                            <td rowSpan={items.length} className={`${tdClass}`}>
+                              <div className="flex items-center justify-center h-full w-full px-2">
+                                <input type="text" readOnly className="w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none font-normal text-black text-[13px]" value={item.floor} />
+                              </div>
+                            </td>
+                            <td rowSpan={items.length} className={`${tdClass}`}>
+                              <div className="flex items-center justify-center h-full w-full px-2">
+                                <input type="text" readOnly className="w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none font-normal text-black text-[13px]" value={formatNumber(item.refPower)} />
+                              </div>
+                            </td>
+                          </>
+                        )}
+                        <td className={`${tdClass} text-right`}><div className="flex items-center justify-end h-full w-full px-2"><span className={`font-normal text-[13px] ${bill < 0 ? 'text-red-600' : 'text-black'}`}>{bill.toLocaleString()}</span></div></td>
+                        <td className={`${tdClass}`}>
+                          <div className="flex items-center justify-center h-full w-full">
+                            <input 
+                              type="text" 
+                              readOnly={!isSummaryEditMode} 
+                              className={`${inputClass} ${isSummaryEditMode ? 'bg-orange-50' : ''}`} 
+                              value={formatNumber(item.currentReading)} 
+                              onChange={e => updateItemField(item.id, 'currentReading', e.target.value)}
+                            />
+                          </div>
+                        </td>
+                        <td className={`${tdClass}`}>
+                          <div className="flex items-center justify-center h-full w-full">
+                            <input 
+                              type="text" 
+                              readOnly={!isSummaryEditMode} 
+                              className={`${inputClass} ${isSummaryEditMode ? 'bg-orange-50' : ''}`} 
+                              value={formatNumber(item.prevReading)} 
+                              onChange={e => updateItemField(item.id, 'prevReading', e.target.value)}
+                            />
+                          </div>
+                        </td>
+                        <td className={`${tdClass}`}><div className="flex items-center justify-center h-full w-full px-2"><span className="font-normal text-[13px]">{usage.toLocaleString()}</span></div></td>
+                        <td className={`${tdClass}`}><div className="flex items-center justify-center h-full w-full px-2"><span className={`font-normal text-[13px] ${excess !== null && (excess as number) > 0 ? 'text-red-500' : 'text-black'}`}>{excess !== null ? (excess as number).toLocaleString() : ''}</span></div></td>
+                        <td className={`${tdClass}`}><div className="flex items-center justify-center h-full w-full px-2"><select disabled className="w-full h-full text-center bg-transparent border-none outline-none shadow-none appearance-none font-normal text-black text-[13px]" value={item.note}><option value="일반">일반</option><option value="특수">특수</option></select></div></td>
+                        <td className={`${tdClass}`}>
+                          <div className="flex items-center justify-center h-full w-full">
+                            <input 
+                              type="checkbox" 
+                              checked={!!item.excludeFromInvoice} 
+                              onChange={() => toggleExcludeFromInvoice(item.id)}
+                              className="w-4 h-4 cursor-pointer"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  });
+                })}
+                <tr className="bg-blue-50/50">
+                  <td colSpan={2} className={`${tdClass} bg-gray-100`}><div className="flex items-center justify-center h-full w-full px-2"><span className="font-normal text-[13px]">합 계</span></div></td>
+                  <td className={`${tdClass}`}></td>
+                  <td className={`${tdClass} text-right`}><div className="flex items-center justify-end h-full w-full px-2"><span className="font-normal text-[13px] text-blue-700">{totalCalculatedBill.toLocaleString()}</span></div></td>
+                  <td colSpan={2} className={`${tdClass}`}></td>
+                  <td className={`${tdClass}`}><div className="flex items-center justify-center h-full w-full px-2"><span className="font-normal text-[13px] text-orange-600">{totalCalculatedUsage.toLocaleString()}</span></div></td>
+                  <td colSpan={3} className={`${tdClass}`}></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <style>{`@keyframes scale-up { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }.animate-scale-up { animation: scale-up 0.2s ease-out forwards; }`}</style>
+    </div>
+  );
+};
+
+export default MeterReadingLog;
