@@ -323,7 +323,7 @@ const SafetyCheckLog: React.FC<SafetyCheckLogProps> = ({ currentDate, viewType }
               .print-page .approval-table td { height: 65px !important; } 
               .print-page .approval-table .side-header { height: 87px !important; font-size: 8.5pt !important; }
             ` : ''}
-            ${activeType === 'general' ? '.print-page .text-\\[13px\\] { font-size: 10px !important; } .print-page .text-\\[12px\\] { font-size: 10px !important; } .print-page textarea { font-size: 10px !important; } .print-page input { font-size: 10px !important; text-align: center !important; } .print-page .text-blue-600 { font-size: 13px !important; }' : ''}
+            ${activeType === 'general' ? '.print-page .text-\\[13px\\] { font-size: 10px !important; } .print-page .text-\\[12px\\] { font-size: 10px !important; } .print-page textarea { font-size: 10px !important; } .print-page input { font-size: 10px !important; text-align: center !important; } .print-page .text-blue-600 { font-size: 13px !important; } .print-page .check-section-2 th, .print-page .check-section-2 td, .print-page .check-section-2 div { font-size: 9px !important; } .print-page .check-section-2 input { padding-left: 4px !important; padding-right: 4px !important; }' : ''}
 
             .print-header-area { display: flex !important; }
             .hidden-in-ui { display: block !important; }
@@ -464,7 +464,7 @@ const SafetyCheckLog: React.FC<SafetyCheckLogProps> = ({ currentDate, viewType }
           </table>
         </div>
       </div>
-      <div className={`mb-2 bg-white ${['low', 'high', 'check'].includes(activeSubTab) ? 'block' : 'hidden-in-ui'} print:block`}>
+      <div className={`mb-2 bg-white ${['low', 'high', 'check'].includes(activeSubTab) ? 'block' : 'hidden-in-ui'} print:block check-section-2`}>
         <h3 className="font-bold text-base mb-1 border-l-4 border-gray-800 pl-2 hidden-in-ui">2. 점검내역</h3>
         <div className="flex gap-2 bg-white flex-col sm:flex-row print:flex-row">
           <div className={`${activeSubTab === 'low' ? 'block w-full' : 'hidden-in-ui'} print:block print:w-[40%]`} style={activeSubTab === 'low' ? {} : { flex: '1.2' }}>
