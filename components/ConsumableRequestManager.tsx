@@ -64,12 +64,14 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
   const syncRequestToDate = (date: Date, allRequests: ConsumableRequest[], autoDrafter: string) => {
     const monthKey = format(date, 'yyyy-MM');
-    const existing = allRequests.find(r => r.date.startsWith(monthKey));
+    const existing = allRequests.find(r => r.category === monthKey) || 
+                     allRequests.find(r => !r.category && r.date.startsWith(monthKey));
     
     if (existing) {
       // 기존 문서가 있을 경우: 저장된 데이터만 로드 (빈 행 추가 로직 제거)
       setActiveRequest({
         ...existing,
+        category: existing.category || monthKey,
         drafter: existing.drafter || autoDrafter
       });
     } else {
@@ -77,6 +79,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       setActiveRequest({
         id: generateId(),
         date: format(date, 'yyyy-MM-dd'),
+        category: monthKey,
         arrivalDate: '',
         department: '시설관리팀',
         drafter: autoDrafter,
