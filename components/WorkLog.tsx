@@ -300,6 +300,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   const [securityDuty, setSecurityDuty] = useState<DutyStatus>(DEFAULT_DUTY);
   const [utility, setUtility] = useState<UtilityUsage>(DEFAULT_UTILITY);
   const [logData, setLogData] = useState<WorkLogData>(getFreshInitialWorkLog());
+  const [isChemicalsVerified, setIsChemicalsVerified] = useState(false);
   const [activeTab, setActiveTab] = useState('electrical');
   const [activeWorkLogSubTab, setActiveWorkLogSubTab] = useState<'electrical' | 'mechanical' | 'fire' | 'elevator' | 'handover' | 'parking' | 'security' | 'cleaning'>('electrical');
   const [activeChecklistTab, setActiveChecklistTab] = useState<'substation' | 'fire' | 'elevator' | 'gas' | 'septic'>('substation');
@@ -445,20 +446,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
       const finalWorkLog: WorkLogData = deepMerge(getFreshInitialWorkLog(), { ...rawWorkLog, scheduled: currentScheduled });
 
-      if (yesterdayDirectReport && yesterdayDirectReport.mechanicalChemicals) {
-        if (!finalWorkLog.mechanicalChemicals) {
-          finalWorkLog.mechanicalChemicals = JSON.parse(JSON.stringify(INITIAL_CHEMICALS));
-        }
-        const chemKeys = ['seed', 'sterilizer'] as const;
-        chemKeys.forEach(key => {
-          const currentChem = finalWorkLog.mechanicalChemicals![key];
-          const yesterdayChem = yesterdayDirectReport.mechanicalChemicals![key];
-          const yesterdayStock = yesterdayChem.stock || (yesterdayChem as any).currentStock || '0';
-          if (yesterdayStock && (!currentChem.prev || currentChem.prev === '' || currentChem.prev === '0')) {
-            currentChem.prev = String(yesterdayStock);
-          }
-        });
-      }
+      setIsChemicalsVerified(!!serverDataResult?.workLog?.mechanicalChemicals?.seed?.prev);
 
       if (finalWorkLog.mechanicalChemicals) {
         ['seed', 'sterilizer'].forEach((key) => {
@@ -599,11 +587,56 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
   useEffect(() => {
     let cancelled = false;
     setIsPrintEnabledLog({ electrical: false, mechanical: false, checklist: false });
+    setIsChemicalsVerified(false);
     loadData(() => cancelled);
     return () => { cancelled = true; };
   }, [dateKey, loadData]);
 
+  const handleLoadPreviousChemicals = async () => {
+    try {
+      const yesterdayStr = format(subDays(currentDate, 1), 'yyyy-MM-dd');
+      const { data: yDailyRaw } = await supabase
+        .from('daily_reports')
+        .select('work_log')
+        .eq('id', yesterdayStr)
+        .maybeSingle();
+      
+      const yesterdayDirectReport = yDailyRaw?.work_log as WorkLogData;
+
+      if (!yesterdayDirectReport || !yesterdayDirectReport.mechanicalChemicals) {
+        alert('전날 저장된 데이터가 없습니다. 전날 일지를 먼저 확인해 주세요.');
+        return;
+      }
+
+      setLogData(prev => {
+        const next = JSON.parse(JSON.stringify(prev));
+        const chemKeys = ['seed', 'sterilizer'] as const;
+        chemKeys.forEach(key => {
+          const yChem = yesterdayDirectReport.mechanicalChemicals![key];
+          const yStock = yChem.stock || (yChem as any).currentStock || '0';
+          next.mechanicalChemicals[key].prev = String(yStock);
+          
+          const p = safeParseFloat(next.mechanicalChemicals[key].prev);
+          const i = safeParseFloat(next.mechanicalChemicals[key].incoming);
+          const u = safeParseFloat(next.mechanicalChemicals[key].used);
+          next.mechanicalChemicals[key].stock = (p + i - u).toString();
+        });
+        return next;
+      });
+      setIsChemicalsVerified(true);
+    } catch (error) {
+      console.error(error);
+      alert('전일 재고를 불러오는 중 오류가 발생했습니다.');
+    } finally {
+      // No global loading here
+    }
+  };
+
   const handleSaveChemicals = async () => {
+    if (!isChemicalsVerified) {
+      alert('전일재고를 먼저 불러와주세요.');
+      return;
+    }
     setSaveStatus('loading');
     try {
       const success = await saveMechanicalChemicals(dateKey, logData.mechanicalChemicals || INITIAL_CHEMICALS);
@@ -950,7 +983,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
   const renderTabContent = () => {
     if (activeTab === 'substation') return <SubstationLog currentDate={currentDate} isEmbedded={true} onUsageChange={val => setUtility(p => ({...p, electricity: val}))} />;
-    if (activeTab === 'mech_facility') return <HvacLog currentDate={currentDate} isEmbedded={true} onUsageChange={(h, b) => setUtility(p => ({...p, hvacGas: h, boilerGas: b}))} chemicals={logData.mechanicalChemicals} onChemicalsChange={handleChemicalUpdate} onChemicalsSave={handleSaveChemicals} onChemicalsRefresh={() => loadData(true)} />;
+    if (activeTab === 'mech_facility') return <HvacLog currentDate={currentDate} isEmbedded={true} onUsageChange={(h, b) => setUtility(p => ({...p, hvacGas: h, boilerGas: b}))} chemicals={logData.mechanicalChemicals} onChemicalsChange={handleChemicalUpdate} onChemicalsSave={handleSaveChemicals} onChemicalsRefresh={handleLoadPreviousChemicals} isChemicalsVerified={isChemicalsVerified} />;
     if (activeTab === 'checklist') {
       const groupedGas: Record<string, GasCheckItem[]> = {};
       gasLog.items.forEach(item => {

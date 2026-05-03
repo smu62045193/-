@@ -34,7 +34,8 @@ interface HvacLogProps {
   chemicals?: any;
   onChemicalsChange?: (idx: number, field: string, value: string) => void;
   onChemicalsSave?: () => Promise<void>;
-  onChemicalsRefresh?: () => void;
+  onChemicalsRefresh?: () => void | Promise<void>;
+  isChemicalsVerified?: boolean;
 }
 
 const HvacLog: React.FC<HvacLogProps> = ({ 
@@ -48,7 +49,8 @@ const HvacLog: React.FC<HvacLogProps> = ({
   chemicals: externalChemicals,
   onChemicalsChange,
   onChemicalsSave,
-  onChemicalsRefresh
+  onChemicalsRefresh,
+  isChemicalsVerified = false
 }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -542,17 +544,28 @@ const HvacLog: React.FC<HvacLogProps> = ({
 
           <div className="flex items-center shrink-0">
             <button 
-              onClick={() => loadData(true)} 
+              onClick={async () => {
+                if (activeSubTab === 'chemicals' && onChemicalsRefresh) {
+                  setLoading(true);
+                  try {
+                    await onChemicalsRefresh();
+                  } finally {
+                    setLoading(false);
+                  }
+                } else {
+                  loadData(true);
+                }
+              }} 
               disabled={loading} 
               className="relative px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black transition-colors whitespace-nowrap disabled:opacity-50 flex items-center shrink-0"
             >
               <RefreshCw size={16} className={`mr-1.5 ${loading ? 'animate-spin' : ''}`} />
-              새로고침
+              {activeSubTab === 'chemicals' ? '전일재고 불러오기' : '새로고침'}
             </button>
 
             <button 
               onClick={handleManualSave} 
-              disabled={loading || saveStatus === 'loading'} 
+              disabled={loading || saveStatus === 'loading' || (activeSubTab === 'chemicals' && !isChemicalsVerified)} 
               className={`relative px-4 py-3 text-[14px] font-bold transition-colors whitespace-nowrap flex items-center shrink-0 ${
                 saveStatus === 'success' ? 'text-orange-600' : 'text-gray-500 hover:text-black'
               }`}
@@ -758,7 +771,13 @@ const HvacLog: React.FC<HvacLogProps> = ({
                   <tr className="border-b border-black h-[32px]">
                     <td className="border border-black p-0 h-[32px] bg-white text-[13px] font-normal text-center text-black">종균제(l)</td>
                     <td className="border border-black p-0 h-[32px] bg-white text-[13px] font-normal text-center text-black">
-                      <div className="flex items-center h-full w-full px-2"><input type="text" value={externalChemicals.seed.prev || ''} onChange={e => onChemicalsChange?.(0, 'prev', e.target.value)} className="w-full h-full text-[13px] font-normal text-center bg-transparent border-none outline-none shadow-none appearance-none" placeholder="0" /></div>
+                      <div className="flex items-center h-full w-full px-2">
+                        {!isChemicalsVerified && (!externalChemicals.seed.prev || externalChemicals.seed.prev === '0') ? (
+                          <span className="w-full text-center text-red-500 font-bold animate-pulse">확인 필요</span>
+                        ) : (
+                          <input type="text" value={externalChemicals.seed.prev || ''} onChange={e => onChemicalsChange?.(0, 'prev', e.target.value)} className="w-full h-full text-[13px] font-normal text-center bg-transparent border-none outline-none shadow-none appearance-none" placeholder="0" />
+                        )}
+                      </div>
                     </td>
                     <td className="border border-black p-0 h-[32px] bg-white text-[13px] font-normal text-center text-black">
                       <div className="flex items-center h-full w-full px-2"><input type="text" value={externalChemicals.seed.incoming || ''} onChange={e => onChemicalsChange?.(0, 'incoming', e.target.value)} className="w-full h-full text-[13px] font-normal text-center bg-transparent border-none outline-none shadow-none appearance-none" placeholder="0" /></div>
@@ -773,7 +792,13 @@ const HvacLog: React.FC<HvacLogProps> = ({
                   <tr className="border-b border-black h-[32px]">
                     <td className="border border-black p-0 h-[32px] bg-white text-[13px] font-normal text-center text-black">소독제(kg)</td>
                     <td className="border border-black p-0 h-[32px] bg-white text-[13px] font-normal text-center text-black">
-                      <div className="flex items-center h-full w-full px-2"><input type="text" value={externalChemicals.sterilizer.prev || ''} onChange={e => onChemicalsChange?.(1, 'prev', e.target.value)} className="w-full h-full text-[13px] font-normal text-center bg-transparent border-none outline-none shadow-none appearance-none" placeholder="0" /></div>
+                      <div className="flex items-center h-full w-full px-2">
+                        {!isChemicalsVerified && (!externalChemicals.sterilizer.prev || externalChemicals.sterilizer.prev === '0') ? (
+                          <span className="w-full text-center text-red-500 font-bold animate-pulse">확인 필요</span>
+                        ) : (
+                          <input type="text" value={externalChemicals.sterilizer.prev || ''} onChange={e => onChemicalsChange?.(1, 'prev', e.target.value)} className="w-full h-full text-[13px] font-normal text-center bg-transparent border-none outline-none shadow-none appearance-none" placeholder="0" />
+                        )}
+                      </div>
                     </td>
                     <td className="border border-black p-0 h-[32px] bg-white text-[13px] font-normal text-center text-black">
                       <div className="flex items-center h-full w-full px-2"><input type="text" value={externalChemicals.sterilizer.incoming || ''} onChange={e => onChemicalsChange?.(1, 'incoming', e.target.value)} className="w-full h-full text-[13px] font-normal text-center bg-transparent border-none outline-none shadow-none appearance-none" placeholder="0" /></div>
