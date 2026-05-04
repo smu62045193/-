@@ -8,6 +8,7 @@ import {
   saveAutoRegSettings, 
   fetchArchiveSettings, 
   saveArchiveSettings,
+  deleteArchiveItem,
   fetchNetworkSettings,
   saveNetworkSettings,
   fetchPasswordSettings,
@@ -1163,14 +1164,20 @@ const AdminManager: React.FC = () => {
     }
   };
 
-  const handleDeleteRow = (id: string) => {
+  const handleDeleteRow = async (id: string) => {
     if (activeTab === 'auto_reg') {
       setRowsData(prev => ({
         ...prev,
         [activeSubTab]: prev[activeSubTab].filter(row => row.id !== id)
       }));
     } else if (activeTab === 'form') {
-      setArchiveRows(prev => prev.filter(row => row.id !== id));
+      const updatedRows = archiveRows.filter(row => row.id !== id);
+      setArchiveRows(updatedRows);
+      try {
+        await deleteArchiveItem(id);
+      } catch (error) {
+        console.error('Failed to delete archive item from server:', error);
+      }
     } else if (activeTab === 'emergency') {
       setEmergencyData(prev => prev.filter(row => row.id !== id));
     }
@@ -1371,7 +1378,7 @@ const AdminManager: React.FC = () => {
                           title={row.fileName || '다운로드'}
                         >
                           <Download size={16} />
-                          <span className="text-[11px] truncate max-w-[60px]">{row.fileName || '파일'}</span>
+                          <span className="text-[11px] break-all">{row.fileName || '파일'}</span>
                         </button>
                       ) : (
                         <label className="cursor-pointer text-gray-400 hover:text-blue-600 transition-colors">

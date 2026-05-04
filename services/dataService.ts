@@ -850,6 +850,24 @@ export const saveArchiveSettings = async (rows: any[]): Promise<boolean> => {
 };
 
 /**
+ * 자료실 항목 삭제하기
+ */
+export const deleteArchiveItem = async (id: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('archive_data')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error('deleteArchiveItem error:', e);
+    return false;
+  }
+};
+
+/**
  * 네트워크 설정 데이터 가져오기
  */
 export const fetchNetworkSettings = async (subTab: string): Promise<any[]> => {
