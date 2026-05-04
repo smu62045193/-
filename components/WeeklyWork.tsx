@@ -164,10 +164,16 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   }, [report, activeTab, activeSubTab]);
 
   useEffect(() => {
+    if (isEditMode) return;
     const newStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     const newStartStr = format(newStart, 'yyyy-MM-dd');
-    loadReport(newStartStr);
-  }, [currentDate, startDateStr]);
+    
+    // 현재 리포트의 시작일과 다르거나 아직 데이터가 없는 경우에만 새로 불러옵니다.
+    // 수정 완료 후 단순히 모드만 변경할 때 데이터가 초기화되는 것을 방지합니다.
+    if (newStartStr !== report.startDate || !report.author) {
+      loadReport(newStartStr);
+    }
+  }, [currentDate, isEditMode, report.startDate, report.author]);
 
   const loadReport = async (dateKey: string) => {
     setLoading(true);
@@ -211,18 +217,42 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   };
 
   const handleReportingDateChange = (newDateStr: string) => {
+    if (!newDateStr) return;
+    
     const newDate = parseISO(newDateStr);
     const newStart = startOfWeek(newDate, { weekStartsOn: 1 });
     const newStartStr = format(newStart, 'yyyy-MM-dd');
-    
+
     setReport(prev => ({
       ...prev,
       reportingDate: newDateStr,
       startDate: newStartStr
     }));
+
+    // 전체 애플리케이션의 날짜(currentDate)도 함께 동계화하여 '대상주간' 표시 및 사이드바와 일관성을 유지합니다.
+    if (onDateChange) {
+      onDateChange(newDate);
+    }
+  };
+
+  const handleDateChange = (newDate: Date) => {
+    const newStart = startOfWeek(newDate, { weekStartsOn: 1 });
+    const newStartStr = format(newStart, 'yyyy-MM-dd');
     
-    // 날짜가 변경되면 해당 주차의 데이터를 새로 불러옵니다.
-    loadReport(newStartStr);
+    setReport(prev => ({
+      ...prev,
+      startDate: newStartStr,
+      // 날짜 선택기로 주간을 바꿀 때는 작성일자를 해당 주의 금요일로 기본 설정해줍니다.
+      reportingDate: format(addDays(newStart, 4), 'yyyy-MM-dd')
+    }));
+    
+    if (onDateChange) {
+      onDateChange(newDate);
+    }
+    
+    if (!isEditMode) {
+      loadReport(newStartStr);
+    }
   };
 
   const handleOpenImportModal = () => {
@@ -441,13 +471,16 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
         setSaveStatus('success');
         alert('저장이 완료되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
+        return true;
       } else {
         setSaveStatus('error');
         alert('저장에 실패했습니다.');
+        return false;
       }
     } catch (e) {
       setSaveStatus('error');
       alert('오류가 발생했습니다.');
+      return false;
     }
   };
 
@@ -667,7 +700,13 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                 연동
               </button>
               <button 
-                onClick={() => setIsEditMode(!isEditMode)} 
+                onClick={async () => {
+                  if (isEditMode) {
+                    const success = await handleSave();
+                    if (!success) return; // 저장 실패 시 수정 모드 유지
+                  }
+                  setIsEditMode(!isEditMode);
+                }} 
                 disabled={loading}
                 className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-all relative whitespace-nowrap disabled:opacity-50 ${
                   isEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
@@ -703,33 +742,38 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             </div>
           </div>
           <div className="w-full max-w-7xl mx-auto flex items-stretch overflow-x-auto scrollbar-hide bg-white print:hidden border-b border-black">
-            {/* Replaced '주간업무보고' with Info Fields */}
-            <div className="flex items-center shrink-0 gap-2">
-              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
-                <span className="text-[14px] font-bold text-gray-500 uppercase">사업자명 :</span>
-                <span className="text-sm font-bold text-black">새마을운동중앙회 대치동사옥</span>
+            <div className="flex items-center shrink-0">
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4 border-r border-black/10">
+                <span className="text-[14px] font-bold text-gray-500">사업자명 :</span>
+                <span className="text-[14px] font-bold text-black">새마을운동중앙회 대치동사옥</span>
               </div>
-              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
-                <span className="text-[14px] font-bold text-gray-500 uppercase">작성자 :</span>
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4 border-r border-black/10">
+                <span className="text-[14px] font-bold text-gray-500">작성자 :</span>
                 <input 
                   type="text" 
                   value={report.author} 
-                  onChange={e => setReport({...report, author: e.target.value})} 
+                  onChange={e => setReport(p => ({...p, author: e.target.value}))} 
                   disabled={!isEditMode}
-                  className={`border-b-2 ${isEditMode ? 'border-blue-500 bg-blue-50/30' : 'border-transparent bg-transparent'} w-24 outline-none text-sm font-bold text-black py-0.5 text-center transition-all rounded-none`} 
+                  className={`border-b-2 ${isEditMode ? 'border-blue-500 bg-blue-50' : 'border-transparent bg-transparent'} w-24 outline-none text-[14px] font-bold text-black py-0.5 text-center transition-all rounded-none`} 
                 />
               </div>
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4 border-r border-black/10">
+                <span className="text-[14px] font-bold text-gray-500">대상주간 :</span>
+                <span className="text-[14px] font-bold text-black">
+                  {format(parseISO(report.startDate), 'MM.dd')} ~ {format(addDays(parseISO(report.startDate), 6), 'MM.dd')}
+                </span>
+              </div>
               <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
-                <span className="text-[14px] font-bold text-gray-500 uppercase">작성일자 :</span>
+                <span className="text-[14px] font-bold text-gray-500">작성일자 :</span>
                 {isEditMode ? (
                   <input 
                     type="date" 
                     value={report.reportingDate} 
                     onChange={e => handleReportingDateChange(e.target.value)}
-                    className="border-b-2 border-blue-500 bg-blue-50/30 outline-none text-sm font-bold text-black py-0.5 px-2 transition-all rounded-none"
+                    className="border-b-2 border-blue-500 bg-blue-50 outline-none text-[14px] font-bold text-black py-0.5 px-2 transition-all rounded-none"
                   />
                 ) : (
-                  <span className="text-sm font-bold text-black">{format(parseISO(report.reportingDate), 'yyyy년 MM월 dd일')}</span>
+                  <span className="text-[14px] font-bold text-black">{format(parseISO(report.reportingDate), 'yyyy년 MM월 dd일')}</span>
                 )}
               </div>
             </div>
