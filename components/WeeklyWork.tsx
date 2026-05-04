@@ -743,11 +743,11 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           </div>
           <div className="w-full max-w-7xl mx-auto flex items-stretch overflow-x-auto scrollbar-hide bg-white print:hidden border-b border-black">
             <div className="flex items-center shrink-0">
-              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4 border-r border-black/10">
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
                 <span className="text-[14px] font-bold text-gray-500">사업자명 :</span>
                 <span className="text-[14px] font-bold text-black">새마을운동중앙회 대치동사옥</span>
               </div>
-              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4 border-r border-black/10">
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
                 <span className="text-[14px] font-bold text-gray-500">작성자 :</span>
                 <input 
                   type="text" 
@@ -757,7 +757,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                   className={`border-b-2 ${isEditMode ? 'border-blue-500 bg-blue-50' : 'border-transparent bg-transparent'} w-24 outline-none text-[14px] font-bold text-black py-0.5 text-center transition-all rounded-none`} 
                 />
               </div>
-              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4 border-r border-black/10">
+              <div className="flex items-center gap-2 whitespace-nowrap shrink-0 py-2 px-4">
                 <span className="text-[14px] font-bold text-gray-500">대상주간 :</span>
                 <span className="text-[14px] font-bold text-black">
                   {format(parseISO(report.startDate), 'MM.dd')} ~ {format(addDays(parseISO(report.startDate), 6), 'MM.dd')}
