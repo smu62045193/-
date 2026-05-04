@@ -11,9 +11,12 @@ interface ConsumableRequestManagerProps {
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 const SECTIONS = [
+  { key: '전체', label: '전체' },
   { key: '전기', label: '전기' },
-  { key: '소방', label: '소방' },
   { key: '기계', label: '기계' },
+  { key: '소방', label: '소방' },
+  { key: '주차', label: '주차' },
+  { key: '미화', label: '미화' },
   { key: '공용', label: '공용' }
 ];
 
@@ -22,7 +25,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
   const [requests, setRequests] = useState<ConsumableRequest[]>([]);
   const [viewDate, setViewDate] = useState(new Date());
   const [activeRequest, setActiveRequest] = useState<ConsumableRequest | null>(null);
-  const [activeSection, setActiveSection] = useState('전기');
+  const [activeSection, setActiveSection] = useState('전체');
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
@@ -121,7 +124,8 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
         });
 
       const newItems: ConsumableRequestItem[] = [];
-      SECTIONS.forEach(sec => {
+      // '전체' 섹션은 무시하고 실제 카테고리별로 처리
+      SECTIONS.filter(s => s.key !== '전체').forEach(sec => {
         const matchingLedger = lowStockItems.filter(l => l.category === sec.key);
         matchingLedger.forEach(l => {
           const itemUnit = l.unit || 'EA';
@@ -161,7 +165,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       const currentItems = [...activeRequest.items];
       const paddedItems: ConsumableRequestItem[] = [];
 
-      SECTIONS.forEach(sec => {
+      SECTIONS.filter(s => s.key !== '전체').forEach(sec => {
         const sectionItems = currentItems.filter(it => it.category === sec.key);
         paddedItems.push(...sectionItems);
         
@@ -244,12 +248,12 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
     if (!printWindow) return;
     const title = `${format(viewDate, 'yyyy년 MM월')} 소모품자재 구입 신청서`;
 
-    const sectionsHtml = SECTIONS.map(sec => {
+    const sectionsHtml = SECTIONS.filter(s => s.key !== '전체').map(sec => {
       const its = activeRequest.items.filter(i => i.category === sec.key && i.itemName.trim() !== '');
       return its.length > 0 ? `
         <div style="break-inside: avoid; margin-bottom: 2px;">
           <h3 style="font-size: 13pt; font-weight: bold; margin-bottom: 6px; border-left: 7px solid black; padding-left: 10px; margin-top: 15px;">${sec.label}</h3>
-          <table>
+          <table style="width: 99%; margin-left: auto; margin-right: auto;">
             <thead><tr style="background:#ffffff; height:30px;">
               <th style="width: 30px;">No</th>
               <th style="width: 140px;">품 명</th>
@@ -317,7 +321,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
   return (
     <div className="space-y-2">
       <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
-        <div className="flex items-center shrink-0">
+        <div className="flex items-stretch shrink-0">
           {/* 월 네비게이션 */}
           <div className="flex items-center shrink-0">
             <button 
@@ -342,12 +346,12 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
           </div>
 
           {/* 카테고리 탭 */}
-          <div className="flex items-center shrink-0">
+          <div className="flex items-stretch shrink-0 bg-white">
             {SECTIONS.map(sec => (
-              <div
+              <button
                 key={sec.key}
                 onClick={() => setActiveSection(sec.key)}
-                className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                className={`relative px-4 py-3 text-[14px] font-bold transition-all whitespace-nowrap ${
                   activeSection === sec.key 
                     ? 'text-orange-600' 
                     : 'text-gray-500 hover:text-black'
@@ -355,9 +359,9 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
               >
                 {sec.label}
                 {activeSection === sec.key && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600"></div>
                 )}
-              </div>
+              </button>
             ))}
           </div>
 
@@ -503,7 +507,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
 
       <div className="space-y-2">
-        {SECTIONS.filter(sec => sec.key === activeSection).map(sec => {
+        {SECTIONS.filter(sec => activeSection === '전체' ? sec.key !== '전체' : sec.key === activeSection).map(sec => {
           const sectionItems = activeRequest?.items.filter(i => i.category === sec.key) || [];
           
           // 조회 모드일 때는 이름이 있는 것만 표시, 수정 모드일 때는 패딩된 행 전체 표시
@@ -515,7 +519,13 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
           if (!isEditMode && displayItems.length === 0) return null;
 
           return (
-            <div key={sec.key} className="animate-fade-in-down space-y-2">
+            <div key={sec.key} className="animate-fade-in-down pt-2">
+              {activeSection === '전체' && (
+                <div className="max-w-7xl mx-auto flex items-center gap-2 mb-2">
+                  <div className="w-[5px] h-6 bg-black"></div>
+                  <span className="text-[18px] font-extrabold text-black">{sec.label}</span>
+                </div>
+              )}
               <div className="bg-white max-w-7xl mx-auto overflow-hidden overflow-x-auto">
                 <table className="w-full min-w-[1000px] border-collapse text-center border border-black">
                   <thead>

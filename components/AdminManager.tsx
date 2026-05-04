@@ -70,6 +70,7 @@ const SUB_TABS_ARCHIVE = [
   { id: 'fire', label: '소방' },
   { id: 'elevator', label: '승강기' },
   { id: 'parking', label: '주차' },
+  { id: 'form', label: '양식' },
   { id: 'etc', label: '기타' },
 ];
 
@@ -1307,6 +1308,7 @@ const AdminManager: React.FC = () => {
         fire: '소방',
         elevator: '승강기',
         parking: '주차',
+        form: '양식',
         etc: '기타'
       };
       
@@ -1336,7 +1338,7 @@ const AdminManager: React.FC = () => {
                 <th className="border border-black text-[13px] font-normal px-2 w-[350px]">제목</th>
                 <th className="border border-black text-[13px] font-normal px-2 w-[150px]">등록일</th>
                 <th className="border border-black text-[13px] font-normal px-2 w-[250px]">첨부</th>
-                <th className="border border-black text-[13px] font-normal px-2 w-[60px]">관리</th>
+                <th className="border border-black text-[13px] font-normal px-2 w-[80px]">관리</th>
               </tr>
             </thead>
             <tbody>
@@ -1389,13 +1391,24 @@ const AdminManager: React.FC = () => {
                     </div>
                   </td>
                   <td className="border border-black text-[13px] font-normal px-2">
-                    <div className="flex items-center justify-center h-full">
+                    <div className="flex items-center justify-center h-full gap-2">
                       <button 
                         onClick={() => handleEditArchive(row.id)}
                         className="text-blue-500 hover:text-blue-700 transition-colors"
                         title="수정"
                       >
                         <Edit size={16} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (window.confirm('정말 삭제하시겠습니까?')) {
+                            handleDeleteRow(row.id);
+                          }
+                        }}
+                        className="text-red-500 hover:text-red-700 transition-colors"
+                        title="삭제"
+                      >
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </td>
@@ -3290,6 +3303,23 @@ const AdminManager: React.FC = () => {
             >
               <Plus size={18} className="mr-1.5" />
               등록
+            </button>
+
+            <button 
+              onClick={handleSave}
+              disabled={isSaving}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
+                saveSuccess ? 'text-orange-600' : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              {isSaving ? (
+                <Loader2 size={18} className="mr-1.5 animate-spin" />
+              ) : saveSuccess ? (
+                <CheckCircle2 size={18} className="mr-1.5" />
+              ) : (
+                <Save size={18} className="mr-1.5" />
+              )}
+              {saveSuccess ? '저장완료' : '저장'}
             </button>
           </div>
         </div>

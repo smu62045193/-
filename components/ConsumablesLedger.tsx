@@ -13,7 +13,7 @@ interface ConsumablesLedgerProps {
 const generateId = () => `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 const CATEGORIES = [
-  '전기', '기계', '소방', '공용'
+  '전기', '기계', '소방', '주차', '미화', '공용'
 ];
 
 const ITEMS_PER_PAGE = 10;
@@ -22,6 +22,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<ConsumableItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('전체');
   const [editId, setEditId] = useState<string | null>(null);
   const [saveSuccess, setSaveStatus] = useState(false);
   
@@ -151,16 +152,15 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       printedItems = printedItems.filter(item => item.isManual);
 
       const getCategoryRank = (cat?: string) => {
-        if (cat === '전기') return 1;
-        if (cat === '기계') return 2;
-        if (cat === '공용') return 3;
-        return 99;
+        const idx = CATEGORIES.indexOf(cat || '');
+        return idx !== -1 ? idx : 999;
       };
 
       printedItems.sort((a, b) => {
         const rankA = getCategoryRank(a.category);
         const rankB = getCategoryRank(b.category);
         if (rankA !== rankB) return rankA - rankB;
+        if (a.isManual !== b.isManual) return a.isManual ? -1 : 1;
         return a.itemName.localeCompare(b.itemName) || (a.modelName || '').localeCompare(b.modelName || '');
       });
     }
@@ -228,7 +228,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               padding-bottom: 10px;
             }
             table { 
-              width: 100%; 
+              width: 99%; 
+              margin-left: auto;
+              margin-right: auto;
               border-collapse: collapse; 
               margin-bottom: 20px; 
             }
@@ -263,7 +265,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                 <tr>
                   ${viewMode === 'ledger' ? `
                     <th style="width: 50px;">No</th>
-                    <th style="width: 60px;">구분</th>
+                    <th style="width: 80px;">코드</th>
                     <th style="width: 180px;">품명</th>
                     <th style="width: 150px;">모델명</th>
                     <th style="width: auto;">비고</th>
@@ -283,10 +285,19 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               <tbody>
                 ${printedItems.length > 0 ? printedItems.map((item, index) => {
                   const globalIdx = printedItems.length - index;
+                  
+                  // 분류별 코드 계산 (전기-01, 기계-01 등)
+                  let categoryCode = '';
+                  if (viewMode === 'ledger') {
+                    const itemsInCategory = printedItems.filter(s => s.category === item.category);
+                    const indexInCategory = itemsInCategory.indexOf(item);
+                    categoryCode = `${item.category}-${String(indexInCategory + 1).padStart(2, '0')}`;
+                  }
+                  
                   return viewMode === 'ledger' ? `
                     <tr>
                       <td>${index + 1}</td>
-                      <td>${item.category || ''}</td>
+                      <td>${categoryCode}</td>
                       <td>${item.itemName || ''}</td>
                       <td>${item.modelName || '-'}</td>
                       <td>${item.note || ''}</td>
@@ -370,11 +381,13 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     return Object.values(groups).map(group => ({
       ...group.lastItem,
       stockQty: (group.totalIn - group.totalOut).toString()
-    })).sort((a, b) => 
-      a.category.localeCompare(b.category) || 
-      a.itemName.localeCompare(b.itemName) ||
-      (a.modelName || '').localeCompare(b.modelName || '')
-    );
+    })).sort((a, b) => {
+      const idxA = CATEGORIES.indexOf(a.category);
+      const idxB = CATEGORIES.indexOf(b.category);
+      if (idxA !== idxB) return idxA - idxB;
+      if (a.isManual !== b.isManual) return a.isManual ? -1 : 1;
+      return a.itemName.localeCompare(b.itemName) || (a.modelName || '').localeCompare(b.modelName || '');
+    });
   }, [items]);
 
   const updateBaseStock = (category: string, name: string, model: string) => {
@@ -512,23 +525,30 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   };
 
   const processedList = useMemo(() => {
-    if (viewMode === 'usage' && !searchTerm.trim()) {
+    if (viewMode === 'usage' && !searchTerm.trim() && selectedCategory === '전체') {
       return [];
     }
 
+    let list = [];
     if (viewMode === 'ledger') {
-      return summaryItems.filter(item => 
+      list = summaryItems.filter(item => 
         (item.itemName || '').includes(searchTerm) || 
         (item.modelName || '').includes(searchTerm)
       );
     } else {
-      return items.filter(item => 
+      list = items.filter(item => 
         (item.itemName || '').includes(searchTerm) || 
         (item.details || '').includes(searchTerm) || 
         (item.modelName || '').includes(searchTerm)
       ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
-  }, [items, summaryItems, searchTerm, viewMode]);
+
+    if (selectedCategory !== '전체') {
+      list = list.filter(item => item.category === selectedCategory);
+    }
+
+    return list;
+  }, [items, summaryItems, searchTerm, selectedCategory, viewMode]);
 
   const totalPages = Math.max(1, Math.ceil(processedList.length / ITEMS_PER_PAGE));
   const paginatedList = useMemo(() => {
@@ -666,15 +686,41 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       {/* 툴바 */}
       <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
         <div className="flex items-stretch shrink-0">
-          <div className="relative w-full sm:w-[250px] flex items-center bg-white border-none rounded-none">
+          <div className="relative w-full sm:w-[220px] flex items-center bg-white border-none rounded-none">
             <input 
               type="text" 
-              placeholder="품명, 모델명, 상세내역 검색" 
+              placeholder="검색어 입력" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
               className="w-full pl-10 pr-4 py-3 border-none text-[14px] font-bold bg-white text-black outline-none transition-all" 
             />
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-black" size={18} />
+          </div>
+
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-[1px] h-6 bg-black"></div>
+          </div>
+
+          <div className="flex items-stretch shrink-0 bg-white">
+            {['전체', ...CATEGORIES].map(cat => (
+              <button
+                key={cat}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  setCurrentPage(1);
+                }}
+                className={`relative px-4 py-3 text-[14px] font-bold transition-all whitespace-nowrap ${
+                  selectedCategory === cat 
+                    ? 'text-orange-600' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {cat}
+                {selectedCategory === cat && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600"></div>
+                )}
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center shrink-0 px-2">
@@ -724,6 +770,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               {viewMode === 'ledger' ? (
                 <tr className="h-[40px]">
                   <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>No</div></th>
+                  <th className={`${thClass} w-[80px]`}><div className={cellDivClass}>코드</div></th>
                   <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>구분</div></th>
                   <th className={`${thClass} w-[180px]`}><div className={cellDivClass}>품명</div></th>
                   <th className={`${thClass} w-[140px]`}><div className={cellDivClass}>모델명</div></th>
@@ -760,12 +807,19 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
               ) : viewMode === 'ledger' ? (
                 paginatedList.map((item, idx) => {
                   const globalIdx = processedList.length - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
+                  
+                  // 분류별 코드 계산 (전기-01, 기계-01 등)
+                  const itemsInCategory = summaryItems.filter(s => s.category === item.category);
+                  const indexInCategory = itemsInCategory.findIndex(s => s.id === item.id);
+                  const categoryCode = `${item.category}-${String(indexInCategory + 1).padStart(2, '0')}`;
+                  
                   const currentStock = parseFloat(item.stockQty);
                   const minStock = parseFloat(item.minStock || '5');
                   const isLowStock = currentStock <= minStock;
                   return (
                     <tr key={`summary-${item.id}`} className="hover:bg-blue-50/30 transition-colors text-center h-[40px]">
                       <td className={tdClass}><div className={cellDivClass}>{globalIdx}</div></td>
+                      <td className={tdClass}><div className={cellDivClass}>{categoryCode}</div></td>
                       <td className={`${tdClass} text-blue-600`}><div className={cellDivClass}>{item.category}</div></td>
                       <td className={tdClass}><div className={cellDivClass}>{item.itemName}</div></td>
                       <td className={tdClass}><div className={cellDivClass}>{item.modelName || '-'}</div></td>
