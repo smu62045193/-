@@ -68,6 +68,8 @@ const HvacLog: React.FC<HvacLogProps> = ({
   const setBoilerData = onBoilerChange || setInternalBoilerData;
 
   const [activeSubTab, setActiveSubTab] = useState<'hvac' | 'boiler' | 'air_env' | 'chemicals'>('hvac');
+  const activeSubTabRef = useRef(activeSubTab);
+  useEffect(() => { activeSubTabRef.current = activeSubTab; }, [activeSubTab]);
   const airEnvRef = useRef<AirEnvironmentLogHandle>(null);
   
   const prevDayInfoRef = useRef({
@@ -165,7 +167,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
   const loadData = useCallback(async (isRefresh = false) => {
     setIsPrintEnabledHvac(false);
     setIsPrintEnabledAirEnv(false);
-    if (activeSubTab === 'air_env' && isRefresh) {
+    if (activeSubTabRef.current === 'air_env' && isRefresh) {
       if (airEnvRef.current) {
         await airEnvRef.current.handleSyncData();
       }
@@ -253,13 +255,11 @@ const HvacLog: React.FC<HvacLogProps> = ({
     } finally { 
       setLoading(false); 
     }
-  }, [dateKey, currentDate, applyCalculations, activeSubTab, setData, setBoilerData]);
+  }, [dateKey, applyCalculations, setData, setBoilerData]);
 
   useEffect(() => { 
-    if (!externalHvacData || !externalBoilerData) {
-      loadData(); 
-    }
-  }, [loadData, externalHvacData, externalBoilerData]);
+    loadData(); 
+  }, [loadData, dateKey]);
 
   const handleManualSave = async () => {
     if (activeSubTab === 'air_env') {

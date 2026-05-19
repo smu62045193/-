@@ -983,7 +983,22 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
   const renderTabContent = () => {
     if (activeTab === 'substation') return <SubstationLog currentDate={currentDate} isEmbedded={true} onUsageChange={val => setUtility(p => ({...p, electricity: val}))} />;
-    if (activeTab === 'mech_facility') return <HvacLog currentDate={currentDate} isEmbedded={true} onUsageChange={(h, b) => setUtility(p => ({...p, hvacGas: h, boilerGas: b}))} chemicals={logData.mechanicalChemicals} onChemicalsChange={handleChemicalUpdate} onChemicalsSave={handleSaveChemicals} onChemicalsRefresh={handleLoadPreviousChemicals} isChemicalsVerified={isChemicalsVerified} />;
+    if (activeTab === 'mech_facility') return (
+      <HvacLog 
+        currentDate={currentDate} 
+        isEmbedded={true} 
+        hvacData={hvacGasReadings}
+        boilerData={boilerGasReadings}
+        onHvacChange={setHvacGasReadings}
+        onBoilerChange={setBoilerGasReadings}
+        onUsageChange={(h, b) => setUtility(p => ({...p, hvacGas: h, boilerGas: b}))} 
+        chemicals={logData.mechanicalChemicals} 
+        onChemicalsChange={handleChemicalUpdate} 
+        onChemicalsSave={handleSaveChemicals} 
+        onChemicalsRefresh={handleLoadPreviousChemicals} 
+        isChemicalsVerified={isChemicalsVerified} 
+      />
+    );
     if (activeTab === 'checklist') {
       const groupedGas: Record<string, GasCheckItem[]> = {};
       gasLog.items.forEach(item => {
