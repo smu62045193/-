@@ -111,14 +111,26 @@ interface TaskRowProps {
 const TaskRow: React.FC<TaskRowProps> = ({ item, isToday, onUpdate, onDelete }) => {
   // 'task_'가 포함된 ID는 수동 추가 항목, 나머지는 자동 등록 항목으로 판별
   const isManual = item?.id?.includes('task_');
+  const isMonthly = item?.frequency === '월간' || item?.id?.includes('-monthly-');
+
+  let textColor = 'text-black';
+  let bulletColor = isToday ? 'bg-blue-400' : 'bg-indigo-400';
+
+  if (isManual) {
+    textColor = '!text-blue-500';
+  } else if (isMonthly) {
+    textColor = '!text-purple-600 font-semibold';
+    bulletColor = isToday ? 'bg-purple-500' : 'bg-purple-300';
+  }
+
   return (
     <div className="flex items-center space-x-2 py-1.5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors px-3 rounded group">
-      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isToday ? 'bg-blue-400' : 'bg-indigo-400'}`}></div>
+      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${bulletColor}`}></div>
       <input 
         type="text"
         value={item?.content || ''}
         onChange={(e) => onUpdate({ ...item, content: e.target.value })}
-        className={`flex-1 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-100 rounded px-2 h-9 border border-transparent focus:border-gray-100 font-medium !text-left ${isManual ? '!text-blue-500' : 'text-black'}`}
+        className={`flex-1 text-sm bg-transparent focus:outline-none focus:ring-1 focus:ring-blue-100 rounded px-2 h-9 border border-transparent focus:border-gray-100 font-medium !text-left ${textColor}`}
         placeholder={isToday ? "작업 내용을 입력하세요" : "예정 사항을 입력하세요"}
       />
       <button onClick={onDelete} className="text-gray-300 hover:text-red-500 p-2 transition-colors opacity-0 group-hover:opacity-100" title="삭제">
@@ -500,7 +512,8 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             elevator: 'elevator',
             parking: 'parking',
             security: 'security',
-            cleaning: 'cleaning'
+            cleaning: 'cleaning',
+            handover: 'remarks'
           };
 
           const dbCategory = categoryMap[key];

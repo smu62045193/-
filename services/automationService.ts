@@ -13,6 +13,7 @@ const FIXED_HOLIDAYS = [
   '05-01', // 근로자의 날
   '05-05', // 어린이날
   '06-06', // 현충일
+  '07-17', // 제헌절
   '08-15', // 광복절
   '10-03', // 개천절
   '10-09', // 한글날
@@ -51,6 +52,131 @@ export const isNonWorkingDay = (date: Date): boolean => {
 };
 
 /**
+ * 월간 자동등록 설정이 특정 날짜에 해당하는지 체크
+ */
+export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
+  const day = getDay(date); // 0: 일, 1: 월, ..., 6: 토
+  const isHoliday = isHolidayOrSunday(date);
+  
+  // Parse item name and metadata if it is stored as JSON
+  const itemText = setting.item || setting.item_name || '';
+  let weekSelect = '1주차';
+  let specificDay = '';
+  let prevDay = false;
+  let nextDay = false;
+
+  if (itemText.includes('__MONTHLY_JSON__')) {
+    const parts = itemText.split('__MONTHLY_JSON__');
+    try {
+      const meta = JSON.parse(parts[1]);
+      weekSelect = meta.weekSelect || '1주차';
+      specificDay = meta.specificDay || '';
+      prevDay = !!meta.prevDay;
+      nextDay = !!meta.nextDay;
+    } catch (e) {
+      console.error('Failed to parse monthly json:', e);
+    }
+  } else {
+    // If it's not JSON format, it's not a monthly setting
+    return false;
+  }
+
+  const checkScheduleForDate = (d: Date): boolean => {
+    const dDay = getDay(d);
+    
+    // 1. Day of week check
+    let dayMatched = false;
+    switch(dDay) {
+      case 0: if (setting.sun) dayMatched = true; break;
+      case 1: if (setting.mon) dayMatched = true; break;
+      case 2: if (setting.tue) dayMatched = true; break;
+      case 3: if (setting.wed) dayMatched = true; break;
+      case 4: if (setting.thu) dayMatched = true; break;
+      case 5: if (setting.fri) dayMatched = true; break;
+      case 6: if (setting.sat) dayMatched = true; break;
+    }
+
+    if (weekSelect === '일자지정') {
+      const targetDay = parseInt(specificDay, 10);
+      return !isNaN(targetDay) && d.getDate() === targetDay;
+    }
+
+    if (weekSelect === '말일') {
+      // Check if d is the last day of its month
+      const tomorrow = addDays(d, 1);
+      return tomorrow.getDate() === 1;
+    }
+
+    // Week based: '1주차', '2주차', '3주차', '4주차', '5주차', '월초'
+    if (dayMatched) {
+      // Calculate calendar-based week occurrence (Sunday starts the week)
+      const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+      const firstDayOfWeek = firstDayOfMonth.getDay(); // 0: Sun, 1: Mon, ..., 6: Sat
+      const occurrence = Math.ceil((d.getDate() + firstDayOfWeek) / 7);
+      switch (weekSelect) {
+        case '월초': return occurrence === 1;
+        case '1주차': return occurrence === 1;
+        case '2주차': return occurrence === 2;
+        case '3주차': return occurrence === 3;
+        case '4주차': return occurrence === 4;
+        case '5주차': return occurrence === 5;
+      }
+    }
+
+    if (weekSelect === '월초') {
+      return d.getDate() === 1;
+    }
+
+    return false;
+  };
+
+  // Exclude holiday check
+  const excludeHolidays = !!(setting.excludeHolidays || setting.exclude_holidays);
+
+  // If we exclude holidays, we treat Saturdays, Sundays, and public holidays as non-working days
+  if (excludeHolidays) {
+    if (isNonWorkingDay(date)) {
+      // If today is a weekend/holiday, we never run today (the scheduled task is shifted or skipped)
+      return false;
+    }
+
+    // Today is a working day (Monday - Friday and not a holiday)
+    // 1. Check if the schedule matches today directly
+    if (checkScheduleForDate(date)) {
+      return true;
+    }
+
+    // 2. Shift checks (since today itself doesn't match standard schedule)
+    if (prevDay) {
+      // Look ahead for consecutive weekend/holidays. If any of them is the scheduled day, we run it on today (the last working day before)
+      let nextDate = addDays(date, 1);
+      while (isNonWorkingDay(nextDate)) {
+        if (checkScheduleForDate(nextDate)) {
+          return true;
+        }
+        nextDate = addDays(nextDate, 1);
+      }
+    }
+
+    if (nextDay) {
+      // Look back for consecutive weekend/holidays. If any of them is the scheduled day, we run it on today (the first working day after)
+      let prevDate = addDays(date, -1);
+      while (isNonWorkingDay(prevDate)) {
+        if (checkScheduleForDate(prevDate)) {
+          return true;
+        }
+        prevDate = addDays(prevDate, -1);
+      }
+    }
+
+    return false;
+  } else {
+    // Standard schedule check (no holiday exclusion or shifting)
+    return checkScheduleForDate(date);
+  }
+};
+
+/**
  * DB에서 설정된 자동 등록 항목 가져오기
  */
 export const getAutomatedTasksFromDB = async (category: string, dateStr: string): Promise<TaskItem[]> => {
@@ -60,8 +186,11 @@ export const getAutomatedTasksFromDB = async (category: string, dateStr: string)
   
   try {
     const settings = await fetchAutoRegSettings(category);
+    // Fetch monthly settings as well
+    const monthlySettings = await fetchAutoRegSettings(category + '_monthly');
     const tasks: TaskItem[] = [];
     
+    // Process weekly settings (standard logic)
     settings.forEach((setting: any) => {
       let shouldAdd = false;
       
@@ -87,6 +216,22 @@ export const getAutomatedTasksFromDB = async (category: string, dateStr: string)
           id: `db-auto-${category}-${setting.id}-${dateStr}`,
           content: setting.item || setting.item_name || '',
           frequency: '일일', // 기본값
+          status: '완료'
+        });
+      }
+    });
+
+    // Process monthly settings
+    monthlySettings.forEach((setting: any) => {
+      if (isMonthlySettingMatched(setting, date)) {
+        let itemText = setting.item || setting.item_name || '';
+        if (itemText.includes('__MONTHLY_JSON__')) {
+          itemText = itemText.split('__MONTHLY_JSON__')[0];
+        }
+        tasks.push({
+          id: `db-auto-${category}-monthly-${setting.id}-${dateStr}`,
+          content: itemText,
+          frequency: '월간',
           status: '완료'
         });
       }

@@ -17,7 +17,9 @@ import {
   Briefcase,
   CalendarCheck,
   LayoutDashboard,
-  Settings
+  Settings,
+  FolderOpen,
+  FileText
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -40,9 +42,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuSelect, isOpen, tog
       case MenuId.FIRE_CHECK: return <Flame size={20} />;
       case MenuId.ELEVATOR_CHECK: return <ArrowUpDown size={20} />;
       case MenuId.PARKING_CHECK: return <Car size={20} />;
+      case MenuId.EQUIPMENT_HISTORY: return <FileText size={20} />;
       case MenuId.CONSUMABLES: return <Package size={20} />;
       case MenuId.CONSTRUCTION: return <HardHat size={20} />;
       case MenuId.STAFF: return <Users size={20} />;
+      case MenuId.ARCHIVE: return <FolderOpen size={20} />;
       case MenuId.ADMIN: return <Settings size={20} />;
       default: return <ClipboardList size={20} />;
     }
@@ -50,10 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeMenu, onMenuSelect, isOpen, tog
 
   return (
     <aside className="bg-[#1e293b] text-slate-300 w-64 h-full flex flex-col shadow-2xl border-r border-slate-700/50">
-      <div className="pt-12 pb-10 px-6 border-b border-slate-700/50 flex flex-col items-center justify-center shrink-0 bg-slate-900/20">
-        <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
-          <Wrench className="text-white" size={24} />
-        </div>
+      <div className="py-5 px-6 border-b border-slate-700/50 flex flex-col items-center justify-center shrink-0 bg-slate-900/20">
         <h1 className="text-[17px] font-black text-white text-center leading-tight tracking-tight">
           새마을운동중앙회<br/>
           <span className="text-[11px] font-bold text-blue-400 uppercase tracking-[0.1em] mt-1 block">대치동사옥 시설관리</span>

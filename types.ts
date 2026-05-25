@@ -12,11 +12,13 @@ export enum MenuId {
   FIRE_CHECK = 'FIRE_CHECK',
   ELEVATOR_CHECK = 'ELEVATOR_CHECK',
   PARKING_CHECK = 'PARKING_CHECK',
+  EQUIPMENT_HISTORY = 'EQUIPMENT_HISTORY',
   CONSUMABLES = 'CONSUMABLES',
   CONSTRUCTION = 'CONSTRUCTION',
   APPOINTMENTS = 'APPOINTMENTS',
   STAFF = 'STAFF',
   CONTRACTORS = 'CONTRACTORS',
+  ARCHIVE = 'ARCHIVE',
   ADMIN = 'ADMIN',
 }
 
@@ -796,6 +798,23 @@ export interface AutoRegRow {
   sat: boolean;
   sun: boolean;
   excludeHolidays: boolean;
+}
+
+export interface MonthlyAutoRegRow {
+  id: string;
+  item: string;
+  weekSelect: string; // "1주차" | "2주차" | "3주차" | "4주차" | "5주차" | "말일" | "일자지정"
+  mon: boolean;
+  tue: boolean;
+  wed: boolean;
+  thu: boolean;
+  fri: boolean;
+  sat: boolean;
+  sun: boolean;
+  specificDay: string;
+  excludeHolidays: boolean;
+  prevDay: boolean; // "전일"
+  nextDay: boolean; // "익일"
 }
 
 export interface ArchiveItem {

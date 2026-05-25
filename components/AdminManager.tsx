@@ -23,16 +23,12 @@ import {
   fetchEmergencySettings,
   saveEmergencySettings
 } from '../services/dataService';
-import { AutoRegRow, ArchiveItem, OutdoorUnitRooftopItem } from '../types';
+import { AutoRegRow, MonthlyAutoRegRow, ArchiveItem, OutdoorUnitRooftopItem } from '../types';
 
 const TABS = [
   { id: 'auto_reg', label: '자동등록' },
-  { id: 'form', label: '자료실' },
   { id: 'network', label: '네트워크' },
   { id: 'password', label: '비밀번호' },
-  { id: 'uniform', label: '근무복' },
-  { id: 'outdoor_unit', label: '실외기' },
-  { id: 'emergency', label: '비상연락망' },
 ];
 
 const SUB_TABS_AUTO_REG = [
@@ -40,6 +36,7 @@ const SUB_TABS_AUTO_REG = [
   { id: 'mech', label: '기계' },
   { id: 'fire', label: '소방' },
   { id: 'elevator', label: '승강기' },
+  { id: 'remarks', label: '특이사항' },
   { id: 'parking', label: '주차' },
   { id: 'security', label: '경비' },
   { id: 'cleaning', label: '미화' },
@@ -92,8 +89,12 @@ const SUB_TABS_EMERGENCY = [
   { id: 'tenant', label: '입주사' },
 ];
 
-const AdminManager: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('auto_reg');
+interface AdminManagerProps {
+  isArchiveOnly?: boolean;
+}
+
+const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) => {
+  const [activeTab, setActiveTab ] = useState(isArchiveOnly ? 'form' : 'auto_reg');
   const [activeSubTab, setActiveSubTab] = useState('elec');
   const [activeArchiveSubTab, setActiveArchiveSubTab] = useState('all');
   const [activeUniformSubTab, setActiveUniformSubTab] = useState('all');
@@ -258,6 +259,18 @@ const AdminManager: React.FC = () => {
     mech: [],
     fire: [],
     elevator: [],
+    remarks: [],
+    parking: [],
+    security: [],
+    cleaning: [],
+  });
+
+  const [monthlyRowsData, setMonthlyRowsData] = useState<Record<string, MonthlyAutoRegRow[]>>({
+    elec: [],
+    mech: [],
+    fire: [],
+    elevator: [],
+    remarks: [],
     parking: [],
     security: [],
     cleaning: [],
@@ -993,6 +1006,94 @@ const AdminManager: React.FC = () => {
           ...prev,
           [activeSubTab]: mappedRows.length > 0 ? mappedRows : [{ id: '1', item: '', mon: false, tue: false, wed: false, thu: false, fri: false, sat: false, sun: false, excludeHolidays: false }]
         }));
+
+        if (activeSubTab === 'elec' || activeSubTab === 'mech' || activeSubTab === 'fire' || activeSubTab === 'remarks' || activeSubTab === 'elevator' || activeSubTab === 'parking' || activeSubTab === 'security' || activeSubTab === 'cleaning') {
+          const mData = await fetchAutoRegSettings(activeSubTab + '_monthly');
+          let mappedMonthly: MonthlyAutoRegRow[] = mData.map(item => {
+            let itemName = item.item || item.item_name || '';
+            let weekSelect = '1주차';
+            let specificDay = '';
+            let prevDay = false;
+            let nextDay = false;
+
+            if (itemName.includes('__MONTHLY_JSON__')) {
+              const parts = itemName.split('__MONTHLY_JSON__');
+              itemName = parts[0];
+              try {
+                const meta = JSON.parse(parts[1]);
+                weekSelect = meta.weekSelect || '1주차';
+                specificDay = meta.specificDay || '';
+                prevDay = !!meta.prevDay;
+                nextDay = !!meta.nextDay;
+              } catch (e) {
+                console.error(e);
+              }
+            }
+
+            return {
+              id: item.id,
+              item: itemName,
+              weekSelect,
+              mon: !!item.mon,
+              tue: !!item.tue,
+              wed: !!item.wed,
+              thu: !!item.thu,
+              fri: !!item.fri,
+              sat: !!item.sat,
+              sun: !!item.sun,
+              specificDay,
+              excludeHolidays: !!(item.excludeHolidays || item.exclude_holidays),
+              prevDay,
+              nextDay
+            };
+          });
+
+          // "전층 부하전류측정 및 점검" 항목 자동 추가 로직 (전기 'elec' 탭에서만 활성화)
+          if (activeSubTab === 'elec') {
+            const hasTargetItem = mappedMonthly.some(row => row.item.trim() === '전층 부하전류측정 및 점검');
+            if (!hasTargetItem) {
+              mappedMonthly.push({
+                id: 'm_auto_added_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                item: '전층 부하전류측정 및 점검',
+                weekSelect: '월초',
+                mon: false,
+                tue: false,
+                wed: false,
+                thu: false,
+                fri: false,
+                sat: false,
+                sun: false,
+                specificDay: '',
+                excludeHolidays: true,
+                prevDay: false,
+                nextDay: false
+              });
+            }
+          } else {
+            // 전기 외 다른 탭(기계, 소방 등)에서 "전층 부하전류측정 및 점검" 항목이 존재하면 제거
+            mappedMonthly = mappedMonthly.filter(row => row.item.trim() !== '전층 부하전류측정 및 점검');
+          }
+
+          setMonthlyRowsData(prev => ({
+            ...prev,
+            [activeSubTab]: mappedMonthly.length > 0 ? mappedMonthly : [{
+              id: 'm1',
+              item: '',
+              weekSelect: '1주차',
+              mon: false,
+              tue: false,
+              wed: false,
+              thu: false,
+              fri: false,
+              sat: false,
+              sun: false,
+              specificDay: '',
+              excludeHolidays: false,
+              prevDay: false,
+              nextDay: false
+            }]
+          }));
+        }
       } else if (activeTab === 'form') {
         const data = await fetchArchiveSettings();
         setArchiveRows(data.length > 0 ? data : [{ id: '1', category: '', title: '', date: '', attachment: '' }]);
@@ -1053,6 +1154,33 @@ const AdminManager: React.FC = () => {
       let success = false;
       if (activeTab === 'auto_reg') {
         success = await saveAutoRegSettings(activeSubTab, rowsData[activeSubTab]);
+        
+        if (activeSubTab === 'elec' || activeSubTab === 'mech' || activeSubTab === 'fire' || activeSubTab === 'remarks' || activeSubTab === 'elevator' || activeSubTab === 'parking' || activeSubTab === 'security' || activeSubTab === 'cleaning') {
+          const monthlyRowsToSave = (monthlyRowsData[activeSubTab] || []).map(row => {
+            const encodedItemName = `${row.item}__MONTHLY_JSON__${JSON.stringify({
+              weekSelect: row.weekSelect,
+              specificDay: row.specificDay,
+              prevDay: row.prevDay,
+              nextDay: row.nextDay
+            })}`;
+            
+            return {
+              id: row.id,
+              item: encodedItemName,
+              mon: !!row.mon,
+              tue: !!row.tue,
+              wed: !!row.wed,
+              thu: !!row.thu,
+              fri: !!row.fri,
+              sat: !!row.sat,
+              sun: !!row.sun,
+              excludeHolidays: !!row.excludeHolidays
+            };
+          });
+          
+          const monthlySuccess = await saveAutoRegSettings(activeSubTab + '_monthly', monthlyRowsToSave);
+          success = success && monthlySuccess;
+        }
       } else if (activeTab === 'form') {
         success = await saveArchiveSettings(archiveRows);
       } else if (activeTab === 'network') {
@@ -1064,7 +1192,17 @@ const AdminManager: React.FC = () => {
         success = await saveNetworkSettings(activeNetworkSubTab, dataToSave);
       } else if (activeTab === 'password') {
         let dataToSave = [];
-        if (activePasswordSubTab === 'site') dataToSave = passwordSiteData;
+        if (activePasswordSubTab === 'site') {
+          dataToSave = passwordSiteData;
+          const adminRows = dataToSave.filter(
+            (row) => row.category?.trim() === '시설관리' && row.siteName?.trim() === '시설관리프로그램'
+          );
+          if (adminRows.length > 4) {
+            alert('구분 "시설관리" 및 사이트명 "시설관리프로그램"인 관리자 비밀번호 항목은 최대 4명까지만 등록할 수 있습니다. (현재 ' + adminRows.length + '개)');
+            setIsSaving(false);
+            return;
+          }
+        }
         else if (activePasswordSubTab === 'building') dataToSave = passwordBuildingData;
         else if (activePasswordSubTab === 'warehouse') dataToSave = passwordWarehouseData;
         
@@ -1091,7 +1229,7 @@ const AdminManager: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [activeTab, activeSubTab, activeNetworkSubTab, activePasswordSubTab, rowsData, archiveRows, networkGeneralData, pcNasData, routerData, passwordSiteData, passwordBuildingData, passwordWarehouseData, loadData]);
+  }, [activeTab, activeSubTab, activeNetworkSubTab, activePasswordSubTab, rowsData, monthlyRowsData, archiveRows, networkGeneralData, pcNasData, routerData, passwordSiteData, passwordBuildingData, passwordWarehouseData, loadData]);
 
   const handleAddRow = () => {
     if (activeTab === 'auto_reg') {
@@ -1109,7 +1247,7 @@ const AdminManager: React.FC = () => {
       };
       setRowsData(prev => ({
         ...prev,
-        [activeSubTab]: [...prev[activeSubTab], newRow]
+        [activeSubTab]: [...(prev[activeSubTab] || []), newRow]
       }));
     } else if (activeTab === 'form') {
       // 자료실 등록은 독립창(새 창)으로 수행
@@ -1196,6 +1334,45 @@ const AdminManager: React.FC = () => {
         row.id === id ? { ...row, [field]: value } : row
       ));
     }
+  };
+
+  const handleUpdateMonthlyRow = (id: string, field: string, value: any) => {
+    setMonthlyRowsData(prev => ({
+      ...prev,
+      [activeSubTab]: (prev[activeSubTab] || []).map(row => 
+        row.id === id ? { ...row, [field]: value } : row
+      )
+    }));
+  };
+
+  const handleDeleteMonthlyRow = (id: string) => {
+    setMonthlyRowsData(prev => ({
+      ...prev,
+      [activeSubTab]: (prev[activeSubTab] || []).filter(row => row.id !== id)
+    }));
+  };
+
+  const handleAddMonthlyRow = () => {
+    const newRow: MonthlyAutoRegRow = {
+      id: Date.now().toString(),
+      item: '',
+      weekSelect: '1주차',
+      mon: false,
+      tue: false,
+      wed: false,
+      thu: false,
+      fri: false,
+      sat: false,
+      sun: false,
+      specificDay: '',
+      excludeHolidays: false,
+      prevDay: false,
+      nextDay: false,
+    };
+    setMonthlyRowsData(prev => ({
+      ...prev,
+      [activeSubTab]: [...(prev[activeSubTab] || []), newRow]
+    }));
   };
 
   const handleFileChange = async (id: string, file: File) => {
@@ -1436,6 +1613,9 @@ const AdminManager: React.FC = () => {
 
   const renderAutoRegTable = () => {
     const rows = rowsData[activeSubTab] || [];
+    const monthlyRows = monthlyRowsData[activeSubTab] || [];
+    const showMonthly = true;
+    const showDaily = true;
     
     return (
       <div className="w-full max-w-7xl mx-auto overflow-x-auto relative">
@@ -1444,7 +1624,22 @@ const AdminManager: React.FC = () => {
             <Loader2 className="animate-spin text-blue-600" size={32} />
           </div>
         )}
-        <table className="w-full border-collapse border border-black text-center bg-white">
+        {showDaily && (
+          <>
+            <div className="flex justify-between items-center mb-3 mt-1 select-none">
+              <div className="text-[15px] font-bold text-black border-l-4 border-orange-500 pl-2">
+                주간
+              </div>
+              <button
+                onClick={handleAddRow}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-600 rounded bg-white text-orange-600 hover:bg-orange-50 font-bold text-[12px] transition-colors"
+                title="주간 행추가"
+              >
+                <Plus size={14} />
+                주간 행추가
+              </button>
+            </div>
+            <table className="w-full border-collapse border border-black text-center bg-white">
           <thead>
             <tr className="h-[40px] bg-white">
               <th className="border border-black text-[13px] font-normal px-2 w-[50px]">NO</th>
@@ -1571,6 +1766,212 @@ const AdminManager: React.FC = () => {
             ))}
           </tbody>
         </table>
+          </>
+        )}
+        
+        {showMonthly && (
+          <div className={showDaily ? "mt-8" : "mt-1"}>
+            <div className="flex justify-between items-center mb-3 mt-1 select-none">
+              <div className="text-[15px] font-bold text-black border-l-4 border-orange-500 pl-2">
+                월간
+              </div>
+              <button
+                onClick={handleAddMonthlyRow}
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-600 rounded bg-white text-orange-600 hover:bg-orange-50 font-bold text-[12px] transition-colors"
+                title="월간 행추가"
+              >
+                <Plus size={14} />
+                월간 행추가
+              </button>
+            </div>
+            
+            <table className="w-full border-collapse border border-black text-center bg-white">
+              <thead>
+                <tr className="h-[40px] bg-white">
+                  <th className="border border-black text-[13px] font-normal px-2 w-[50px]">No</th>
+                  <th className="border border-black text-[13px] font-normal px-2">항목</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[100px]">주간선택</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">월요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">화요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">수요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">목요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">금요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[110px]">일자지정</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[80px]">공휴일제외</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">전일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">익일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[60px]">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthlyRows.map((row, index) => (
+                  <tr key={row.id} className="h-[40px] border-b border-black">
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">{index + 1}</div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center h-full">
+                        <input 
+                          type="text" 
+                          value={row.item}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'item', e.target.value)}
+                          className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal"
+                          placeholder="항목 입력"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <select
+                          value={row.weekSelect}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '말일' || val === '월초' || val === '일자지정') {
+                              setMonthlyRowsData(prev => ({
+                                ...prev,
+                                [activeSubTab]: (prev[activeSubTab] || []).map(r => 
+                                  r.id === row.id ? { ...r, weekSelect: val, specificDay: '', mon: false, tue: false, wed: false, thu: false, fri: false } : r
+                                )
+                              }));
+                            } else {
+                              handleUpdateMonthlyRow(row.id, 'weekSelect', val);
+                            }
+                          }}
+                          className="bg-transparent border border-gray-300 rounded text-[13px] px-1 py-0.5 outline-none select-none"
+                        >
+                          <option value="월초">월초</option>
+                          <option value="1주차">1주차</option>
+                          <option value="2주차">2주차</option>
+                          <option value="3주차">3주차</option>
+                          <option value="4주차">4주차</option>
+                          <option value="5주차">5주차</option>
+                          <option value="말일">말일</option>
+                          <option value="일자지정">일자지정</option>
+                        </select>
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.mon}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'mon', e.target.checked)}
+                          disabled={row.weekSelect === '일자지정' || row.weekSelect === '말일' || row.weekSelect === '월초'}
+                          className="w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.tue}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'tue', e.target.checked)}
+                          disabled={row.weekSelect === '일자지정' || row.weekSelect === '말일' || row.weekSelect === '월초'}
+                          className="w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.wed}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'wed', e.target.checked)}
+                          disabled={row.weekSelect === '일자지정' || row.weekSelect === '말일' || row.weekSelect === '월초'}
+                          className="w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.thu}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'thu', e.target.checked)}
+                          disabled={row.weekSelect === '일자지정' || row.weekSelect === '말일' || row.weekSelect === '월초'}
+                          className="w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.fri}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'fri', e.target.checked)}
+                          disabled={row.weekSelect === '일자지정' || row.weekSelect === '말일' || row.weekSelect === '월초'}
+                          className="w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="text" 
+                          placeholder="숫자(1~31) 또는 일(예: 15일)"
+                          value={row.specificDay}
+                          disabled={row.weekSelect !== '일자지정'}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            handleUpdateMonthlyRow(row.id, 'specificDay', val);
+                          }}
+                          className="w-20 text-center border border-gray-300 rounded text-[13px] py-0.5 outline-none disabled:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.excludeHolidays}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'excludeHolidays', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.prevDay}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'prevDay', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.nextDay}
+                          onChange={(e) => handleUpdateMonthlyRow(row.id, 'nextDay', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <button 
+                          onClick={() => handleDeleteMonthlyRow(row.id)}
+                          className="text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {monthlyRows.length === 0 && (
+                  <tr className="h-[100px]">
+                    <td colSpan={13} className="border border-black text-gray-400">데이터가 없습니다.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+        
         <div className="mt-4 flex justify-between items-center">
           <div className="text-[12px] text-gray-500">
             * 각 요일별로 자동 등록될 항목을 설정하세요.
@@ -3140,36 +3541,33 @@ const AdminManager: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-2 pb-32">
       {/* 메인탭메뉴 */}
-      <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
-        <div className="flex shrink-0">
-          {TABS.map(tab => (
-            <div
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
-                activeTab === tab.id 
-                  ? 'text-orange-600' 
-                  : 'text-gray-500 hover:text-black'
-              }`}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
-              )}
-            </div>
-          ))}
+      {!isArchiveOnly && (
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+          <div className="flex shrink-0">
+            {TABS.map(tab => (
+              <div
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                  activeTab === tab.id 
+                    ? 'text-orange-600' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {tab.label}
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* 근무복 탭일 때만 표시되는 구분선과 버튼들 (서브탭 메뉴로 이동함) */}
+          {activeTab === 'uniform' && (
+            <div className="flex-1"></div>
+          )}
         </div>
-
-        {/* 근무복 탭일 때만 표시되는 구분선과 버튼들 (서브탭 메뉴로 이동함) */}
-        {activeTab === 'uniform' && (
-          <div className="flex-1"></div>
-        )}
-
-        {/* 자료실 탭일 때만 표시되는 구분선과 등록 버튼 (서브탭 메뉴로 이동함) */}
-        {activeTab === 'form' && (
-          <div className="flex-1"></div>
-        )}
-      </div>
+      )}
 
       {/* 서브탭메뉴 (근무복일 때만 표시) */}
       {activeTab === 'uniform' && (
@@ -3362,14 +3760,6 @@ const AdminManager: React.FC = () => {
           {/* 액션 버튼들 */}
           <div className="flex items-center shrink-0">
             <button 
-              onClick={handleAddRow}
-              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
-            >
-              <Plus size={18} className="mr-1.5" />
-              행추가
-            </button>
-            
-            <button 
               onClick={handleSave}
               disabled={isSaving}
               className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 ${
@@ -3553,77 +3943,7 @@ const AdminManager: React.FC = () => {
         </div>
       )}
 
-      {/* 서브탭메뉴 (실외기일 때 표시) */}
-      {activeTab === 'outdoor_unit' && (
-        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
-          <div className="flex items-center shrink-0">
-            {SUB_TABS_OUTDOOR_UNIT.map(subTab => (
-              <div
-                key={subTab.id}
-                onClick={() => setActiveOutdoorUnitSubTab(subTab.id)}
-                className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
-                  activeOutdoorUnitSubTab === subTab.id 
-                    ? 'text-orange-600' 
-                    : 'text-gray-500 hover:text-black'
-                }`}
-              >
-                {subTab.label}
-                {activeOutdoorUnitSubTab === subTab.id && (
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
-                )}
-              </div>
-            ))}
-          </div>
 
-          {/* 구분선 (검정색 1px) */}
-          <div className="flex items-center shrink-0 px-2">
-            <div className="w-px h-6 bg-black"></div>
-          </div>
-
-          {/* 액션 버튼들 */}
-          <div className="flex items-center shrink-0">
-            <button 
-              onClick={handleOutdoorUnitRefresh}
-              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
-            >
-              <RefreshCw size={18} className="mr-1.5" />
-              새로고침
-            </button>
-            <button 
-              onClick={() => setIsOutdoorUnitEditMode(!isOutdoorUnitEditMode)}
-              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
-                isOutdoorUnitEditMode ? 'text-orange-600' : 'text-gray-500 hover:text-black'
-              }`}
-            >
-              <Edit size={18} className="mr-1.5" />
-              {isOutdoorUnitEditMode ? '수정완료' : '수정'}
-            </button>
-            <button 
-              onClick={handleOutdoorUnitSave} 
-              disabled={isSaving}
-              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap ${
-                saveSuccess ? 'text-orange-600' : 'text-gray-500 hover:text-black'
-              }`}
-            >
-              {isSaving ? (
-                <Loader2 size={18} className="mr-1.5 animate-spin" />
-              ) : saveSuccess ? (
-                <CheckCircle2 size={18} className="mr-1.5" />
-              ) : (
-                <Save size={18} className="mr-1.5" />
-              )}
-              {saveSuccess ? '저장완료' : '저장'}
-            </button>
-            <button 
-              onClick={handleOutdoorUnitPrint}
-              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap"
-            >
-              <Printer size={18} className="mr-1.5" />
-              인쇄
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* 서브탭메뉴 (비상연락망일 때 표시) */}
       {activeTab === 'emergency' && (
@@ -3717,8 +4037,6 @@ const AdminManager: React.FC = () => {
           renderPasswordContent()
         ) : activeTab === 'uniform' ? (
           renderUniformContent()
-        ) : activeTab === 'outdoor_unit' ? (
-          renderOutdoorUnitContent()
         ) : activeTab === 'emergency' ? (
           renderEmergencyContent()
         ) : (

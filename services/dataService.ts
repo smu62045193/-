@@ -1332,6 +1332,36 @@ export const saveAppointmentList = async (list: AppointmentItem[]): Promise<bool
   return !error;
 };
 
+export const fetchEquipmentHistoryList = async (): Promise<any[]> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'EQUIPMENT_DB').maybeSingle();
+    if (data?.data?.equipmentList) return data.data.equipmentList;
+  } catch (e) {
+    console.error('fetchEquipmentHistoryList error:', e);
+  }
+  return [];
+};
+
+export const saveEquipmentHistoryList = async (list: any[]): Promise<boolean> => {
+  const { error = null } = await supabase.from('system_settings').upsert({ id: 'EQUIPMENT_DB', data: { equipmentList: list }, last_updated: new Date().toISOString() });
+  return !error;
+};
+
+export const fetchEquipmentMaintenanceRecords = async (): Promise<any[]> => {
+  try {
+    const { data } = await supabase.from('system_settings').select('data').eq('id', 'EQUIPMENT_MAINT_DB').maybeSingle();
+    if (data?.data?.maintenanceList) return data.data.maintenanceList;
+  } catch (e) {
+    console.error('fetchEquipmentMaintenanceRecords error:', e);
+  }
+  return [];
+};
+
+export const saveEquipmentMaintenanceRecords = async (list: any[]): Promise<boolean> => {
+  const { error = null } = await supabase.from('system_settings').upsert({ id: 'EQUIPMENT_MAINT_DB', data: { maintenanceList: list }, last_updated: new Date().toISOString() });
+  return !error;
+};
+
 export const fetchSubstationChecklist = async (date: string): Promise<SubstationChecklistData | null> => {
   try {
     const { data } = await supabase.from('substation_checklists').select('*').eq('id', `SUB_CHECK_${date}`).maybeSingle();
