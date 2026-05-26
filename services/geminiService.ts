@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { WeatherData, Tenant } from "../types";
 import { isWithinInterval, addDays, subDays, parseISO, startOfDay, format } from "date-fns";
 

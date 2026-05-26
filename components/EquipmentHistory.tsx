@@ -22,7 +22,8 @@ import {
   Image,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from 'lucide-react';
 import { getFromStorage, saveToCache, fetchEquipmentHistoryList, saveEquipmentHistoryList, fetchEquipmentMaintenanceRecords, saveEquipmentMaintenanceRecords } from '../services/dataService';
 
@@ -163,36 +164,55 @@ const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
   }
 ];
 
+// Helper function to compress images locally in browser using Canvas API
+const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressed);
+        } else {
+          resolve(e.target?.result as string || '');
+        }
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
 const EquipmentHistory: React.FC = () => {
-  const [equipments, setEquipments] = useState<Equipment[]>(() => {
-    try {
-      const cachedEq = getFromStorage('equipment_history_list');
-      if (cachedEq) return cachedEq;
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_EQUIPMENTS;
-  });
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [isSavedSuccessfully, setIsSavedSuccessfully] = useState<boolean>(false);
+  const [equipments, setEquipments] = useState<Equipment[]>([]);
 
-  const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>(() => {
-    try {
-      const cachedMaint = getFromStorage('equipment_maintenance_records');
-      if (cachedMaint) return cachedMaint;
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_MAINTENANCE;
-  });
+  const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
 
-  const [selectedEqId, setSelectedEqId] = useState<string>(() => {
-    try {
-      const cachedEq = getFromStorage('equipment_history_list');
-      if (cachedEq && cachedEq.length > 0) return cachedEq[0].id;
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_EQUIPMENTS[0]?.id || '';
-  });
+  const [selectedEqId, setSelectedEqId] = useState<string>('');
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('전체');
@@ -202,15 +222,7 @@ const EquipmentHistory: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
   
   // Form states for currently selected equipment
-  const [editForm, setEditForm] = useState<Equipment | null>(() => {
-    try {
-      const cachedEq = getFromStorage('equipment_history_list');
-      if (cachedEq && cachedEq.length > 0) return cachedEq[0];
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_EQUIPMENTS[0] || null;
-  });
+  const [editForm, setEditForm] = useState<Equipment | null>(null);
   
   // Maintenance Record fields in modal / adding area
   const [newMaintDate, setNewMaintDate] = useState<string>(() => new Date().toISOString().substring(0, 10));
@@ -245,38 +257,36 @@ const EquipmentHistory: React.FC = () => {
         const eqDb = await fetchEquipmentHistoryList();
         const maintDb = await fetchEquipmentMaintenanceRecords();
         
-        // Use functional state updates to avoid placing state variables in dependencies
-        setEquipments(prevEqs => {
-          let finalEq = prevEqs;
-          if (eqDb && eqDb.length > 0) {
-            finalEq = eqDb;
-          }
-          
-          setMaintenance(prevMaint => {
-            if (maintDb && maintDb.length > 0) {
-              return maintDb;
-            }
-            return prevMaint;
-          });
+        let finalEq: Equipment[] = [];
+        if (eqDb && eqDb.length > 0) {
+          finalEq = eqDb;
+        } else {
+          finalEq = getFromStorage('equipment_history_list') || INITIAL_EQUIPMENTS;
+        }
 
-          setSelectedEqId(prevId => {
-            const activeId = finalEq.some(e => e.id === prevId) ? prevId : (finalEq[0]?.id || '');
-            const activeEq = finalEq.find(e => e.id === activeId);
-            if (activeEq) {
-              setEditForm(activeEq);
-            }
-            return activeId;
-          });
+        let finalMaint: MaintenanceRecord[] = [];
+        if (maintDb && maintDb.length > 0) {
+          finalMaint = maintDb;
+        } else {
+          finalMaint = getFromStorage('equipment_maintenance_records') || INITIAL_MAINTENANCE;
+        }
 
-          return finalEq;
-        });
+        setEquipments(finalEq);
+        setMaintenance(finalMaint);
 
+        const activeId = finalEq[0]?.id || '';
+        setSelectedEqId(activeId);
+        const activeEq = finalEq.find(e => e.id === activeId);
+        if (activeEq) {
+          setEditForm(activeEq);
+        }
       } catch (err) {
         console.error('Failed to load equipment data from Supabase:', err);
+      } finally {
+        setIsInitialLoading(false);
       }
     };
     loadSupabaseData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // specifications 문자열을 { id, label, value } 객체 배열로 변환하는 파서
@@ -359,12 +369,52 @@ const EquipmentHistory: React.FC = () => {
     });
   };
 
+  const handleRefresh = async () => {
+    setIsInitialLoading(true);
+    try {
+      const eqDb = await fetchEquipmentHistoryList();
+      const maintDb = await fetchEquipmentMaintenanceRecords();
+      
+      let finalEq: Equipment[] = [];
+      if (eqDb && eqDb.length > 0) {
+        finalEq = eqDb;
+      } else {
+        finalEq = getFromStorage('equipment_history_list') || INITIAL_EQUIPMENTS;
+      }
+
+      let finalMaint: MaintenanceRecord[] = [];
+      if (maintDb && maintDb.length > 0) {
+        finalMaint = maintDb;
+      } else {
+        finalMaint = getFromStorage('equipment_maintenance_records') || INITIAL_MAINTENANCE;
+      }
+
+      setEquipments(finalEq);
+      setMaintenance(finalMaint);
+
+      const activeId = finalEq.some(e => e.id === selectedEqId) ? selectedEqId : (finalEq[0]?.id || '');
+      setSelectedEqId(activeId);
+      const activeEq = finalEq.find(e => e.id === activeId);
+      if (activeEq) {
+        setEditForm(activeEq);
+      }
+      alert('새로고침이 완료되었습니다.');
+    } catch (err) {
+      console.error('새로고침 오류:', err);
+      alert('새로고침 중 오류가 발생했습니다.');
+    } finally {
+      setIsInitialLoading(false);
+    }
+  };
+
   const handleSaveToSupabase = async () => {
     try {
       const isEqSaved = await saveEquipmentHistoryList(equipments);
       const isMaintSaved = await saveEquipmentMaintenanceRecords(maintenance);
       if (isEqSaved && isMaintSaved) {
-        alert('성공적으로 수파베이스에 저장되었습니다.');
+        setIsSavedSuccessfully(true);
+        alert('저장완료');
+        setTimeout(() => setIsSavedSuccessfully(false), 2000);
       } else {
         alert('수파베이스 저장 중 오류가 발생했습니다.');
       }
@@ -510,7 +560,7 @@ const EquipmentHistory: React.FC = () => {
       eq.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       eq.manufacturer.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
-  });
+  }).sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true }));
 
   // Pagination logic
   const itemsPerPage = 8;
@@ -761,7 +811,12 @@ const EquipmentHistory: React.FC = () => {
 
           {/* Equipment Selection List list */}
           <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-            {filteredEquipments.length === 0 ? (
+            {isInitialLoading ? (
+              <div className="text-center py-12 text-slate-400">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500 mx-auto mb-2"></div>
+                <p className="text-xs font-medium">데이터를 불러오는 중입니다...</p>
+              </div>
+            ) : filteredEquipments.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <Settings size={28} className="mx-auto mb-2 opacity-40 animate-spin-slow" />
                 <p className="text-xs font-medium">해당 조건에 만족하는 장비가 없습니다.</p>
@@ -903,14 +958,20 @@ const EquipmentHistory: React.FC = () => {
                             type="file" 
                             accept="image/*" 
                             className="hidden" 
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) {
-                                const reader = new FileReader();
-                                reader.onloadend = () => {
-                                  setNewEqImageUrl(reader.result as string);
-                                };
-                                reader.readAsDataURL(file);
+                                try {
+                                  const compressedData = await compressImage(file, 800, 800, 0.7);
+                                  setNewEqImageUrl(compressedData);
+                                } catch (err) {
+                                  console.error("이미지 압축 안됨, 원본으로 저장:", err);
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    setNewEqImageUrl(reader.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
                               }
                             }}
                           />
@@ -1148,6 +1209,14 @@ const EquipmentHistory: React.FC = () => {
                     <>
                       <div className="self-center h-6 w-[1px] bg-slate-300 mx-2 shrink-0" />
                       <button 
+                        onClick={handleRefresh}
+                        className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0"
+                      >
+                        <RefreshCw size={14} />
+                        새로고침
+                      </button>
+
+                      <button 
                         onClick={() => {
                           if (activeTab === 'history') {
                             setShowAddMaintBox(true);
@@ -1173,10 +1242,14 @@ const EquipmentHistory: React.FC = () => {
 
                       <button 
                         onClick={handleSaveToSupabase}
-                        className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0"
+                        className={`px-4 py-3 text-[14px] font-bold flex items-center gap-1.5 transition-colors shrink-0 ${
+                          isSavedSuccessfully 
+                            ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' 
+                            : 'text-gray-500 hover:text-black bg-white'
+                        }`}
                       >
-                        <Save size={14} />
-                        저장
+                        <Save size={14} className={isSavedSuccessfully ? 'text-emerald-600 animate-bounce' : ''} />
+                        {isSavedSuccessfully ? '저장완료' : '저장'}
                       </button>
 
                       <button 
@@ -1223,14 +1296,20 @@ const EquipmentHistory: React.FC = () => {
                                   type="file" 
                                   accept="image/*" 
                                   className="hidden" 
-                                  onChange={(e) => {
+                                  onChange={async (e) => {
                                     const file = e.target.files?.[0];
-                                    if (file) {
-                                      const reader = new FileReader();
-                                      reader.onloadend = () => {
-                                        setEditForm({ ...editForm, imageUrl: reader.result as string });
-                                      };
-                                      reader.readAsDataURL(file);
+                                    if (file && editForm) {
+                                      try {
+                                        const compressedData = await compressImage(file, 800, 800, 0.7);
+                                        setEditForm({ ...editForm, imageUrl: compressedData });
+                                      } catch (err) {
+                                        console.error("이미지 압축 안됨, 원본으로 저장:", err);
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => {
+                                          setEditForm({ ...editForm, imageUrl: reader.result as string });
+                                        };
+                                        reader.readAsDataURL(file);
+                                      }
                                     }
                                   }}
                                 />
