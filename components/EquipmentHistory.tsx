@@ -19,7 +19,7 @@ import {
   ArrowLeftRight,
   Camera,
   Upload,
-  Image,
+  Image as ImageIcon,
   X,
   ChevronLeft,
   ChevronRight,
@@ -1366,7 +1366,7 @@ const EquipmentHistory: React.FC = () => {
                               />
                             ) : (
                               <div className="flex flex-col items-center justify-center p-4 text-center">
-                                <Image className="text-slate-300 mb-2" size={24} />
+                                <ImageIcon className="text-slate-300 mb-2" size={24} />
                                 <span className="text-[11px] text-slate-400 font-bold">등록된 사진 없음</span>
                               </div>
                             )
