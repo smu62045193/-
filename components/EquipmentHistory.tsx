@@ -51,6 +51,7 @@ interface MaintenanceRecord {
   cost: number;
   contractor: string;
   manager: string;
+  phone?: string;
 }
 
 const INITIAL_EQUIPMENTS: Equipment[] = [
@@ -130,7 +131,8 @@ const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
     details: '밸브 설정작업 및 분출 압력 6.5kg/cm² 기밀 테스트 성적 완료',
     cost: 450000,
     contractor: '대성보일러텍',
-    manager: '홍길동 과장'
+    manager: '홍길동 과장',
+    phone: ''
   },
   {
     id: 'm-002',
@@ -140,7 +142,8 @@ const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
     details: '연소율 향상을 위해 고압 노즐 및 유량 조절부 기계 청소',
     cost: 280000,
     contractor: '자체 시설팀',
-    manager: '이순신 대리'
+    manager: '이순신 대리',
+    phone: ''
   },
   {
     id: 'm-003',
@@ -150,7 +153,8 @@ const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
     details: '납축전지 12V 150AH x 2EA 설치 완료 및 충전 전압 점검(27.4V)',
     cost: 580000,
     contractor: '동양이엔지',
-    manager: '김철수 부장'
+    manager: '김철수 부장',
+    phone: ''
   },
   {
     id: 'm-004',
@@ -160,7 +164,8 @@ const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
     details: '체절부 압력 저하 개선을 위한 한수원 1.5kg 질소 주입',
     cost: 150000,
     contractor: '신강엔지니어링',
-    manager: '이순신 대리'
+    manager: '이순신 대리',
+    phone: ''
   }
 ];
 
@@ -248,6 +253,7 @@ const EquipmentHistory: React.FC = () => {
   const [newMaintCost, setNewMaintCost] = useState<string>('0');
   const [newMaintContractor, setNewMaintContractor] = useState<string>('');
   const [newMaintManager, setNewMaintManager] = useState<string>('');
+  const [newMaintPhone, setNewMaintPhone] = useState<string>('');
   
   // Maintenance Record editing form states
   const [editingMaintId, setEditingMaintId] = useState<string | null>(null);
@@ -256,6 +262,7 @@ const EquipmentHistory: React.FC = () => {
   const [editMaintDetails, setEditMaintDetails] = useState<string>('');
   const [editMaintContractor, setEditMaintContractor] = useState<string>('');
   const [editMaintManager, setEditMaintManager] = useState<string>('');
+  const [editMaintPhone, setEditMaintPhone] = useState<string>('');
   
   const [showAddMaintBox, setShowAddMaintBox] = useState<boolean>(false);
   const [isAddingNewEquipment, setIsAddingNewEquipment] = useState<boolean>(false);
@@ -527,6 +534,7 @@ const EquipmentHistory: React.FC = () => {
       cost: Number(newMaintCost) || 0,
       contractor: newMaintContractor,
       manager: newMaintManager,
+      phone: newMaintPhone,
     };
 
     const updated = [...maintenance, record];
@@ -538,6 +546,7 @@ const EquipmentHistory: React.FC = () => {
     setNewMaintCost('0');
     setNewMaintContractor('');
     setNewMaintManager('');
+    setNewMaintPhone('');
     setShowAddMaintBox(false);
     alert('유지 관리 작업 이력이 성공적으로 추가되었습니다.');
   };
@@ -559,6 +568,7 @@ const EquipmentHistory: React.FC = () => {
     setEditMaintDetails(rec.details || '');
     setEditMaintContractor(rec.contractor || '');
     setEditMaintManager(rec.manager || '');
+    setEditMaintPhone(rec.phone || '');
   };
 
   const handleSaveEditMaintenance = () => {
@@ -574,7 +584,8 @@ const EquipmentHistory: React.FC = () => {
           title: editMaintTitle,
           details: editMaintDetails,
           contractor: editMaintContractor,
-          manager: editMaintManager
+          manager: editMaintManager,
+          phone: editMaintPhone
         };
       }
       return m;
@@ -1592,9 +1603,10 @@ const EquipmentHistory: React.FC = () => {
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
                             <th className="py-3 px-4 text-center w-[15%]">작업일자</th>
-                            <th className="py-3 px-4 w-[50%]">조치 내역 요약</th>
-                            <th className="py-3 px-4 w-[18%]">작업업체</th>
-                            <th className="py-3 px-4 w-[12%]">감독자</th>
+                            <th className="py-3 px-4 w-[38%]">조치 내역 요약</th>
+                            <th className="py-3 px-4 w-[15%]">작업업체</th>
+                            <th className="py-3 px-4 w-[12%]">담당자</th>
+                            <th className="py-3 px-4 w-[12%]">연락처</th>
                             <th className="py-3 px-4 text-center w-[8%]">관리</th>
                           </tr>
                         </thead>
@@ -1603,10 +1615,11 @@ const EquipmentHistory: React.FC = () => {
                             <tr className="bg-indigo-50/30 font-semibold animate-in slide-in-from-top duration-200">
                               <td className="py-2.5 px-3 text-center">
                                 <input 
-                                  type="date"
+                                  type="text"
                                   value={newMaintDate}
                                   onChange={(e) => setNewMaintDate(e.target.value)}
                                   className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs text-center font-mono font-bold font-sans text-slate-800 focus:border-indigo-500 focus:outline-none"
+                                  placeholder="YYYY-MM-DD 또는 범위"
                                 />
                               </td>
                               <td className="py-2.5 px-3 space-y-1.5 col-span-1">
@@ -1633,7 +1646,16 @@ const EquipmentHistory: React.FC = () => {
                                   value={newMaintManager}
                                   onChange={(e) => setNewMaintManager(e.target.value)}
                                   className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-600 font-sans focus:border-indigo-500 focus:outline-none"
-                                  placeholder="감독자"
+                                  placeholder="담당자"
+                                />
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <input 
+                                  type="text"
+                                  value={newMaintPhone}
+                                  onChange={(e) => setNewMaintPhone(e.target.value)}
+                                  className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-600 font-sans focus:border-indigo-500 focus:outline-none"
+                                  placeholder="연락처"
                                 />
                               </td>
                               <td className="py-2.5 px-3 text-center whitespace-nowrap">
@@ -1658,7 +1680,7 @@ const EquipmentHistory: React.FC = () => {
                           )}
                           {currentMaintRecords.length === 0 && !showAddMaintBox ? (
                             <tr>
-                              <td colSpan={5} className="py-8 text-center text-slate-400 font-medium">
+                              <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
                                 등록된 안전 검사나 가동 및 수리 이력이 없습니다.
                               </td>
                             </tr>
@@ -1668,10 +1690,11 @@ const EquipmentHistory: React.FC = () => {
                                 <tr key={rec.id} className="bg-indigo-50/20">
                                   <td className="py-2.5 px-3 text-center">
                                     <input 
-                                      type="date"
+                                      type="text"
                                       value={editMaintDate}
                                       onChange={(e) => setEditMaintDate(e.target.value)}
                                       className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs text-center font-mono font-bold font-sans text-slate-800"
+                                      placeholder="YYYY-MM-DD 또는 범위"
                                     />
                                   </td>
                                   <td className="py-2.5 px-3 space-y-1.5 col-span-1">
@@ -1681,13 +1704,6 @@ const EquipmentHistory: React.FC = () => {
                                       onChange={(e) => setEditMaintTitle(e.target.value)}
                                       className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold font-sans text-slate-800"
                                       placeholder="조치 내역 요약"
-                                    />
-                                    <textarea 
-                                      rows={1}
-                                      value={editMaintDetails}
-                                      onChange={(e) => setEditMaintDetails(e.target.value)}
-                                      className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs text-slate-600 leading-relaxed font-sans"
-                                      placeholder="상세 사항"
                                     />
                                   </td>
                                   <td className="py-2.5 px-3">
@@ -1705,7 +1721,16 @@ const EquipmentHistory: React.FC = () => {
                                       value={editMaintManager}
                                       onChange={(e) => setEditMaintManager(e.target.value)}
                                       className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-600 font-sans"
-                                      placeholder="감독자"
+                                      placeholder="담당자"
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    <input 
+                                      type="text"
+                                      value={editMaintPhone}
+                                      onChange={(e) => setEditMaintPhone(e.target.value)}
+                                      className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-xs font-semibold text-slate-600 font-sans"
+                                      placeholder="연락처"
                                     />
                                   </td>
                                   <td className="py-2.5 px-3 text-center whitespace-nowrap">
@@ -1745,6 +1770,9 @@ const EquipmentHistory: React.FC = () => {
                                   </td>
                                   <td className="py-3.5 px-4 font-semibold text-slate-500 whitespace-nowrap">
                                     {rec.manager || '-'}
+                                  </td>
+                                  <td className="py-3.5 px-4 font-semibold text-slate-500 whitespace-nowrap">
+                                    {rec.phone || '-'}
                                   </td>
                                   <td className="py-3.5 px-4 text-center whitespace-nowrap">
                                     <div className="flex items-center justify-center gap-1.5">
