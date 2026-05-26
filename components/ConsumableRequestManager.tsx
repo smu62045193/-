@@ -123,11 +123,23 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
           return item.currentStock < threshold;
         });
 
+      // Get existing non-empty items that the user already entered
+      const existingEnteredItems = activeRequest.items.filter(it => it.itemName && it.itemName.trim() !== '');
+
       const newItems: ConsumableRequestItem[] = [];
       // '전체' 섹션은 무시하고 실제 카테고리별로 처리
       SECTIONS.filter(s => s.key !== '전체').forEach(sec => {
+        // 1. Keep the already entered items for this category at the top
+        const existingInSec = existingEnteredItems.filter(it => it.category === sec.key);
+        newItems.push(...existingInSec);
+
+        // 2. Fetch new low stock items for this category, excluding ones already entered to prevent duplicates
         const matchingLedger = lowStockItems.filter(l => l.category === sec.key);
-        matchingLedger.forEach(l => {
+        const filteredMatchingLedger = matchingLedger.filter(l => {
+          return !existingInSec.some(exist => exist.itemName.trim() === l.itemName.trim());
+        });
+
+        filteredMatchingLedger.forEach(l => {
           const itemUnit = l.unit || 'EA';
           newItems.push({
             id: generateId(),
@@ -141,6 +153,8 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             amount: 0
           });
         });
+
+        // 3. Keep the 5-row visual structure by adding empty rows if the total count in this category is less than 5
         const currentCount = newItems.filter(ni => ni.category === sec.key).length;
         if (currentCount < 5) {
           for (let i = 0; i < (5 - currentCount); i++) {
