@@ -165,7 +165,7 @@ const INITIAL_MAINTENANCE: MaintenanceRecord[] = [
 ];
 
 // Helper function to compress images locally in browser using Canvas API
-const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.7): Promise<string> => {
+const compressImage = (file: File, maxWidth = 500, maxHeight = 500, quality = 0.5): Promise<string> => {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -203,6 +203,23 @@ const compressImage = (file: File, maxWidth = 800, maxHeight = 800, quality = 0.
     };
     reader.readAsDataURL(file);
   });
+};
+
+// Helper function to parse equipment names and sort by dynamic sub-category roles
+const parseEquipmentNameForSorting = (name: string) => {
+  const suffixes = ['순환펌프', '냉각수펌프', '전동기'];
+  let base = name;
+  let suffixIndex = -1;
+
+  for (let i = 0; i < suffixes.length; i++) {
+    if (name.includes(suffixes[i])) {
+      base = name.replace(suffixes[i], '');
+      suffixIndex = i;
+      break;
+    }
+  }
+
+  return { base, suffixIndex };
 };
 
 const EquipmentHistory: React.FC = () => {
@@ -461,9 +478,11 @@ const EquipmentHistory: React.FC = () => {
     const updatedList = [...equipments, newEq];
     saveEquipmentsState(updatedList);
     setSelectedEqId(newEq.id);
+    setEditForm(newEq);
     setIsAddingNewEquipment(false);
     setNewEqImageUrl('');
-    alert('새로운 장비가 성공적으로 등록되었습니다.');
+    setNewEqSpecs([{ id: '1', label: '용량 및 규격', value: '' }]);
+    alert('등록이 완료되었습니다.');
   };
 
   const handleDeleteEquipment = (id: string) => {
@@ -560,7 +579,15 @@ const EquipmentHistory: React.FC = () => {
       eq.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
       eq.manufacturer.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
-  }).sort((a, b) => a.name.localeCompare(b.name, 'ko', { numeric: true }));
+  }).sort((a, b) => {
+    const parseA = parseEquipmentNameForSorting(a.name);
+    const parseB = parseEquipmentNameForSorting(b.name);
+
+    if (parseA.base === parseB.base) {
+      return parseA.suffixIndex - parseB.suffixIndex;
+    }
+    return parseA.base.localeCompare(parseB.base, 'ko', { numeric: true });
+  });
 
   // Pagination logic
   const itemsPerPage = 8;
@@ -962,7 +989,7 @@ const EquipmentHistory: React.FC = () => {
                               const file = e.target.files?.[0];
                               if (file) {
                                 try {
-                                  const compressedData = await compressImage(file, 800, 800, 0.7);
+                                  const compressedData = await compressImage(file, 500, 500, 0.5);
                                   setNewEqImageUrl(compressedData);
                                 } catch (err) {
                                   console.error("이미지 압축 안됨, 원본으로 저장:", err);
@@ -1300,7 +1327,7 @@ const EquipmentHistory: React.FC = () => {
                                     const file = e.target.files?.[0];
                                     if (file && editForm) {
                                       try {
-                                        const compressedData = await compressImage(file, 800, 800, 0.7);
+                                        const compressedData = await compressImage(file, 500, 500, 0.5);
                                         setEditForm({ ...editForm, imageUrl: compressedData });
                                       } catch (err) {
                                         console.error("이미지 압축 안됨, 원본으로 저장:", err);
