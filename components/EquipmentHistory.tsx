@@ -227,6 +227,11 @@ const EquipmentHistory: React.FC = () => {
   const [isSavedSuccessfully, setIsSavedSuccessfully] = useState<boolean>(false);
   const [equipments, setEquipments] = useState<Equipment[]>([]);
 
+  // Custom Registration/Saving Modal States
+  const [showCreatedSuccessModal, setShowCreatedSuccessModal] = useState<boolean>(false);
+  const [showCreatedFailureModal, setShowCreatedFailureModal] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
   const [maintenance, setMaintenance] = useState<MaintenanceRecord[]>([]);
 
   const [selectedEqId, setSelectedEqId] = useState<string>('');
@@ -451,7 +456,7 @@ const EquipmentHistory: React.FC = () => {
     alert('장비 스펙 카드가 성공적으로 업데이트되었습니다.');
   };
 
-  const handleCreateEquipment = (e: React.FormEvent) => {
+  const handleCreateEquipment = async (e: React.FormEvent) => {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
     
@@ -475,14 +480,35 @@ const EquipmentHistory: React.FC = () => {
       return;
     }
 
-    const updatedList = [...equipments, newEq];
-    saveEquipmentsState(updatedList);
-    setSelectedEqId(newEq.id);
-    setEditForm(newEq);
+    try {
+      const updatedList = [...equipments, newEq];
+      const isSuccess = await saveEquipmentHistoryList(updatedList);
+      if (isSuccess) {
+        setEquipments(updatedList);
+        saveToCache('equipment_history_list', updatedList);
+        setSelectedEqId(newEq.id);
+        setEditForm(newEq);
+        setShowCreatedSuccessModal(true);
+      } else {
+        setErrorMessage('데이터베이스 저장 중 오류가 발생했습니다.');
+        setShowCreatedFailureModal(true);
+      }
+    } catch (err: any) {
+      console.error('Error creating equipment:', err);
+      setErrorMessage(err?.message || '장비 등록 중 시스템 에러가 발생했습니다.');
+      setShowCreatedFailureModal(true);
+    }
+  };
+
+  const handleSuccessConfirm = () => {
+    setShowCreatedSuccessModal(false);
     setIsAddingNewEquipment(false);
     setNewEqImageUrl('');
     setNewEqSpecs([{ id: '1', label: '용량 및 규격', value: '' }]);
-    alert('등록이 완료되었습니다.');
+  };
+
+  const handleFailureConfirm = () => {
+    setShowCreatedFailureModal(false);
   };
 
   const handleDeleteEquipment = (id: string) => {
@@ -1773,6 +1799,56 @@ const EquipmentHistory: React.FC = () => {
         </div>
 
       </div>
+
+      {/* Custom Success Modal mimicking Chrome macOS Dark themed JS Alert */}
+      {showCreatedSuccessModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-3xs flex items-center justify-center z-50 animate-fade-in no-print">
+          <div className="bg-[#242122] border border-[#3c3639] rounded-2xl w-[450px] shadow-2xl p-5 text-white font-sans flex flex-col justify-between">
+            <div>
+              <div className="text-slate-300 text-[13px] font-medium mb-4 select-none">
+                saemaul-facility.vercel.app 내용:
+              </div>
+              <div className="text-white text-[15px] font-medium tracking-wide mb-6 pl-1">
+                저장완료
+              </div>
+            </div>
+            <div className="flex justify-end mt-2 pr-1">
+              <button
+                type="button"
+                onClick={handleSuccessConfirm}
+                className="bg-[#fbcfe8] hover:bg-[#f9a8d4] text-[#86198f] font-semibold text-[13.5px] px-6 py-2.5 rounded-full transition-all border-2 border-[#f472b6] focus:outline-none focus:ring-4 focus:ring-[#fbcfe8] cursor-pointer"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Failure Modal mimicking Chrome macOS Dark themed JS Alert */}
+      {showCreatedFailureModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-3xs flex items-center justify-center z-50 animate-fade-in no-print">
+          <div className="bg-[#242122] border border-[#3c3639] rounded-2xl w-[450px] shadow-2xl p-5 text-white font-sans flex flex-col justify-between">
+            <div>
+              <div className="text-slate-300 text-[13px] font-medium mb-4 select-none">
+                saemaul-facility.vercel.app 내용:
+              </div>
+              <div className="text-red-400 text-[14px] font-medium tracking-wide mb-6 pl-1">
+                {errorMessage || '저장에 실패했습니다.'}
+              </div>
+            </div>
+            <div className="flex justify-end mt-2 pr-1">
+              <button
+                type="button"
+                onClick={handleFailureConfirm}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-800 font-semibold text-[13.5px] px-6 py-2.5 rounded-full transition-all border-2 border-slate-300 focus:outline-none focus:ring-4 focus:ring-slate-200 cursor-pointer"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -282,7 +282,11 @@ export const getFromStorage = (key: string, isJson = true) => {
 };
 
 export const saveToCache = (key: string, data: any, isJson = true) => {
-  localStorage.setItem(key, isJson ? JSON.stringify(data) : data);
+  try {
+    localStorage.setItem(key, isJson ? JSON.stringify(data) : data);
+  } catch (error) {
+    console.warn(`[saveToCache] Failed to save key "${key}" to localStorage due to quota or storage restrictions:`, error);
+  }
 };
 
 export const clearCache = (key: string) => {
@@ -1343,8 +1347,34 @@ export const fetchEquipmentHistoryList = async (): Promise<any[]> => {
 };
 
 export const saveEquipmentHistoryList = async (list: any[]): Promise<boolean> => {
-  const { error = null } = await supabase.from('system_settings').upsert({ id: 'EQUIPMENT_DB', data: { equipmentList: list }, last_updated: new Date().toISOString() });
-  return !error;
+  try {
+    const processedList = [];
+    for (let i = 0; i < list.length; i++) {
+      const item = { ...list[i] };
+      if (item && item.imageUrl && item.imageUrl.startsWith('data:image/')) {
+        const fileExt = item.imageUrl.split(';')[0].split('/')[1] || 'jpg';
+        const fileName = `eq_${Date.now()}_${i}.${fileExt}`;
+        const publicUrl = await uploadFile('facility', 'equipment', fileName, item.imageUrl);
+        if (publicUrl) {
+          item.imageUrl = publicUrl;
+        }
+      }
+      processedList.push(item);
+    }
+
+    const { error = null } = await supabase
+      .from('system_settings')
+      .upsert({ id: 'EQUIPMENT_DB', data: { equipmentList: processedList }, last_updated: new Date().toISOString() });
+    
+    if (error) {
+      console.error('saveEquipmentHistoryList Supabase error:', error);
+      throw new Error(`[DB 에러: ${error.code || ''}] ${error.message || '저장 오류'} (${error.details || ''})`);
+    }
+    return true;
+  } catch (err: any) {
+    console.error('saveEquipmentHistoryList exception:', err);
+    throw err;
+  }
 };
 
 export const fetchEquipmentMaintenanceRecords = async (): Promise<any[]> => {
