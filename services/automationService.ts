@@ -177,6 +177,123 @@ export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
 };
 
 /**
+ * 년간 자동등록 설정이 특정 날짜에 해당하는지 체크
+ */
+export const isYearlySettingMatched = (setting: any, date: Date): boolean => {
+  const itemText = setting.item || setting.item_name || '';
+  let monthSelect = '1월';
+  let weekSelect = '1주차';
+  let prevDay = false;
+  let nextDay = false;
+
+  if (itemText.includes('__YEARLY_JSON__')) {
+    const parts = itemText.split('__YEARLY_JSON__');
+    try {
+      const meta = JSON.parse(parts[1]);
+      monthSelect = meta.monthSelect || '1월';
+      weekSelect = meta.weekSelect || '1주차';
+      prevDay = !!meta.prevDay;
+      nextDay = !!meta.nextDay;
+    } catch (e) {
+      console.error('Failed to parse yearly json:', e);
+    }
+  } else {
+    return false;
+  }
+
+  const checkScheduleForDate = (d: Date): boolean => {
+    const dMonth = d.getMonth() + 1; // 1 ~ 12
+    const dDay = getDay(d);
+
+    // Month check
+    let monthMatched = false;
+    if (monthSelect.endsWith('월')) {
+      const targetMonth = parseInt(monthSelect.replace('월', ''), 10);
+      if (dMonth === targetMonth) monthMatched = true;
+    } else if (monthSelect === '짝수달') {
+      if (dMonth % 2 === 0) monthMatched = true;
+    } else if (monthSelect === '홀수달') {
+      if (dMonth % 2 !== 0) monthMatched = true;
+    } else if (monthSelect === '반기') {
+      // Half-yearly (Jan and Jul starts)
+      if (dMonth === 1 || dMonth === 7) monthMatched = true;
+    } else if (monthSelect === '분기') {
+      // Quarterly (Jan, Apr, Jul, Oct starts)
+      if (dMonth === 1 || dMonth === 4 || dMonth === 7 || dMonth === 10) monthMatched = true;
+    }
+
+    if (!monthMatched) return false;
+
+    // Day of week check
+    let dayMatched = false;
+    switch(dDay) {
+      case 0: if (setting.sun) dayMatched = true; break;
+      case 1: if (setting.mon) dayMatched = true; break;
+      case 2: if (setting.tue) dayMatched = true; break;
+      case 3: if (setting.wed) dayMatched = true; break;
+      case 4: if (setting.thu) dayMatched = true; break;
+      case 5: if (setting.fri) dayMatched = true; break;
+      case 6: if (setting.sat) dayMatched = true; break;
+    }
+
+    if (!dayMatched) return false;
+
+    // Week based check: '1주차', '2주차', '3주차', '4주차', '5주차'
+    const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+    const firstDayOfWeek = firstDayOfMonth.getDay(); // 0: Sun, 1: Mon, ..., 6: Sat
+    const occurrence = Math.ceil((d.getDate() + firstDayOfWeek) / 7);
+    switch (weekSelect) {
+      case '1주차': return occurrence === 1;
+      case '2주차': return occurrence === 2;
+      case '3주차': return occurrence === 3;
+      case '4주차': return occurrence === 4;
+      case '5주차': return occurrence === 5;
+    }
+
+    return false;
+  };
+
+  // Exclude holiday check
+  const excludeHolidays = !!(setting.excludeHolidays || setting.exclude_holidays);
+
+  if (excludeHolidays) {
+    if (isNonWorkingDay(date)) {
+      return false;
+    }
+
+    // Today is a working day
+    if (checkScheduleForDate(date)) {
+      return true;
+    }
+
+    // Shift checks
+    if (prevDay) {
+      let nextDate = addDays(date, 1);
+      while (isNonWorkingDay(nextDate)) {
+        if (checkScheduleForDate(nextDate)) {
+          return true;
+        }
+        nextDate = addDays(nextDate, 1);
+      }
+    }
+
+    if (nextDay) {
+      let prevDate = addDays(date, -1);
+      while (isNonWorkingDay(prevDate)) {
+        if (checkScheduleForDate(prevDate)) {
+          return true;
+        }
+        prevDate = addDays(prevDate, -1);
+      }
+    }
+
+    return false;
+  } else {
+    return checkScheduleForDate(date);
+  }
+};
+
+/**
  * DB에서 설정된 자동 등록 항목 가져오기
  */
 export const getAutomatedTasksFromDB = async (category: string, dateStr: string): Promise<TaskItem[]> => {
@@ -188,6 +305,8 @@ export const getAutomatedTasksFromDB = async (category: string, dateStr: string)
     const settings = await fetchAutoRegSettings(category);
     // Fetch monthly settings as well
     const monthlySettings = await fetchAutoRegSettings(category + '_monthly');
+    // Fetch yearly settings
+    const yearlySettings = await fetchAutoRegSettings(category + '_yearly');
     const tasks: TaskItem[] = [];
     
     // Process weekly settings (standard logic)
@@ -232,6 +351,22 @@ export const getAutomatedTasksFromDB = async (category: string, dateStr: string)
           id: `db-auto-${category}-monthly-${setting.id}-${dateStr}`,
           content: itemText,
           frequency: '월간',
+          status: '완료'
+        });
+      }
+    });
+
+    // Process yearly settings
+    yearlySettings.forEach((setting: any) => {
+      if (isYearlySettingMatched(setting, date)) {
+        let itemText = setting.item || setting.item_name || '';
+        if (itemText.includes('__YEARLY_JSON__')) {
+          itemText = itemText.split('__YEARLY_JSON__')[0];
+        }
+        tasks.push({
+          id: `db-auto-${category}-yearly-${setting.id}-${dateStr}`,
+          content: itemText,
+          frequency: '년간',
           status: '완료'
         });
       }

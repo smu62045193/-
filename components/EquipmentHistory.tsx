@@ -298,12 +298,9 @@ const EquipmentHistory: React.FC = () => {
         setEquipments(finalEq);
         setMaintenance(finalMaint);
 
-        const activeId = finalEq[0]?.id || '';
-        setSelectedEqId(activeId);
-        const activeEq = finalEq.find(e => e.id === activeId);
-        if (activeEq) {
-          setEditForm(activeEq);
-        }
+        // 장비이력카드 메뉴 최초 선택 시 빈 페이지(선택된 장비 없음)로 나오도록 초기 선택을 비워둡니다.
+        setSelectedEqId('');
+        setEditForm(null);
       } catch (err) {
         console.error('Failed to load equipment data from Supabase:', err);
       } finally {
@@ -416,11 +413,13 @@ const EquipmentHistory: React.FC = () => {
       setEquipments(finalEq);
       setMaintenance(finalMaint);
 
-      const activeId = finalEq.some(e => e.id === selectedEqId) ? selectedEqId : (finalEq[0]?.id || '');
+      const activeId = finalEq.some(e => e.id === selectedEqId) ? selectedEqId : '';
       setSelectedEqId(activeId);
       const activeEq = finalEq.find(e => e.id === activeId);
       if (activeEq) {
         setEditForm(activeEq);
+      } else {
+        setEditForm(null);
       }
       alert('새로고침이 완료되었습니다.');
     } catch (err) {
@@ -813,9 +812,172 @@ const EquipmentHistory: React.FC = () => {
   };
 
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-4 pb-32 animate-fade-in text-slate-800">
+    <div id="equipment-history-container" className="p-4 max-w-7xl mx-auto space-y-4 pb-32 animate-fade-in text-slate-800">
       
+      {/* 1. 상단 컨트롤/탭 바 통합 구성 */}
+      <div id="equipment-control-bar" className="w-full max-w-7xl mx-auto bg-white border-b border-black flex items-stretch justify-start overflow-x-auto whitespace-nowrap scrollbar-hide select-none mb-4">
+        <button 
+          id="tab-details"
+          onClick={() => {
+            setIsAddingNewEquipment(false);
+            setActiveTab('details');
+          }}
+          type="button"
+          className={`relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold cursor-pointer shrink-0 transition-colors focus:outline-none ${
+            activeTab === 'details' && !isAddingNewEquipment ? 'text-orange-600 bg-white' : 'text-gray-500 hover:text-black bg-white'
+          }`}
+        >
+          <span>장비제원</span>
+          {activeTab === 'details' && !isAddingNewEquipment && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+          )}
+        </button>
 
+        <button 
+          id="tab-history"
+          onClick={() => {
+            setIsAddingNewEquipment(false);
+            setActiveTab('history');
+          }}
+          type="button"
+          className={`relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold cursor-pointer shrink-0 transition-colors focus:outline-none ${
+            activeTab === 'history' && !isAddingNewEquipment ? 'text-orange-600 bg-white' : 'text-gray-500 hover:text-black bg-white'
+          }`}
+        >
+          <span>점검이력</span>
+          {activeTab === 'history' && !isAddingNewEquipment && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+          )}
+        </button>
+        
+        {isAddingNewEquipment ? (
+          <>
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-[1px] h-6 bg-black"></div>
+            </div>
+            <div className="relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold text-orange-600 shrink-0">
+              <Plus size={14} />
+              <span>신규장비등록 중</span>
+            </div>
+            
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-[1px] h-6 bg-black"></div>
+            </div>
+            <button 
+              id="btn-register-submit"
+              type="submit"
+              form="new-equipment-form"
+              className="px-4 py-3 text-[14px] font-bold text-blue-600 hover:text-blue-800 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            >
+              <Save size={14} />
+              등록완료
+            </button>
+            <button 
+              id="btn-register-cancel"
+              type="button"
+              onClick={() => {
+                setIsAddingNewEquipment(false);
+                setNewEqImageUrl('');
+              }}
+              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            >
+              <X size={14} />
+              취소
+            </button>
+          </>
+        ) : isEditMode ? (
+          <>
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-[1px] h-6 bg-black"></div>
+            </div>
+            <button 
+              id="btn-edit-save"
+              onClick={handleUpdateEquipment}
+              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            >
+              <Save size={14} />
+              저장
+            </button>
+            
+            <button 
+              id="btn-edit-cancel"
+              onClick={() => {
+                setIsEditMode(false);
+                if (currentEquipment) {
+                  setEditForm(currentEquipment);
+                }
+              }}
+              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            >
+              취소
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center shrink-0 px-2">
+              <div className="w-[1px] h-6 bg-black"></div>
+            </div>
+            <button 
+              id="btn-refresh"
+              onClick={handleRefresh}
+              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            >
+              <RefreshCw size={14} />
+              새로고침
+            </button>
+
+            <button 
+              id="btn-register"
+              onClick={() => {
+                if (activeTab === 'history') {
+                  setShowAddMaintBox(true);
+                } else {
+                  setIsAddingNewEquipment(true);
+                }
+              }}
+              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            >
+              <Plus size={14} />
+              등록
+            </button>
+
+            {activeTab === 'details' && currentEquipment && (
+              <button 
+                id="btn-edit"
+                onClick={startEditing}
+                className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+              >
+                <Edit size={14} />
+                수정
+              </button>
+            )}
+
+            <button 
+              id="btn-save-supabase"
+              onClick={handleSaveToSupabase}
+              className={`px-4 py-3 text-[14px] font-bold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer ${
+                isSavedSuccessfully 
+                  ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' 
+                  : 'text-gray-500 hover:text-black bg-white'
+              }`}
+            >
+              <Save size={14} className={isSavedSuccessfully ? 'text-emerald-600 animate-bounce' : ''} />
+              {isSavedSuccessfully ? '저장완료' : '저장'}
+            </button>
+
+            {currentEquipment && (
+              <button 
+                id="btn-print"
+                onClick={handlePrint}
+                className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+              >
+                <Printer size={14} />
+                인쇄
+              </button>
+            )}
+          </>
+        )}
+      </div>
 
       {/* Main Grid View */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -946,40 +1108,8 @@ const EquipmentHistory: React.FC = () => {
         {/* Right Column - Setup Specs & Maintenance History logs (lg:col-span-9) */}
         <div className="lg:col-span-9 space-y-6">
           {isAddingNewEquipment ? (
-            <form onSubmit={handleCreateEquipment} className="bg-white overflow-hidden animate-in fade-in duration-300 flex flex-col space-y-2">
-              <div className="w-full bg-white border-b border-black flex items-stretch overflow-x-auto whitespace-nowrap scrollbar-hide">
-                <div className="relative flex items-center gap-2 px-4 py-3 text-[14px] font-bold text-orange-600 bg-white cursor-pointer shrink-0">
-                  <Wrench size={16} />
-                  <span>신규장비등록</span>
-                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
-                </div>
-                
-                <div className="self-center px-2 shrink-0">
-                  <div className="h-6 w-[1px] bg-black" />
-                </div>
-
-                <button 
-                  type="submit"
-                  className="px-4 py-3 text-[14px] font-bold text-blue-600 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
-                >
-                  <Save size={14} />
-                  등록완료
-                </button>
-                
-                <button 
-                  type="button"
-                  onClick={() => {
-                    setIsAddingNewEquipment(false);
-                    setNewEqImageUrl('');
-                  }}
-                  className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
-                >
-                  <X size={14} />
-                  취소
-                </button>
-              </div>
-
-              <div className="p-6 border border-black bg-white">
+            <form id="new-equipment-form" onSubmit={handleCreateEquipment} className="bg-white border border-black overflow-hidden animate-in fade-in duration-300 flex flex-col space-y-2">
+              <div className="p-6 bg-white">
                 <div className="flex flex-col md:flex-row gap-6">
                   {/* Left: Equipment Photo Section */}
                   <div className="w-full md:w-56 shrink-0 flex flex-col gap-2">
@@ -1207,114 +1337,6 @@ const EquipmentHistory: React.FC = () => {
             <>
               {/* Card Base Specification Panel */}
               <div className="bg-white flex flex-col space-y-2">
-                <div className="w-full max-w-7xl bg-white border-b border-black flex items-stretch overflow-x-auto whitespace-nowrap scrollbar-hide">
-                  <button 
-                    onClick={() => setActiveTab('details')}
-                    type="button"
-                    className={`relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold cursor-pointer shrink-0 transition-colors focus:outline-none ${
-                      activeTab === 'details' ? 'text-orange-600 font-extrabold bg-white' : 'text-slate-500 hover:text-black'
-                    }`}
-                  >
-                    <Wrench size={15} />
-                    <span>장비제원</span>
-                    {activeTab === 'details' && (
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
-                    )}
-                  </button>
-
-                  <button 
-                    onClick={() => setActiveTab('history')}
-                    type="button"
-                    className={`relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold cursor-pointer shrink-0 transition-colors focus:outline-none ${
-                      activeTab === 'history' ? 'text-orange-600 font-extrabold bg-white' : 'text-slate-500 hover:text-black'
-                    }`}
-                  >
-                    <Activity size={15} />
-                    <span>점검이력</span>
-                    {activeTab === 'history' && (
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
-                    )}
-                  </button>
-                  
-                  {isEditMode ? (
-                    <>
-                      <div className="self-center h-6 w-[1px] bg-slate-300 mx-2 shrink-0" />
-                      <button 
-                        onClick={handleUpdateEquipment}
-                        className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0"
-                      >
-                        <Save size={14} />
-                        저장
-                      </button>
-                      
-                      <button 
-                        onClick={() => {
-                          setIsEditMode(false);
-                          setEditForm(currentEquipment);
-                        }}
-                        className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0"
-                      >
-                        취소
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="self-center h-6 w-[1px] bg-slate-300 mx-2 shrink-0" />
-                      <button 
-                        onClick={handleRefresh}
-                        className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0"
-                      >
-                        <RefreshCw size={14} />
-                        새로고침
-                      </button>
-
-                      <button 
-                        onClick={() => {
-                          if (activeTab === 'history') {
-                            setShowAddMaintBox(true);
-                          } else {
-                            setIsAddingNewEquipment(true);
-                          }
-                        }}
-                        className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0"
-                      >
-                        <Plus size={14} />
-                        등록
-                      </button>
-
-                      {activeTab === 'details' && (
-                        <button 
-                          onClick={startEditing}
-                          className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0"
-                        >
-                          <Edit size={14} />
-                          수정
-                        </button>
-                      )}
-
-                      <button 
-                        onClick={handleSaveToSupabase}
-                        className={`px-4 py-3 text-[14px] font-bold flex items-center gap-1.5 transition-colors shrink-0 ${
-                          isSavedSuccessfully 
-                            ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' 
-                            : 'text-gray-500 hover:text-black bg-white'
-                        }`}
-                      >
-                        <Save size={14} className={isSavedSuccessfully ? 'text-emerald-600 animate-bounce' : ''} />
-                        {isSavedSuccessfully ? '저장완료' : '저장'}
-                      </button>
-
-                      <button 
-                        onClick={handlePrint}
-                        className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0"
-                      >
-                        <Printer size={14} />
-                        인쇄
-                      </button>
-                    </>
-                  )}
-                </div>
-
                 {activeTab === 'details' ? (
                   <div className="p-6 border border-black bg-white">
                     <div className="flex flex-col md:flex-row gap-6">

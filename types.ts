@@ -817,6 +817,21 @@ export interface MonthlyAutoRegRow {
   nextDay: boolean; // "익일"
 }
 
+export interface YearlyAutoRegRow {
+  id: string;
+  item: string;
+  monthSelect: string; // "1월" ~ "12월", "짝수달", "홀수달", "반기", "분기"
+  weekSelect: string;  // "1주차", "2주차", "3주차", "4주차", "5주차"
+  mon: boolean;
+  tue: boolean;
+  wed: boolean;
+  thu: boolean;
+  fri: boolean;
+  excludeHolidays: boolean;
+  prevDay: boolean;
+  nextDay: boolean;
+}
+
 export interface ArchiveItem {
   id: string;
   category: string;

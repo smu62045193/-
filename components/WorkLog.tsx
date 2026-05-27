@@ -112,6 +112,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ item, isToday, onUpdate, onDelete }) 
   // 'task_'가 포함된 ID는 수동 추가 항목, 나머지는 자동 등록 항목으로 판별
   const isManual = item?.id?.includes('task_');
   const isMonthly = item?.frequency === '월간' || item?.id?.includes('-monthly-');
+  const isYearly = item?.frequency === '년간' || item?.id?.includes('-yearly-');
 
   let textColor = 'text-black';
   let bulletColor = isToday ? 'bg-blue-400' : 'bg-indigo-400';
@@ -121,6 +122,9 @@ const TaskRow: React.FC<TaskRowProps> = ({ item, isToday, onUpdate, onDelete }) 
   } else if (isMonthly) {
     textColor = '!text-purple-600 font-semibold';
     bulletColor = isToday ? 'bg-purple-500' : 'bg-purple-300';
+  } else if (isYearly) {
+    textColor = '!text-emerald-600 font-semibold'; // 자동입력항목 년간 (emerald색)
+    bulletColor = isToday ? 'bg-emerald-500' : 'bg-emerald-300';
   }
 
   return (

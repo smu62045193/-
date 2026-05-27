@@ -23,7 +23,7 @@ import {
   fetchEmergencySettings,
   saveEmergencySettings
 } from '../services/dataService';
-import { AutoRegRow, MonthlyAutoRegRow, ArchiveItem, OutdoorUnitRooftopItem } from '../types';
+import { AutoRegRow, MonthlyAutoRegRow, YearlyAutoRegRow, ArchiveItem, OutdoorUnitRooftopItem } from '../types';
 
 const TABS = [
   { id: 'auto_reg', label: '자동등록' },
@@ -96,6 +96,7 @@ interface AdminManagerProps {
 const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) => {
   const [activeTab, setActiveTab ] = useState(isArchiveOnly ? 'form' : 'auto_reg');
   const [activeSubTab, setActiveSubTab] = useState('elec');
+  const [autoRegMode, setAutoRegMode] = useState<'weekly' | 'monthly' | 'yearly'>('weekly');
   const [activeArchiveSubTab, setActiveArchiveSubTab] = useState('all');
   const [activeUniformSubTab, setActiveUniformSubTab] = useState('all');
   const [activeNetworkSubTab, setActiveNetworkSubTab] = useState('general');
@@ -266,6 +267,17 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
   });
 
   const [monthlyRowsData, setMonthlyRowsData] = useState<Record<string, MonthlyAutoRegRow[]>>({
+    elec: [],
+    mech: [],
+    fire: [],
+    elevator: [],
+    remarks: [],
+    parking: [],
+    security: [],
+    cleaning: [],
+  });
+
+  const [yearlyRowsData, setYearlyRowsData] = useState<Record<string, YearlyAutoRegRow[]>>({
     elec: [],
     mech: [],
     fire: [],
@@ -1093,6 +1105,62 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
               nextDay: false
             }]
           }));
+
+          const yData = await fetchAutoRegSettings(activeSubTab + '_yearly');
+          const mappedYearly: YearlyAutoRegRow[] = yData.map(item => {
+            let itemName = item.item || item.item_name || '';
+            let monthSelect = '1월';
+            let weekSelect = '1주차';
+            let prevDay = false;
+            let nextDay = false;
+
+            if (itemName.includes('__YEARLY_JSON__')) {
+              const parts = itemName.split('__YEARLY_JSON__');
+              itemName = parts[0];
+              try {
+                const meta = JSON.parse(parts[1]);
+                monthSelect = meta.monthSelect || '1월';
+                weekSelect = meta.weekSelect || '1주차';
+                prevDay = !!meta.prevDay;
+                nextDay = !!meta.nextDay;
+              } catch (e) {
+                console.error(e);
+              }
+            }
+
+            return {
+              id: item.id,
+              item: itemName,
+              monthSelect,
+              weekSelect,
+              mon: !!item.mon,
+              tue: !!item.tue,
+              wed: !!item.wed,
+              thu: !!item.thu,
+              fri: !!item.fri,
+              excludeHolidays: !!(item.excludeHolidays || item.exclude_holidays),
+              prevDay,
+              nextDay
+            };
+          });
+
+          setYearlyRowsData(prev => ({
+            ...prev,
+            [activeSubTab]: mappedYearly.length > 0 ? mappedYearly : [{
+              id: 'y1',
+              item: '',
+              monthSelect: '1월',
+              weekSelect: '1주차',
+              mon: false,
+              tue: false,
+              wed: false,
+              thu: false,
+              fri: false,
+              excludeHolidays: false,
+              prevDay: false,
+              nextDay: false
+            }]
+          }));
         }
       } else if (activeTab === 'form') {
         const data = await fetchArchiveSettings();
@@ -1179,7 +1247,32 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
           });
           
           const monthlySuccess = await saveAutoRegSettings(activeSubTab + '_monthly', monthlyRowsToSave);
-          success = success && monthlySuccess;
+          
+          const yearlyRowsToSave = (yearlyRowsData[activeSubTab] || []).map(row => {
+            const encodedItemName = `${row.item}__YEARLY_JSON__${JSON.stringify({
+              monthSelect: row.monthSelect,
+              weekSelect: row.weekSelect,
+              prevDay: row.prevDay,
+              nextDay: row.nextDay
+            })}`;
+            
+            return {
+              id: row.id,
+              item: encodedItemName,
+              mon: !!row.mon,
+              tue: !!row.tue,
+              wed: !!row.wed,
+              thu: !!row.thu,
+              fri: !!row.fri,
+              sat: false,
+              sun: false,
+              excludeHolidays: !!row.excludeHolidays
+            };
+          });
+          
+          const yearlySuccess = await saveAutoRegSettings(activeSubTab + '_yearly', yearlyRowsToSave);
+          
+          success = success && monthlySuccess && yearlySuccess;
         }
       } else if (activeTab === 'form') {
         success = await saveArchiveSettings(archiveRows);
@@ -1229,7 +1322,7 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
     } finally {
       setIsSaving(false);
     }
-  }, [activeTab, activeSubTab, activeNetworkSubTab, activePasswordSubTab, rowsData, monthlyRowsData, archiveRows, networkGeneralData, pcNasData, routerData, passwordSiteData, passwordBuildingData, passwordWarehouseData, loadData]);
+  }, [activeTab, activeSubTab, activeNetworkSubTab, activePasswordSubTab, rowsData, monthlyRowsData, yearlyRowsData, archiveRows, networkGeneralData, pcNasData, routerData, passwordSiteData, passwordBuildingData, passwordWarehouseData, loadData]);
 
   const handleAddRow = () => {
     if (activeTab === 'auto_reg') {
@@ -1370,6 +1463,43 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
       nextDay: false,
     };
     setMonthlyRowsData(prev => ({
+      ...prev,
+      [activeSubTab]: [...(prev[activeSubTab] || []), newRow]
+    }));
+  };
+
+  const handleUpdateYearlyRow = (id: string, field: string, value: any) => {
+    setYearlyRowsData(prev => ({
+      ...prev,
+      [activeSubTab]: (prev[activeSubTab] || []).map(row => 
+        row.id === id ? { ...row, [field]: value } : row
+      )
+    }));
+  };
+
+  const handleDeleteYearlyRow = (id: string) => {
+    setYearlyRowsData(prev => ({
+      ...prev,
+      [activeSubTab]: (prev[activeSubTab] || []).filter(row => row.id !== id)
+    }));
+  };
+
+  const handleAddYearlyRow = () => {
+    const newRow: YearlyAutoRegRow = {
+      id: Date.now().toString(),
+      item: '',
+      monthSelect: '1월',
+      weekSelect: '1주차',
+      mon: false,
+      tue: false,
+      wed: false,
+      thu: false,
+      fri: false,
+      excludeHolidays: false,
+      prevDay: false,
+      nextDay: false,
+    };
+    setYearlyRowsData(prev => ({
       ...prev,
       [activeSubTab]: [...(prev[activeSubTab] || []), newRow]
     }));
@@ -1614,177 +1744,167 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
   const renderAutoRegTable = () => {
     const rows = rowsData[activeSubTab] || [];
     const monthlyRows = monthlyRowsData[activeSubTab] || [];
-    const showMonthly = true;
-    const showDaily = true;
+    const yearlyRows = yearlyRowsData[activeSubTab] || [];
     
     return (
       <div className="w-full max-w-7xl mx-auto overflow-x-auto relative">
         {isLoading && (
           <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
-            <Loader2 className="animate-spin text-blue-600" size={32} />
+            <Loader2 className="animate-spin text-orange-650" size={32} />
           </div>
         )}
-        {showDaily && (
+
+        {autoRegMode === 'weekly' && (
           <>
-            <div className="flex justify-between items-center mb-3 mt-1 select-none">
-              <div className="text-[15px] font-bold text-black border-l-4 border-orange-500 pl-2">
-                주간
-              </div>
-              <button
-                onClick={handleAddRow}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-600 rounded bg-white text-orange-600 hover:bg-orange-50 font-bold text-[12px] transition-colors"
-                title="주간 행추가"
-              >
-                <Plus size={14} />
-                주간 행추가
-              </button>
+            <div className="text-[14px] font-bold text-black border-l-4 border-orange-500 pl-2 mb-3">
+              주간 자동등록 리스트
             </div>
             <table className="w-full border-collapse border border-black text-center bg-white">
-          <thead>
-            <tr className="h-[40px] bg-white">
-              <th className="border border-black text-[13px] font-normal px-2 w-[50px]">NO</th>
-              <th className="border border-black text-[13px] font-normal px-2">항목</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[70px]">월요일</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[70px]">화요일</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[70px]">수요일</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[70px]">목요일</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[70px]">금요일</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[70px]">토요일</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[70px]">일요일</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[80px]">공휴일제외</th>
-              <th className="border border-black text-[13px] font-normal px-2 w-[60px]">관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, index) => (
-              <tr key={row.id} className="h-[40px] border-b border-black">
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">{index + 1}</div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center h-full">
-                    <input 
-                      type="text" 
-                      value={row.item}
-                      onChange={(e) => handleUpdateRow(row.id, 'item', e.target.value)}
-                      className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal"
-                      placeholder="항목 입력"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <input 
-                      type="checkbox" 
-                      checked={row.mon}
-                      onChange={(e) => handleUpdateRow(row.id, 'mon', e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <input 
-                      type="checkbox" 
-                      checked={row.tue}
-                      onChange={(e) => handleUpdateRow(row.id, 'tue', e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <input 
-                      type="checkbox" 
-                      checked={row.wed}
-                      onChange={(e) => handleUpdateRow(row.id, 'wed', e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <input 
-                      type="checkbox" 
-                      checked={row.thu}
-                      onChange={(e) => handleUpdateRow(row.id, 'thu', e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <input 
-                      type="checkbox" 
-                      checked={row.fri}
-                      onChange={(e) => handleUpdateRow(row.id, 'fri', e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <input 
-                      type="checkbox" 
-                      checked={row.sat}
-                      onChange={(e) => handleUpdateRow(row.id, 'sat', e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <input 
-                      type="checkbox" 
-                      checked={row.sun}
-                      onChange={(e) => handleUpdateRow(row.id, 'sun', e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <input 
-                      type="checkbox" 
-                      checked={row.excludeHolidays}
-                      onChange={(e) => handleUpdateRow(row.id, 'excludeHolidays', e.target.checked)}
-                      className="w-4 h-4 cursor-pointer"
-                    />
-                  </div>
-                </td>
-                <td className="border border-black text-[13px] font-normal px-2">
-                  <div className="flex items-center justify-center h-full">
-                    <button 
-                      onClick={() => handleDeleteRow(row.id)}
-                      className="text-red-500 hover:text-red-700 transition-colors"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              <thead>
+                <tr className="h-[40px] bg-white">
+                  <th className="border border-black text-[13px] font-normal px-2 w-[50px]">NO</th>
+                  <th className="border border-black text-[13px] font-normal px-2">항목</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">월요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">화요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">수요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">목요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">금요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">토요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">일요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[80px]">공휴일제외</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[60px]">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, index) => (
+                  <tr key={row.id} className="h-[40px] border-b border-black">
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">{index + 1}</div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center h-full">
+                        <input 
+                          type="text" 
+                          value={row.item}
+                          onChange={(e) => handleUpdateRow(row.id, 'item', e.target.value)}
+                          className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal"
+                          placeholder="항목 입력"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.mon}
+                          onChange={(e) => handleUpdateRow(row.id, 'mon', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.tue}
+                          onChange={(e) => handleUpdateRow(row.id, 'tue', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.wed}
+                          onChange={(e) => handleUpdateRow(row.id, 'wed', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.thu}
+                          onChange={(e) => handleUpdateRow(row.id, 'thu', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.fri}
+                          onChange={(e) => handleUpdateRow(row.id, 'fri', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.sat}
+                          onChange={(e) => handleUpdateRow(row.id, 'sat', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.sun}
+                          onChange={(e) => handleUpdateRow(row.id, 'sun', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.excludeHolidays}
+                          onChange={(e) => handleUpdateRow(row.id, 'excludeHolidays', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <button 
+                          onClick={() => handleDeleteRow(row.id)}
+                          className="text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr className="h-[100px]">
+                    <td colSpan={11} className="border border-black text-gray-400">데이터가 없습니다.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-[12px] text-gray-500">
+                * 각 요일별로 주간에 자동 등록될 항목을 설정하세요.
+              </div>
+            </div>
           </>
         )}
         
-        {showMonthly && (
-          <div className={showDaily ? "mt-8" : "mt-1"}>
-            <div className="flex justify-between items-center mb-3 mt-1 select-none">
-              <div className="text-[15px] font-bold text-black border-l-4 border-orange-500 pl-2">
-                월간
-              </div>
-              <button
-                onClick={handleAddMonthlyRow}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-orange-600 rounded bg-white text-orange-600 hover:bg-orange-50 font-bold text-[12px] transition-colors"
-                title="월간 행추가"
-              >
-                <Plus size={14} />
-                월간 행추가
-              </button>
+        {autoRegMode === 'monthly' && (
+          <>
+            <div className="text-[14px] font-bold text-black border-l-4 border-orange-500 pl-2 mb-3">
+              월간 자동등록 리스트
             </div>
-            
             <table className="w-full border-collapse border border-black text-center bg-white">
               <thead>
                 <tr className="h-[40px] bg-white">
@@ -1810,7 +1930,7 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                       <div className="flex items-center justify-center h-full">{index + 1}</div>
                     </td>
                     <td className="border border-black text-[13px] font-normal px-2">
-                      <div className="flex items-center h-full">
+                       <div className="flex items-center h-full">
                         <input 
                           type="text" 
                           value={row.item}
@@ -1969,14 +2089,191 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                 )}
               </tbody>
             </table>
-          </div>
+            
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-[12px] text-gray-500">
+                * 각 요일 또는 지정 일자별로 월간 자동 등록될 항목을 설정하세요.
+              </div>
+            </div>
+          </>
         )}
-        
-        <div className="mt-4 flex justify-between items-center">
-          <div className="text-[12px] text-gray-500">
-            * 각 요일별로 자동 등록될 항목을 설정하세요.
-          </div>
-        </div>
+
+        {autoRegMode === 'yearly' && (
+          <>
+            <div className="text-[14px] font-bold text-black border-l-4 border-orange-500 pl-2 mb-3">
+              년간 자동등록 리스트
+            </div>
+            <table className="w-full border-collapse border border-black text-center bg-white">
+              <thead>
+                <tr className="h-[40px] bg-white">
+                  <th className="border border-black text-[13px] font-normal px-2 w-[50px]">No</th>
+                  <th className="border border-black text-[13px] font-normal px-2">항목</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[100px]">월선택</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[100px]">주간선택</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">월요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">화요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">수요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">목요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">금요일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[80px]">공휴일제외</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">전일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">익일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[60px]">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {yearlyRows.map((row, index) => (
+                  <tr key={row.id} className="h-[40px] border-b border-black">
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">{index + 1}</div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                       <div className="flex items-center h-full">
+                        <input 
+                          type="text" 
+                          value={row.item}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'item', e.target.value)}
+                          className="w-full bg-transparent border-none outline-none shadow-none appearance-none text-[13px] font-normal"
+                          placeholder="항목 입력"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <select
+                          value={row.monthSelect}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'monthSelect', e.target.value)}
+                          className="bg-transparent border border-gray-300 rounded text-[13px] px-1 py-0.5 outline-none select-none"
+                        >
+                          {["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월", "짝수달", "홀수달", "반기", "분기"].map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <select
+                          value={row.weekSelect}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'weekSelect', e.target.value)}
+                          className="bg-transparent border border-gray-300 rounded text-[13px] px-1 py-0.5 outline-none select-none"
+                        >
+                          {["1주차", "2주차", "3주차", "4주차", "5주차"].map(w => (
+                            <option key={w} value={w}>{w}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.mon}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'mon', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.tue}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'tue', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.wed}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'wed', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.thu}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'thu', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.fri}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'fri', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.excludeHolidays}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'excludeHolidays', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.prevDay}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'prevDay', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={row.nextDay}
+                          onChange={(e) => handleUpdateYearlyRow(row.id, 'nextDay', e.target.checked)}
+                          className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <button 
+                          onClick={() => handleDeleteYearlyRow(row.id)}
+                          className="text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {yearlyRows.length === 0 && (
+                  <tr className="h-[100px]">
+                    <td colSpan={13} className="border border-black text-gray-400">데이터가 없습니다.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            
+            <div className="mt-4 flex flex-col gap-1 items-start pl-2">
+              <div className="text-[13px] text-gray-700 font-medium">
+                월선택 : 1월~12월, 짝수달, 홀수달, 반기, 분기
+              </div>
+              <div className="text-[13px] text-gray-700 font-medium">
+                주간선택 : 1주차, 2주차, 3주차, 4주차, 5주차
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   };
@@ -3732,7 +4029,8 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
 
       {/* 서브탭메뉴 (자동등록일 때만 표시) */}
       {activeTab === 'auto_reg' && (
-        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black select-none">
+          {/* 1. 카테고리 탭 (전기 기계 소방 승강기 특이사항 주차 경비 미화) */}
           <div className="flex items-center shrink-0">
             {SUB_TABS_AUTO_REG.map(subTab => (
               <div
@@ -3740,7 +4038,7 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                 onClick={() => setActiveSubTab(subTab.id)}
                 className={`px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                   activeSubTab === subTab.id 
-                    ? 'text-orange-600' 
+                    ? 'text-orange-650' 
                     : 'text-gray-500 hover:text-black'
                 }`}
               >
@@ -3757,8 +4055,51 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
             <div className="w-px h-6 bg-black"></div>
           </div>
 
-          {/* 액션 버튼들 */}
+          {/* 2. 주간 월간 년간 탭 (파란색 계열) */}
           <div className="flex items-center shrink-0">
+            {[
+              { id: 'weekly', label: '주간' },
+              { id: 'monthly', label: '월간' },
+              { id: 'yearly', label: '년간' }
+            ].map((tab) => (
+              <div
+                key={tab.id}
+                onClick={() => setAutoRegMode(tab.id as any)}
+                className={`relative py-3 px-4 text-[14px] font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                  autoRegMode === tab.id
+                    ? 'text-blue-600'
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {tab.label}
+                {autoRegMode === tab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-600" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-px h-6 bg-black"></div>
+          </div>
+
+          {/* 3. 액션 버튼들 (행추가 / 저장) */}
+          <div className="flex items-center shrink-0">
+            <button
+              onClick={
+                autoRegMode === 'weekly' 
+                  ? handleAddRow 
+                  : autoRegMode === 'monthly' 
+                    ? handleAddMonthlyRow 
+                    : handleAddYearlyRow
+              }
+              className="flex items-center gap-1.5 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap cursor-pointer"
+            >
+              <Plus size={14} />
+              행추가
+            </button>
+
             <button 
               onClick={handleSave}
               disabled={isSaving}
