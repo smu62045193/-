@@ -855,34 +855,54 @@ const EquipmentHistory: React.FC = () => {
             <div className="flex items-center shrink-0 px-2">
               <div className="w-[1px] h-6 bg-black"></div>
             </div>
-            <div className="relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold text-orange-600 shrink-0">
-              <Plus size={14} />
-              <span>신규장비등록 중</span>
-            </div>
-            
-            <div className="flex items-center shrink-0 px-2">
-              <div className="w-[1px] h-6 bg-black"></div>
-            </div>
+            <button 
+              id="btn-refresh-register"
+              type="button"
+              onClick={handleRefresh}
+              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            >
+              <RefreshCw size={14} />
+              새로고침
+            </button>
+
             <button 
               id="btn-register-submit"
               type="submit"
               form="new-equipment-form"
-              className="px-4 py-3 text-[14px] font-bold text-blue-600 hover:text-blue-800 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+              className="relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold text-orange-600 bg-white transition-colors shrink-0 cursor-pointer focus:outline-none"
+            >
+              <span>완료</span>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+            </button>
+
+            <button 
+              id="btn-edit-register"
+              type="button"
+              disabled
+              className="px-4 py-3 text-[14px] font-bold text-gray-300 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-not-allowed"
+            >
+              <Edit size={14} />
+              수정
+            </button>
+
+            <button 
+              id="btn-save-register"
+              type="button"
+              disabled
+              className="px-4 py-3 text-[14px] font-bold text-gray-300 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-not-allowed"
             >
               <Save size={14} />
-              등록완료
+              저장
             </button>
+
             <button 
-              id="btn-register-cancel"
+              id="btn-print-register"
               type="button"
-              onClick={() => {
-                setIsAddingNewEquipment(false);
-                setNewEqImageUrl('');
-              }}
-              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+              disabled
+              className="px-4 py-3 text-[14px] font-bold text-gray-300 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-not-allowed"
             >
-              <X size={14} />
-              취소
+              <Printer size={14} />
+              인쇄
             </button>
           </>
         ) : isEditMode ? (
@@ -955,14 +975,17 @@ const EquipmentHistory: React.FC = () => {
             <button 
               id="btn-save-supabase"
               onClick={handleSaveToSupabase}
-              className={`px-4 py-3 text-[14px] font-bold flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer ${
+              className={`relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold transition-colors shrink-0 cursor-pointer focus:outline-none ${
                 isSavedSuccessfully 
-                  ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' 
+                  ? 'text-orange-600 bg-white' 
                   : 'text-gray-500 hover:text-black bg-white'
               }`}
             >
-              <Save size={14} className={isSavedSuccessfully ? 'text-emerald-600 animate-bounce' : ''} />
-              {isSavedSuccessfully ? '저장완료' : '저장'}
+              <Save size={14} className={isSavedSuccessfully ? 'text-orange-600' : ''} />
+              <span>{isSavedSuccessfully ? '저장완료' : '저장'}</span>
+              {isSavedSuccessfully && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+              )}
             </button>
 
             {currentEquipment && (
