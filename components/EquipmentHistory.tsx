@@ -876,6 +876,20 @@ const EquipmentHistory: React.FC = () => {
             </button>
 
             <button 
+              id="btn-cancel-register"
+              type="button"
+              onClick={() => {
+                setIsAddingNewEquipment(false);
+                setSelectedEqId('');
+                setEditForm(null);
+                setNewEqSpecs([{ id: '1', label: '용량 및 규격', value: '' }]);
+              }}
+              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+            >
+              취소
+            </button>
+
+            <button 
               id="btn-edit-register"
               type="button"
               disabled
@@ -911,25 +925,53 @@ const EquipmentHistory: React.FC = () => {
               <div className="w-[1px] h-6 bg-black"></div>
             </div>
             <button 
-              id="btn-edit-save"
+              id="btn-refresh-edit"
+              type="button"
+              disabled
+              className="px-4 py-3 text-[14px] font-bold text-gray-300 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-not-allowed"
+            >
+              <RefreshCw size={14} />
+              새로고침
+            </button>
+
+            <button 
+              id="btn-register-edit"
+              type="button"
+              disabled
+              className="px-4 py-3 text-[14px] font-bold text-gray-300 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-not-allowed"
+            >
+              <Plus size={14} />
+              등록
+            </button>
+
+            <button 
+              id="btn-edit-submit"
+              type="button"
               onClick={handleUpdateEquipment}
-              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+              className="relative flex items-center gap-1.5 px-4 py-3 text-[14px] font-bold text-orange-600 bg-white transition-colors shrink-0 cursor-pointer focus:outline-none"
+            >
+              <span>완료</span>
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+            </button>
+
+            <button 
+              id="btn-save-edit"
+              type="button"
+              disabled
+              className="px-4 py-3 text-[14px] font-bold text-gray-300 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-not-allowed"
             >
               <Save size={14} />
               저장
             </button>
-            
+
             <button 
-              id="btn-edit-cancel"
-              onClick={() => {
-                setIsEditMode(false);
-                if (currentEquipment) {
-                  setEditForm(currentEquipment);
-                }
-              }}
-              className="px-4 py-3 text-[14px] font-bold text-gray-500 hover:text-black bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
+              id="btn-print-edit"
+              type="button"
+              disabled
+              className="px-4 py-3 text-[14px] font-bold text-gray-300 bg-white flex items-center gap-1.5 transition-colors shrink-0 cursor-not-allowed"
             >
-              취소
+              <Printer size={14} />
+              인쇄
             </button>
           </>
         ) : (
