@@ -469,7 +469,7 @@ const EquipmentHistory: React.FC = () => {
       manufacturer: new FormData(form).get('manufacturer') as string,
       specifications: serializeSpecs(newEqSpecs),
       location: new FormData(form).get('location') as string,
-      installDate: new FormData(form).get('installDate') as string || new Date().toISOString().substring(0, 10),
+      installDate: (new FormData(form).get('installDate') as string)?.substring(0, 7) || new Date().toISOString().substring(0, 7),
       supplier: new FormData(form).get('supplier') as string,
       warrantyPeriod: new FormData(form).get('warrantyPeriod') as string,
       status: new FormData(form).get('status') as any || '정상',
@@ -776,7 +776,7 @@ const EquipmentHistory: React.FC = () => {
                   <th>설치위치</th>
                   <td>${currentEquipment.location || '-'}</td>
                   <th>제조년월</th>
-                  <td>${currentEquipment.installDate || '-'}</td>
+                  <td>${currentEquipment.installDate ? currentEquipment.installDate.substring(0, 7) : '-'}</td>
                 </tr>
               </table>
             </div>
@@ -1214,6 +1214,7 @@ const EquipmentHistory: React.FC = () => {
                             type="text" 
                             placeholder="예: 현대일렉트릭"
                             className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800 focus:outline-none focus:border-orange-500" 
+                            autoComplete="off"
                           />
                         </div>
                       </div>
@@ -1230,6 +1231,7 @@ const EquipmentHistory: React.FC = () => {
                             type="text" 
                             placeholder="예: TR-100KVA"
                             className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800 focus:outline-none focus:border-orange-500" 
+                            autoComplete="off"
                           />
                         </div>
                       </div>
@@ -1243,9 +1245,10 @@ const EquipmentHistory: React.FC = () => {
                           <div className="text-[13px] text-slate-500 font-normal whitespace-nowrap">제조년월 :</div>
                           <input 
                             name="installDate"
-                            type="date" 
-                            defaultValue={new Date().toISOString().substring(0, 10)}
+                            type="month" 
+                            defaultValue={new Date().toISOString().substring(0, 7)}
                             className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-800 focus:outline-none focus:border-orange-500" 
+                            autoComplete="off"
                           />
                         </div>
                       </div>
@@ -1262,6 +1265,7 @@ const EquipmentHistory: React.FC = () => {
                             type="text" 
                             placeholder="예: B3F 전기기계실"
                             className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800 focus:outline-none focus:border-orange-500" 
+                            autoComplete="off"
                           />
                         </div>
                       </div>
@@ -1468,9 +1472,10 @@ const EquipmentHistory: React.FC = () => {
                                   value={editForm.manufacturer} 
                                   onChange={(e) => setEditForm({ ...editForm, manufacturer: e.target.value })}
                                   className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800 focus:outline-none focus:border-orange-500" 
+                                  autoComplete="off"
                                 />
                               ) : (
-                                <div className="font-normal text-black text-[13px] whitespace-nowrap truncate">{currentEquipment.manufacturer || '-'}</div>
+                                <div className="font-normal text-black text-[13px] whitespace-nowrap truncate">{currentEquipment ? (currentEquipment.manufacturer || '-') : '-'}</div>
                               )}
                             </div>
                           </div>
@@ -1488,9 +1493,10 @@ const EquipmentHistory: React.FC = () => {
                                   value={editForm.modelName} 
                                   onChange={(e) => setEditForm({ ...editForm, modelName: e.target.value })}
                                   className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800 focus:outline-none focus:border-orange-500" 
+                                  autoComplete="off"
                                 />
                               ) : (
-                                <div className="font-normal text-black text-[13px] whitespace-nowrap truncate">{currentEquipment.modelName || '-'}</div>
+                                <div className="font-normal text-black text-[13px] whitespace-nowrap truncate">{currentEquipment ? (currentEquipment.modelName || '-') : '-'}</div>
                               )}
                             </div>
                           </div>
@@ -1504,13 +1510,14 @@ const EquipmentHistory: React.FC = () => {
                               <div className="text-[13px] text-slate-500 font-normal whitespace-nowrap">제조년월 :</div>
                               {isEditMode && editForm ? (
                                 <input 
-                                  type="date" 
-                                  value={editForm.installDate} 
+                                  type="month" 
+                                  value={editForm.installDate ? editForm.installDate.substring(0, 7) : ''} 
                                   onChange={(e) => setEditForm({ ...editForm, installDate: e.target.value })}
                                   className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold font-mono text-slate-800 focus:outline-none focus:border-orange-500" 
+                                  autoComplete="off"
                                 />
                               ) : (
-                                <div className="font-normal text-black text-[13px] whitespace-nowrap">{currentEquipment.installDate || '-'}</div>
+                                <div className="font-normal text-black text-[13px] whitespace-nowrap">{currentEquipment ? (currentEquipment.installDate ? currentEquipment.installDate.substring(0, 7) : '-') : '-'}</div>
                               )}
                             </div>
                           </div>
@@ -1528,9 +1535,10 @@ const EquipmentHistory: React.FC = () => {
                                   value={editForm.location} 
                                   onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
                                   className="flex-1 min-w-0 px-2 py-1 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800 focus:outline-none focus:border-orange-500" 
+                                  autoComplete="off"
                                 />
                               ) : (
-                                <div className="font-normal text-black text-[13px] whitespace-nowrap truncate">{currentEquipment.location || '-'}</div>
+                                <div className="font-normal text-black text-[13px] whitespace-nowrap truncate">{currentEquipment ? (currentEquipment.location || '-') : '-'}</div>
                               )}
                             </div>
                           </div>
