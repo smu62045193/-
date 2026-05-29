@@ -29,14 +29,14 @@ export const WORK_LOG_TABS = [
   { id: 'mech_facility', label: '기계설비' },
 ];
 
-// Variable Holidays (Lunar New Year, Chuseok, Buddha's Birthday and Substitutes) 2024-2033
+// Variable Holidays (Lunar New Year, Chuseok, Buddha's Birthday, Substitutes, and Nationwide Elections) 2024-2033
 export const HOLIDAYS: Holiday[] = [
   // 2024
   { date: '2024-02-09', name: '설날 연휴' },
   { date: '2024-02-10', name: '설날' },
   { date: '2024-02-11', name: '설날 연휴' },
   { date: '2024-02-12', name: '대체공휴일' },
-  { date: '2024-04-10', name: '국회의원선거' },
+  { date: '2024-04-10', name: '제22대 국회의원선거' },
   { date: '2024-05-06', name: '대체공휴일' },
   { date: '2024-05-15', name: '부처님오신날' },
   { date: '2024-07-17', name: '제헌절' },
@@ -64,6 +64,7 @@ export const HOLIDAYS: Holiday[] = [
   { date: '2026-03-02', name: '대체공휴일' },
   { date: '2026-05-24', name: '부처님오신날' },
   { date: '2026-05-25', name: '대체공휴일' },
+  { date: '2026-06-03', name: '제9회 전국동시지방선거' },
   { date: '2026-07-17', name: '제헌절' },
   { date: '2026-08-17', name: '대체공휴일' },
   { date: '2026-09-24', name: '추석 연휴' },
@@ -77,6 +78,7 @@ export const HOLIDAYS: Holiday[] = [
   { date: '2027-02-07', name: '설날' },
   { date: '2027-02-08', name: '설날 연휴' },
   { date: '2027-02-09', name: '대체공휴일' },
+  { date: '2027-03-03', name: '제21대 대통령선거' },
   { date: '2027-05-13', name: '부처님오신날' },
   { date: '2027-07-17', name: '제헌절' },
   { date: '2027-09-14', name: '추석 연휴' },
@@ -87,6 +89,7 @@ export const HOLIDAYS: Holiday[] = [
   { date: '2028-01-26', name: '설날 연휴' },
   { date: '2028-01-27', name: '설날' },
   { date: '2028-01-28', name: '설날 연휴' },
+  { date: '2028-04-12', name: '제23대 국회의원선거' },
   { date: '2028-05-02', name: '부처님오신날' },
   { date: '2028-07-17', name: '제헌절' },
   { date: '2028-10-02', name: '추석 연휴' },
@@ -112,6 +115,7 @@ export const HOLIDAYS: Holiday[] = [
   { date: '2030-02-04', name: '설날 연휴' },
   { date: '2030-02-05', name: '대체공휴일' },
   { date: '2030-05-09', name: '부처님오신날' },
+  { date: '2030-06-12', name: '제10회 전국동시지방선거' },
   { date: '2030-07-17', name: '제헌절' },
   { date: '2030-09-11', name: '추석 연휴' },
   { date: '2030-09-12', name: '추석' },
@@ -131,6 +135,8 @@ export const HOLIDAYS: Holiday[] = [
   { date: '2032-02-10', name: '설날 연휴' },
   { date: '2032-02-11', name: '설날' },
   { date: '2032-02-12', name: '설날 연휴' },
+  { date: '2032-03-03', name: '제22대 대통령선거' },
+  { date: '2032-04-14', name: '제24대 국회의원선거' },
   { date: '2032-05-16', name: '부처님오신날' },
   { date: '2032-05-17', name: '대체공휴일' },
   { date: '2032-07-17', name: '제헌절' },

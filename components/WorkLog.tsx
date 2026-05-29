@@ -815,12 +815,18 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         });
         const usedConsumables = Array.from(aggMap.values());
 
-        const consumableRows = []; for (let i = 0; i < 2; i++) consumableRows.push({ left: usedConsumables[i] || null, right: usedConsumables[i + 2] || null });
+        const consumableRows = []; for (let i = 0; i < 3; i++) consumableRows.push({ left: usedConsumables[i] || null, right: usedConsumables[i + 3] || null });
         const chemicals = logData.mechanicalChemicals || INITIAL_CHEMICALS;
 
         bodyHtml = `
           <div class="print-page">
-            <style>tr, th, td { height: 20px !important; line-height: 20px !important; padding: 0 4px !important; } td > div { height: 20px !important; line-height: 20px !important; }</style>
+            <style>
+              tr, th, td { height: 20px !important; line-height: 20px !important; padding: 0 4px !important; } 
+              td > div { height: 20px !important; line-height: 20px !important; }
+              .flex-header { min-height: 70px !important; margin-bottom: 4px !important; }
+              .info-row { margin-bottom: 4px !important; }
+              .section-header { margin-top: 6px !important; margin-bottom: 4px !important; }
+            </style>
             <div class="flex-header"><div class="title-box"><div class="doc-title">기계실 업무일지</div></div>${approvalTableHtml()}</div>
             <div class="info-row"><div>${formattedYear}년 ${formattedMonth}월 ${formattedDay}일 (${dayName})</div><div>${dutyInfo}</div></div>
             <div class="section-header">1. 업무일지</div>

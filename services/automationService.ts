@@ -109,10 +109,8 @@ export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
 
     // Week based: '1주차', '2주차', '3주차', '4주차', '5주차', '월초'
     if (dayMatched) {
-      // Calculate calendar-based week occurrence (Sunday starts the week)
-      const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-      const firstDayOfWeek = firstDayOfMonth.getDay(); // 0: Sun, 1: Mon, ..., 6: Sat
-      const occurrence = Math.ceil((d.getDate() + firstDayOfWeek) / 7);
+      // 해당 요일의 월 기준 등장 횟수 (예: 매월 첫 번째 월요일 = 1주차 월요일)
+      const occurrence = Math.ceil(d.getDate() / 7);
       switch (weekSelect) {
         case '월초': return occurrence === 1;
         case '1주차': return occurrence === 1;
@@ -239,9 +237,8 @@ export const isYearlySettingMatched = (setting: any, date: Date): boolean => {
     if (!dayMatched) return false;
 
     // Week based check: '1주차', '2주차', '3주차', '4주차', '5주차'
-    const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-    const firstDayOfWeek = firstDayOfMonth.getDay(); // 0: Sun, 1: Mon, ..., 6: Sat
-    const occurrence = Math.ceil((d.getDate() + firstDayOfWeek) / 7);
+    // 해당 요일의 월 기준 등장 횟수 (예: 첫 번째 월요일 = 1주차 월요일)
+    const occurrence = Math.ceil(d.getDate() / 7);
     switch (weekSelect) {
       case '1주차': return occurrence === 1;
       case '2주차': return occurrence === 2;
