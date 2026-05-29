@@ -52,12 +52,35 @@ export const isNonWorkingDay = (date: Date): boolean => {
 };
 
 /**
+ * 매월 첫 번째 월요일을 기준(1주차의 첫 날인 월요일)으로 날짜의 마일리안 주차를 계산합니다.
+ * 첫 번째 월요일 이전의 일은 주차가 없는 것으로 판단해 0을 반환합니다.
+ */
+export const getCustomWeekOccurrence = (d: Date): number => {
+  const currentYear = d.getFullYear();
+  const currentMonthNum = d.getMonth();
+  
+  // 첫 번째 월요일 찾기 (1일 ~ 7일 중 요일이 월요일(1)인 날)
+  let m1 = 1;
+  for (let dayNum = 1; dayNum <= 7; dayNum++) {
+    const tempDate = new Date(currentYear, currentMonthNum, dayNum);
+    if (tempDate.getDay() === 1) { // 1: 월요일
+      m1 = dayNum;
+      break;
+    }
+  }
+
+  const dateVal = d.getDate();
+  if (dateVal < m1) {
+    return 0; // 첫 번째 월요일 이전은 주차 없음
+  }
+
+  return Math.floor((dateVal - m1) / 7) + 1;
+};
+
+/**
  * 월간 자동등록 설정이 특정 날짜에 해당하는지 체크
  */
 export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
-  const day = getDay(date); // 0: 일, 1: 월, ..., 6: 토
-  const isHoliday = isHolidayOrSunday(date);
-  
   // Parse item name and metadata if it is stored as JSON
   const itemText = setting.item || setting.item_name || '';
   let weekSelect = '1주차';
@@ -109,8 +132,9 @@ export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
 
     // Week based: '1주차', '2주차', '3주차', '4주차', '5주차', '월초'
     if (dayMatched) {
-      // 해당 요일의 월 기준 등장 횟수 (예: 매월 첫 번째 월요일 = 1주차 월요일)
-      const occurrence = Math.ceil(d.getDate() / 7);
+      // 해당 요일의 월 기준 등장 횟수 (매월 첫 번째 월요일을 기준으로 주차 계산)
+      const occurrence = getCustomWeekOccurrence(d);
+      if (occurrence === 0) return false; // 첫 번째 월요일 이전은 주차 없음
       switch (weekSelect) {
         case '월초': return occurrence === 1;
         case '1주차': return occurrence === 1;
@@ -131,39 +155,92 @@ export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
   // Exclude holiday check
   const excludeHolidays = !!(setting.excludeHolidays || setting.exclude_holidays);
 
-  // If we exclude holidays, we treat Saturdays, Sundays, and public holidays as non-working days
   if (excludeHolidays) {
     if (isNonWorkingDay(date)) {
-      // If today is a weekend/holiday, we never run today (the scheduled task is shifted or skipped)
+      // If today is a weekend/holiday, we never run today (the scheduled task is shifted)
       return false;
     }
 
-    // Today is a working day (Monday - Friday and not a holiday)
-    // 1. Check if the schedule matches today directly
-    if (checkScheduleForDate(date)) {
-      return true;
-    }
+    // Today is a working day.
+    // Find all scheduled dates in this specific month (same month and year as 'date')
+    const currentYear = date.getFullYear();
+    const currentMonthNum = date.getMonth();
+    const daysInMonth = new Date(currentYear, currentMonthNum + 1, 0).getDate();
 
-    // 2. Shift checks (since today itself doesn't match standard schedule)
-    if (prevDay) {
-      // Look ahead for consecutive weekend/holidays. If any of them is the scheduled day, we run it on today (the last working day before)
-      let nextDate = addDays(date, 1);
-      while (isNonWorkingDay(nextDate)) {
-        if (checkScheduleForDate(nextDate)) {
-          return true;
-        }
-        nextDate = addDays(nextDate, 1);
+    const scheduledDates: Date[] = [];
+    for (let dNum = 1; dNum <= daysInMonth; dNum++) {
+      const testDate = new Date(currentYear, currentMonthNum, dNum);
+      if (checkScheduleForDate(testDate)) {
+        scheduledDates.push(testDate);
       }
     }
 
-    if (nextDay) {
-      // Look back for consecutive weekend/holidays. If any of them is the scheduled day, we run it on today (the first working day after)
-      let prevDate = addDays(date, -1);
-      while (isNonWorkingDay(prevDate)) {
-        if (checkScheduleForDate(prevDate)) {
-          return true;
+    // For each potential scheduled date S, check if its actual run date under holiday shifting maps to today
+    for (const S of scheduledDates) {
+      let runDate: Date = S;
+
+      if (isNonWorkingDay(S)) {
+        // A. 1주차 + 공휴일 특수 처리: 2주차 같은 요일로 등록
+        if (weekSelect === '1주차' && getCustomWeekOccurrence(S) === 1) {
+          const plus7 = addDays(S, 7);
+          if (plus7.getMonth() === S.getMonth()) {
+            runDate = plus7;
+          }
         }
-        prevDate = addDays(prevDate, -1);
+
+        // B. 만약 여전히 휴무일이라면, 동일한 월 내에서 전일/익일 로직 수행 (월 이탈 방지)
+        if (isNonWorkingDay(runDate)) {
+          if (prevDay) {
+            let temp = addDays(S, -1);
+            let found = false;
+            while (temp.getMonth() === S.getMonth()) {
+              if (!isNonWorkingDay(temp)) {
+                runDate = temp;
+                found = true;
+                break;
+              }
+              temp = addDays(temp, -1);
+            }
+            // 월을 이탈할 시, 익일(이후 근무일)로 자동 대체하여 같은 달 내에서 처리
+            if (!found) {
+              let tempForward = addDays(S, 1);
+              while (tempForward.getMonth() === S.getMonth()) {
+                if (!isNonWorkingDay(tempForward)) {
+                  runDate = tempForward;
+                  break;
+                }
+                tempForward = addDays(tempForward, 1);
+              }
+            }
+          } else if (nextDay) {
+            let temp = addDays(S, 1);
+            let found = false;
+            while (temp.getMonth() === S.getMonth()) {
+              if (!isNonWorkingDay(temp)) {
+                runDate = temp;
+                found = true;
+                break;
+              }
+              temp = addDays(temp, 1);
+            }
+            // 월을 이탈할 시, 전일(이전 근무일)로 자동 대체하여 같은 달 내에서 처리
+            if (!found) {
+              let tempBackward = addDays(S, -1);
+              while (tempBackward.getMonth() === S.getMonth()) {
+                if (!isNonWorkingDay(tempBackward)) {
+                  runDate = tempBackward;
+                  break;
+                }
+                tempBackward = addDays(tempBackward, -1);
+              }
+            }
+          }
+        }
+      }
+
+      // 만약 도출된 최종 실행일이 오늘 날짜(date)와 동일하면 매칭 성공!
+      if (!isNonWorkingDay(runDate) && runDate.getDate() === date.getDate()) {
+        return true;
       }
     }
 
@@ -237,8 +314,9 @@ export const isYearlySettingMatched = (setting: any, date: Date): boolean => {
     if (!dayMatched) return false;
 
     // Week based check: '1주차', '2주차', '3주차', '4주차', '5주차'
-    // 해당 요일의 월 기준 등장 횟수 (예: 첫 번째 월요일 = 1주차 월요일)
-    const occurrence = Math.ceil(d.getDate() / 7);
+    // 해당 요일의 월 기준 등장 횟수 (매월 첫 번째 월요일을 기준으로 주차 계산)
+    const occurrence = getCustomWeekOccurrence(d);
+    if (occurrence === 0) return false; // 첫 번째 월요일 이전은 주차 없음
     switch (weekSelect) {
       case '1주차': return occurrence === 1;
       case '2주차': return occurrence === 2;
@@ -258,29 +336,82 @@ export const isYearlySettingMatched = (setting: any, date: Date): boolean => {
       return false;
     }
 
-    // Today is a working day
-    if (checkScheduleForDate(date)) {
-      return true;
-    }
+    // Today is a working day.
+    // Check if any scheduled date in this specific month matches today after adjustment (staying in same month)
+    const currentYear = date.getFullYear();
+    const currentMonthNum = date.getMonth();
+    const daysInMonth = new Date(currentYear, currentMonthNum + 1, 0).getDate();
 
-    // Shift checks
-    if (prevDay) {
-      let nextDate = addDays(date, 1);
-      while (isNonWorkingDay(nextDate)) {
-        if (checkScheduleForDate(nextDate)) {
-          return true;
-        }
-        nextDate = addDays(nextDate, 1);
+    const scheduledDates: Date[] = [];
+    for (let dNum = 1; dNum <= daysInMonth; dNum++) {
+      const testDate = new Date(currentYear, currentMonthNum, dNum);
+      if (checkScheduleForDate(testDate)) {
+        scheduledDates.push(testDate);
       }
     }
 
-    if (nextDay) {
-      let prevDate = addDays(date, -1);
-      while (isNonWorkingDay(prevDate)) {
-        if (checkScheduleForDate(prevDate)) {
-          return true;
+    for (const S of scheduledDates) {
+      let runDate = S;
+
+      if (isNonWorkingDay(S)) {
+        // A. 1주차 + 공휴일 특수 처리: 2주차 같은 요일로 등록
+        if (weekSelect === '1주차' && getCustomWeekOccurrence(S) === 1) {
+          const plus7 = addDays(S, 7);
+          if (plus7.getMonth() === S.getMonth()) {
+            runDate = plus7;
+          }
         }
-        prevDate = addDays(prevDate, -1);
+
+        // B. 만약 여전히 휴무일이라면, 동일한 월 내에서 전일/익일 로직 수행 (월 이탈 방지)
+        if (isNonWorkingDay(runDate)) {
+          if (prevDay) {
+            let temp = addDays(S, -1);
+            let found = false;
+            while (temp.getMonth() === S.getMonth()) {
+              if (!isNonWorkingDay(temp)) {
+                runDate = temp;
+                found = true;
+                break;
+              }
+              temp = addDays(temp, -1);
+            }
+            if (!found) {
+              let tempForward = addDays(S, 1);
+              while (tempForward.getMonth() === S.getMonth()) {
+                if (!isNonWorkingDay(tempForward)) {
+                  runDate = tempForward;
+                  break;
+                }
+                tempForward = addDays(tempForward, 1);
+              }
+            }
+          } else if (nextDay) {
+            let temp = addDays(S, 1);
+            let found = false;
+            while (temp.getMonth() === S.getMonth()) {
+              if (!isNonWorkingDay(temp)) {
+                runDate = temp;
+                found = true;
+                break;
+              }
+              temp = addDays(temp, 1);
+            }
+            if (!found) {
+              let tempBackward = addDays(S, -1);
+              while (tempBackward.getMonth() === S.getMonth()) {
+                if (!isNonWorkingDay(tempBackward)) {
+                  runDate = tempBackward;
+                  break;
+                }
+                tempBackward = addDays(tempBackward, -1);
+              }
+            }
+          }
+        }
+      }
+
+      if (!isNonWorkingDay(runDate) && runDate.getDate() === date.getDate()) {
+        return true;
       }
     }
 
