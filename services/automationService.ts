@@ -78,6 +78,118 @@ export const getCustomWeekOccurrence = (d: Date): number => {
 };
 
 /**
+ * 주간 자동등록 설정이 특정 날짜에 해당하는지 체크 (공휴일제외 및 전일/익일 이동 포함)
+ */
+export const isWeeklySettingMatched = (setting: any, date: Date): boolean => {
+  const checkScheduleForDate = (d: Date): boolean => {
+    const day = getDay(d); // 0: 일요일, 1: 월요일, ..., 6: 토요일
+    switch (day) {
+      case 0: return !!setting.sun;
+      case 1: return !!setting.mon;
+      case 2: return !!setting.tue;
+      case 3: return !!setting.wed;
+      case 4: return !!setting.thu;
+      case 5: return !!setting.fri;
+      case 6: return !!setting.sat;
+    }
+    return false;
+  };
+
+  const excludeHolidays = !!(setting.excludeHolidays || setting.exclude_holidays);
+  let prevDay = !!setting.prevDay;
+  let nextDay = !!setting.nextDay;
+
+  const itemName = setting.item || setting.item_name || '';
+  if (itemName.includes('__WEEKLY_JSON__')) {
+    try {
+      const meta = JSON.parse(itemName.split('__WEEKLY_JSON__')[1]);
+      if (meta.prevDay !== undefined) prevDay = !!meta.prevDay;
+      if (meta.nextDay !== undefined) nextDay = !!meta.nextDay;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  if (excludeHolidays) {
+    if (isNonWorkingDay(date)) {
+      return false;
+    }
+
+    const currentYear = date.getFullYear();
+    const currentMonthNum = date.getMonth();
+    const daysInMonth = new Date(currentYear, currentMonthNum + 1, 0).getDate();
+
+    const scheduledDates: Date[] = [];
+    for (let dNum = 1; dNum <= daysInMonth; dNum++) {
+      const testDate = new Date(currentYear, currentMonthNum, dNum);
+      if (checkScheduleForDate(testDate)) {
+        scheduledDates.push(testDate);
+      }
+    }
+
+    for (const S of scheduledDates) {
+      let runDate: Date = S;
+
+      if (isNonWorkingDay(S)) {
+        if (prevDay) {
+          let temp = addDays(S, -1);
+          let found = false;
+          while (temp.getMonth() === S.getMonth()) {
+            if (!isNonWorkingDay(temp)) {
+              runDate = temp;
+              found = true;
+              break;
+            }
+            temp = addDays(temp, -1);
+          }
+          if (!found) {
+            let tempForward = addDays(S, 1);
+            while (tempForward.getMonth() === S.getMonth()) {
+              if (!isNonWorkingDay(tempForward)) {
+                runDate = tempForward;
+                break;
+              }
+              tempForward = addDays(tempForward, 1);
+            }
+          }
+        } else if (nextDay) {
+          let temp = addDays(S, 1);
+          let found = false;
+          while (temp.getMonth() === S.getMonth()) {
+            if (!isNonWorkingDay(temp)) {
+              runDate = temp;
+              found = true;
+              break;
+            }
+            temp = addDays(temp, 1);
+          }
+          if (!found) {
+            let tempBackward = addDays(S, -1);
+            while (tempBackward.getMonth() === S.getMonth()) {
+              if (!isNonWorkingDay(tempBackward)) {
+                runDate = tempBackward;
+                break;
+              }
+              tempBackward = addDays(tempBackward, -1);
+            }
+          }
+        } else {
+          continue; // No shifting. Ignored
+        }
+      }
+
+      if (!isNonWorkingDay(runDate) && runDate.getDate() === date.getDate()) {
+        return true;
+      }
+    }
+
+    return false;
+  } else {
+    return checkScheduleForDate(date);
+  }
+};
+
+/**
  * 월간 자동등록 설정이 특정 날짜에 해당하는지 체크
  */
 export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
@@ -437,31 +549,16 @@ export const getAutomatedTasksFromDB = async (category: string, dateStr: string)
     const yearlySettings = await fetchAutoRegSettings(category + '_yearly');
     const tasks: TaskItem[] = [];
     
-    // Process weekly settings (standard logic)
+    // Process weekly settings (with holiday shifting support)
     settings.forEach((setting: any) => {
-      let shouldAdd = false;
-      
-      // 요일 체크
-      switch(day) {
-        case 0: if (setting.sun) shouldAdd = true; break;
-        case 1: if (setting.mon) shouldAdd = true; break;
-        case 2: if (setting.tue) shouldAdd = true; break;
-        case 3: if (setting.wed) shouldAdd = true; break;
-        case 4: if (setting.thu) shouldAdd = true; break;
-        case 5: if (setting.fri) shouldAdd = true; break;
-        case 6: if (setting.sat) shouldAdd = true; break;
-      }
-      
-      // 공휴일 제외 체크
-      const excludeHolidays = setting.excludeHolidays || setting.exclude_holidays;
-      if (shouldAdd && excludeHolidays && isHoliday) {
-        shouldAdd = false;
-      }
-      
-      if (shouldAdd) {
+      if (isWeeklySettingMatched(setting, date)) {
+        let itemText = setting.item || setting.item_name || '';
+        if (itemText.includes('__WEEKLY_JSON__')) {
+          itemText = itemText.split('__WEEKLY_JSON__')[0];
+        }
         tasks.push({
           id: `db-auto-${category}-${setting.id}-${dateStr}`,
-          content: setting.item || setting.item_name || '',
+          content: itemText,
           frequency: '일일', // 기본값
           status: '완료'
         });

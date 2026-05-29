@@ -1001,22 +1001,42 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
       if (activeTab === 'auto_reg') {
         const data = await fetchAutoRegSettings(activeSubTab);
         // data is now the direct array of AutoRegRow objects from system_settings
-        const mappedRows = data.map(item => ({
-          id: item.id,
-          item: item.item || item.item_name || '', // Handle both old and new formats
-          mon: !!item.mon,
-          tue: !!item.tue,
-          wed: !!item.wed,
-          thu: !!item.thu,
-          fri: !!item.fri,
-          sat: !!item.sat,
-          sun: !!item.sun,
-          excludeHolidays: !!(item.excludeHolidays || item.exclude_holidays)
-        }));
+        const mappedRows = data.map(item => {
+          let itemName = item.item || item.item_name || '';
+          let prevDay = false;
+          let nextDay = false;
+
+          if (itemName.includes('__WEEKLY_JSON__')) {
+            const parts = itemName.split('__WEEKLY_JSON__');
+            itemName = parts[0];
+            try {
+              const meta = JSON.parse(parts[1]);
+              prevDay = !!meta.prevDay;
+              nextDay = !!meta.nextDay;
+            } catch (e) {
+              console.error(e);
+            }
+          }
+
+          return {
+            id: item.id,
+            item: itemName,
+            mon: !!item.mon,
+            tue: !!item.tue,
+            wed: !!item.wed,
+            thu: !!item.thu,
+            fri: !!item.fri,
+            sat: !!item.sat,
+            sun: !!item.sun,
+            excludeHolidays: !!(item.excludeHolidays || item.exclude_holidays),
+            prevDay,
+            nextDay
+          };
+        });
         
         setRowsData(prev => ({
           ...prev,
-          [activeSubTab]: mappedRows.length > 0 ? mappedRows : [{ id: '1', item: '', mon: false, tue: false, wed: false, thu: false, fri: false, sat: false, sun: false, excludeHolidays: false }]
+          [activeSubTab]: mappedRows.length > 0 ? mappedRows : [{ id: '1', item: '', mon: false, tue: false, wed: false, thu: false, fri: false, sat: false, sun: false, excludeHolidays: false, prevDay: false, nextDay: false }]
         }));
 
         if (activeSubTab === 'elec' || activeSubTab === 'mech' || activeSubTab === 'fire' || activeSubTab === 'remarks' || activeSubTab === 'elevator' || activeSubTab === 'parking' || activeSubTab === 'security' || activeSubTab === 'cleaning') {
@@ -1221,7 +1241,28 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
     try {
       let success = false;
       if (activeTab === 'auto_reg') {
-        success = await saveAutoRegSettings(activeSubTab, rowsData[activeSubTab]);
+        const weeklyRowsToSave = (rowsData[activeSubTab] || []).map(row => {
+          const encodedItemName = (row.prevDay || row.nextDay)
+            ? `${row.item}__WEEKLY_JSON__${JSON.stringify({
+                prevDay: !!row.prevDay,
+                nextDay: !!row.nextDay
+              })}`
+            : row.item;
+
+          return {
+            id: row.id,
+            item: encodedItemName,
+            mon: !!row.mon,
+            tue: !!row.tue,
+            wed: !!row.wed,
+            thu: !!row.thu,
+            fri: !!row.fri,
+            sat: !!row.sat,
+            sun: !!row.sun,
+            excludeHolidays: !!row.excludeHolidays
+          };
+        });
+        success = await saveAutoRegSettings(activeSubTab, weeklyRowsToSave);
         
         if (activeSubTab === 'elec' || activeSubTab === 'mech' || activeSubTab === 'fire' || activeSubTab === 'remarks' || activeSubTab === 'elevator' || activeSubTab === 'parking' || activeSubTab === 'security' || activeSubTab === 'cleaning') {
           const monthlyRowsToSave = (monthlyRowsData[activeSubTab] || []).map(row => {
@@ -1337,6 +1378,8 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
         sat: false,
         sun: false,
         excludeHolidays: false,
+        prevDay: false,
+        nextDay: false,
       };
       setRowsData(prev => ({
         ...prev,
@@ -1772,6 +1815,8 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                   <th className="border border-black text-[13px] font-normal px-2 w-[70px]">토요일</th>
                   <th className="border border-black text-[13px] font-normal px-2 w-[70px]">일요일</th>
                   <th className="border border-black text-[13px] font-normal px-2 w-[80px]">공휴일제외</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">전일</th>
+                  <th className="border border-black text-[13px] font-normal px-2 w-[70px]">익일</th>
                   <th className="border border-black text-[13px] font-normal px-2 w-[60px]">관리</th>
                 </tr>
               </thead>
@@ -1867,8 +1912,51 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                         <input 
                           type="checkbox" 
                           checked={row.excludeHolidays}
-                          onChange={(e) => handleUpdateRow(row.id, 'excludeHolidays', e.target.checked)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            handleUpdateRow(row.id, 'excludeHolidays', checked);
+                            if (!checked) {
+                              handleUpdateRow(row.id, 'prevDay', false);
+                              handleUpdateRow(row.id, 'nextDay', false);
+                            }
+                          }}
                           className="w-4 h-4 cursor-pointer"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={!!row.prevDay}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              handleUpdateRow(row.id, 'prevDay', true);
+                              handleUpdateRow(row.id, 'nextDay', false);
+                            } else {
+                              handleUpdateRow(row.id, 'prevDay', false);
+                            }
+                          }}
+                          disabled={!row.excludeHolidays}
+                          className="w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-black text-[13px] font-normal px-2">
+                      <div className="flex items-center justify-center h-full">
+                        <input 
+                          type="checkbox" 
+                          checked={!!row.nextDay}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              handleUpdateRow(row.id, 'nextDay', true);
+                              handleUpdateRow(row.id, 'prevDay', false);
+                            } else {
+                              handleUpdateRow(row.id, 'nextDay', false);
+                            }
+                          }}
+                          disabled={!row.excludeHolidays}
+                          className="w-4 h-4 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                         />
                       </div>
                     </td>
@@ -1886,7 +1974,7 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                 ))}
                 {rows.length === 0 && (
                   <tr className="h-[100px]">
-                    <td colSpan={11} className="border border-black text-gray-400">데이터가 없습니다.</td>
+                    <td colSpan={13} className="border border-black text-gray-400">데이터가 없습니다.</td>
                   </tr>
                 )}
               </tbody>

@@ -303,7 +303,7 @@ const App: React.FC = () => {
             <div className="mb-5">
               <input
                 type="password"
-                placeholder="비밀번호 입력 (기본값: 0000)"
+                placeholder="비밀번호 입력"
                 value={adminPasswordInput}
                 onChange={(e) => {
                   setAdminPasswordInput(e.target.value);

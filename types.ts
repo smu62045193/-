@@ -798,6 +798,8 @@ export interface AutoRegRow {
   sat: boolean;
   sun: boolean;
   excludeHolidays: boolean;
+  prevDay?: boolean;
+  nextDay?: boolean;
 }
 
 export interface MonthlyAutoRegRow {
