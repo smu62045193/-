@@ -1115,10 +1115,10 @@ const EquipmentHistory: React.FC = () => {
                     }`}
                   >
                     <div className="flex items-center justify-start gap-2.5 min-w-0">
-                      <span className="text-[10.5px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                      <span className="text-[10.5px] font-semibold uppercase tracking-wider text-black bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
                         {eq.category}
                       </span>
-                      <h4 className="text-[13px] font-normal text-slate-800 leading-tight truncate">
+                      <h4 className="text-[13px] font-normal text-black leading-tight truncate">
                         {eq.name}
                       </h4>
                     </div>

@@ -345,7 +345,12 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
       const log = (workLog as any)[cat.key] as LogCategory;
       if (log?.today) {
         const taskContents = log.today
-          .filter((t: TaskItem) => t.id && (t.id.includes('task_') || t.id.includes('from_prev_')))
+          .filter((t: TaskItem) => t.id && (
+            t.id.includes('task_') || 
+            t.id.includes('from_prev_') || 
+            t.id.includes('-monthly-') || 
+            t.id.includes('-yearly-')
+          ))
           .map((t: TaskItem) => t.content?.trim())
           .filter((c: string) => c && c !== '');
           

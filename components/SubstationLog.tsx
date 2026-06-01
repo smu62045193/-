@@ -154,10 +154,10 @@ const SubstationLog: React.FC<SubstationLogProps> = ({ currentDate, isEmbedded =
       let hSum = 0;
       let yesterdayDataForBase = null;
 
-      if (dateKey !== monthStartStr) {
-        const yesterdayLog = await fetchSubstationLog(yesterdayStr, true);
-        if (yesterdayLog) {
-          yesterdayDataForBase = yesterdayLog;
+      const yesterdayLog = await fetchSubstationLog(yesterdayStr, true);
+      if (yesterdayLog) {
+        yesterdayDataForBase = yesterdayLog;
+        if (dateKey !== monthStartStr) {
           const stats = yesterdayLog.dailyStats || (yesterdayLog as any).daily_stats;
           hSum = safeParseFloat(stats?.monthTotal);
         }
