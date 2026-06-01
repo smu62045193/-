@@ -292,8 +292,8 @@ export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
       let runDate: Date = S;
 
       if (isNonWorkingDay(S)) {
-        // A. 1주차 + 공휴일 특수 처리: 2주차 같은 요일로 등록
-        if (weekSelect === '1주차' && getCustomWeekOccurrence(S) === 1) {
+        // A. 1주차 + 공휴일 특수 처리: 2주차 같은 요일로 등록 (오직 금요일만 적용하도록 제한)
+        if (weekSelect === '1주차' && getCustomWeekOccurrence(S) === 1 && getDay(S) === 5) {
           const plus7 = addDays(S, 7);
           if (plus7.getMonth() === S.getMonth()) {
             runDate = plus7;
@@ -466,8 +466,8 @@ export const isYearlySettingMatched = (setting: any, date: Date): boolean => {
       let runDate = S;
 
       if (isNonWorkingDay(S)) {
-        // A. 1주차 + 공휴일 특수 처리: 2주차 같은 요일로 등록
-        if (weekSelect === '1주차' && getCustomWeekOccurrence(S) === 1) {
+        // A. 1주차 + 공휴일 특수 처리: 2주차 같은 요일로 등록 (오직 금요일만 적용하도록 제한)
+        if (weekSelect === '1주차' && getCustomWeekOccurrence(S) === 1 && getDay(S) === 5) {
           const plus7 = addDays(S, 7);
           if (plus7.getMonth() === S.getMonth()) {
             runDate = plus7;
