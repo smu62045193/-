@@ -469,7 +469,7 @@ const EquipmentHistory: React.FC = () => {
       manufacturer: new FormData(form).get('manufacturer') as string,
       specifications: serializeSpecs(newEqSpecs),
       location: new FormData(form).get('location') as string,
-      installDate: (new FormData(form).get('installDate') as string)?.substring(0, 7) || new Date().toISOString().substring(0, 7),
+      installDate: (new FormData(form).get('installDate') as string)?.substring(0, 7) || '',
       supplier: new FormData(form).get('supplier') as string,
       warrantyPeriod: new FormData(form).get('warrantyPeriod') as string,
       status: new FormData(form).get('status') as any || '정상',

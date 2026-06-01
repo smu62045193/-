@@ -236,9 +236,9 @@ const App: React.FC = () => {
       case MenuId.STAFF:
         return <StaffManager />;
       case MenuId.ARCHIVE:
-        return <AdminManager isArchiveOnly={true} />;
+        return <AdminManager key="archive-manager" isArchiveOnly={true} />;
       case MenuId.ADMIN:
-        return <AdminManager />;
+        return <AdminManager key="admin-manager" />;
       default:
         return <Dashboard currentDate={currentDate} />;
     }
