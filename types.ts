@@ -202,6 +202,7 @@ export interface ConsumableRequestItem {
   qty: string;       // 수량 (with unit if needed)
   receivedDate?: string; // 입고일
   remarks: string;   // 비고
+  isLinked?: boolean; // 연동 여부 구분
   
   // Legacy/Optional fields
   spec?: string; 

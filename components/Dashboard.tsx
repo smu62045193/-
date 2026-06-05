@@ -632,9 +632,19 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
 
       <div className="bg-white shadow-sm border border-black overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b border-black flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <ClipboardList className="text-indigo-600" size={20} />
-            <h3 className="font-black text-xl text-slate-800 tracking-tight">금일 중요 업무 요약</h3>
+            <h3 className="font-black text-xl text-slate-800 tracking-tight flex items-center flex-wrap gap-x-2">
+              <span>금일 중요 업무 요약</span>
+              <span className="text-[14px] font-bold text-slate-500 normal-case tracking-normal">
+                (
+                <span className="text-blue-500">추가:파란색</span>,{' '}
+                <span className="text-amber-600">주간:주황색</span>,{' '}
+                <span className="text-purple-600">월간:보라색</span>,{' '}
+                <span className="text-emerald-600">년간:초록색</span>
+                )
+              </span>
+            </h3>
           </div>
           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Operational Summary</div>
         </div>

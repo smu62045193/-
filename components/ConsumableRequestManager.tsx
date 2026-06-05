@@ -150,7 +150,8 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             qty: ` ${itemUnit}`,
             receivedDate: '',
             remarks: '',
-            amount: 0
+            amount: 0,
+            isLinked: true
           });
         });
 
@@ -519,6 +520,21 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
         </div>
       </div>
 
+      <div className="w-full max-w-7xl mx-auto px-4 py-2 bg-slate-50 border border-black flex items-center justify-between print:hidden">
+        <div className="flex items-center gap-4 text-[12px] font-bold text-slate-500">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+            <span>연동 자재 : <span className="text-blue-600 font-extrabold">파란색</span></span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span>수동 입력 : <span className="text-amber-600 font-extrabold">주황색</span></span>
+          </span>
+        </div>
+        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+          Consumables Color Coding Guide
+        </div>
+      </div>
 
       <div className="space-y-2">
         {SECTIONS.filter(sec => activeSection === '전체' ? sec.key !== '전체' : sec.key === activeSection).map(sec => {
@@ -554,111 +570,125 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                     </tr>
                   </thead>
                   <tbody>
-                    {displayItems.map((it, idx) => (
-                      <tr key={it.id} className="hover:bg-blue-50/30 transition-colors text-center group h-[40px]">
-                        <td className={`${tdClass} text-gray-400 relative`}>
-                          <div className={cellDivClass}>
-                            <span className={isEditMode ? "group-hover:opacity-0" : ""}>{idx + 1}</span>
-                            {isEditMode && (
-                              <button 
-                                onClick={() => handleDeleteItem(it.id)}
-                                className="absolute inset-0 flex items-center justify-center text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="항목 삭제"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                        <td className={tdClass}>
-                          <div className="flex items-center justify-center h-full">
-                            <input 
-                              type="text" 
-                              value={it.itemName} 
-                              onChange={e => {
-                                const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, itemName: e.target.value } : i);
-                                setActiveRequest({ ...activeRequest, items: ni });
-                              }} 
-                              className={isEditMode ? editableInputClass : inputClass}
-                              readOnly={!isEditMode}
-                            />
-                          </div>
-                        </td>
-                        <td className={tdClass}>
-                          <div className="flex items-center justify-center h-full">
-                            <input 
-                              type="text" 
-                              value={it.spec || ''} 
-                              onChange={e => {
-                                const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, spec: e.target.value } : i);
-                                setActiveRequest({ ...activeRequest, items: ni });
-                              }} 
-                              className={isEditMode ? editableInputClass : inputClass}
-                              readOnly={!isEditMode}
-                              placeholder="모델명"
-                            />
-                          </div>
-                        </td>
-                        <td className={tdClass}>
-                          <div className="flex items-center justify-center h-full">
-                            <input 
-                              type="text" 
-                              value={it.stock} 
-                              onChange={e => {
-                                const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, stock: e.target.value } : i);
-                                setActiveRequest({ ...activeRequest, items: ni });
-                              }} 
-                              className={inputClass}
-                              readOnly={!isEditMode}
-                            />
-                          </div>
-                        </td>
-                        <td className={tdClass}>
-                          <div className="flex items-center justify-center h-full">
-                            <input 
-                              type="text" 
-                              value={it.qty} 
-                              onChange={e => {
-                                const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, qty: e.target.value } : i);
-                                setActiveRequest({ ...activeRequest, items: ni });
-                              }} 
-                              className={isEditMode ? editableInputClass : `${inputClass} font-normal`}
-                              readOnly={!isEditMode}
-                              placeholder="수량"
-                            />
-                          </div>
-                        </td>
-                        <td className={tdClass}>
-                          <div className="flex items-center justify-center h-full">
-                            <input 
-                              type="text" 
-                              value={it.receivedDate} 
-                              onChange={e => {
-                                const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, receivedDate: e.target.value } : i);
-                                setActiveRequest({ ...activeRequest, items: ni });
-                              }} 
-                              className={isEditMode ? editableInputClass : `${inputClass} font-normal`}
-                              readOnly={!isEditMode}
-                              placeholder="00/00"
-                            />
-                          </div>
-                        </td>
-                        <td className={tdClass}>
-                          <div className="flex items-center justify-center h-full">
-                            <input 
-                              type="text" 
-                              value={it.remarks} 
-                              onChange={e => {
-                                const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, remarks: e.target.value } : i);
-                                setActiveRequest({ ...activeRequest, items: ni });
-                              }} 
-                              className={isEditMode ? editableInputClass : `${inputClass} font-normal`}
-                              readOnly={!isEditMode}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {displayItems.map((it, idx) => {
+                      const isLinked = !!it.isLinked;
+                      const hasText = it.itemName && it.itemName.trim() !== '';
+                      
+                      let textColClass = '';
+                      if (hasText) {
+                        if (isLinked) {
+                          textColClass = '!text-blue-600 !font-extrabold';
+                        } else {
+                          textColClass = '!text-amber-600 !font-extrabold';
+                        }
+                      }
+
+                      return (
+                        <tr key={it.id} className="hover:bg-blue-50/30 transition-colors text-center group h-[40px]">
+                          <td className={`${tdClass} text-gray-400 relative`}>
+                            <div className={cellDivClass}>
+                              <span className={isEditMode ? "group-hover:opacity-0" : ""}>{idx + 1}</span>
+                              {isEditMode && (
+                                <button 
+                                  onClick={() => handleDeleteItem(it.id)}
+                                  className="absolute inset-0 flex items-center justify-center text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="항목 삭제"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className={tdClass}>
+                            <div className="flex items-center justify-center h-full">
+                              <input 
+                                type="text" 
+                                value={it.itemName} 
+                                onChange={e => {
+                                  const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, itemName: e.target.value } : i);
+                                  setActiveRequest({ ...activeRequest, items: ni });
+                                }} 
+                                className={`${isEditMode ? editableInputClass : inputClass} ${textColClass}`}
+                                readOnly={!isEditMode}
+                              />
+                            </div>
+                          </td>
+                          <td className={tdClass}>
+                            <div className="flex items-center justify-center h-full">
+                              <input 
+                                type="text" 
+                                value={it.spec || ''} 
+                                onChange={e => {
+                                  const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, spec: e.target.value } : i);
+                                  setActiveRequest({ ...activeRequest, items: ni });
+                                }} 
+                                className={`${isEditMode ? editableInputClass : inputClass} ${textColClass}`}
+                                readOnly={!isEditMode}
+                                placeholder="모델명"
+                              />
+                            </div>
+                          </td>
+                          <td className={tdClass}>
+                            <div className="flex items-center justify-center h-full">
+                              <input 
+                                type="text" 
+                                value={it.stock} 
+                                onChange={e => {
+                                  const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, stock: e.target.value } : i);
+                                  setActiveRequest({ ...activeRequest, items: ni });
+                                }} 
+                                className={`${inputClass} ${textColClass}`}
+                                readOnly={!isEditMode}
+                              />
+                            </div>
+                          </td>
+                          <td className={tdClass}>
+                            <div className="flex items-center justify-center h-full">
+                              <input 
+                                type="text" 
+                                value={it.qty} 
+                                onChange={e => {
+                                  const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, qty: e.target.value } : i);
+                                  setActiveRequest({ ...activeRequest, items: ni });
+                                }} 
+                                className={`${isEditMode ? editableInputClass : `${inputClass} font-normal`} ${textColClass}`}
+                                readOnly={!isEditMode}
+                                placeholder="수량"
+                              />
+                            </div>
+                          </td>
+                          <td className={tdClass}>
+                            <div className="flex items-center justify-center h-full">
+                              <input 
+                                type="text" 
+                                value={it.receivedDate} 
+                                onChange={e => {
+                                  const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, receivedDate: e.target.value } : i);
+                                  setActiveRequest({ ...activeRequest, items: ni });
+                                }} 
+                                className={`${isEditMode ? editableInputClass : `${inputClass} font-normal`} ${textColClass}`}
+                                readOnly={!isEditMode}
+                                placeholder="00/00"
+                              />
+                            </div>
+                          </td>
+                          <td className={tdClass}>
+                            <div className="flex items-center justify-center h-full">
+                              <input 
+                                type="text" 
+                                value={it.remarks} 
+                                onChange={e => {
+                                  const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, remarks: e.target.value } : i);
+                                  setActiveRequest({ ...activeRequest, items: ni });
+                                }} 
+                                className={`${isEditMode ? editableInputClass : `${inputClass} font-normal`} ${textColClass}`}
+                                readOnly={!isEditMode}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {isEditMode && (
                       <tr>
                         <td colSpan={7} className="p-2 bg-gray-50/50 border-b border-r border-black">
