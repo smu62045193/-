@@ -113,6 +113,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ item, isToday, onUpdate, onDelete }) 
   const isManual = item?.id?.includes('task_');
   const isMonthly = item?.frequency === '월간' || item?.id?.includes('-monthly-');
   const isYearly = item?.frequency === '년간' || item?.id?.includes('-yearly-');
+  const isPartialWeekly = !!item?.isPartialWeekly;
 
   let textColor = 'text-black';
   let bulletColor = isToday ? 'bg-blue-400' : 'bg-indigo-400';
@@ -125,6 +126,9 @@ const TaskRow: React.FC<TaskRowProps> = ({ item, isToday, onUpdate, onDelete }) 
   } else if (isYearly) {
     textColor = '!text-emerald-600 font-semibold'; // 자동입력항목 년간 (emerald색)
     bulletColor = isToday ? 'bg-emerald-500' : 'bg-emerald-300';
+  } else if (isPartialWeekly) {
+    textColor = '!text-amber-600 font-semibold'; // 주간 요일 중 일부만 선택된 항목 (amber색)
+    bulletColor = isToday ? 'bg-amber-500' : 'bg-amber-300';
   }
 
   return (
@@ -930,9 +934,45 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             <div class="flex-header"><div class="title-box"><div class="doc-title">${catLabel} 작업일지</div></div>${approvalTableHtml()}</div>
             <div class="info-row"><div>${formattedYear}년 ${formattedMonth}월 ${formattedDay}일 (${dayName})</div><div>날씨: ${weather?.condition || '맑음'}</div></div>
             <div class="section-header">금일 작업 내용</div>
-            <div style="border:1.2px solid black; padding:15px; min-height:250px; text-align:left;">${catData.today.filter(t => t.content.trim()).map(t => `<div style="margin-bottom:8px;">• ${t.content}</div>`).join('') || '내역 없음'}</div>
+            <div style="border:1.2px solid black; padding:15px; min-height:250px; text-align:left;">
+              ${catData.today.filter(t => t.content.trim()).map(t => {
+                let styleStr = 'margin-bottom:8px;';
+                const isManual = t.id?.includes('task_');
+                const isMonthly = t.frequency === '월간' || t.id?.includes('-monthly-');
+                const isYearly = t.frequency === '년간' || t.id?.includes('-yearly-');
+                const isPartialWeekly = !!t.isPartialWeekly;
+                if (isManual) {
+                  styleStr += ' color: #3b82f6;';
+                } else if (isMonthly) {
+                  styleStr += ' color: #9333ea; font-weight: bold;';
+                } else if (isYearly) {
+                  styleStr += ' color: #059669; font-weight: bold;';
+                } else if (isPartialWeekly) {
+                  styleStr += ' color: #d97706; font-weight: bold;';
+                }
+                return `<div style="${styleStr}">• ${t.content}</div>`;
+              }).join('') || '내역 없음'}
+            </div>
             <div class="section-header">익일 예정 사항</div>
-            <div style="border:1.2px solid black; padding:15px; min-height:250px; text-align:left;">${catData.tomorrow.filter(t => t.content.trim()).map(t => `<div style="margin-bottom:8px;">• ${t.content}</div>`).join('') || '내역 없음'}</div>
+            <div style="border:1.2px solid black; padding:15px; min-height:250px; text-align:left;">
+              ${catData.tomorrow.filter(t => t.content.trim()).map(t => {
+                let styleStr = 'margin-bottom:8px;';
+                const isManual = t.id?.includes('task_');
+                const isMonthly = t.frequency === '월간' || t.id?.includes('-monthly-');
+                const isYearly = t.frequency === '년간' || t.id?.includes('-yearly-');
+                const isPartialWeekly = !!t.isPartialWeekly;
+                if (isManual) {
+                  styleStr += ' color: #3b82f6;';
+                } else if (isMonthly) {
+                  styleStr += ' color: #9333ea; font-weight: bold;';
+                } else if (isYearly) {
+                  styleStr += ' color: #059669; font-weight: bold;';
+                } else if (isPartialWeekly) {
+                  styleStr += ' color: #d97706; font-weight: bold;';
+                }
+                return `<div style="${styleStr}">• ${t.content}</div>`;
+              }).join('') || '내역 없음'}
+            </div>
           </div>
         `;
     }
@@ -947,11 +987,27 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
 
     function generateFixedRowsHtml(cat: keyof WorkLogData, type: 'today' | 'tomorrow', count: number, rowHeight: number = 22) {
       const tasks = (logData[cat] as LogCategory)?.[type] || [];
-      const contents = tasks.map(t => t.content).filter(Boolean);
       let html = '';
       for (let i = 0; i < count; i++) {
-        const text = contents[i] ? `&nbsp; • ${contents[i]}` : '&nbsp;';
-        html += `<div style="height: ${rowHeight}px; line-height: ${rowHeight}px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 8.5pt; border-bottom: 0.5px solid #eee;">${text}</div>`;
+        const t = tasks[i];
+        const text = t && t.content ? `&nbsp; • ${t.content}` : '&nbsp;';
+        let colorStyle = 'color: black;';
+        if (t && t.content) {
+          const isManual = t.id?.includes('task_');
+          const isMonthly = t.frequency === '월간' || t.id?.includes('-monthly-');
+          const isYearly = t.frequency === '년간' || t.id?.includes('-yearly-');
+          const isPartialWeekly = !!t.isPartialWeekly;
+          if (isManual) {
+            colorStyle = 'color: #3b82f6;';
+          } else if (isMonthly) {
+            colorStyle = 'color: #9333ea; font-weight: bold;';
+          } else if (isYearly) {
+            colorStyle = 'color: #059669; font-weight: bold;';
+          } else if (isPartialWeekly) {
+            colorStyle = 'color: #d97706; font-weight: bold;';
+          }
+        }
+        html += `<div style="height: ${rowHeight}px; line-height: ${rowHeight}px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 8.5pt; border-bottom: 0.5px solid #eee; ${colorStyle}">${text}</div>`;
       }
       return html;
     }

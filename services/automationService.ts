@@ -556,11 +556,13 @@ export const getAutomatedTasksFromDB = async (category: string, dateStr: string)
         if (itemText.includes('__WEEKLY_JSON__')) {
           itemText = itemText.split('__WEEKLY_JSON__')[0];
         }
+        const isAllDaysSelected = !!setting.mon && !!setting.tue && !!setting.wed && !!setting.thu && !!setting.fri && !!setting.sat && !!setting.sun;
         tasks.push({
           id: `db-auto-${category}-${setting.id}-${dateStr}`,
           content: itemText,
           frequency: '일일', // 기본값
-          status: '완료'
+          status: '완료',
+          isPartialWeekly: !isAllDaysSelected
         });
       }
     });

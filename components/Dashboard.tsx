@@ -328,7 +328,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
 
   const keyWorkTasks = useMemo(() => {
     if (!dailyData?.workLog) return [];
-    const sections: { label: string; icon: React.ReactNode; tasks: string[] }[] = [];
+    const sections: { label: string; icon: React.ReactNode; tasks: TaskItem[] }[] = [];
     const workLog = dailyData.workLog;
     const categories: { key: keyof WorkLogData; label: string; icon: React.ReactNode }[] = [
       { key: 'electrical', label: '전기 설비', icon: <Zap size={16} /> },
@@ -344,19 +344,26 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
     categories.forEach(cat => {
       const log = (workLog as any)[cat.key] as LogCategory;
       if (log?.today) {
-        const taskContents = log.today
-          .filter((t: TaskItem) => t.id && (
+        const filtered = log.today
+          .filter((t: TaskItem) => t.id && t.content?.trim() && (
             t.id.includes('task_') || 
             t.id.includes('from_prev_') || 
             t.id.includes('-monthly-') || 
-            t.id.includes('-yearly-')
-          ))
-          .map((t: TaskItem) => t.content?.trim())
-          .filter((c: string) => c && c !== '');
-          
-        if (taskContents.length > 0) {
-          const uniqueContents = Array.from(new Set(taskContents));
-          sections.push({ label: cat.label, icon: cat.icon, tasks: uniqueContents });
+            t.id.includes('-yearly-') ||
+            !!t.isPartialWeekly
+          ));
+
+        if (filtered.length > 0) {
+          // 중복 방지
+          const uniqueDict: { [key: string]: TaskItem } = {};
+          filtered.forEach((t: TaskItem) => {
+            const trimmed = t.content.trim();
+            if (!uniqueDict[trimmed]) {
+              uniqueDict[trimmed] = t;
+            }
+          });
+          const uniqueTasks = Object.values(uniqueDict);
+          sections.push({ label: cat.label, icon: cat.icon, tasks: uniqueTasks });
         }
       }
     });
@@ -647,12 +654,36 @@ const Dashboard: React.FC<DashboardProps> = ({ currentDate, isSearchPopupMode = 
                     <span className="font-black text-slate-800 tracking-tight">{section.label}</span>
                   </div>
                   <ul className="space-y-3">
-                    {section.tasks.map((task, tidx) => (
-                      <li key={tidx} className="flex items-start gap-3 text-sm text-slate-600 font-bold leading-relaxed">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0"></div>
-                        <span>{task}</span>
-                      </li>
-                    ))}
+                    {section.tasks.map((task, tidx) => {
+                      const isManual = task.id?.includes('task_');
+                      const isMonthly = task.frequency === '월간' || task.id?.includes('-monthly-');
+                      const isYearly = task.frequency === '년간' || task.id?.includes('-yearly-');
+                      const isPartialWeekly = !!task.isPartialWeekly;
+
+                      let textColor = 'text-slate-600';
+                      let bulletColor = 'bg-emerald-400';
+
+                      if (isManual) {
+                        textColor = 'text-blue-500 font-bold';
+                        bulletColor = 'bg-blue-400';
+                      } else if (isMonthly) {
+                        textColor = 'text-purple-600 font-extrabold';
+                        bulletColor = 'bg-purple-500';
+                      } else if (isYearly) {
+                        textColor = 'text-emerald-600 font-extrabold';
+                        bulletColor = 'bg-emerald-500';
+                      } else if (isPartialWeekly) {
+                        textColor = 'text-amber-600 font-extrabold';
+                        bulletColor = 'bg-amber-500';
+                      }
+
+                      return (
+                        <li key={tidx} className={`flex items-start gap-3 text-sm leading-relaxed ${textColor}`}>
+                          <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${bulletColor}`}></div>
+                          <span>{task.content}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               ))}

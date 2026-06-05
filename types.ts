@@ -69,6 +69,7 @@ export interface TaskItem {
   content: string;
   frequency: '일일' | '주간' | '월간';
   status?: '진행중' | '완료'; // Only used for 'Today'
+  isPartialWeekly?: boolean; // 주간 요일 중 일부만 선택된 항목 표시 용도
 }
 
 export interface ScheduleItem {
