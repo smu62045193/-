@@ -911,3 +911,22 @@ export interface OutdoorUnitRooftopItem {
   id: string;
   label: string;
 }
+
+export interface AnnualCheckRow {
+  id: string;
+  category: string; // 분야 (전기, 기계, 소방, 승강기)
+  cycle: string;    // 점검주기
+  content: string;  // 점검사항
+  y2021: string;    // 2021년
+  y2022: string;    // 2022년
+  y2023: string;    // 2023년
+  y2024: string;    // 2024년
+  y2025: string;    // 2025년
+  y2026: string;    // 2026년
+  y2027: string;    // 2027년
+  y2028: string;    // 2028년
+  y2029: string;    // 2029년
+  y2030: string;    // 2030년
+  [key: string]: any; // 동적 연도 및 추가 속성 허용
+}
+

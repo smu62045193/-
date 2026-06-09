@@ -2476,3 +2476,61 @@ export const enforceDataRetentionPolicy = async (): Promise<void> => {
     console.error('Error executing data retention policy:', error);
   }
 };
+
+/**
+ * 년간점검사항 설정 가져오기
+ */
+export const fetchAnnualCheckSettings = async (): Promise<any[] | null> => {
+  try {
+    const { data, error } = await supabase.from('system_settings').select('data').eq('id', 'ANNUAL_CHECK_SETTINGS').maybeSingle();
+    if (error) throw error;
+    return data?.data || null;
+  } catch (e) {
+    console.error('fetchAnnualCheckSettings error:', e);
+    return null;
+  }
+};
+
+/**
+ * 년간점검사항 설정 저장
+ */
+export const saveAnnualCheckSettings = async (rows: any[]): Promise<boolean> => {
+  try {
+    const { error = null } = await supabase.from('system_settings').upsert({ 
+      id: 'ANNUAL_CHECK_SETTINGS', 
+      data: rows, 
+      last_updated: new Date().toISOString() 
+    });
+    return !error;
+  } catch (e) {
+    console.error('saveAnnualCheckSettings error:', e);
+    return false;
+  }
+};
+
+/**
+ * 연계 연도들의 일일업무일지 가져오기 (년간점검사항 연동용)
+ */
+export const fetchDailyReportsForSync = async (): Promise<{id: string; work_log: any}[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('daily_reports')
+      .select('id, work_log');
+    if (error) throw error;
+    return (data || []).map(item => {
+      let parsedWorkLog = item.work_log;
+      if (typeof parsedWorkLog === 'string') {
+        try { parsedWorkLog = JSON.parse(parsedWorkLog); } catch (e) { parsedWorkLog = {}; }
+      }
+      return {
+        id: item.id,
+        work_log: parsedWorkLog
+      };
+    });
+  } catch (e) {
+    console.error('fetchDailyReportsForSync error:', e);
+    return [];
+  }
+};
+
+

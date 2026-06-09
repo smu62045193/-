@@ -392,21 +392,53 @@ export const isYearlySettingMatched = (setting: any, date: Date): boolean => {
     const dMonth = d.getMonth() + 1; // 1 ~ 12
     const dDay = getDay(d);
 
-    // Month check
+    // Month check - support comma separated multiple items (e.g. "1월, 2월", "반기, 10월", "분기")
     let monthMatched = false;
-    if (monthSelect.endsWith('월')) {
-      const targetMonth = parseInt(monthSelect.replace('월', ''), 10);
-      if (dMonth === targetMonth) monthMatched = true;
-    } else if (monthSelect === '짝수달') {
-      if (dMonth % 2 === 0) monthMatched = true;
-    } else if (monthSelect === '홀수달') {
-      if (dMonth % 2 !== 0) monthMatched = true;
-    } else if (monthSelect === '반기') {
-      // Half-yearly (Jan and Jul starts)
-      if (dMonth === 1 || dMonth === 7) monthMatched = true;
-    } else if (monthSelect === '분기') {
-      // Quarterly (Jan, Apr, Jul, Oct starts)
-      if (dMonth === 1 || dMonth === 4 || dMonth === 7 || dMonth === 10) monthMatched = true;
+    const cleanMonthSelect = monthSelect || '';
+    const monthOptions = cleanMonthSelect.split(',').map(m => m.trim().toLowerCase()).filter(Boolean);
+
+    if (monthOptions.length === 0) {
+      // Default fallback if empty
+      monthMatched = false;
+    } else {
+      for (const option of monthOptions) {
+        if (option.endsWith('월')) {
+          const targetMonth = parseInt(option.replace('월', ''), 10);
+          if (dMonth === targetMonth) {
+            monthMatched = true;
+            break;
+          }
+        } else if (option === '짝수달' || option.includes('짝수')) {
+          if (dMonth % 2 === 0) {
+            monthMatched = true;
+            break;
+          }
+        } else if (option === '홀수달' || option.includes('홀수')) {
+          if (dMonth % 2 !== 0) {
+            monthMatched = true;
+            break;
+          }
+        } else if (option === '반기' || option.includes('반기')) {
+          // Half-yearly (1, 7)
+          if (dMonth === 1 || dMonth === 7) {
+            monthMatched = true;
+            break;
+          }
+        } else if (option === '분기' || option.includes('분기')) {
+          // Quarterly (1, 4, 7, 10)
+          if (dMonth === 1 || dMonth === 4 || dMonth === 7 || dMonth === 10) {
+            monthMatched = true;
+            break;
+          }
+        } else {
+          // Fallback if user typing raw number
+          const rawNum = parseInt(option, 10);
+          if (!isNaN(rawNum) && dMonth === rawNum) {
+            monthMatched = true;
+            break;
+          }
+        }
+      }
     }
 
     if (!monthMatched) return false;

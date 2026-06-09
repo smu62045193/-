@@ -21,14 +21,26 @@ import {
   fetchOutdoorUnitSettings,
   saveOutdoorUnitSettings,
   fetchEmergencySettings,
-  saveEmergencySettings
+  saveEmergencySettings,
+  fetchAnnualCheckSettings,
+  saveAnnualCheckSettings,
+  fetchDailyReportsForSync
 } from '../services/dataService';
-import { AutoRegRow, MonthlyAutoRegRow, YearlyAutoRegRow, ArchiveItem, OutdoorUnitRooftopItem } from '../types';
+import { AutoRegRow, MonthlyAutoRegRow, YearlyAutoRegRow, ArchiveItem, OutdoorUnitRooftopItem, AnnualCheckRow } from '../types';
 
 const TABS = [
   { id: 'auto_reg', label: '자동등록' },
   { id: 'network', label: '네트워크' },
   { id: 'password', label: '비밀번호' },
+  { id: 'annual_check', label: '년간점검사항' },
+];
+
+const SUB_TABS_ANNUAL_CHECK = [
+  { id: 'all', label: '전체' },
+  { id: 'elec', label: '전기' },
+  { id: 'mech', label: '기계' },
+  { id: 'fire', label: '소방' },
+  { id: 'elevator', label: '승강기' },
 ];
 
 const SUB_TABS_AUTO_REG = [
@@ -129,6 +141,10 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
     { id: '7', category: '', position: '', name: '', winterTop: '', winterBottom: '', summerTop: '', summerBottom: '', note: '' },
   ]);
   const [isPasswordEditMode, setIsPasswordEditMode] = useState(false);
+  const [activeAnnualCheckSubTab, setActiveAnnualCheckSubTab] = useState('all');
+  const [annualCheckStartYear, setAnnualCheckStartYear] = useState(2021);
+  const [annualCheckData, setAnnualCheckData] = useState<AnnualCheckRow[]>([]);
+  const [syncedDailyReports, setSyncedDailyReports] = useState<{ id: string; work_log: any }[]>([]);
   const [isUniformEditMode, setIsUniformEditMode] = useState(false);
   const [uniformSaveSuccess, setUniformSaveSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -189,6 +205,10 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
       handleOutdoorUnitRefresh();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    setOpenYearlyMonthId(null);
+  }, [activeTab, activeSubTab, autoRegMode]);
 
   const [outdoorUnitRooftopData, setOutdoorUnitRooftopData] = useState<OutdoorUnitRooftopItem[]>([
     { id: '1', label: '삼성 / 6F / 이가자산' },
@@ -289,6 +309,7 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
   });
 
   const [archiveRows, setArchiveRows] = useState<ArchiveItem[]>([]);
+  const [openYearlyMonthId, setOpenYearlyMonthId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -1205,6 +1226,21 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
         if (warehouse.length > 0) setPasswordWarehouseData(warehouse);
       } else if (activeTab === 'emergency') {
         loadEmergencyDataWithStaff();
+      } else if (activeTab === 'annual_check') {
+        const [data, reports] = await Promise.all([
+          fetchAnnualCheckSettings(),
+          fetchDailyReportsForSync()
+        ]);
+        if (reports) {
+          setSyncedDailyReports(reports);
+        }
+        if (data && data.length > 0) {
+          setAnnualCheckData(data);
+        } else {
+          setAnnualCheckData([
+            { id: 'ac1', category: '전기', cycle: '년 1회', content: '', y2021: '', y2022: '', y2023: '', y2024: '', y2025: '', y2026: '', y2027: '', y2028: '', y2029: '', y2030: '' }
+          ]);
+        }
       }
     } catch (error) {
       console.error('Failed to load settings:', error);
@@ -1214,7 +1250,7 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
   }, [activeTab, activeSubTab, loadEmergencyDataWithStaff]);
 
   useEffect(() => {
-    if (activeTab === 'auto_reg' || activeTab === 'form' || activeTab === 'network' || activeTab === 'password' || activeTab === 'emergency') {
+    if (activeTab === 'auto_reg' || activeTab === 'form' || activeTab === 'network' || activeTab === 'password' || activeTab === 'emergency' || activeTab === 'annual_check') {
       loadData();
     }
 
@@ -1454,6 +1490,59 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
       }
     } else if (activeTab === 'emergency') {
       setEmergencyData(prev => prev.filter(row => row.id !== id));
+    }
+  };
+
+  const handleAddAnnualCheckRow = () => {
+    const newCategory = activeAnnualCheckSubTab !== 'all' ? (SUB_TABS_ANNUAL_CHECK.find(t => t.id === activeAnnualCheckSubTab)?.label || '전기') : '전기';
+    const newRow: AnnualCheckRow = {
+      id: generateUUID(),
+      category: newCategory,
+      cycle: '년 1회',
+      content: '',
+      y2021: '',
+      y2022: '',
+      y2023: '',
+      y2024: '',
+      y2025: '',
+      y2026: '',
+      y2027: '',
+      y2028: '',
+      y2029: '',
+      y2030: '',
+    };
+    setAnnualCheckData(prev => [...prev, newRow]);
+  };
+
+  const handleDeleteAnnualCheckRow = (id: string) => {
+    setAnnualCheckData(prev => prev.filter(row => row.id !== id));
+  };
+
+  const handleUpdateAnnualCheckRow = (id: string, field: keyof AnnualCheckRow, value: any) => {
+    setAnnualCheckData(prev => prev.map(row => row.id === id ? { ...row, [field]: value } : row));
+  };
+
+  const handleSaveAnnualCheck = async () => {
+    setIsSaving(true);
+    setSaveSuccess(false);
+    try {
+      const success = await saveAnnualCheckSettings(annualCheckData);
+      if (success) {
+        setSaveSuccess(true);
+        alert('저장되었습니다.');
+        const data = await fetchAnnualCheckSettings();
+        if (data && data.length > 0) {
+          setAnnualCheckData(data);
+        }
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        alert('저장에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      alert('저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -1790,7 +1879,7 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
     const yearlyRows = yearlyRowsData[activeSubTab] || [];
     
     return (
-      <div className="w-full max-w-7xl mx-auto overflow-x-auto relative">
+      <div className={`w-full max-w-7xl mx-auto overflow-x-auto relative ${openYearlyMonthId ? 'pb-[220px]' : ''}`}>
         {isLoading && (
           <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-10">
             <Loader2 className="animate-spin text-orange-650" size={32} />
@@ -2226,17 +2315,119 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                         />
                       </div>
                     </td>
-                    <td className="border border-black text-[13px] font-normal px-2">
+                    <td className="border border-black text-[13px] font-normal px-2 relative">
                       <div className="flex items-center justify-center h-full">
-                        <select
-                          value={row.monthSelect}
-                          onChange={(e) => handleUpdateYearlyRow(row.id, 'monthSelect', e.target.value)}
-                          className="bg-transparent border border-gray-300 rounded text-[13px] px-1 py-0.5 outline-none select-none"
+                        <button
+                          type="button"
+                          onClick={() => setOpenYearlyMonthId(openYearlyMonthId === row.id ? null : row.id)}
+                          className="bg-transparent border border-gray-300 rounded text-[13px] px-2 py-0.5 outline-none font-bold text-blue-600 hover:bg-slate-50 transition-all truncate max-w-[120px]"
+                          title={row.monthSelect}
                         >
-                          {["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월", "짝수달", "홀수달", "반기", "분기"].map(m => (
-                            <option key={m} value={m}>{m}</option>
-                          ))}
-                        </select>
+                          {row.monthSelect || '월 선택'} ▾
+                        </button>
+
+                        {openYearlyMonthId === row.id && (
+                          <div className="absolute top-[35px] left-1/2 transform -translate-x-1/2 z-50 bg-white border-2 border-black rounded shadow-xl p-3 w-[260px] text-left">
+                            <div className="text-[12px] font-black text-slate-800 mb-2 border-b pb-1 flex justify-between items-center">
+                              <span>월 다중 선택 (중복 가능)</span>
+                              <button 
+                                type="button"
+                                onClick={() => setOpenYearlyMonthId(null)}
+                                className="text-red-500 font-bold text-[13px] hover:underline"
+                              >
+                                [닫기]
+                              </button>
+                            </div>
+
+                            {/* Preset Buttons */}
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateYearlyRow(row.id, 'monthSelect', '1월, 2월, 3월, 4월, 5월, 6월, 7월, 8월, 9월, 10월, 11월, 12월')}
+                                className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border rounded text-[10px] font-bold"
+                              >
+                                전체
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateYearlyRow(row.id, 'monthSelect', '2월, 4월, 6월, 8월, 10월, 12월')}
+                                className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border rounded text-[10px] font-bold"
+                              >
+                                짝수달
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateYearlyRow(row.id, 'monthSelect', '1월, 3월, 5월, 7월, 9월, 11월')}
+                                className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border rounded text-[10px] font-bold"
+                              >
+                                홀수달
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateYearlyRow(row.id, 'monthSelect', '1월, 7월')}
+                                className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border rounded text-[10px] font-bold"
+                              >
+                                반기
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateYearlyRow(row.id, 'monthSelect', '1월, 4월, 7월, 10월')}
+                                className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 border rounded text-[10px] font-bold"
+                              >
+                                분기
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateYearlyRow(row.id, 'monthSelect', '')}
+                                className="px-1.5 py-0.5 bg-red-50 hover:bg-red-100 border border-red-200 rounded text-[10px] font-bold text-red-650 animate-pulse"
+                              >
+                                초기화
+                              </button>
+                            </div>
+
+                            {/* 12 Months selection */}
+                            <div className="grid grid-cols-4 gap-x-1 gap-y-1.5 mb-2 border-b pb-2">
+                              {Array.from({ length: 12 }, (_, i) => `${i + 1}월`).map(m => {
+                                const selectedParts = row.monthSelect ? row.monthSelect.split(',').map(item => item.trim()).filter(Boolean) : [];
+                                const isSelected = selectedParts.includes(m);
+                                return (
+                                  <label key={m} className={`flex items-center gap-1 cursor-pointer select-none text-[11px] font-bold hover:text-blue-600 ${isSelected ? 'text-blue-600' : 'text-slate-650'}`}>
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => {
+                                        let selectedList = row.monthSelect ? row.monthSelect.split(',').map(item => item.trim()).filter(Boolean) : [];
+                                        if (e.target.checked) {
+                                          if (!selectedList.includes(m)) {
+                                            selectedList.push(m);
+                                          }
+                                        } else {
+                                          selectedList = selectedList.filter(item => item !== m);
+                                        }
+                                        selectedList.sort((a, b) => parseInt(a) - parseInt(b));
+                                        handleUpdateYearlyRow(row.id, 'monthSelect', selectedList.join(', '));
+                                      }}
+                                      className="w-3.5 h-3.5 cursor-pointer accent-blue-600"
+                                    />
+                                    <span>{m}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+
+                            {/* Manual Direct/Custom Input field */}
+                            <div>
+                              <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">수동 직접 입력</label>
+                              <input
+                                type="text"
+                                value={row.monthSelect || ''}
+                                onChange={(e) => handleUpdateYearlyRow(row.id, 'monthSelect', e.target.value)}
+                                className="w-full px-2 py-1 bg-slate-50 border border-slate-300 rounded text-[11px] focus:outline-none focus:border-blue-500 font-bold text-slate-800"
+                                placeholder="예: 1월, 2월, 5월, 분기"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="border border-black text-[13px] font-normal px-2">
@@ -3923,6 +4114,310 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
     );
   };
 
+  const renderAnnualCheckContent = () => {
+    const selectedSubTabLabel = SUB_TABS_ANNUAL_CHECK.find(t => t.id === activeAnnualCheckSubTab)?.label || '전체';
+    const filteredRows = selectedSubTabLabel === '전체'
+      ? annualCheckData
+      : annualCheckData.filter(row => row.category === selectedSubTabLabel);
+
+    const showCategory = activeAnnualCheckSubTab === 'all';
+    const displayYearCount = 7;
+    const displayYears = Array.from({ length: displayYearCount }, (_, i) => annualCheckStartYear + i);
+
+    // Helpers to find synced dates for a specific row and year
+    const getSyncedDates = (rowContent: string, year: number): string[] => {
+      if (!rowContent || !syncedDailyReports || syncedDailyReports.length === 0) return [];
+      
+      const cleanRowContent = rowContent.replace(/\s+/g, '').replace(/[()[\]]/g, '').toLowerCase();
+      if (cleanRowContent.length < 2) return [];
+
+      const yearStr = year.toString();
+      const matchedReportIds: string[] = [];
+
+      syncedDailyReports.forEach(report => {
+        if (!report.id || !report.id.startsWith(yearStr)) return;
+
+        const workLog = report.work_log;
+        if (!workLog) return;
+
+        Object.entries(workLog).forEach(([catKey, catValue]) => {
+          if (catKey === 'scheduled' || catKey === 'mechanicalChemicals') return;
+          const logCat = catValue as any;
+          if (logCat && Array.isArray(logCat.today)) {
+            logCat.today.forEach((task: any) => {
+              if (task.content) {
+                const cleanTaskContent = task.content.replace(/\s+/g, '').replace(/[()[\]]/g, '').toLowerCase();
+                
+                // If either string contains the other (with safety length check to avoid single characters matching)
+                const shortestLen = Math.min(cleanTaskContent.length, cleanRowContent.length);
+                if (shortestLen >= 4) {
+                  if (cleanTaskContent.includes(cleanRowContent) || cleanRowContent.includes(cleanTaskContent)) {
+                    if (!matchedReportIds.includes(report.id)) {
+                      matchedReportIds.push(report.id);
+                    }
+                  }
+                } else if (shortestLen >= 2 && cleanTaskContent === cleanRowContent) {
+                  if (!matchedReportIds.includes(report.id)) {
+                    matchedReportIds.push(report.id);
+                  }
+                }
+              }
+            });
+          }
+        });
+      });
+
+      if (matchedReportIds.length === 0) return [];
+
+      // Sort chronological
+      matchedReportIds.sort();
+
+      const parsed = matchedReportIds.map(id => {
+        const parts = id.split('-');
+        return {
+          id,
+          year: parseInt(parts[0]),
+          month: parseInt(parts[1]),
+          day: parseInt(parts[2]),
+          dateObj: new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]))
+        };
+      }).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+      // Eliminate duplicates just in case
+      const uniqueParsed: typeof parsed = [];
+      parsed.forEach(p => {
+        if (!uniqueParsed.some(up => up.id === p.id)) {
+          uniqueParsed.push(p);
+        }
+      });
+
+      if (uniqueParsed.length === 0) return [];
+
+      // Find consecutive groups
+      const groups: typeof uniqueParsed[] = [];
+      let currentGroup: typeof uniqueParsed = [uniqueParsed[0]];
+
+      for (let i = 1; i < uniqueParsed.length; i++) {
+        const prev = uniqueParsed[i - 1];
+        const curr = uniqueParsed[i];
+        const diffTime = curr.dateObj.getTime() - prev.dateObj.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) {
+          currentGroup.push(curr);
+        } else {
+          groups.push(currentGroup);
+          currentGroup = [curr];
+        }
+      }
+      groups.push(currentGroup);
+
+      // Format groups
+      const formattedGroups = groups.map(group => {
+        if (group.length === 1) {
+          const m = String(group[0].month).padStart(2, '0');
+          const d = String(group[0].day).padStart(2, '0');
+          return `${m}/${d}`;
+        } else {
+          const first = group[0];
+          const last = group[group.length - 1];
+          const fm = String(first.month).padStart(2, '0');
+          const fd = String(first.day).padStart(2, '0');
+          const lm = String(last.month).padStart(2, '0');
+          const ld = String(last.day).padStart(2, '0');
+
+          if (first.month === last.month) {
+            return `${fm}/${fd}~${ld}`;
+          } else {
+            return `${fm}/${fd}~${lm}/${ld}`;
+          }
+        }
+      });
+
+      return formattedGroups;
+    };
+
+    return (
+      <div className="w-full max-w-7xl mx-auto pb-20 mt-4 h-full">
+        {/* 연도 조정 네비게이터 헤더 */}
+        <div className="flex flex-col sm:flex-row items-center justify-between mb-4 bg-slate-50 border border-black p-3 rounded gap-3 select-none">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] font-black text-black">기준 연도 설정:</span>
+            <button
+              onClick={() => setAnnualCheckStartYear(prev => Math.max(2010, prev - 1))}
+              className="px-2 py-1 border border-black rounded bg-white hover:bg-slate-100 font-bold text-xs cursor-pointer transition-colors"
+              title="이전 연도로 이동"
+            >
+              ◀ 1년 이전
+            </button>
+            <select
+              value={annualCheckStartYear}
+              onChange={(e) => setAnnualCheckStartYear(parseInt(e.target.value))}
+              className="border border-black rounded px-2 py-1 text-xs font-bold bg-white cursor-pointer outline-none"
+            >
+              {Array.from({ length: 25 }, (_, i) => 2015 + i).map(year => (
+                <option key={year} value={year}>{year}년 ~ {year + displayYearCount - 1}년</option>
+              ))}
+            </select>
+            <button
+              onClick={() => setAnnualCheckStartYear(prev => Math.min(2040, prev + 1))}
+              className="px-2 py-1 border border-black rounded bg-white hover:bg-slate-100 font-bold text-xs cursor-pointer transition-colors"
+              title="다음 연도로 이동"
+            >
+              1년 이후 ▶
+            </button>
+          </div>
+          <div className="text-[11px] font-semibold text-slate-500">
+            * 기준 연도를 변경해도 데이터베이스에 저장된 다른 연도의 이력은 안전하게 유지됩니다.
+          </div>
+        </div>
+
+        {/* 테이블 데이터 뷰 */}
+        <div className="overflow-x-auto w-full">
+          {filteredRows.length === 0 ? (
+            <div className="text-center py-20 bg-slate-50 border border-black rounded-lg">
+              <p className="text-gray-500 font-bold mb-4">등록된 년간점검사항이 없습니다.</p>
+              <button
+                onClick={handleAddAnnualCheckRow}
+                className="px-4 py-2 bg-orange-600 text-white font-bold rounded hover:bg-orange-700 transition cursor-pointer"
+              >
+                + 첫 행 추가
+              </button>
+            </div>
+          ) : (
+            <table className="w-full border-collapse border border-black text-center min-w-[1000px] bg-white">
+              <thead>
+                <tr className="bg-slate-50 border-b-2 border-black text-[13px] font-black text-black h-10">
+                  {showCategory && <th className="border border-black px-2 w-[110px]">분야</th>}
+                  <th className="border border-black px-2 w-[120px]">점검주기</th>
+                  <th className="border border-black px-4 text-center">점검 사 항</th>
+                  {displayYears.map(year => (
+                    <th key={year} className="border border-black px-1 w-[80px]">{year}년</th>
+                  ))}
+                  <th className="border border-black px-2 w-[60px]">관리</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((row) => (
+                  <tr key={row.id} className="hover:bg-slate-50/50 h-10 text-[12px] font-normal text-slate-800 border-b border-black">
+                    {/* 분야 (선택 가능) - showCategory 가 true 일 때만 노출 */}
+                    {showCategory && (
+                      <td className="border border-black p-1">
+                         <select
+                           value={row.category}
+                           onChange={(e) => handleUpdateAnnualCheckRow(row.id, 'category', e.target.value)}
+                           className="w-full bg-transparent border border-gray-300 rounded text-[12px] px-1 py-1 font-normal text-center outline-none cursor-pointer"
+                         >
+                           <option value="전기">전기</option>
+                           <option value="기계">기계</option>
+                           <option value="소방">소방</option>
+                           <option value="승강기">승강기</option>
+                         </select>
+                      </td>
+                    )}
+
+                    {/* 점검주기 (직접 입력 혹은 기본 선택) */}
+                    <td className="border border-black p-1">
+                      <div className="flex flex-col gap-1 w-full">
+                        <select
+                          value={['년 1회', '2년 1회', '3년 1회', '4년 1회'].includes(row.cycle) ? row.cycle : 'custom'}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === 'custom') {
+                              handleUpdateAnnualCheckRow(row.id, 'cycle', '');
+                            } else {
+                              handleUpdateAnnualCheckRow(row.id, 'cycle', val);
+                            }
+                          }}
+                          className="w-full bg-transparent border border-gray-300 rounded text-[11px] px-1 py-1 font-normal text-center outline-none cursor-pointer"
+                        >
+                          <option value="년 1회">년 1회</option>
+                          <option value="2년 1회">2년 1회</option>
+                          <option value="3년 1회">3년 1회</option>
+                          <option value="4년 1회">4년 1회</option>
+                          <option value="custom">직접입력</option>
+                        </select>
+                        {!['년 1회', '2년 1회', '3년 1회', '4년 1회'].includes(row.cycle) && (
+                          <input
+                            type="text"
+                            value={row.cycle}
+                            placeholder="주기 직접 입력"
+                            onChange={(e) => handleUpdateAnnualCheckRow(row.id, 'cycle', e.target.value)}
+                            className="w-full px-1.5 py-0.5 border border-slate-300 rounded text-[11px] font-normal text-center outline-none bg-white"
+                          />
+                        )}
+                      </div>
+                    </td>
+
+                    {/* 점검 사 항 (글자 입력) */}
+                    <td className="border border-black p-1 text-center">
+                      <input
+                        type="text"
+                        value={row.content}
+                        placeholder="점검 항목 상세 내용을 입력하세요"
+                        onChange={(e) => handleUpdateAnnualCheckRow(row.id, 'content', e.target.value)}
+                        className="w-full bg-transparent px-2 py-1 outline-none border-0 text-[12px] placeholder-gray-400 font-normal text-center"
+                      />
+                    </td>
+
+                    {/* 동적 7개년도 입력창 */}
+                    {displayYears.map((year) => {
+                      const yearKey = `y${year}`;
+                      // 현재 날짜 기준 연도와 같은지 체크 (예: 2026년 하이라이트)
+                      const isCurrentYear = year === 2026;
+                      const syncedDates = getSyncedDates(row.content, year);
+                      const hasSyncedDates = syncedDates.length > 0 && !row[yearKey];
+                      return (
+                        <td key={year} className={`border border-black p-1 ${isCurrentYear ? 'bg-orange-50/40' : ''}`}>
+                          <div className="flex flex-col items-center justify-center min-h-[36px]">
+                            <input
+                              type="text"
+                              value={row[yearKey] || ''}
+                              placeholder="-"
+                              onChange={(e) => handleUpdateAnnualCheckRow(row.id, yearKey, e.target.value)}
+                              className="w-full bg-transparent border-none text-center outline-none text-[11px] font-normal"
+                            />
+                            {hasSyncedDates && (
+                              <div
+                                onClick={() => {
+                                  handleUpdateAnnualCheckRow(row.id, yearKey, syncedDates.join(', '));
+                                }}
+                                className="mt-0.5 text-[10px] text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded px-1 py-0.5 select-none cursor-pointer font-normal transition-colors flex items-center justify-center gap-0.5 mx-auto"
+                                style={{ maxWidth: '74px' }}
+                                title="일일업무일지에서 감지됨. 클릭하여 일지에 기록된 날짜를 입력합니다."
+                              >
+                                <span>🔄</span>
+                                <span className="truncate">{syncedDates.join(',')}</span>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+
+                    {/* 관리 (삭제버튼) */}
+                    <td className="border border-black p-2">
+                      <div className="flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAnnualCheckRow(row.id)}
+                          className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors cursor-pointer"
+                          title="삭제"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-7xl mx-auto p-4 space-y-2 pb-32">
       {/* 메인탭메뉴 */}
@@ -4454,6 +4949,63 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
         </div>
       )}
 
+      {/* 서브탭메뉴 (년간점검사항일 때 표시) */}
+      {activeTab === 'annual_check' && (
+        <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black select-none">
+          {/* 서브탭 */}
+          <div className="flex items-stretch shrink-0">
+            {SUB_TABS_ANNUAL_CHECK.map(subTab => (
+              <div
+                key={subTab.id}
+                onClick={() => setActiveAnnualCheckSubTab(subTab.id)}
+                className={`flex items-center px-4 py-3 text-[14px] font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
+                  activeAnnualCheckSubTab === subTab.id 
+                    ? 'text-orange-600' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                {subTab.label}
+                {activeAnnualCheckSubTab === subTab.id && (
+                  <div className="absolute bottom-0 left-0 right-0 h-1 bg-orange-600" />
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* 구분선 (검정색 1px) */}
+          <div className="flex items-center shrink-0 px-2">
+            <div className="w-px h-6 bg-black"></div>
+          </div>
+
+          {/* 액션 버튼들 */}
+          <div className="flex items-stretch shrink-0">
+            <button 
+              onClick={handleAddAnnualCheckRow}
+              className="flex items-center shrink-0 px-4 py-3 bg-transparent text-gray-500 hover:text-black font-bold text-[14px] transition-colors relative whitespace-nowrap cursor-pointer"
+            >
+              <Plus size={14} className="mr-1.5" />
+              행추가
+            </button>
+            <button 
+              onClick={handleSaveAnnualCheck}
+              disabled={isSaving}
+              className={`flex items-center shrink-0 px-4 py-3 bg-transparent font-bold text-[14px] transition-colors relative whitespace-nowrap disabled:opacity-50 cursor-pointer ${
+                saveSuccess ? 'text-orange-600 font-extrabold' : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              {isSaving ? (
+                <Loader2 size={14} className="mr-1.5 animate-spin" />
+              ) : saveSuccess ? (
+                <CheckCircle2 size={14} className="mr-1.5" />
+              ) : (
+                <Save size={14} className="mr-1.5" />
+              )}
+              {saveSuccess ? '저장완료' : '저장'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Content Area */}
       <div className="min-h-[400px]">
         {activeTab === 'auto_reg' ? (
@@ -4468,6 +5020,8 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
           renderUniformContent()
         ) : activeTab === 'emergency' ? (
           renderEmergencyContent()
+        ) : activeTab === 'annual_check' ? (
+          renderAnnualCheckContent()
         ) : (
           <div className="flex items-center justify-center h-full min-h-[400px]">
             <div className="text-center">

@@ -936,40 +936,14 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
             <div class="section-header">금일 작업 내용</div>
             <div style="border:1.2px solid black; padding:15px; min-height:250px; text-align:left;">
               ${catData.today.filter(t => t.content.trim()).map(t => {
-                let styleStr = 'margin-bottom:8px;';
-                const isManual = t.id?.includes('task_');
-                const isMonthly = t.frequency === '월간' || t.id?.includes('-monthly-');
-                const isYearly = t.frequency === '년간' || t.id?.includes('-yearly-');
-                const isPartialWeekly = !!t.isPartialWeekly;
-                if (isManual) {
-                  styleStr += ' color: #3b82f6;';
-                } else if (isMonthly) {
-                  styleStr += ' color: #9333ea; font-weight: bold;';
-                } else if (isYearly) {
-                  styleStr += ' color: #059669; font-weight: bold;';
-                } else if (isPartialWeekly) {
-                  styleStr += ' color: #d97706; font-weight: bold;';
-                }
+                const styleStr = 'margin-bottom:8px; color: black; font-weight: normal;';
                 return `<div style="${styleStr}">• ${t.content}</div>`;
               }).join('') || '내역 없음'}
             </div>
             <div class="section-header">익일 예정 사항</div>
             <div style="border:1.2px solid black; padding:15px; min-height:250px; text-align:left;">
               ${catData.tomorrow.filter(t => t.content.trim()).map(t => {
-                let styleStr = 'margin-bottom:8px;';
-                const isManual = t.id?.includes('task_');
-                const isMonthly = t.frequency === '월간' || t.id?.includes('-monthly-');
-                const isYearly = t.frequency === '년간' || t.id?.includes('-yearly-');
-                const isPartialWeekly = !!t.isPartialWeekly;
-                if (isManual) {
-                  styleStr += ' color: #3b82f6;';
-                } else if (isMonthly) {
-                  styleStr += ' color: #9333ea; font-weight: bold;';
-                } else if (isYearly) {
-                  styleStr += ' color: #059669; font-weight: bold;';
-                } else if (isPartialWeekly) {
-                  styleStr += ' color: #d97706; font-weight: bold;';
-                }
+                const styleStr = 'margin-bottom:8px; color: black; font-weight: normal;';
                 return `<div style="${styleStr}">• ${t.content}</div>`;
               }).join('') || '내역 없음'}
             </div>
@@ -991,22 +965,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
       for (let i = 0; i < count; i++) {
         const t = tasks[i];
         const text = t && t.content ? `&nbsp; • ${t.content}` : '&nbsp;';
-        let colorStyle = 'color: black;';
-        if (t && t.content) {
-          const isManual = t.id?.includes('task_');
-          const isMonthly = t.frequency === '월간' || t.id?.includes('-monthly-');
-          const isYearly = t.frequency === '년간' || t.id?.includes('-yearly-');
-          const isPartialWeekly = !!t.isPartialWeekly;
-          if (isManual) {
-            colorStyle = 'color: #3b82f6;';
-          } else if (isMonthly) {
-            colorStyle = 'color: #9333ea; font-weight: bold;';
-          } else if (isYearly) {
-            colorStyle = 'color: #059669; font-weight: bold;';
-          } else if (isPartialWeekly) {
-            colorStyle = 'color: #d97706; font-weight: bold;';
-          }
-        }
+        const colorStyle = 'color: black; font-weight: normal;';
         html += `<div style="height: ${rowHeight}px; line-height: ${rowHeight}px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-size: 8.5pt; border-bottom: 0.5px solid #eee; ${colorStyle}">${text}</div>`;
       }
       return html;
