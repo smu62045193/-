@@ -1698,7 +1698,7 @@ const EquipmentHistory: React.FC = () => {
                         <thead>
                           <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
                             <th className="py-3 px-4 text-center w-[15%]">작업일자</th>
-                            <th className="py-3 px-4 w-[38%]">조치 내역 요약</th>
+                            <th className="py-3 px-4 text-center w-[38%]">조치 내역 요약</th>
                             <th className="py-3 px-4 w-[15%]">작업업체</th>
                             <th className="py-3 px-4 w-[12%]">담당자</th>
                             <th className="py-3 px-4 w-[12%]">연락처</th>
@@ -1849,24 +1849,24 @@ const EquipmentHistory: React.FC = () => {
                                 </tr>
                               ) : (
                                 <tr key={rec.id} className="hover:bg-slate-50/50 transition-colors">
-                                  <td className="py-3.5 px-4 text-center whitespace-nowrap font-mono text-slate-500">
+                                  <td className="py-3.5 px-4 text-center whitespace-nowrap text-[13px] font-normal text-slate-500">
                                     {rec.date}
                                   </td>
-                                  <td className="py-3.5 px-4">
-                                    <div className="font-bold text-slate-800">{rec.title}</div>
+                                  <td className="py-3.5 px-4 text-center">
+                                    <div className="text-[13px] font-normal text-slate-800">{rec.title}</div>
                                     {rec.details && (
-                                      <div className="text-[11px] text-slate-400 font-medium mt-0.5 leading-relaxed">
+                                      <div className="text-[11px] text-slate-400 font-normal mt-0.5 leading-relaxed">
                                         {rec.details}
                                       </div>
                                     )}
                                   </td>
-                                  <td className="py-3.5 px-4 font-semibold text-slate-700 truncate max-w-[124px]">
+                                  <td className="py-3.5 px-4 text-[13px] font-normal text-slate-700 truncate max-w-[124px]">
                                     {rec.contractor || '-'}
                                   </td>
-                                  <td className="py-3.5 px-4 font-semibold text-slate-500 whitespace-nowrap">
+                                  <td className="py-3.5 px-4 text-[13px] font-normal text-slate-500 whitespace-nowrap">
                                     {rec.manager || '-'}
                                   </td>
-                                  <td className="py-3.5 px-4 font-semibold text-slate-500 whitespace-nowrap">
+                                  <td className="py-3.5 px-4 text-[13px] font-normal text-slate-500 whitespace-nowrap">
                                     {rec.phone || '-'}
                                   </td>
                                   <td className="py-3.5 px-4 text-center whitespace-nowrap">

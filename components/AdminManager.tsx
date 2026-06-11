@@ -81,6 +81,8 @@ const SUB_TABS_ARCHIVE = [
   { id: 'elevator', label: '승강기' },
   { id: 'parking', label: '주차' },
   { id: 'form', label: '양식' },
+  { id: 'report', label: '보고서' },
+  { id: 'doc', label: '공문' },
   { id: 'etc', label: '기타' },
 ];
 
@@ -1755,6 +1757,8 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
         elevator: '승강기',
         parking: '주차',
         form: '양식',
+        report: '보고서',
+        doc: '공문',
         etc: '기타'
       };
       
@@ -1780,10 +1784,10 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
             <thead>
               <tr className="h-[40px] bg-white">
                 <th className="border border-black text-[13px] font-normal px-2 w-[60px]">No</th>
-                <th className="border border-black text-[13px] font-normal px-2 w-[120px]">구분</th>
+                <th className="border border-black text-[13px] font-normal px-2 w-[80px]">구분</th>
                 <th className="border border-black text-[13px] font-normal px-2 w-[350px]">제목</th>
                 <th className="border border-black text-[13px] font-normal px-2 w-[150px]">등록일</th>
-                <th className="border border-black text-[13px] font-normal px-2 w-[250px]">첨부</th>
+                <th className="border border-black text-[13px] font-normal px-2 w-[290px]">첨부</th>
                 <th className="border border-black text-[13px] font-normal px-2 w-[80px]">관리</th>
               </tr>
             </thead>
@@ -1799,7 +1803,7 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                     </div>
                   </td>
                   <td className="border border-black text-[13px] font-normal px-2">
-                    <div className="flex items-center justify-start h-full text-[13px] font-normal">
+                    <div className="flex items-center justify-center h-full text-[13px] font-normal">
                       {row.title}
                     </div>
                   </td>
