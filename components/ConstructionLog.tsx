@@ -58,13 +58,69 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
   
   const [currentMode, setCurrentMode] = useState<WorkSource>(mode);
   const [currentItem, setCurrentItem] = useState<WorkItemWithSource>({
-    id: generateUUID(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: mode
+    id: generateUUID(), date: `${new Date().toISOString().split('T')[0]} ~ `, category: '전기', company: '', content: '', photos: [], source: mode
   });
   const [isManualCategory, setIsManualCategory] = useState(false);
 
   const PREDEFINED_CATEGORIES = ['전기', '기계', '소방', '승강기', '영선', '미화', '주차', '인테리어', '복구'];
 
-  const PHOTO_LIMIT = currentMode === 'external' ? 20 : 10;
+  const PHOTO_LIMIT = 15;
+
+  const getDatesInRange = (dateStr: string): string[] => {
+    if (!dateStr) return [];
+    const parts = dateStr.split('~').map(p => p.trim());
+    const startDateStr = parts[0];
+    const endDateStr = parts[1];
+    
+    if (!startDateStr) return [];
+    
+    const start = new Date(startDateStr);
+    let end: Date;
+    
+    if (!endDateStr) {
+      if (dateStr.includes('~')) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        end = new Date(todayStr);
+      } else {
+        return [startDateStr];
+      }
+    } else {
+      end = new Date(endDateStr);
+    }
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
+      return [startDateStr];
+    }
+    
+    const dates: string[] = [];
+    let current = new Date(start);
+    let limitCount = 0;
+    while (current <= end && limitCount < 30) {
+      const yyyy = current.getFullYear();
+      const mm = String(current.getMonth() + 1).padStart(2, '0');
+      const dd = String(current.getDate()).padStart(2, '0');
+      dates.push(`${yyyy}-${mm}-${dd}`);
+      current = new Date(current.getTime() + 24 * 60 * 60 * 1000);
+      limitCount++;
+    }
+    return dates;
+  };
+
+  const datesInRange = useMemo(() => getDatesInRange(currentItem.date), [currentItem.date]);
+  const isProgressing = useMemo(() => {
+    return currentItem.date.includes('~') && !currentItem.date.split('~')[1]?.trim();
+  }, [currentItem.date]);
+  const [selectedUploadDate, setSelectedUploadDate] = useState<string>('');
+
+  useEffect(() => {
+    if (datesInRange.length > 0) {
+      if (!selectedUploadDate || !datesInRange.includes(selectedUploadDate)) {
+        setSelectedUploadDate(datesInRange[0]);
+      }
+    } else {
+      setSelectedUploadDate('');
+    }
+  }, [datesInRange, selectedUploadDate]);
 
   useEffect(() => {
     if (isPopupMode) {
@@ -86,14 +142,19 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         if (urlId && urlId !== 'new') {
           const matched = list.find(i => String(i.id) === String(urlId));
           if (matched) {
-            setCurrentItem({ ...matched, source: urlMode || mode });
+            let formattedDate = matched.date || '';
+            if (formattedDate && !formattedDate.includes('~')) {
+              formattedDate = `${formattedDate.trim()} ~ `;
+            }
+            setCurrentItem({ ...matched, date: formattedDate, source: urlMode || mode });
             setEditId(urlId);
             if (!PREDEFINED_CATEGORIES.includes(matched.category)) {
               setIsManualCategory(true);
             }
           }
         } else {
-          setCurrentItem(prev => ({ ...prev, source: urlMode || mode }));
+          const today = new Date().toISOString().split('T')[0];
+          setCurrentItem(prev => ({ ...prev, date: `${today} ~ `, source: urlMode || mode }));
         }
         setLoading(false);
       };
@@ -128,15 +189,15 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         fetchedItems = (internalData || []).map(i => ({ ...i, source: 'internal' as WorkSource }));
       }
       fetchedItems.sort((a, b) => {
-        const aHasEnd = a.date.includes(' ~ ') && a.date.split(' ~ ')[1]?.trim() ? 1 : 0;
-        const bHasEnd = b.date.includes(' ~ ') && b.date.split(' ~ ')[1]?.trim() ? 1 : 0;
+        const aNoEnd = a.date && a.date.includes('~') && !a.date.split('~')[1]?.trim();
+        const bNoEnd = b.date && b.date.includes('~') && !b.date.split('~')[1]?.trim();
         
-        if (aHasEnd !== bHasEnd) {
-          return aHasEnd - bHasEnd;
+        if (aNoEnd !== bNoEnd) {
+          return aNoEnd ? -1 : 1;
         }
         
-        const aStart = a.date.includes(' ~ ') ? a.date.split(' ~ ')[0].trim() : a.date;
-        const bStart = b.date.includes(' ~ ') ? b.date.split(' ~ ')[0].trim() : b.date;
+        const aStart = a.date && a.date.includes('~') ? a.date.split('~')[0].trim() : (a.date || '');
+        const bStart = b.date && b.date.includes('~') ? b.date.split('~')[0].trim() : (b.date || '');
         return bStart.localeCompare(aStart);
       });
       setItems(fetchedItems);
@@ -173,18 +234,47 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
     setLoading(true); 
     try {
       const uploadedPhotos: WorkPhoto[] = [];
-      for (let i = 0; i < currentItem.photos.length; i++) {
-        const photo = currentItem.photos[i];
-        if (photo.dataUrl.startsWith('data:image')) {
-          const fileName = `work_${currentItem.id}_${photo.id}.jpg`;
-          const publicUrl = await uploadFile('facility', 'construction', fileName, photo.dataUrl);
-          uploadedPhotos.push({
-            ...photo,
-            dataUrl: publicUrl || photo.dataUrl,
-            fileName: `${currentItem.content.trim()}_${i + 1}`
-          });
-        } else {
-          uploadedPhotos.push(photo);
+      const dates = getDatesInRange(currentItem.date);
+      const defaultDate = dates[0] || new Date().toISOString().split('T')[0];
+
+      // Group photos by date to assign numbers sequentially within each date
+      const photosByDate: { [date: string]: WorkPhoto[] } = {};
+      dates.forEach(dt => {
+        photosByDate[dt] = [];
+      });
+
+      currentItem.photos.forEach(photo => {
+        const pDate = photo.date || defaultDate;
+        if (!photosByDate[pDate]) {
+          photosByDate[pDate] = [];
+        }
+        photosByDate[pDate].push(photo);
+      });
+
+      for (const dVal of Object.keys(photosByDate)) {
+        const dayPhotos = photosByDate[dVal];
+        for (let idx = 0; idx < dayPhotos.length; idx++) {
+          const photo = dayPhotos[idx];
+          const fileNum = idx + 1;
+          const cleanContent = currentItem.content.trim().split('\n')[0].replace(/[^a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s_-]+/g, '').substring(0, 30);
+          const targetPhotoName = `${cleanContent}-${dVal}-${fileNum}`;
+
+          if (photo.dataUrl.startsWith('data:image')) {
+            const fileName = `work_${currentItem.id}_${photo.id}.jpg`;
+            const publicUrl = await uploadFile('facility', 'construction', fileName, photo.dataUrl);
+            uploadedPhotos.push({
+              ...photo,
+              dataUrl: publicUrl || photo.dataUrl,
+              fileName: targetPhotoName,
+              date: dVal
+            });
+          } else {
+            uploadedPhotos.push({
+              ...photo,
+              fileName: targetPhotoName,
+              date: dVal
+            });
+          }
         }
       }
 
@@ -210,7 +300,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         } else {
           // 등록 성공 후 초기화 및 리스트 새로고침
           setCurrentItem({
-            id: generateUUID(), date: new Date().toISOString().split('T')[0], category: '전기', company: '', content: '', photos: [], source: currentMode
+            id: generateUUID(), date: `${new Date().toISOString().split('T')[0]} ~ `, category: '전기', company: '', content: '', photos: [], source: currentMode
           });
           setEditId(null);
           loadData();
@@ -227,20 +317,40 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files; if (!files) return;
-    const fileList = Array.from(files) as File[]; const remaining = PHOTO_LIMIT - currentItem.photos.length;
-    if (fileList.length > remaining) { alert(`최대 ${PHOTO_LIMIT}장까지만 가능합니다.`); return; }
+    const fileList = Array.from(files) as File[];
+    
+    const dates = getDatesInRange(currentItem.date);
+    const targetDate = selectedUploadDate || dates[0] || new Date().toISOString().split('T')[0];
+
+    const currentDayPhotos = currentItem.photos.filter(p => (p.date || dates[0]) === targetDate);
+    const remaining = 15 - currentDayPhotos.length;
+
+    if (fileList.length > remaining) { 
+      alert(`해당 일자(${targetDate})의 사진은 최대 15장까지만 가능합니다. (현재 ${currentDayPhotos.length}장 등록됨, 추가 가능: ${remaining}장)`); 
+      return; 
+    }
     
     setLoading(true);
     const newPhotos: WorkPhoto[] = [];
     for (const file of fileList) { 
       try { 
         const resized = await resizeImage(file); 
-        newPhotos.push({ id: generateUUID(), dataUrl: resized, fileName: file.name }); 
+        newPhotos.push({ 
+          id: generateUUID(), 
+          dataUrl: resized, 
+          fileName: file.name,
+          date: targetDate
+        }); 
       } catch (err) { 
         alert(`${file.name} 처리 오류`); 
       } 
     }
-    if (newPhotos.length > 0) setCurrentItem(prev => ({ ...prev, photos: [...prev.photos, ...newPhotos] }));
+    if (newPhotos.length > 0) {
+      setCurrentItem(prev => ({ 
+        ...prev, 
+        photos: [...prev.photos, ...newPhotos] 
+      }));
+    }
     setLoading(false);
     e.target.value = '';
   };
@@ -312,7 +422,8 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
             extension = photo.dataUrl.split(';')[0].split('/')[1];
           }
           
-          zip.file(`${folderName}/image_${index + 1}.${extension}`, blob);
+          const nameInZip = photo.fileName || `image_${index + 1}`;
+          zip.file(`${folderName}/${nameInZip}.${extension}`, blob);
         } catch (error) {
           console.error(`이미지 다운로드 실패: ${photo.dataUrl}`, error);
         }
@@ -377,36 +488,49 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">시작일 *</label>
                 <input 
                   type="date" 
-                  value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[0].trim() : currentItem.date} 
+                  value={currentItem.date.includes('~') ? currentItem.date.split('~')[0].trim() : currentItem.date} 
                   onChange={e => {
                     const start = e.target.value;
-                    const parts = currentItem.date.split(' ~ ');
+                    const parts = currentItem.date.split('~');
                     const end = parts[1] ? parts[1].trim() : '';
-                    if (end && start !== end) {
-                      setCurrentItem({...currentItem, date: `${start} ~ ${end}`});
-                    } else {
-                      setCurrentItem({...currentItem, date: start});
-                    }
+                    setCurrentItem({...currentItem, date: `${start} ~ ${end}`});
                   }} 
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">종료일</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest">종료일</label>
+                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={isProgressing} 
+                      onChange={(e) => {
+                        const parts = currentItem.date.split('~');
+                        const start = parts[0] ? parts[0].trim() : new Date().toISOString().split('T')[0];
+                        if (e.target.checked) {
+                          setCurrentItem({ ...currentItem, date: `${start} ~ ` });
+                        } else {
+                          const end = parts[1] && parts[1].trim() ? parts[1].trim() : start;
+                          setCurrentItem({ ...currentItem, date: `${start} ~ ${end}` });
+                        }
+                      }}
+                      className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-bold text-amber-600">진행중</span>
+                  </label>
+                </div>
                 <input 
                   type="date" 
-                  value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[1].trim() : ''} 
+                  value={currentItem.date.includes('~') ? (currentItem.date.split('~')[1] || '').trim() : ''} 
                   onChange={e => {
                     const end = e.target.value;
-                    const parts = currentItem.date.split(' ~ ');
+                    const parts = currentItem.date.split('~');
                     const start = parts[0] ? parts[0].trim() : currentItem.date;
-                    if (end && start !== end) {
-                      setCurrentItem({...currentItem, date: `${start} ~ ${end}`});
-                    } else {
-                      setCurrentItem({...currentItem, date: start});
-                    }
+                    setCurrentItem({...currentItem, date: `${start} ~ ${end}`});
                   }} 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                  disabled={isProgressing}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500 ${isProgressing ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}`} 
                 />
               </div>
               <div>
@@ -455,28 +579,63 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
             </div>
 
             <div>
-              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">사진 첨부 ({currentItem.photos.length}/{PHOTO_LIMIT})</label>
+              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">사진 첨부 (총 {currentItem.photos.length}장)</label>
+              
+              {/* 일자별 탭 선택기 */}
+              {datesInRange.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4 bg-slate-50 p-2 rounded-2xl border border-slate-200">
+                  {datesInRange.map((dateVal, index) => {
+                    const countForThisDate = currentItem.photos.filter(p => (p.date || datesInRange[0]) === dateVal).length;
+                    const isSelected = selectedUploadDate === dateVal;
+                    return (
+                      <button
+                        key={dateVal}
+                        type="button"
+                        onClick={() => setSelectedUploadDate(dateVal)}
+                        className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                          isSelected 
+                            ? 'bg-blue-600 text-white shadow-md' 
+                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {index + 1}일차 ({dateVal}) [{countForThisDate}/15장]
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 현재 선택된 일자 표시 */}
+              {selectedUploadDate && (
+                <div className="mb-3 text-[11px] font-extrabold text-blue-600 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 inline-block animate-pulse"></span>
+                  현재 선택된 일자: {selectedUploadDate} (최대 15장 등록 가능)
+                </div>
+              )}
+
               <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {currentItem.photos.length < PHOTO_LIMIT && (
+                {currentItem.photos.filter(p => (p.date || datesInRange[0]) === selectedUploadDate).length < 15 && (
                   <label className="flex flex-col items-center justify-center aspect-square border-2 border-dashed border-slate-200 rounded-2xl cursor-pointer bg-slate-50 hover:border-blue-400 hover:bg-blue-50 transition-all">
                     <Upload size={32} className="text-slate-300 mb-2" />
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Upload</span>
                     <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload}/>
                   </label>
                 )}
-                {currentItem.photos.map((photo) => (
-                  <div key={photo.id} className="relative aspect-square rounded-2xl border border-slate-200 overflow-hidden group shadow-sm bg-white">
-                    <img src={formatImageUrl(photo.dataUrl)} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
-                      <button onClick={() => downloadPhoto(photo)} className="p-2 bg-white rounded-full text-blue-600 hover:bg-blue-50 shadow-md">
-                        <Download size={16} />
-                      </button>
-                      <button onClick={() => removePhoto(photo.id)} className="p-2 bg-white rounded-full text-red-600 hover:bg-red-50 shadow-md">
-                        <Trash2 size={16} />
-                      </button>
+                {currentItem.photos
+                  .filter(photo => (photo.date || datesInRange[0]) === selectedUploadDate)
+                  .map((photo) => (
+                    <div key={photo.id} className="relative aspect-square rounded-2xl border border-slate-200 overflow-hidden group shadow-sm bg-white">
+                      <img src={formatImageUrl(photo.dataUrl)} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                        <button onClick={() => downloadPhoto(photo)} className="p-2 bg-white rounded-full text-blue-600 hover:bg-blue-50 shadow-md">
+                          <Download size={16} />
+                        </button>
+                        <button onClick={() => removePhoto(photo.id)} className="p-2 bg-white rounded-full text-red-600 hover:bg-red-50 shadow-md">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
               <p className="text-[10px] text-blue-500 mt-3 font-bold">* 저장 시 사진은 압축되어 서버에 최적화 저장됩니다.</p>
             </div>
@@ -563,20 +722,36 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
               ) : (
                 paginatedItems.map((item, idx) => {
                   const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
+                  const isNoEnd = item.date && item.date.includes('~') && !item.date.split('~')[1]?.trim();
                   return (
-                    <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{globalIdx}</div></td>
+                    <tr key={item.id} className={`transition-colors group border-b border-black last:border-b-0 h-[40px] ${
+                      isNoEnd 
+                        ? 'bg-amber-50/90 hover:bg-amber-100/90 font-bold' 
+                        : 'hover:bg-blue-50/40'
+                    }`}>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{isNoEnd ? "" : globalIdx}</div></td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
-                        <div className="flex items-center justify-center h-full px-2">
-                          {(() => {
-                            if (item.date && item.date.includes(' ~ ')) {
-                              const parts = item.date.split(' ~ ');
-                              if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
-                                return parts[0].trim();
+                        <div className="flex items-center justify-center h-full px-2 gap-1.5">
+                          <span>
+                            {(() => {
+                              if (item.date && item.date.includes('~')) {
+                                const parts = item.date.split('~');
+                                if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
+                                  return parts[0].trim();
+                                }
+                                if (parts[0] && !parts[1]?.trim()) {
+                                  return `${parts[0].trim()} ~`;
+                                }
+                                return item.date;
                               }
-                            }
-                            return item.date;
-                          })()}
+                              return item.date;
+                            })()}
+                          </span>
+                          {isNoEnd && item.date && (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-200 text-amber-900 border border-amber-300 font-black text-[10px] scale-95 animate-pulse">
+                              진행중
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">

@@ -1503,10 +1503,28 @@ export const fetchDateRangeData = async (start: string, days: number): Promise<a
   return await apiFetchRange("DAILY_", start, end);
 };
 
+const decodeConstructionLogs = (row: any): ConstructionWorkItem => {
+  let date = row.date;
+  let content = row.content || '';
+  const rangeMatch = content.match(/\n\[DateRange:\s*([^\]]+)\]$/);
+  if (rangeMatch) {
+    date = rangeMatch[1].trim();
+    content = content.replace(/\n\[DateRange:\s*([^\]]+)\]$/, '');
+  }
+  return {
+    id: row.id,
+    date: date,
+    category: row.category,
+    company: row.company,
+    content: content,
+    photos: row.photos || []
+  };
+};
+
 export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> => {
   try {
     const { data } = await supabase.from('construction_logs').select('*').eq('source', 'external').order('date', { ascending: false });
-    if (data && data.length > 0) return data.map(w => ({ id: w.id, date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos || [] }));
+    if (data && data.length > 0) return data.map(decodeConstructionLogs);
   } catch (e) {
     console.error('fetchExternalWorkList error:', e);
   }
@@ -1517,22 +1535,46 @@ export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> =
  * 공사/작업 단일 항목 저장
  */
 export const saveConstructionWorkItem = async (item: ConstructionWorkItem, source: 'external' | 'internal'): Promise<boolean> => {
+  let dbDate = item.date;
+  let dbContent = item.content;
+  if (item.date && item.date.includes('~')) {
+    dbDate = item.date.split('~')[0].trim();
+    if (!dbDate) {
+      dbDate = new Date().toISOString().split('T')[0];
+    }
+    dbContent = `${item.content}\n[DateRange: ${item.date}]`;
+  }
+
   const dbData = { 
     id: ensureID(item.id), 
-    date: item.date, 
+    date: dbDate, 
     category: item.category, 
     company: item.company || null, 
-    content: item.content, 
+    content: dbContent, 
     photos: item.photos || [], 
     source: source,
     last_updated: new Date().toISOString()
   };
   const { error = null } = await supabase.from('construction_logs').upsert(dbData);
+  if (error) {
+    console.error('saveConstructionWorkItem upsert error:', error);
+  }
   return !error;
 };
 
 export const saveExternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
-  const dbData = list.map(w => ({ id: ensureID(w.id), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'external' }));
+  const dbData = list.map(w => {
+    let dbDate = w.date;
+    let dbContent = w.content;
+    if (w.date && w.date.includes('~')) {
+      dbDate = w.date.split('~')[0].trim();
+      if (!dbDate) {
+        dbDate = new Date().toISOString().split('T')[0];
+      }
+      dbContent = `${w.content}\n[DateRange: ${w.date}]`;
+    }
+    return { id: ensureID(w.id), date: dbDate, category: w.category, company: w.company, content: dbContent, photos: w.photos, source: 'external' };
+  });
   const { error = null } = await supabase.from('construction_logs').upsert(dbData);
   return !error;
 };
@@ -1540,7 +1582,7 @@ export const saveExternalWorkList = async (list: ConstructionWorkItem[]): Promis
 export const fetchInternalWorkList = async (): Promise<ConstructionWorkItem[]> => {
   try {
     const { data } = await supabase.from('construction_logs').select('*').eq('source', 'internal').order('date', { ascending: false });
-    if (data && data.length > 0) return data.map(w => ({ id: w.id, date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos || [] }));
+    if (data && data.length > 0) return data.map(decodeConstructionLogs);
   } catch (e) {
     console.error('fetchInternalWorkList error:', e);
   }
@@ -1548,7 +1590,18 @@ export const fetchInternalWorkList = async (): Promise<ConstructionWorkItem[]> =
 };
 
 export const saveInternalWorkList = async (list: ConstructionWorkItem[]): Promise<boolean> => {
-  const dbData = list.map(w => ({ id: ensureID(w.id), date: w.date, category: w.category, company: w.company, content: w.content, photos: w.photos, source: 'internal' }));
+  const dbData = list.map(w => {
+    let dbDate = w.date;
+    let dbContent = w.content;
+    if (w.date && w.date.includes('~')) {
+      dbDate = w.date.split('~')[0].trim();
+      if (!dbDate) {
+        dbDate = new Date().toISOString().split('T')[0];
+      }
+      dbContent = `${w.content}\n[DateRange: ${w.date}]`;
+    }
+    return { id: ensureID(w.id), date: dbDate, category: w.category, company: w.company, content: dbContent, photos: w.photos, source: 'internal' };
+  });
   const { error = null } = await supabase.from('construction_logs').upsert(dbData);
   return !error;
 };

@@ -148,7 +148,9 @@ const App: React.FC = () => {
   }
 
   if (isPopupMode === 'construction_log') {
-    return <ConstructionLog mode="external" isPopupMode={true} />;
+    const params = new URLSearchParams(window.location.search);
+    const modeParam = (params.get('mode') as 'external' | 'internal') || 'external';
+    return <ConstructionLog mode={modeParam} isPopupMode={true} />;
   }
 
   if (isPopupMode === 'elevator_contractor') {

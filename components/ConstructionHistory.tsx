@@ -39,15 +39,15 @@ const ConstructionHistory: React.FC = () => {
 
       // 최신순 정렬 (종료일이 없는 데이터가 최상단, 그 후 시작일 최신순, 그 후 ID 역순으로 정렬하여 최근 추가 항목이 위로 오게 함)
       combined.sort((a, b) => {
-        const aHasEnd = a.date.includes(' ~ ') && a.date.split(' ~ ')[1]?.trim() ? 1 : 0;
-        const bHasEnd = b.date.includes(' ~ ') && b.date.split(' ~ ')[1]?.trim() ? 1 : 0;
+        const aNoEnd = a.date && a.date.includes('~') && !a.date.split('~')[1]?.trim();
+        const bNoEnd = b.date && b.date.includes('~') && !b.date.split('~')[1]?.trim();
         
-        if (aHasEnd !== bHasEnd) {
-          return aHasEnd - bHasEnd;
+        if (aNoEnd !== bNoEnd) {
+          return aNoEnd ? -1 : 1;
         }
         
-        const aStart = a.date.includes(' ~ ') ? a.date.split(' ~ ')[0].trim() : a.date;
-        const bStart = b.date.includes(' ~ ') ? b.date.split(' ~ ')[0].trim() : b.date;
+        const aStart = a.date && a.date.includes('~') ? a.date.split('~')[0].trim() : (a.date || '');
+        const bStart = b.date && b.date.includes('~') ? b.date.split('~')[0].trim() : (b.date || '');
         
         const dateCompare = bStart.localeCompare(aStart);
         if (dateCompare !== 0) return dateCompare;
@@ -198,7 +198,8 @@ const ConstructionHistory: React.FC = () => {
             extension = photo.dataUrl.split(';')[0].split('/')[1];
           }
           
-          zip.file(`${folderName}/image_${index + 1}.${extension}`, blob);
+          const nameInZip = photo.fileName || `image_${index + 1}`;
+          zip.file(`${folderName}/${nameInZip}.${extension}`, blob);
         } catch (error) {
           console.error(`이미지 다운로드 실패: ${photo.dataUrl}`, error);
         }
@@ -300,20 +301,36 @@ const ConstructionHistory: React.FC = () => {
               ) : (
                 paginatedHistory.map((item, idx) => {
                   const globalIdx = totalItems - ((currentPage - 1) * ITEMS_PER_PAGE + idx);
+                  const isNoEnd = item.date && item.date.includes('~') && !item.date.split('~')[1]?.trim();
                   return (
-                    <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{globalIdx}</div></td>
+                    <tr key={item.id} className={`transition-colors group border-b border-black last:border-b-0 h-[40px] ${
+                      isNoEnd 
+                        ? 'bg-amber-50/90 hover:bg-amber-100/90 font-bold' 
+                        : 'hover:bg-blue-50/40'
+                    }`}>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{isNoEnd ? "" : globalIdx}</div></td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
-                        <div className="flex items-center justify-center h-full px-2">
-                          {(() => {
-                            if (item.date && item.date.includes(' ~ ')) {
-                              const parts = item.date.split(' ~ ');
-                              if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
-                                return parts[0].trim();
+                        <div className="flex items-center justify-center h-full px-2 gap-1.5">
+                          <span>
+                            {(() => {
+                              if (item.date && item.date.includes('~')) {
+                                const parts = item.date.split('~');
+                                if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
+                                  return parts[0].trim();
+                                }
+                                if (parts[0] && !parts[1]?.trim()) {
+                                  return `${parts[0].trim()} ~`;
+                                }
+                                return item.date;
                               }
-                            }
-                            return item.date;
-                          })()}
+                              return item.date;
+                            })()}
+                          </span>
+                          {isNoEnd && item.date && (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-200 text-amber-900 border border-amber-300 font-black text-[10px] scale-95 animate-pulse">
+                              진행중
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">

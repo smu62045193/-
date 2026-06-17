@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Contractor } from '../types';
-import { fetchConstructionContractors, saveConstructionContractors, deleteConstructionContractor, generateUUID } from '../services/dataService';
+import { fetchConstructionContractors, saveConstructionContractors, deleteConstructionContractor, generateUUID, fetchContractors } from '../services/dataService';
 import { Save, Search, Printer, Edit2, RotateCcw, RefreshCw, X, Cloud, CheckCircle, UserPlus, Plus, ChevronLeft, ChevronRight, LayoutList, Star, Trash2, Briefcase, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -13,6 +13,7 @@ const ITEMS_PER_PAGE = 10;
 
 const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps> = ({ isPopupMode = false }) => {
   const [contractors, setContractors] = useState<Contractor[]>([]);
+  const [coopPartners, setCoopPartners] = useState<Contractor[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
@@ -22,7 +23,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
   const initialNewItem: Contractor = {
     id: '', 
     name: '', 
-    type: format(new Date(), 'yyyy-MM-dd'), 
+    type: `${format(new Date(), 'yyyy-MM-dd')} ~ `, 
     contactPerson: '', 
     phoneMain: '', 
     phoneMobile: '', 
@@ -33,8 +34,17 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
 
   const [newItem, setNewItem] = useState<Contractor>(initialNewItem);
 
+  const isProgressing = useMemo(() => {
+    return newItem.type.includes('~') && !newItem.type.split('~')[1]?.trim();
+  }, [newItem.type]);
+
+  const exactMatch = useMemo(() => {
+    return coopPartners.some(p => p.name.trim().toLowerCase() === newItem.name.trim().toLowerCase());
+  }, [coopPartners, newItem.name]);
+
   useEffect(() => {
     loadData();
+    loadCoopPartners();
 
     if (isPopupMode) {
       const params = new URLSearchParams(window.location.search);
@@ -45,16 +55,32 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
     const handleMessage = (e: MessageEvent) => {
       if (e.data?.type === 'CONSTRUCTION_CONTRACTOR_SAVED') {
         loadData();
+        loadCoopPartners();
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [isPopupMode]);
 
+  const loadCoopPartners = async () => {
+    try {
+      const coops = await fetchContractors();
+      setCoopPartners(coops || []);
+    } catch (e) {
+      console.error('loadCoopPartners Error:', e);
+    }
+  };
+
   useEffect(() => {
     if (editId && contractors.length > 0) {
       const item = contractors.find(i => String(i.id) === String(editId));
-      if (item) setNewItem({ ...item });
+      if (item) {
+        let formattedDate = item.type || '';
+        if (formattedDate && !formattedDate.includes('~')) {
+          formattedDate = `${formattedDate.trim()} ~ `;
+        }
+        setNewItem({ ...item, type: formattedDate });
+      }
     }
   }, [editId, contractors]);
 
@@ -86,6 +112,25 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
       `ConstContractorWin_${id}`,
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=no,location=no`
     );
+  };
+
+  const handleLoadCoopInfo = () => {
+    if (!newItem.name.trim()) {
+      alert('업체명을 입력해주세요.');
+      return;
+    }
+    const match = coopPartners.find(p => p.name.trim().toLowerCase() === newItem.name.trim().toLowerCase());
+    if (match) {
+      setNewItem(prev => ({
+        ...prev,
+        contactPerson: match.contactPerson || prev.contactPerson,
+        phoneMain: match.phoneMain || prev.phoneMain,
+        phoneMobile: match.phoneMobile || prev.phoneMobile
+      }));
+      alert(`[${match.name}] 협력업체 정보를 성공적으로 불러왔습니다.`);
+    } else {
+      alert('입력하신 업체명과 일치하는 등록된 협력업체가 없습니다.');
+    }
   };
 
   const handleRegister = async () => {
@@ -140,7 +185,18 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
   const filteredList = useMemo(() => {
     return contractors
       .filter(c => (c.name+(c.type||'')+(c.contactPerson||'')).toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort((a, b) => b.type.localeCompare(a.type)); 
+      .sort((a, b) => {
+        const aNoEnd = a.type && a.type.includes('~') && !a.type.split('~')[1]?.trim();
+        const bNoEnd = b.type && b.type.includes('~') && !b.type.split('~')[1]?.trim();
+        
+        if (aNoEnd !== bNoEnd) {
+          return aNoEnd ? -1 : 1;
+        }
+        
+        const aStart = a.type && a.type.includes('~') ? a.type.split('~')[0].trim() : (a.type || '');
+        const bStart = b.type && b.type.includes('~') ? b.type.split('~')[0].trim() : (b.type || '');
+        return bStart.localeCompare(aStart);
+      }); 
   }, [contractors, searchTerm]);
 
   const totalItems = filteredList.length;
@@ -179,8 +235,51 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
           <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
             <div className="grid grid-cols-1 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명 *</label>
-                <input type="text" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="업체명" />
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex items-center gap-2">
+                    <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest">업체명 *</label>
+                    {exactMatch && (
+                      <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded border border-green-200 animate-pulse">협력업체 매칭됨</span>
+                    )}
+                  </div>
+                  {newItem.name.trim() && (
+                    <button 
+                      type="button" 
+                      onClick={handleLoadCoopInfo} 
+                      className="text-[11px] font-black text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg border border-blue-200"
+                    >
+                      <RefreshCw size={10} className="animate-spin-slow" />
+                      협력업체 연락처 불러오기
+                    </button>
+                  )}
+                </div>
+                <input 
+                  type="text" 
+                  list="coop-partners"
+                  value={newItem.name} 
+                  onChange={e => {
+                    const val = e.target.value;
+                    const match = coopPartners.find(p => p.name.trim() === val.trim());
+                    if (match) {
+                      setNewItem(prev => ({
+                        ...prev,
+                        name: val,
+                        contactPerson: match.contactPerson || prev.contactPerson,
+                        phoneMain: match.phoneMain || prev.phoneMain,
+                        phoneMobile: match.phoneMobile || prev.phoneMobile
+                      }));
+                    } else {
+                      setNewItem(prev => ({ ...prev, name: val }));
+                    }
+                  }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500" 
+                  placeholder="업체명을 입력하세요 (협력업체 매칭 가능)" 
+                />
+                <datalist id="coop-partners">
+                  {coopPartners.map(p => (
+                    <option key={p.id} value={p.name} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -189,26 +288,49 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">시작일 *</label>
                 <input 
                   type="date" 
-                  value={newItem.type.includes(' ~ ') ? newItem.type.split(' ~ ')[0] : newItem.type} 
+                  value={newItem.type.includes('~') ? newItem.type.split('~')[0].trim() : newItem.type} 
                   onChange={e => {
-                    const parts = newItem.type.split(' ~ ');
-                    const end = parts[1] || e.target.value;
-                    setNewItem({...newItem, type: `${e.target.value} ~ ${end}`});
+                    const parts = newItem.type.split('~');
+                    const start = e.target.value;
+                    const end = parts[1] ? parts[1].trim() : '';
+                    setNewItem({...newItem, type: `${start} ~ ${end}`});
                   }} 
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">종료일 *</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest">종료일</label>
+                  <label className="flex items-center gap-1 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={isProgressing} 
+                      onChange={(e) => {
+                        const parts = newItem.type.split('~');
+                        const start = parts[0] ? parts[0].trim() : new Date().toISOString().split('T')[0];
+                        if (e.target.checked) {
+                          setNewItem({ ...newItem, type: `${start} ~ ` });
+                        } else {
+                          const end = parts[1] && parts[1].trim() ? parts[1].trim() : start;
+                          setNewItem({ ...newItem, type: `${start} ~ ${end}` });
+                        }
+                      }}
+                      className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="text-[11px] font-bold text-amber-600">진행중</span>
+                  </label>
+                </div>
                 <input 
                   type="date" 
-                  value={newItem.type.includes(' ~ ') ? newItem.type.split(' ~ ')[1] : newItem.type} 
+                  value={newItem.type.includes('~') ? (newItem.type.split('~')[1] || '').trim() : ''} 
                   onChange={e => {
-                    const parts = newItem.type.split(' ~ ');
-                    const start = parts[0] || e.target.value;
-                    setNewItem({...newItem, type: `${start} ~ ${e.target.value}`});
+                    const parts = newItem.type.split('~');
+                    const start = parts[0] ? parts[0].trim() : newItem.type;
+                    const end = e.target.value;
+                    setNewItem({...newItem, type: `${start} ~ ${end}`});
                   }} 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                  disabled={isProgressing}
+                  className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500 ${isProgressing ? 'opacity-50 cursor-not-allowed bg-slate-100' : ''}`} 
                 />
               </div>
             </div>
@@ -298,7 +420,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
             <thead>
               <tr className="bg-white border-b border-black h-[40px]">
                 <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[60px] border-r border-black px-2"><div className="flex items-center justify-center h-full">No</div></th>
-                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[120px] border-r border-black px-2"><div className="flex items-center justify-center h-full">날짜</div></th>
+                <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[120px] border-r border-black px-2"><div className="flex items-center justify-center h-full">일자</div></th>
                 <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[180px] border-r border-black px-2"><div className="flex items-center justify-center h-full">업체명</div></th>
                 <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[100px] border-r border-black px-2"><div className="flex items-center justify-center h-full">담당자</div></th>
                 <th className="text-[13px] font-normal text-black uppercase tracking-wider w-[130px] border-r border-black px-2"><div className="flex items-center justify-center h-full">대표번호</div></th>
@@ -318,17 +440,36 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                 </tr>
               ) : (
                 paginatedList.map((item, index) => {
+                  const isNoEnd = item.type && item.type.includes('~') && !item.type.split('~')[1]?.trim();
                   return (
-                    <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{totalItems - ((currentPage-1)*ITEMS_PER_PAGE + index)}</div></td>
+                    <tr key={item.id} className={`transition-colors group border-b border-black last:border-b-0 h-[40px] ${
+                      isNoEnd 
+                        ? 'bg-amber-50/90 hover:bg-amber-100/90 font-bold' 
+                        : 'hover:bg-blue-50/40'
+                    }`}>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{isNoEnd ? "" : (totalItems - ((currentPage-1)*ITEMS_PER_PAGE + index))}</div></td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
-                        <div className="flex items-center justify-center h-full px-2">
-                          {item.type && item.type.includes(' ~ ') ? (
-                            (() => {
-                              const parts = item.type.split(' ~ ');
-                              return (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) ? parts[0].trim() : item.type;
-                            })()
-                          ) : item.type}
+                        <div className="flex items-center justify-center h-full px-2 gap-1.5">
+                          <span>
+                            {(() => {
+                              if (item.type && item.type.includes('~')) {
+                                const parts = item.type.split('~');
+                                if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
+                                  return parts[0].trim();
+                                }
+                                if (parts[0] && !parts[1]?.trim()) {
+                                  return `${parts[0].trim()} ~`;
+                                }
+                                return item.type;
+                              }
+                              return item.type ? `${item.type.trim()} ~` : '';
+                            })()}
+                          </span>
+                          {isNoEnd && item.type && (
+                            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-200 text-amber-900 border border-amber-300 font-black text-[10px] scale-95 animate-pulse">
+                              진행중
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.name}</div></td>

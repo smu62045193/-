@@ -881,6 +881,7 @@ export interface WorkPhoto {
   id: string;
   dataUrl: string; // Base64 string
   fileName: string;
+  date?: string;
 }
 
 export interface ConstructionWorkItem {
