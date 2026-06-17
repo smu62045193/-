@@ -111,6 +111,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
     return currentItem.date.includes('~') && !currentItem.date.split('~')[1]?.trim();
   }, [currentItem.date]);
   const [selectedUploadDate, setSelectedUploadDate] = useState<string>('');
+  const [hideEmptyDates, setHideEmptyDates] = useState<boolean>(true);
 
   useEffect(() => {
     if (datesInRange.length > 0) {
@@ -579,29 +580,49 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
             </div>
 
             <div>
-              <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">사진 첨부 (총 {currentItem.photos.length}장)</label>
+              <div className="flex justify-between items-center mb-2">
+                <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest">사진 첨부 (총 {currentItem.photos.length}장)</label>
+                {datesInRange.length > 1 && (
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={hideEmptyDates} 
+                      onChange={(e) => setHideEmptyDates(e.target.checked)}
+                      className="w-3.5 h-3.5 text-blue-600 border-slate-300 rounded focus:ring-blue-500 cursor-pointer text-xs"
+                    />
+                    <span className="text-[11px] font-bold text-slate-500 select-none">사진 없는 날짜 숨기기</span>
+                  </label>
+                )}
+              </div>
               
               {/* 일자별 탭 선택기 */}
               {datesInRange.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-                  {datesInRange.map((dateVal, index) => {
-                    const countForThisDate = currentItem.photos.filter(p => (p.date || datesInRange[0]) === dateVal).length;
-                    const isSelected = selectedUploadDate === dateVal;
-                    return (
-                      <button
-                        key={dateVal}
-                        type="button"
-                        onClick={() => setSelectedUploadDate(dateVal)}
-                        className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
-                          isSelected 
-                            ? 'bg-blue-600 text-white shadow-md' 
-                            : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {index + 1}일차 ({dateVal}) [{countForThisDate}/15장]
-                      </button>
-                    );
-                  })}
+                  {datesInRange
+                    .filter((dateVal, index) => {
+                      if (!hideEmptyDates) return true;
+                      const countForThisDate = currentItem.photos.filter(p => (p.date || datesInRange[0]) === dateVal).length;
+                      return index === 0 || countForThisDate > 0 || selectedUploadDate === dateVal;
+                    })
+                    .map((dateVal) => {
+                      const countForThisDate = currentItem.photos.filter(p => (p.date || datesInRange[0]) === dateVal).length;
+                      const isSelected = selectedUploadDate === dateVal;
+                      const formattedTabDate = dateVal.includes('-') ? dateVal.split('-').slice(1).join('-') : dateVal;
+                      return (
+                        <button
+                          key={dateVal}
+                          type="button"
+                          onClick={() => setSelectedUploadDate(dateVal)}
+                          className={`px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                            isSelected 
+                              ? 'bg-blue-600 text-white shadow-md' 
+                              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {formattedTabDate} [{countForThisDate}/15장]
+                        </button>
+                      );
+                    })}
                 </div>
               )}
 
