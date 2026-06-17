@@ -321,7 +321,16 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                   return (
                     <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{totalItems - ((currentPage-1)*ITEMS_PER_PAGE + index)}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.type}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                        <div className="flex items-center justify-center h-full px-2">
+                          {item.type && item.type.includes(' ~ ') ? (
+                            (() => {
+                              const parts = item.type.split(' ~ ');
+                              return (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) ? parts[0].trim() : item.type;
+                            })()
+                          ) : item.type}
+                        </div>
+                      </td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.name}</div></td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.contactPerson}</div></td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.phoneMain}</div></td>

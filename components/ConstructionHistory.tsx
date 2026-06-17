@@ -37,9 +37,19 @@ const ConstructionHistory: React.FC = () => {
         ...(internal || []).map(item => ({ ...item, type: '시설작업' }))
       ];
 
-      // 최신순 정렬 (날짜가 같으면 ID 역순으로 정렬하여 최근 추가 항목이 위로 오게 함)
+      // 최신순 정렬 (종료일이 없는 데이터가 최상단, 그 후 시작일 최신순, 그 후 ID 역순으로 정렬하여 최근 추가 항목이 위로 오게 함)
       combined.sort((a, b) => {
-        const dateCompare = b.date.localeCompare(a.date);
+        const aHasEnd = a.date.includes(' ~ ') && a.date.split(' ~ ')[1]?.trim() ? 1 : 0;
+        const bHasEnd = b.date.includes(' ~ ') && b.date.split(' ~ ')[1]?.trim() ? 1 : 0;
+        
+        if (aHasEnd !== bHasEnd) {
+          return aHasEnd - bHasEnd;
+        }
+        
+        const aStart = a.date.includes(' ~ ') ? a.date.split(' ~ ')[0].trim() : a.date;
+        const bStart = b.date.includes(' ~ ') ? b.date.split(' ~ ')[0].trim() : b.date;
+        
+        const dateCompare = bStart.localeCompare(aStart);
         if (dateCompare !== 0) return dateCompare;
         return String(b.id).localeCompare(String(a.id));
       });
@@ -293,7 +303,19 @@ const ConstructionHistory: React.FC = () => {
                   return (
                     <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{globalIdx}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.date}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                        <div className="flex items-center justify-center h-full px-2">
+                          {(() => {
+                            if (item.date && item.date.includes(' ~ ')) {
+                              const parts = item.date.split(' ~ ');
+                              if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
+                                return parts[0].trim();
+                              }
+                            }
+                            return item.date;
+                          })()}
+                        </div>
+                      </td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
                         <div className="flex items-center justify-center h-full px-2">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${item.type === '외부공사' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{item.category}</span>

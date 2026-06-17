@@ -127,7 +127,18 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
         const internalData = await fetchInternalWorkList();
         fetchedItems = (internalData || []).map(i => ({ ...i, source: 'internal' as WorkSource }));
       }
-      fetchedItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      fetchedItems.sort((a, b) => {
+        const aHasEnd = a.date.includes(' ~ ') && a.date.split(' ~ ')[1]?.trim() ? 1 : 0;
+        const bHasEnd = b.date.includes(' ~ ') && b.date.split(' ~ ')[1]?.trim() ? 1 : 0;
+        
+        if (aHasEnd !== bHasEnd) {
+          return aHasEnd - bHasEnd;
+        }
+        
+        const aStart = a.date.includes(' ~ ') ? a.date.split(' ~ ')[0].trim() : a.date;
+        const bStart = b.date.includes(' ~ ') ? b.date.split(' ~ ')[0].trim() : b.date;
+        return bStart.localeCompare(aStart);
+      });
       setItems(fetchedItems);
     } catch (e) { setItems([]); } finally { setLoading(false); }
   };
@@ -179,7 +190,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
 
       const itemToSave: ConstructionWorkItem = { 
         id: currentItem.id, 
-        date: currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[0] : currentItem.date, 
+        date: currentItem.date, 
         category: currentItem.category, 
         company: currentItem.company, 
         content: currentItem.content, 
@@ -361,14 +372,39 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
           </div>
 
           <div className="p-8 space-y-6 flex-1 overflow-y-auto scrollbar-hide">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">작업일 *</label>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">시작일 *</label>
                 <input 
                   type="date" 
-                  value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[0] : currentItem.date} 
+                  value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[0].trim() : currentItem.date} 
                   onChange={e => {
-                    setCurrentItem({...currentItem, date: e.target.value});
+                    const start = e.target.value;
+                    const parts = currentItem.date.split(' ~ ');
+                    const end = parts[1] ? parts[1].trim() : '';
+                    if (end && start !== end) {
+                      setCurrentItem({...currentItem, date: `${start} ~ ${end}`});
+                    } else {
+                      setCurrentItem({...currentItem, date: start});
+                    }
+                  }} 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">종료일</label>
+                <input 
+                  type="date" 
+                  value={currentItem.date.includes(' ~ ') ? currentItem.date.split(' ~ ')[1].trim() : ''} 
+                  onChange={e => {
+                    const end = e.target.value;
+                    const parts = currentItem.date.split(' ~ ');
+                    const start = parts[0] ? parts[0].trim() : currentItem.date;
+                    if (end && start !== end) {
+                      setCurrentItem({...currentItem, date: `${start} ~ ${end}`});
+                    } else {
+                      setCurrentItem({...currentItem, date: start});
+                    }
                   }} 
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold outline-none focus:ring-2 focus:ring-blue-500" 
                 />
@@ -403,11 +439,13 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
                   />
                 )}
               </div>
-              {currentMode === 'external' && (
-                <div>
+              {currentMode === 'external' ? (
+                <div className="md:col-span-2">
                   <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명</label>
                   <input type="text" value={currentItem.company || ''} onChange={e => setCurrentItem({...currentItem, company: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-black text-blue-700 outline-none focus:ring-2 focus:ring-blue-500" placeholder="업체명" />
                 </div>
+              ) : (
+                <div className="md:col-span-2"></div>
               )}
             </div>
 
@@ -528,7 +566,19 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
                   return (
                     <tr key={item.id} className="hover:bg-blue-50/40 transition-colors group border-b border-black last:border-b-0 h-[40px]">
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{globalIdx}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.date}</div></td>
+                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                        <div className="flex items-center justify-center h-full px-2">
+                          {(() => {
+                            if (item.date && item.date.includes(' ~ ')) {
+                              const parts = item.date.split(' ~ ');
+                              if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
+                                return parts[0].trim();
+                              }
+                            }
+                            return item.date;
+                          })()}
+                        </div>
+                      </td>
                       <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
                         <div className="flex items-center justify-center h-full px-2">
                           <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px]">{item.category}</span>
