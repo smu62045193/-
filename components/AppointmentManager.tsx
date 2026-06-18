@@ -47,7 +47,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   };
   const [newItem, setNewItem] = useState<AppointmentItem>(initialNewItem);
 
-  const loadData = async () => { 
+  const loadData = React.useCallback(async () => { 
     setLoading(true); 
     const data = await fetchAppointmentList(); 
     setItems(data || []); 
@@ -56,7 +56,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
       if (item) setNewItem({ ...item });
     }
     setLoading(false); 
-  };
+  }, [editId]);
 
   const openIndependentWindow = (id: string = 'new') => {
     const width = 750;
@@ -124,12 +124,14 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
     }
   };
 
-  const sortedItems = [...items].sort((a, b) => {
+  const sortedItems = React.useMemo(() => {
     const orderMap: Record<string, number> = { '전기': 1, '소방': 2, '기계': 3, '승강기': 4 };
-    return (orderMap[a.category] || 99) - (orderMap[b.category] || 99) || a.name.localeCompare(b.name);
-  });
+    return [...items].sort((a, b) => {
+      return (orderMap[a.category] || 99) - (orderMap[b.category] || 99) || a.name.localeCompare(b.name);
+    });
+  }, [items]);
 
-  const handlePrint = () => {
+  const handlePrint = React.useCallback(() => {
     const printWindow = window.open('', '_blank', 'width=1100,height=900');
     if (!printWindow) return;
 
@@ -198,7 +200,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
       </html>
     `);
     printWindow.document.close();
-  };
+  }, [sortedItems]);
 
   useEffect(() => { 
     let isMounted = true;
@@ -277,10 +279,10 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">선임 명칭 *</label>
                 <input 
                   type="text" 
-                  value={newItem.title} 
+                  value={newItem.title || ''} 
                   onChange={e => setNewItem({...newItem, title: e.target.value})}
                   placeholder="예: 전기안전관리자"
-                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-normal text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -290,42 +292,64 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">성명 *</label>
                 <input 
                   type="text" 
-                  value={newItem.name} 
+                  value={newItem.name || ''} 
                   onChange={e => setNewItem({...newItem, name: e.target.value})}
                   placeholder="성명"
-                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal text-blue-700"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-normal text-blue-700 outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">관리 기관</label>
                 <input 
                   type="text" 
-                  value={newItem.agency} 
+                  value={newItem.agency || ''} 
                   onChange={e => setNewItem({...newItem, agency: e.target.value})}
                   placeholder="예: 한국소방안전원"
-                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-normal text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-1 uppercase tracking-widest">연락처</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest">연락처</label>
+                  {newItem.phone && (
+                    <button 
+                      type="button"
+                      onClick={() => setNewItem({...newItem, phone: ''})}
+                      className="text-[10px] text-red-500 hover:text-red-700 font-bold bg-red-50 px-1.5 py-0.5 rounded border border-red-100 transition-colors"
+                    >
+                      지우기
+                    </button>
+                  )}
+                </div>
                 <input 
                   type="text" 
-                  value={newItem.phone} 
+                  value={newItem.phone || ''} 
                   onChange={e => setNewItem({...newItem, phone: e.target.value})}
                   placeholder="010-0000-0000"
-                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-normal text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-black text-slate-400 mb-1 uppercase tracking-widest">선임 일자</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-[11px] font-black text-slate-400 uppercase tracking-widest">선임 일자</label>
+                  {newItem.appointmentDate && (
+                    <button 
+                      type="button"
+                      onClick={() => setNewItem({...newItem, appointmentDate: ''})}
+                      className="text-[10px] text-red-500 hover:text-red-700 font-bold bg-red-50 px-1.5 py-0.5 rounded border border-red-100 transition-colors"
+                    >
+                      지우기
+                    </button>
+                  )}
+                </div>
                 <input 
                   type="date" 
-                  value={newItem.appointmentDate} 
+                  value={newItem.appointmentDate || ''} 
                   onChange={e => setNewItem({...newItem, appointmentDate: e.target.value})}
-                  className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-normal text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -334,20 +358,20 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
               <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">보유 자격 및 면허</label>
               <input 
                 type="text" 
-                value={newItem.license} 
+                value={newItem.license || ''} 
                 onChange={e => setNewItem({...newItem, license: e.target.value})}
                 placeholder="보유 자격증 정보"
-                className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-normal text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
 
             <div>
               <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고 및 특이사항</label>
               <textarea 
-                value={newItem.note} 
+                value={newItem.note || ''} 
                 onChange={e => setNewItem({...newItem, note: e.target.value})}
                 placeholder="기타 참고사항"
-                className="w-full bg-transparent border-none outline-none shadow-none appearance-none px-2 py-1 text-[13px] font-normal resize-none h-24"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-normal text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 resize-none h-24"
               />
             </div>
           </div>
