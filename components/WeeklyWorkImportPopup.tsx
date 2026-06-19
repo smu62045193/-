@@ -95,10 +95,8 @@ const WeeklyWorkImportPopup: React.FC<WeeklyWorkImportPopupProps> = ({ startDate
             }
           }
           
-          base = base.replace(/\(([^)]+)\)/g, (match, inner) => {
-            const isKeyword = allKeywords.some(k => inner.includes(k));
-            return isKeyword ? match : '';
-          }).trim();
+          // 괄호 안에 들어간 회사명(예: 우경이엔씨, 동원유체기계 등)이 필터링되지 않고 
+          // 그대로 출력되게 하기 위해 괄호 내용 삭제 로직은 제외합니다.
           
           return base;
         };

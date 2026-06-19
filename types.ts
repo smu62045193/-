@@ -248,6 +248,16 @@ export interface ParkingStatusItem {
 }
 
 // Contractor Types
+export interface SubcontractorLog {
+  id: string;
+  startDate: string;     // 시작일
+  endDate: string;       // 종료일
+  company: string;       // 협력(하청)업체명
+  workerName: string;    // 작업자
+  phone: string;         // 휴대폰
+  workContent: string;   // 작업내용
+}
+
 export interface Contractor {
   id: string;
   name: string;      // 업체명
@@ -258,6 +268,7 @@ export interface Contractor {
   fax: string;         // 팩스 (New)
   note: string;      // 비고
   isImportant?: boolean; // 중요업체 여부
+  subcontractors?: SubcontractorLog[]; // 협력(하청)업체 이력 리스트
 }
 
 // Emergency Generator Types

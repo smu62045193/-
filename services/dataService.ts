@@ -16,6 +16,7 @@ import {
   ParkingChangeItem, 
   ParkingStatusItem, 
   Contractor, 
+  SubcontractorLog, 
   GeneratorCheckData, 
   SubstationLogData, 
   MeterReadingData, 
@@ -1775,8 +1776,31 @@ export const fetchConstructionContractors = async (): Promise<Contractor[]> => {
     const { data } = await supabase.from('construction_contractors').select('*');
     if (data && data.length > 0) return data.map(c => {
       const isImportant = (c.note || '').startsWith('[중요] ');
-      const cleanNote = isImportant ? c.note.replace('[중요] ', '') : c.note;
+      const rawNote = isImportant ? c.note.replace('[중요] ', '') : (c.note || '');
       
+      let noteText = rawNote;
+      let subcontractors: SubcontractorLog[] = [];
+      if (rawNote.includes('||JSON_SUBCONTRACTORS||')) {
+        const parts = rawNote.split('||JSON_SUBCONTRACTORS||');
+        noteText = parts[0];
+        try {
+          const parsed = JSON.parse(parts[1]);
+          if (Array.isArray(parsed)) {
+            subcontractors = parsed.map((item: any) => ({
+              id: item.id || '',
+              startDate: item.startDate || item.date || '',
+              endDate: item.endDate || item.startDate || item.date || '',
+              company: item.company || '',
+              workerName: item.workerName || '',
+              phone: item.phone || item.managerName || '',
+              workContent: item.workContent || ''
+            }));
+          }
+        } catch (e) {
+          console.error('Error parsing subcontractors JSON:', e);
+        }
+      }
+
       return { 
         id: c.id, 
         name: c.name, 
@@ -1785,8 +1809,9 @@ export const fetchConstructionContractors = async (): Promise<Contractor[]> => {
         phoneMain: c.phone_main, 
         phoneMobile: c.phone_mobile, 
         fax: c.fax, 
-        note: cleanNote,
-        isImportant: isImportant
+        note: noteText,
+        isImportant: isImportant,
+        subcontractors: subcontractors
       };
     });
   } catch (e) {
@@ -1800,7 +1825,11 @@ export const fetchConstructionContractors = async (): Promise<Contractor[]> => {
  */
 export const saveConstructionContractors = async (list: Contractor[]): Promise<boolean> => {
   const dbData = list.map(c => {
-    const finalNote = c.isImportant ? `[중요] ${c.note || ''}` : (c.note || '');
+    let noteContent = c.note || '';
+    if (c.subcontractors && c.subcontractors.length > 0) {
+      noteContent = `${noteContent}||JSON_SUBCONTRACTORS||${JSON.stringify(c.subcontractors)}`;
+    }
+    const finalNote = c.isImportant ? `[중요] ${noteContent}` : noteContent;
     return { 
       id: ensureID(c.id), 
       name: c.name, 

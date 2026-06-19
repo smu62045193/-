@@ -19,6 +19,15 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
   const [editId, setEditId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // 협력(하청) 업체 추가용 서브 상태
+  const [subStartDate, setSubStartDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [subEndDate, setSubEndDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [subCompany, setSubCompany] = useState<string>('');
+  const [subWorker, setSubWorker] = useState<string>('');
+  const [subPhone, setSubPhone] = useState<string>('');
+  const [subWorkContent, setSubWorkContent] = useState<string>('');
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+
   // 업종(type) 필드를 날짜 저장용으로 재사용합니다. 팩스(fax)는 사용하지 않으므로 제외합니다.
   const initialNewItem: Contractor = {
     id: '', 
@@ -29,7 +38,8 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
     phoneMobile: '', 
     fax: '', 
     note: '', 
-    isImportant: false
+    isImportant: false,
+    subcontractors: []
   };
 
   const [newItem, setNewItem] = useState<Contractor>(initialNewItem);
@@ -79,7 +89,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
         if (formattedDate && !formattedDate.includes('~')) {
           formattedDate = `${formattedDate.trim()} ~ `;
         }
-        setNewItem({ ...item, type: formattedDate });
+        setNewItem({ ...item, type: formattedDate, subcontractors: item.subcontractors || [] });
       }
     }
   }, [editId, contractors]);
@@ -357,6 +367,165 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
               <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">비고</label>
               <textarea value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-16" placeholder="공사 내역 및 특이사항 입력" />
             </div>
+
+            {/* 협력(하청) 업체 및 작업자 이력 관리 섹션 */}
+            <div className="border-t border-slate-200 pt-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-6 bg-slate-950 rounded-full"></div>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">협력(하청) 업체 및 작업자 이력</h3>
+              </div>
+              
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60 space-y-3">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">시작일</label>
+                    <input 
+                      type="date" 
+                      value={subStartDate} 
+                      onChange={e => setSubStartDate(e.target.value)} 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">종료일</label>
+                    <input 
+                      type="date" 
+                      value={subEndDate} 
+                      onChange={e => setSubEndDate(e.target.value)} 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">협력(하청) 업체명 *</label>
+                    <input 
+                      type="text" 
+                      value={subCompany} 
+                      onChange={e => setSubCompany(e.target.value)} 
+                      placeholder="예: 모더너스 협력" 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">작업자</label>
+                    <input 
+                      type="text" 
+                      value={subWorker} 
+                      onChange={e => setSubWorker(e.target.value)} 
+                      placeholder="예: 김작업 외 2명" 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">휴대폰</label>
+                    <input 
+                      type="text" 
+                      value={subPhone} 
+                      onChange={e => setSubPhone(e.target.value)} 
+                      placeholder="예: 010-1234-5678" 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">작업내용</label>
+                    <input 
+                      type="text" 
+                      value={subWorkContent} 
+                      onChange={e => setSubWorkContent(e.target.value)} 
+                      placeholder="예: 천장 마감 작업" 
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500" 
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      if (!subCompany.trim()) {
+                        alert('협력업체명을 입력해주세요.');
+                        return;
+                      }
+                      const newSub = {
+                        id: generateUUID(),
+                        startDate: subStartDate,
+                        endDate: subEndDate,
+                        company: subCompany.trim(),
+                        workerName: subWorker.trim() || '-',
+                        phone: subPhone.trim() || '-',
+                        workContent: subWorkContent.trim() || '-'
+                      };
+                      setNewItem(prev => ({
+                        ...prev,
+                        subcontractors: [...(prev.subcontractors || []), newSub]
+                      }));
+                      setSubCompany('');
+                      setSubWorker('');
+                      setSubPhone('');
+                      setSubWorkContent('');
+                    }}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                  >
+                    <Plus size={14} />이력 추가
+                  </button>
+                </div>
+              </div>
+
+              {/* 추가된 이력 목록 */}
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">추가된 이력 목록 (총 {(newItem.subcontractors || []).length}건)</label>
+                {(!newItem.subcontractors || newItem.subcontractors.length === 0) ? (
+                  <div className="text-center py-6 text-xs text-slate-400 border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                    추가된 하청업체/작업자 이력이 없습니다.
+                  </div>
+                ) : (
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white max-h-60 overflow-y-auto w-full">
+                    <table className="w-full text-[11px] text-center border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 text-slate-500 border-b border-slate-200">
+                          <th className="py-2.5 font-bold border-r border-slate-200 w-32">기간 (작업일)</th>
+                          <th className="py-2.5 font-bold border-r border-slate-200 w-36">업체명</th>
+                          <th className="py-2.5 font-bold border-r border-slate-200 w-28">작업자</th>
+                          <th className="py-2.5 font-bold border-r border-slate-200 w-32">휴대폰</th>
+                          <th className="py-2.5 font-bold border-r border-slate-200">작업내용</th>
+                          <th className="py-2.5 font-bold w-12">삭제</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {(newItem.subcontractors || []).map(sub => (
+                          <tr key={sub.id} className="hover:bg-slate-50/50">
+                            <td className="py-2 border-r border-slate-200 font-mono">
+                              {sub.startDate === sub.endDate ? sub.startDate : `${sub.startDate} ~ ${sub.endDate}`}
+                            </td>
+                            <td className="py-2 border-r border-slate-200 font-black text-blue-700">{sub.company}</td>
+                            <td className="py-2 border-r border-slate-200 font-bold">{sub.workerName}</td>
+                            <td className="py-2 border-r border-slate-200 font-bold text-slate-600">{sub.phone}</td>
+                            <td className="py-2 border-r border-slate-200 font-bold text-slate-600 text-left px-2 truncate max-w-xs" title={sub.workContent}>{sub.workContent}</td>
+                            <td className="py-2">
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  setNewItem(prev => ({
+                                    ...prev,
+                                    subcontractors: (prev.subcontractors || []).filter(item => item.id !== sub.id)
+                                  }));
+                                }}
+                                className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors inline-flex items-center justify-center"
+                                title="삭제"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
@@ -441,49 +610,100 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
               ) : (
                 paginatedList.map((item, index) => {
                   const isNoEnd = item.type && item.type.includes('~') && !item.type.split('~')[1]?.trim();
+                  const isExpanded = expandedIds[item.id] !== false;
                   return (
-                    <tr key={item.id} className={`transition-colors group border-b border-black last:border-b-0 h-[40px] ${
-                      isNoEnd 
-                        ? 'bg-amber-50/90 hover:bg-amber-100/90 font-bold' 
-                        : 'hover:bg-blue-50/40'
-                    }`}>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{isNoEnd ? "" : (totalItems - ((currentPage-1)*ITEMS_PER_PAGE + index))}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
-                        <div className="flex items-center justify-center h-full px-2 gap-1.5">
-                          <span>
-                            {(() => {
-                              if (item.type && item.type.includes('~')) {
-                                const parts = item.type.split('~');
-                                if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
-                                  return parts[0].trim();
+                    <React.Fragment key={item.id}>
+                      <tr className={`transition-colors group border-b border-black last:border-b-0 h-[40px] ${
+                        isNoEnd 
+                          ? 'bg-amber-50/90 hover:bg-amber-100/90 font-bold' 
+                          : 'hover:bg-blue-50/40'
+                      }`}>
+                        <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2 font-mono text-xs">{isNoEnd ? "" : (totalItems - ((currentPage-1)*ITEMS_PER_PAGE + index))}</div></td>
+                        <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                          <div className="flex items-center justify-center h-full px-2 gap-1.5">
+                            <span>
+                              {(() => {
+                                if (item.type && item.type.includes('~')) {
+                                  const parts = item.type.split('~');
+                                  if (parts[0] && parts[1] && parts[0].trim() === parts[1].trim()) {
+                                    return parts[0].trim();
+                                  }
+                                  if (parts[0] && !parts[1]?.trim()) {
+                                    return `${parts[0].trim()} ~`;
+                                  }
+                                  return item.type;
                                 }
-                                if (parts[0] && !parts[1]?.trim()) {
-                                  return `${parts[0].trim()} ~`;
-                                }
-                                return item.type;
-                              }
-                              return item.type ? `${item.type.trim()} ~` : '';
-                            })()}
-                          </span>
-                          {isNoEnd && item.type && (
-                            <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-200 text-amber-900 border border-amber-300 font-black text-[10px] scale-95 animate-pulse">
-                              진행중
+                                return item.type ? `${item.type.trim()} ~` : '';
+                              })()}
                             </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.name}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.contactPerson}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.phoneMain}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.phoneMobile}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.note}</div></td>
-                      <td className="text-center text-black text-[13px] font-normal px-2">
-                        <div className="flex items-center justify-center h-full px-2 gap-1 py-1">
-                          <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16}/></button>
-                          <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16}/></button>
-                        </div>
-                      </td>
-                    </tr>
+                            {isNoEnd && item.type && (
+                              <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-200 text-amber-900 border border-amber-300 font-black text-[10px] scale-95 animate-pulse">
+                                진행중
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-center text-black text-[13px] font-normal border-r border-black px-2">
+                          <div className="flex items-center justify-center h-full px-2 gap-1.5 font-bold">
+                            <span>{item.name}</span>
+                            {item.subcontractors && item.subcontractors.length > 0 && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedIds(prev => ({ ...prev, [item.id]: !isExpanded }));
+                                }}
+                                className="px-1.5 py-0.5 rounded text-[10px] bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors border border-sky-200"
+                                title="하청/작업자 목록 토글"
+                              >
+                                하청 {item.subcontractors.length}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.contactPerson}</div></td>
+                        <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.phoneMain}</div></td>
+                        <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.phoneMobile}</div></td>
+                        <td className="text-center text-black text-[13px] font-normal border-r border-black px-2"><div className="flex items-center justify-center h-full px-2">{item.note}</div></td>
+                        <td className="text-center text-black text-[13px] font-normal px-2">
+                          <div className="flex items-center justify-center h-full px-2 gap-1 py-1">
+                            <button onClick={() => openIndependentWindow(item.id)} className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-all" title="수정"><Edit2 size={16}/></button>
+                            <button onClick={() => handleDelete(item.id)} className="p-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded-lg transition-all" title="삭제"><Trash2 size={16}/></button>
+                          </div>
+                        </td>
+                      </tr>
+                      {item.subcontractors && item.subcontractors.length > 0 && isExpanded && (
+                        <tr className="bg-slate-50/50">
+                          <td colSpan={8} className="p-3 bg-[#FCFDFE]">
+                            <div className="max-w-[1200px] mx-auto border border-black rounded-lg bg-white overflow-hidden shadow-sm">
+                              <table className="w-full text-center border-collapse">
+                                <thead>
+                                  <tr className="bg-slate-100 text-slate-800 border-b border-black font-bold h-8 text-[12px]">
+                                    <th className="border-r border-black font-bold w-40">기간 (작업일)</th>
+                                    <th className="border-r border-black font-bold w-52">협력(하청) 업체명</th>
+                                    <th className="border-r border-black font-bold w-40">작업자</th>
+                                    <th className="border-r border-black font-bold w-44">휴대폰</th>
+                                    <th className="font-bold text-center">작업내용</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {item.subcontractors.map(sub => (
+                                    <tr key={sub.id} className="h-8 border-b border-gray-100 last:border-b-0 hover:bg-slate-50 text-[11px]">
+                                      <td className="border-r border-black font-mono text-[11px]">
+                                        {sub.startDate === sub.endDate ? sub.startDate : `${sub.startDate} ~ ${sub.endDate}`}
+                                      </td>
+                                      <td className="border-r border-black text-blue-800 font-bold text-[11px]">{sub.company}</td>
+                                      <td className="border-r border-black font-bold text-gray-700 text-[11px]">{sub.workerName}</td>
+                                      <td className="border-r border-black font-bold text-gray-600 text-[11px]">{sub.phone}</td>
+                                      <td className="font-medium text-gray-600 text-left px-3 text-[11px] truncate max-w-md" title={sub.workContent}>{sub.workContent}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}

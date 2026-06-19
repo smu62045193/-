@@ -298,7 +298,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           const updatedNextLines = [...currentNextLines];
 
           selThis.forEach((it, idx) => {
-            const dateSuffix = it.dayName ? `(${it.dayName})` : '';
+            const dateSuffix = it.dayName ? `(${it.dayName}일)` : '';
             const content = `${it.content}${dateSuffix}`;
             if (!updatedThisLines.includes(content)) {
               updatedThisLines.push(content);
@@ -379,21 +379,55 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   const handleOpenPhotoImportModal = async () => {
     setLoading(true);
     try {
-      const [ext, int] = await Promise.all([fetchExternalWorkList(), fetchInternalWorkList()]);
-      const weekStart = parseISO(report.startDate); const weekEnd = addDays(weekStart, 6);
+      let ext: ConstructionWorkItem[] = [];
+      let int: ConstructionWorkItem[] = [];
+      try { ext = await fetchExternalWorkList(); } catch (e) { console.error('ext load error:', e); }
+      try { int = await fetchInternalWorkList(); } catch (e) { console.error('int load error:', e); }
+      
+      const weekStart = parseISO(report.startDate); 
+      const weekEnd = addDays(weekStart, 6);
       const photos: SelectablePhoto[] = [];
+      
       const process = (list: ConstructionWorkItem[]) => {
+        if (!list || !Array.isArray(list)) return;
         list.forEach(item => {
-          const itemDate = parseISO(item.date);
-          if (isWithinInterval(itemDate, { start: weekStart, end: weekEnd })) {
-            item.photos.forEach(photo => photos.push({ id: photo.id, dataUrl: photo.dataUrl, fileName: photo.fileName, date: item.date, category: item.category, content: item.content, selected: false }));
+          if (!item.date) return;
+          // 날짜 문자열에서 날짜(YYYY-MM-DD 또는 YYYY.MM.DD) 추출 시도
+          const match = item.date.replace(/\./g, '-').match(/\d{4}-\d{2}-\d{2}/);
+          if (!match) return;
+          
+          const itemDate = parseISO(match[0]);
+          if (!isNaN(itemDate.getTime()) && isWithinInterval(itemDate, { start: weekStart, end: weekEnd })) {
+            if (item.photos && Array.isArray(item.photos)) {
+              item.photos.forEach(photo => {
+                if (photo && photo.dataUrl) {
+                  photos.push({ 
+                    id: photo.id, 
+                    dataUrl: photo.dataUrl, 
+                    fileName: photo.fileName || '', 
+                    date: match[0], 
+                    category: item.category || '공사', 
+                    content: item.content || '', 
+                    selected: false 
+                  });
+                }
+              });
+            }
           }
         });
       };
-      process(ext || []); process(int || []);
+      
+      process(ext); 
+      process(int);
       photos.sort((a, b) => a.date.localeCompare(b.date));
-      setSelectablePhotos(photos); setIsPhotoModalOpen(true);
-    } catch (e) { alert('사진 로드 오류'); } finally { setLoading(false); }
+      setSelectablePhotos(photos); 
+      setIsPhotoModalOpen(true);
+    } catch (e) { 
+      console.error(e);
+      alert('사진 로드 오류'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const toggleSelectPhoto = (id: string) => {
@@ -436,7 +470,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       
       const formatGroup = (items: SelectableItem[], isThis: boolean) => {
         return items.map(it => {
-          const dateSuffix = (isThis && it.dayName) ? `(${it.dayName})` : '';
+          const dateSuffix = (isThis && it.dayName) ? `(${it.dayName}일)` : '';
           return `${it.content}${dateSuffix}`;
         }).join('\n');
       };
@@ -657,7 +691,16 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           )}
         </div>
       </div>
-      {activeTab === 'list' ? <WeeklyReportList onSelectReport={(s) => { if(onDateChange) onDateChange(parseISO(s)); setActiveTab('form'); }} /> : (
+      {activeTab === 'list' ? (
+        <WeeklyReportList 
+          onSelectReport={async (s) => { 
+            if(onDateChange) onDateChange(parseISO(s)); 
+            setIsEditMode(true);
+            setActiveTab('form'); 
+            await loadReport(s);
+          }} 
+        />
+      ) : (
         <div className="space-y-2">
           {/* Sub-tab menu moved here, immediately below main tabs */}
           <div className="bg-white print:hidden w-full max-w-7xl mx-auto flex items-stretch justify-start overflow-x-auto scrollbar-hide border-b border-black">
