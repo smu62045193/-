@@ -410,8 +410,8 @@ const AirEnvironmentLog = forwardRef<AirEnvironmentLogHandle, AirEnvironmentLogP
 
           <div className="mb-8 max-w-7xl mx-auto">
             <h3 className="text-base font-bold mb-3 border-l-4 border-black pl-2 text-black">1. 배출구별 주요 배출시설 및 방지시설 가동(조업)시간</h3>
-            <div className="max-w-7xl mx-auto overflow-x-auto">
-              <table className="w-full min-w-[500px] border-collapse bg-white text-center text-black border border-black">
+            <div className="max-w-7xl mx-auto">
+              <table className="w-full border-collapse bg-white text-center text-black border border-black">
                 <thead><tr className="border-b border-black h-[32px]"><th className={`${thClass} w-[13%]`}>배 출 구</th><th className={`${thClass} w-[37%]`}>배 출 시 설</th><th className={`${thClass} w-[35%]`}>가 동 시 간</th><th className={`${thClass} w-[15%]`}>비 고</th></tr></thead>
                 <tbody>
                   {data?.emissions?.map((item) => (
@@ -430,8 +430,8 @@ const AirEnvironmentLog = forwardRef<AirEnvironmentLogHandle, AirEnvironmentLogP
           
           <div className="mt-8 max-w-7xl mx-auto">
             <h3 className="text-base font-bold mb-3 border-l-4 border-black pl-2 text-black">2. 방지시설 운영사항</h3>
-            <div className="max-w-7xl mx-auto overflow-x-auto">
-              <table className="w-full min-w-[500px] border-collapse bg-white text-center text-black border border-black">
+            <div className="max-w-7xl mx-auto">
+              <table className="w-full border-collapse bg-white text-center text-black border border-black">
                 <thead><tr className="border-b border-black h-[32px]"><th className={`${thClass} w-[25%]`}>방 지 시 설 명</th><th className={`${thClass} w-[25%]`}>설치 위치</th><th className={`${thClass} w-[25%]`}>가스사용량</th><th className={`${thClass} w-[25%]`}>처리오염물질</th></tr></thead>
                 <tbody>
                   {data?.preventions?.map((item) => (
