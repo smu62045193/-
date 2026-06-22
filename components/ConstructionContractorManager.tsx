@@ -27,6 +27,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
   const [subPhone, setSubPhone] = useState<string>('');
   const [subWorkContent, setSubWorkContent] = useState<string>('');
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
 
   // 업종(type) 필드를 날짜 저장용으로 재사용합니다. 팩스(fax)는 사용하지 않으므로 제외합니다.
   const initialNewItem: Contractor = {
@@ -396,7 +397,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">협력(하청) 업체명 *</label>
+                    <label className="block text-[10px] font-black text-slate-400 mb-1 uppercase tracking-widest">협력(하청) 업체명</label>
                     <input 
                       type="text" 
                       value={subCompany} 
@@ -440,36 +441,79 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                   </div>
                 </div>
 
-                <div className="flex justify-end pt-1">
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      if (!subCompany.trim()) {
-                        alert('협력업체명을 입력해주세요.');
-                        return;
-                      }
-                      const newSub = {
-                        id: generateUUID(),
-                        startDate: subStartDate,
-                        endDate: subEndDate,
-                        company: subCompany.trim(),
-                        workerName: subWorker.trim() || '-',
-                        phone: subPhone.trim() || '-',
-                        workContent: subWorkContent.trim() || '-'
-                      };
-                      setNewItem(prev => ({
-                        ...prev,
-                        subcontractors: [...(prev.subcontractors || []), newSub]
-                      }));
-                      setSubCompany('');
-                      setSubWorker('');
-                      setSubPhone('');
-                      setSubWorkContent('');
-                    }}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
-                  >
-                    <Plus size={14} />이력 추가
-                  </button>
+                <div className="flex justify-end gap-2 pt-1">
+                  {editingSubId ? (
+                    <>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setNewItem(prev => ({
+                            ...prev,
+                            subcontractors: (prev.subcontractors || []).map(item => 
+                              item.id === editingSubId 
+                                ? {
+                                    ...item,
+                                    startDate: subStartDate,
+                                    endDate: subEndDate,
+                                    company: subCompany.trim() || '-',
+                                    workerName: subWorker.trim() || '-',
+                                    phone: subPhone.trim() || '-',
+                                    workContent: subWorkContent.trim() || '-'
+                                  }
+                                : item
+                            )
+                          }));
+                          setEditingSubId(null);
+                          setSubCompany('');
+                          setSubWorker('');
+                          setSubPhone('');
+                          setSubWorkContent('');
+                        }}
+                        className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                      >
+                        <Save size={14} />이력 수정 완료
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setEditingSubId(null);
+                          setSubCompany('');
+                          setSubWorker('');
+                          setSubPhone('');
+                          setSubWorkContent('');
+                        }}
+                        className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                      >
+                        수정 취소
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const newSub = {
+                          id: generateUUID(),
+                          startDate: subStartDate,
+                          endDate: subEndDate,
+                          company: subCompany.trim() || '-',
+                          workerName: subWorker.trim() || '-',
+                          phone: subPhone.trim() || '-',
+                          workContent: subWorkContent.trim() || '-'
+                        };
+                        setNewItem(prev => ({
+                          ...prev,
+                          subcontractors: [...(prev.subcontractors || []), newSub]
+                        }));
+                        setSubCompany('');
+                        setSubWorker('');
+                        setSubPhone('');
+                        setSubWorkContent('');
+                      }}
+                      className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+                    >
+                      <Plus size={14} />이력 추가
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -490,12 +534,12 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                           <th className="py-2.5 font-bold border-r border-slate-200 w-28">작업자</th>
                           <th className="py-2.5 font-bold border-r border-slate-200 w-32">휴대폰</th>
                           <th className="py-2.5 font-bold border-r border-slate-200">작업내용</th>
-                          <th className="py-2.5 font-bold w-12">삭제</th>
+                          <th className="py-2.5 font-bold w-20">수정/삭제</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-slate-700">
                         {(newItem.subcontractors || []).map(sub => (
-                          <tr key={sub.id} className="hover:bg-slate-50/50">
+                          <tr key={sub.id} className={`hover:bg-slate-50/50 ${editingSubId === sub.id ? 'bg-orange-50/60' : ''}`}>
                             <td className="py-2 border-r border-slate-200 font-mono">
                               {sub.startDate === sub.endDate ? sub.startDate : `${sub.startDate} ~ ${sub.endDate}`}
                             </td>
@@ -504,19 +548,44 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
                             <td className="py-2 border-r border-slate-200 font-bold text-slate-600">{sub.phone}</td>
                             <td className="py-2 border-r border-slate-200 font-bold text-slate-600 text-left px-2 truncate max-w-xs" title={sub.workContent}>{sub.workContent}</td>
                             <td className="py-2">
-                              <button 
-                                type="button" 
-                                onClick={() => {
-                                  setNewItem(prev => ({
-                                    ...prev,
-                                    subcontractors: (prev.subcontractors || []).filter(item => item.id !== sub.id)
-                                  }));
-                                }}
-                                className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors inline-flex items-center justify-center"
-                                title="삭제"
-                              >
-                                <Trash2 size={14} />
-                              </button>
+                              <div className="flex items-center justify-center gap-1">
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    setEditingSubId(sub.id);
+                                    setSubStartDate(sub.startDate);
+                                    setSubEndDate(sub.endDate);
+                                    setSubCompany(sub.company === '-' ? '' : sub.company);
+                                    setSubWorker(sub.workerName === '-' ? '' : sub.workerName);
+                                    setSubPhone(sub.phone === '-' ? '' : sub.phone);
+                                    setSubWorkContent(sub.workContent === '-' ? '' : sub.workContent);
+                                  }}
+                                  className="p-1 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center justify-center"
+                                  title="수정"
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                                <button 
+                                  type="button" 
+                                  onClick={() => {
+                                    if (editingSubId === sub.id) {
+                                      setEditingSubId(null);
+                                      setSubCompany('');
+                                      setSubWorker('');
+                                      setSubPhone('');
+                                      setSubWorkContent('');
+                                    }
+                                    setNewItem(prev => ({
+                                      ...prev,
+                                      subcontractors: (prev.subcontractors || []).filter(item => item.id !== sub.id)
+                                    }));
+                                  }}
+                                  className="p-1 text-red-500 hover:bg-red-50 rounded-lg transition-colors inline-flex items-center justify-center"
+                                  title="삭제"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
