@@ -606,7 +606,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
                         <tr className="border-b border-black h-[32px]">
                             <th rowSpan={2} className={`${thClass} w-48`}>점검 항목</th>
                             <th colSpan={2} className={`${thClass} h-[32px] text-[13px] font-normal text-black`}>
-                                냉,온수기 (<span className="hidden print:inline-block">{data.unitNo || '\u00A0\u00A0\u00A0'}</span><select value={data.unitNo || ''} onChange={(e) => setData(prev => ({...prev, unitNo: e.target.value}))} className="bg-transparent text-black font-normal outline-none cursor-pointer px-1 appearance-none border-none text-[13px] print:hidden"><option value=""> </option><option value="1">1</option><option value="2">2</option></select>) 호기
+                                냉,온수기 (<span className="hidden print:inline-block">{data.unitNo || '\u00A0\u00A0\u00A0'}</span><select value={data.unitNo || ''} onChange={(e) => setData(prev => ({...prev, unitNo: e.target.value}))} className="bg-transparent text-black font-normal outline-none cursor-pointer px-1 appearance-none border-none text-[13px] print:hidden"><option value=""> </option><option value="1">1</option><option value="2">2</option><option value="1,2">1,2</option></select>) 호기
                             </th>
                         </tr>
                         <tr className="border-b border-black h-[32px]"><th className={thClass}>10:00</th><th className={thClass}>15:00</th></tr>
@@ -633,7 +633,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
                     </tbody>
                 </table>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 overflow-x-auto">
                 <table className="w-full border-collapse bg-white table-fixed border border-black text-center text-black">
                   <thead><tr className="border-b border-black h-[32px]"><th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th><th className={`${thClass} w-[20%]`}>전일(m³)</th><th className={`${thClass} w-[20%]`}>금일(m³)</th><th className={`${thClass} w-[20%]`}>사용(m³)</th><th className={`${thClass} w-[20%]`}>누계(m³)</th></tr></thead>
                   <tbody><tr className="border-b border-black h-[32px]"><td className={`${thClass} whitespace-nowrap font-normal`}>냉,온수기 가스 사용량</td><td className={tdClass}>{renderCellWithUnit(data.gas?.prev, (v) => updateHvacNestedField('gas', 'prev', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.curr, (v) => updateHvacNestedField('gas', 'curr', v), '')}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.usage, () => {}, '', true)}</td><td className={tdClass}>{renderCellWithUnit(data.gas?.monthTotal, () => {}, '', true)}</td></tr></tbody>
@@ -706,7 +706,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
               </tbody>
             </table>
           </div>
-          <div className="flex flex-col gap-2 mt-2">
+          <div className="flex flex-col gap-2 mt-2 overflow-x-auto">
             <table className="w-full border-collapse bg-transparent table-fixed border border-black text-center text-black">
               <thead><tr className="border-b border-black"><th className={`${thClass} w-[20%] whitespace-nowrap`}>구분</th><th className={`${thClass} w-[20%]`}>전일(m³)</th><th className={`${thClass} w-[20%]`}>금일(m³)</th><th className={`${thClass} w-[20%]`}>사용(m³)</th><th className={`${thClass} w-[20%]`}>누계(m³)</th></tr></thead>
               <tbody><tr className="border-b border-black"><td className={`${thClass} font-normal`}>보일러 가스 사용량</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.prev, (v) => updateBoilerNestedField('gas', 'prev', v), '')}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.curr, (v) => updateBoilerNestedField('gas', 'curr', v), '')}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.usage, () => {}, '', true)}</td><td className={tdClass}>{renderCellWithUnit(boilerData.gas?.monthTotal, () => {}, '', true)}</td></tr></tbody>
@@ -755,7 +755,8 @@ const HvacLog: React.FC<HvacLogProps> = ({
         </section>
 
         <section className={`max-w-7xl mx-auto ${activeSubTab === 'chemicals' ? '' : 'hidden'}`}>
-          <table className="w-full border-collapse bg-white border border-black text-center text-[13px] font-normal text-black table-fixed">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse bg-white border border-black text-center text-[13px] font-normal text-black table-fixed">
             <thead>
               <tr className="border-b border-black h-[32px]">
                 <th className="border border-black text-[13px] font-normal text-center h-[32px] align-middle text-black w-[20%] print:w-32">구분</th>
@@ -832,6 +833,7 @@ const HvacLog: React.FC<HvacLogProps> = ({
               )}
             </tbody>
           </table>
+          </div>
         </section>
       </div>
     </LogSheetLayout>

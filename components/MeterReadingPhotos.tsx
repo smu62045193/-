@@ -325,6 +325,11 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
       .sort((a, b) => {
         const floorDiff = getFloorWeight(a.floor) - getFloorWeight(b.floor);
         if (floorDiff !== 0) return floorDiff;
+        
+        const tenantCompare = a.tenant.localeCompare(b.tenant);
+        if (tenantCompare !== 0) return tenantCompare;
+        
+        if (a.type === b.type) return 0;
         return a.type === '일반' ? -1 : 1;
       });
   }, [data.items, searchTerm]);
