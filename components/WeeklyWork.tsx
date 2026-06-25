@@ -391,28 +391,52 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       const process = (list: ConstructionWorkItem[]) => {
         if (!list || !Array.isArray(list)) return;
         list.forEach(item => {
-          if (!item.date) return;
-          // 날짜 문자열에서 날짜(YYYY-MM-DD 또는 YYYY.MM.DD) 추출 시도
-          const match = item.date.replace(/\./g, '-').match(/\d{4}-\d{2}-\d{2}/);
-          if (!match) return;
+          let itemDateValid = false;
+          let itemDateStr = '';
           
-          const itemDate = parseISO(match[0]);
-          if (!isNaN(itemDate.getTime()) && isWithinInterval(itemDate, { start: weekStart, end: weekEnd })) {
-            if (item.photos && Array.isArray(item.photos)) {
-              item.photos.forEach(photo => {
-                if (photo && photo.dataUrl) {
+          if (item.date) {
+            const match = item.date.replace(/\./g, '-').match(/\d{4}-\d{2}-\d{2}/);
+            if (match) {
+              itemDateStr = match[0];
+              const itemDate = parseISO(itemDateStr);
+              if (!isNaN(itemDate.getTime()) && isWithinInterval(itemDate, { start: weekStart, end: weekEnd })) {
+                itemDateValid = true;
+              }
+            }
+          }
+          
+          if (item.photos && Array.isArray(item.photos)) {
+            item.photos.forEach(photo => {
+              if (photo && photo.dataUrl) {
+                let photoDateValid = false;
+                let photoDateStr = '';
+                
+                if (photo.date) {
+                  const photoMatch = photo.date.replace(/\./g, '-').match(/\d{4}-\d{2}-\d{2}/);
+                  if (photoMatch) {
+                    photoDateStr = photoMatch[0];
+                    const photoDate = parseISO(photoDateStr);
+                    if (!isNaN(photoDate.getTime()) && isWithinInterval(photoDate, { start: weekStart, end: weekEnd })) {
+                      photoDateValid = true;
+                    }
+                  }
+                }
+                
+                // 공사 자체가 이번 주간에 속하거나, 혹은 공사 자체는 이전 주간이더라도 개별 사진의 일자가 이번 주간에 속하는 경우 모두 포함합니다.
+                if (itemDateValid || photoDateValid) {
+                  const displayDate = photoDateStr || itemDateStr || report.startDate;
                   photos.push({ 
                     id: photo.id, 
                     dataUrl: photo.dataUrl, 
                     fileName: photo.fileName || '', 
-                    date: match[0], 
+                    date: displayDate, 
                     category: item.category || '공사', 
                     content: item.content || '', 
                     selected: false 
                   });
                 }
-              });
-            }
+              }
+            });
           }
         });
       };
