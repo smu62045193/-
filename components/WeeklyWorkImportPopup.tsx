@@ -211,14 +211,107 @@ const WeeklyWorkImportPopup: React.FC<WeeklyWorkImportPopupProps> = ({ startDate
         processWeek(thisWeekLogs, 'this', thisWeekStart);
         processWeek(nextWeekLogs, 'next', nextWeekStart);
 
-        const items: SelectableItem[] = Object.values(groupedItems).map(g => ({
-          id: `group_${g.weekType}_${g.fieldKey}_${g.content}`,
-          content: g.content,
-          fieldKey: g.fieldKey,
-          weekType: g.weekType,
-          selected: true,
-          dayName: formatRanges(g.dates)
-        }));
+        // window.opener postMessage, BroadcastChannel 및 localStorage를 사용하여 기존 작성 필드를 가져오는 헬퍼
+        const getExistingFields = (): Promise<any> => {
+          return new Promise((resolve) => {
+            let resolved = false;
+
+            // 1. window.opener 및 postMessage 리스너 등록 (매우 안정적인 상위-하위 창 통신)
+            const handleWindowMessage = (event: MessageEvent) => {
+              if (event.data?.type === 'RESPONSE_EXISTING_FIELDS') {
+                resolved = true;
+                cleanup();
+                resolve(event.data.fields);
+              }
+            };
+
+            // 2. BroadcastChannel 리스너 등록
+            const channel = new BroadcastChannel('weekly_import_channel');
+            const handleChannelMessage = (event: MessageEvent) => {
+              if (event.data?.type === 'RESPONSE_EXISTING_FIELDS') {
+                resolved = true;
+                cleanup();
+                resolve(event.data.fields);
+              }
+            };
+
+            const cleanup = () => {
+              window.removeEventListener('message', handleWindowMessage);
+              try {
+                channel.close();
+              } catch (e) {
+                console.warn('Channel close failed', e);
+              }
+            };
+
+            window.addEventListener('message', handleWindowMessage);
+            channel.onmessage = handleChannelMessage;
+
+            // 3. 응답이 지연되거나 없는 경우 localStorage 및 최종 null 처리 fallback (400ms)
+            const timeout = setTimeout(() => {
+              if (!resolved) {
+                resolved = true;
+                cleanup();
+                try {
+                  const stored = localStorage.getItem('weekly_current_report_fields');
+                  if (stored) {
+                    resolve(JSON.parse(stored));
+                    return;
+                  }
+                } catch (e) {
+                  console.warn('Backup localStorage load failed', e);
+                }
+                resolve(null);
+              }
+            }, 400);
+
+            // window.opener 로 직접 postMessage 요청 전송
+            if (window.opener) {
+              try {
+                window.opener.postMessage({ type: 'REQUEST_EXISTING_FIELDS' }, '*');
+              } catch (e) {
+                console.warn('Failed to send REQUEST_EXISTING_FIELDS via opener', e);
+              }
+            }
+
+            // BroadcastChannel로도 요청 전송
+            try {
+              channel.postMessage({ type: 'REQUEST_EXISTING_FIELDS' });
+            } catch (e) {
+              console.warn('Failed to send REQUEST_EXISTING_FIELDS via BroadcastChannel', e);
+            }
+          });
+        };
+
+        const existingFields = await getExistingFields();
+
+        const items: SelectableItem[] = Object.values(groupedItems).map(g => {
+          let isSelected = true;
+          if (existingFields) {
+            const fieldData = existingFields[g.fieldKey];
+            if (fieldData) {
+              const textToSearch = g.weekType === 'this' ? (fieldData.thisWeek || '') : (fieldData.nextWeek || '');
+              const fieldHasContent = textToSearch.trim().length > 0;
+              
+              if (fieldHasContent) {
+                const cleanContent = g.content.trim();
+                const lines = textToSearch.split('\n').map((l: string) => l.trim()).filter(Boolean);
+                isSelected = lines.some((line: string) => line.includes(cleanContent));
+              } else {
+                isSelected = true;
+              }
+            }
+          }
+
+          return {
+            id: `group_${g.weekType}_${g.fieldKey}_${g.content}`,
+            content: g.content,
+            fieldKey: g.fieldKey,
+            weekType: g.weekType,
+            selected: isSelected,
+            dayName: formatRanges(g.dates)
+          };
+        });
 
         setSelectableItems(items);
       } catch (e) { 

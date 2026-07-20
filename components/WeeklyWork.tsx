@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { startOfWeek, addDays, format, subDays, parseISO, isWithinInterval } from 'date-fns';
 import { HOLIDAYS } from '../constants';
 import { fetchWeeklyReport, saveWeeklyReport, fetchDateRangeData, fetchExternalWorkList, fetchInternalWorkList } from '../services/dataService';
@@ -152,6 +152,11 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     photos: createDefaultPhotos()
   });
 
+  const reportRef = useRef(report);
+  useEffect(() => {
+    reportRef.current = report;
+  }, [report]);
+
   useEffect(() => {
     const adjustHeight = () => {
       document.querySelectorAll('.auto-expand-textarea').forEach((ta) => {
@@ -261,6 +266,11 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     const h = 800;
     const left = (window.screen.width / 2) - (w / 2);
     const top = (window.screen.height / 2) - (h / 2);
+    try {
+      localStorage.setItem('weekly_current_report_fields', JSON.stringify(report.fields));
+    } catch (e) {
+      console.error('Failed to save current report fields to localStorage', e);
+    }
     // Use _blank and timestamp to force a fresh load of the popup with the latest code
     window.open(`/?popup=weekly_import&date=${report.startDate}&t=${Date.now()}`, '_blank', `width=${w},height=${h},top=${top},left=${left}`);
   };
@@ -271,46 +281,77 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
         const newFields = { ...prev.fields };
         
         FIELDS.forEach(field => {
-          const selThis = items.filter(i => i.fieldKey === field.id && i.weekType === 'this' && i.selected);
-          const selNext = items.filter(i => i.fieldKey === field.id && i.weekType === 'next' && i.selected);
+          const allThisItems = items.filter(i => i.fieldKey === field.id && i.weekType === 'this');
+          const allNextItems = items.filter(i => i.fieldKey === field.id && i.weekType === 'next');
           
-          if (selThis.length === 0 && selNext.length === 0) return;
-
-          const resultsList: string[] = selThis.map(it => {
-            const text = it.content;
-            let res = '완료 / 이상없음';
-            if (text.includes('입고')) res = '입고완료';
-            else if (text.includes('신청')) res = '신청완료';
-            else if (text.includes('재활용')) res = '배출완료';
-            else if (text.includes('소독')) res = '소독완료';
-            else if (text.includes('청소')) res = '청소완료';
-            else if (text.includes('제거')) res = '제거완료';
-            else if (text.includes('교체')) res = '교체완료';
-            else if (text.includes('불량')) res = '조치중';
-            return res;
-          });
+          if (allThisItems.length === 0 && allNextItems.length === 0) return;
 
           const currentThisLines = (newFields[field.id as keyof typeof newFields]?.thisWeek || '').split('\n').map(l => l.trim()).filter(l => l !== '');
           const currentResLines = (newFields[field.id as keyof typeof newFields]?.results || '').split('\n').map(l => l.trim()).filter(l => l !== '');
           const currentNextLines = (newFields[field.id as keyof typeof newFields]?.nextWeek || '').split('\n').map(l => l.trim()).filter(l => l !== '');
 
-          const updatedThisLines = [...currentThisLines];
-          const updatedResLines = [...currentResLines];
-          const updatedNextLines = [...currentNextLines];
+          const updatedThisLines: string[] = [];
+          const updatedResLines: string[] = [];
+          const matchedSelectedThisIds = new Set<string>();
 
-          selThis.forEach((it, idx) => {
-            const dateSuffix = it.dayName ? `(${it.dayName}일)` : '';
-            const content = `${it.content}${dateSuffix}`;
-            if (!updatedThisLines.includes(content)) {
-              updatedThisLines.push(content);
-              updatedResLines.push(resultsList[idx]);
+          currentThisLines.forEach((line, idx) => {
+            const matchingItem = allThisItems.find(it => line.includes(it.content.trim()));
+            if (matchingItem) {
+              if (matchingItem.selected) {
+                updatedThisLines.push(line);
+                updatedResLines.push(currentResLines[idx] || '완료 / 이상없음');
+                matchedSelectedThisIds.add(matchingItem.id);
+              }
+            } else {
+              updatedThisLines.push(line);
+              updatedResLines.push(currentResLines[idx] || '완료 / 이상없음');
             }
           });
 
-          selNext.forEach(it => {
-            const content = it.content;
-            if (!updatedNextLines.includes(content)) {
-              updatedNextLines.push(content);
+          allThisItems.forEach(it => {
+            if (it.selected && !matchedSelectedThisIds.has(it.id)) {
+              const dateSuffix = it.dayName ? `(${it.dayName}일)` : '';
+              const content = `${it.content}${dateSuffix}`;
+              if (!updatedThisLines.includes(content)) {
+                updatedThisLines.push(content);
+                
+                let res = '완료 / 이상없음';
+                const text = it.content;
+                if (text.includes('입고')) res = '입고완료';
+                else if (text.includes('신청')) res = '신청완료';
+                else if (text.includes('재활용')) res = '배출완료';
+                else if (text.includes('소독')) res = '소독완료';
+                else if (text.includes('청소')) res = '청소완료';
+                else if (text.includes('제거')) res = '제거완료';
+                else if (text.includes('교체')) res = '교체완료';
+                else if (text.includes('불량')) res = '조치중';
+                
+                updatedResLines.push(res);
+              }
+            }
+          });
+
+          const updatedNextLines: string[] = [];
+          const matchedSelectedNextIds = new Set<string>();
+
+          currentNextLines.forEach((line) => {
+            const matchingItem = allNextItems.find(it => line.includes(it.content.trim()));
+            if (matchingItem) {
+              if (matchingItem.selected) {
+                updatedNextLines.push(line);
+                matchedSelectedNextIds.add(matchingItem.id);
+              }
+            } else {
+              updatedNextLines.push(line);
+            }
+          });
+
+          allNextItems.forEach(it => {
+            if (it.selected && !matchedSelectedNextIds.has(it.id)) {
+              const content = it.content;
+              if (!updatedNextLines.includes(content)) {
+                updatedNextLines.push(content);
+              }
             }
           });
 
@@ -346,6 +387,11 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     channel.onmessage = (event: MessageEvent) => {
       if (event.data?.type === 'IMPORT_WEEKLY_WORK') {
         processImportData(event.data);
+      } else if (event.data?.type === 'REQUEST_EXISTING_FIELDS') {
+        channel.postMessage({
+          type: 'RESPONSE_EXISTING_FIELDS',
+          fields: reportRef.current.fields
+        });
       }
     };
 
@@ -366,6 +412,17 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'IMPORT_WEEKLY_WORK') {
         processImportData(event.data);
+      } else if (event.data?.type === 'REQUEST_EXISTING_FIELDS') {
+        if (event.source) {
+          try {
+            event.source.postMessage({
+              type: 'RESPONSE_EXISTING_FIELDS',
+              fields: reportRef.current.fields
+            }, { targetOrigin: '*' });
+          } catch (e) {
+            // postMessage failed (e.g. cross origin) - fallback to broadcast channel is already running
+          }
+        }
       }
     };
     window.addEventListener('message', handleMessage);
