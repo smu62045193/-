@@ -806,7 +806,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
         const safeGas = gasData || getInitialGasLog(dateKey);
         const safeSeptic = septicData || getInitialSepticLog(dateKey);
         
-        const dailyConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && (c.category === '기계' || c.category === '공용'));
+        const dailyConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && c.isManual === true && (c.category === '기계' || c.category === '미화' || c.category === '공용'));
         const aggMap = new Map();
         dailyConsumables.forEach(c => {
           const key = `${c.itemName.trim()}_${(c.modelName || '').trim()}`;
@@ -869,7 +869,7 @@ const WorkLog: React.FC<WorkLogProps> = ({ currentDate }) => {
     } else if (catId === 'electrical') {
         const [subCheckData, consumables] = await Promise.all([fetchSubstationChecklist(dateKey), fetchConsumables()]);
         
-        const dailyConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && (c.category === '전기' || c.category === '소방'));
+        const dailyConsumables = (consumables || []).filter(c => c.date === dateKey && parseFloat(c.outQty || '0') > 0 && c.isManual === true && (c.category === '전기' || c.category === '소방' || c.category === '주차'));
         const aggMap = new Map();
         dailyConsumables.forEach(c => {
           const key = `${c.itemName.trim()}_${(c.modelName || '').trim()}`;
