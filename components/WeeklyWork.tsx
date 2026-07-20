@@ -124,6 +124,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [isEditMode, setIsEditMode] = useState(false);
   const [photoGroupingMode, setPhotoGroupingMode] = useState<'date' | 'content'>('date');
+  const [targetPhotoIndex, setTargetPhotoIndex] = useState<number | null>(null);
   
   const startOfCurrentWeek = startOfWeek(currentDate, { weekStartsOn: 1 });
   const startDateStr = format(startOfCurrentWeek, 'yyyy-MM-dd');
@@ -376,7 +377,8 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     };
   }, []);
 
-  const handleOpenPhotoImportModal = async () => {
+  const handleOpenPhotoImportModal = async (targetIndex: number | null = null) => {
+    setTargetPhotoIndex(targetIndex);
     setLoading(true);
     try {
       let ext: ConstructionWorkItem[] = [];
@@ -455,7 +457,15 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
   };
 
   const toggleSelectPhoto = (id: string) => {
-    setSelectablePhotos(prev => prev.map(p => p.id === id ? { ...p, selected: !p.selected } : p));
+    setSelectablePhotos(prev => prev.map(p => {
+      if (p.id === id) {
+        return { ...p, selected: !p.selected };
+      }
+      if (targetPhotoIndex !== null) {
+        return { ...p, selected: false };
+      }
+      return p;
+    }));
   };
 
   const handleApplyPhotoSelection = () => {
@@ -466,19 +476,30 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     if (selected.length === 0) { setIsPhotoModalOpen(false); return; }
     
     const newPhotos = [...(report.photos || [])];
-    selected.forEach(p => {
-      const emptyIdx = newPhotos.findIndex(item => !item.dataUrl);
-      const photoData = { 
-        id: Math.random().toString(), 
-        dataUrl: p.dataUrl, 
-        title: p.content || `${p.category} 작업`, 
-        description: '' 
+    if (targetPhotoIndex !== null) {
+      const p = selected[0];
+      newPhotos[targetPhotoIndex] = {
+        ...newPhotos[targetPhotoIndex],
+        id: Math.random().toString(),
+        dataUrl: p.dataUrl,
+        title: p.content || `${p.category} 작업`
       };
-      if (emptyIdx !== -1) newPhotos[emptyIdx] = photoData; 
-      else newPhotos.push(photoData);
-    });
+    } else {
+      selected.forEach(p => {
+        const emptyIdx = newPhotos.findIndex(item => !item.dataUrl);
+        const photoData = { 
+          id: Math.random().toString(), 
+          dataUrl: p.dataUrl, 
+          title: p.content || `${p.category} 작업`, 
+          description: '' 
+         };
+        if (emptyIdx !== -1) newPhotos[emptyIdx] = photoData; 
+        else newPhotos.push(photoData);
+      });
+    }
     setReport(prev => ({ ...prev, photos: newPhotos })); 
     setIsPhotoModalOpen(false);
+    setTargetPhotoIndex(null);
   };
 
   const toggleSelectItem = (id: string) => {
@@ -908,7 +929,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
                   <ImageIcon size={18} className="mr-2 text-blue-500" />작업 사진
                 </h3>
                 <button 
-                  onClick={handleOpenPhotoImportModal} 
+                  onClick={() => handleOpenPhotoImportModal(null)} 
                   disabled={!isEditMode}
                   className={`flex items-center justify-center px-6 py-2 rounded-xl font-bold shadow-md transition-all text-sm active:scale-95 print:hidden ${isEditMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
                 >
@@ -917,27 +938,48 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               </div>
               <div className="grid grid-cols-3 gap-4">{(report.photos || []).map((p, i) => (
                 <div key={p.id} className="border border-gray-200 p-1.5 rounded-xl relative group bg-gray-50">
-                  <div className="aspect-[4/3] bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 shadow-inner">
-                    {p.dataUrl ? <img src={p.dataUrl} className="w-full h-full object-cover" /> : (
+                  <div className="aspect-[4/3] bg-white rounded-lg flex items-center justify-center overflow-hidden border border-gray-100 shadow-inner relative">
+                    {p.dataUrl ? (
+                      <div className="relative w-full h-full group/img">
+                        <img src={p.dataUrl} className="w-full h-full object-cover" />
+                        {isEditMode && (
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button 
+                              onClick={() => handleOpenPhotoImportModal(i)}
+                              className="bg-white/90 hover:bg-white text-blue-600 font-bold text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-md transition-all active:scale-95"
+                            >
+                              <RefreshCw size={12} /> 교체
+                            </button>
+                            <button 
+                              onClick={() => {
+                                const n=[...(report.photos || [])];
+                                if (n.length > 3) {
+                                  n.splice(i, 1);
+                                } else {
+                                  n[i] = { ...n[i], dataUrl: '', title: '' };
+                                }
+                                setReport({ ...report, photos: n });
+                              }}
+                              className="bg-white/90 hover:bg-white text-red-600 font-bold text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 shadow-md transition-all active:scale-95"
+                            >
+                              <X size={12} /> 삭제
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
                       <div className="text-center p-4">
-                        <label className={`cursor-pointer text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${isEditMode ? 'text-blue-600 bg-blue-50 hover:bg-blue-100' : 'text-gray-400 bg-gray-50 cursor-not-allowed'}`}>
+                        <button 
+                          onClick={() => {
+                            if (isEditMode) {
+                              handleOpenPhotoImportModal(i);
+                            }
+                          }}
+                          disabled={!isEditMode}
+                          className={`text-xs font-bold px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 ${isEditMode ? 'text-blue-600 bg-blue-50 hover:bg-blue-100 cursor-pointer' : 'text-gray-400 bg-gray-50 cursor-not-allowed'}`}
+                        >
                           <Upload size={14}/> 사진 업로드
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            disabled={!isEditMode}
-                            onChange={async e => { 
-                              const f=e.target.files?.[0]; 
-                              if(f && isEditMode){
-                                const u=await resizeImage(f); 
-                                const n=[...(report.photos || [])]; 
-                                n[i]={...n[i],dataUrl:u}; 
-                                setReport({...report,photos:n});
-                              } 
-                            }} 
-                          />
-                        </label>
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1020,7 +1062,9 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             </div>
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
               <button onClick={() => setIsPhotoModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-gray-600 hover:bg-gray-100 transition-all">취소</button>
-              <button onClick={handleApplyPhotoSelection} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">선택한 사진 추가 ({selectablePhotos.filter(p=>p.selected).length}장)</button>
+              <button onClick={handleApplyPhotoSelection} className="px-8 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition-all">
+                {targetPhotoIndex !== null ? '선택한 사진으로 교체' : `선택한 사진 추가 (${selectablePhotos.filter(p=>p.selected).length}장)`}
+              </button>
             </div>
           </div>
         </div>

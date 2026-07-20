@@ -94,14 +94,12 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
     
     const dates: string[] = [];
     let current = new Date(start);
-    let limitCount = 0;
-    while (current <= end && limitCount < 30) {
+    while (current <= end) {
       const yyyy = current.getFullYear();
       const mm = String(current.getMonth() + 1).padStart(2, '0');
       const dd = String(current.getDate()).padStart(2, '0');
       dates.push(`${yyyy}-${mm}-${dd}`);
       current = new Date(current.getTime() + 24 * 60 * 60 * 1000);
-      limitCount++;
     }
     return dates;
   };
@@ -602,7 +600,7 @@ const ConstructionLog: React.FC<ConstructionLogProps> = ({ mode, isPopupMode = f
                     .filter((dateVal, index) => {
                       if (!hideEmptyDates) return true;
                       const countForThisDate = currentItem.photos.filter(p => (p.date || datesInRange[0]) === dateVal).length;
-                      return index === 0 || countForThisDate > 0 || selectedUploadDate === dateVal;
+                      return index === 0 || index === datesInRange.length - 1 || countForThisDate > 0 || selectedUploadDate === dateVal;
                     })
                     .map((dateVal) => {
                       const countForThisDate = currentItem.photos.filter(p => (p.date || datesInRange[0]) === dateVal).length;
