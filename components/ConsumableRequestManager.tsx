@@ -265,7 +265,16 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
 
     const sectionsHtml = SECTIONS.filter(s => s.key !== '전체').map(sec => {
       const its = activeRequest.items.filter(i => i.category === sec.key && i.itemName.trim() !== '');
-      return its.length > 0 ? `
+      
+      const sortedIts = [...its].sort((a, b) => {
+        const aPre = !!a.isPreReceived;
+        const bPre = !!b.isPreReceived;
+        if (aPre && !bPre) return -1;
+        if (!aPre && bPre) return 1;
+        return 0;
+      });
+
+      return sortedIts.length > 0 ? `
         <div style="break-inside: avoid; margin-bottom: 2px;">
           <h3 style="font-size: 13pt; font-weight: bold; margin-bottom: 6px; border-left: 7px solid black; padding-left: 10px; margin-top: 15px;">${sec.label}</h3>
           <table style="width: 99%; margin-left: auto; margin-right: auto;">
@@ -278,16 +287,27 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
               <th style="width: 55px;">입고일</th>
               <th>비 고</th>
             </tr></thead>
-            <tbody>${its.map((item, idx) => `
-              <tr style="height:28px;">
+            <tbody>${sortedIts.map((item, idx) => {
+              const preReceivedBadge = item.isPreReceived
+                ? `<span style="color: #000000; font-weight: normal; font-size: 9pt; margin-right: 5px;">[선입고]</span>`
+                : '';
+              const preReceivedRemarks = item.isPreReceived && item.receivedDate && item.receivedDate.trim() !== ''
+                ? `[${item.receivedDate.trim()}_ 선입고완료] `
+                : '';
+              const finalRemarks = `${preReceivedRemarks}${item.remarks || ''}`;
+              const rowBg = item.isPreReceived ? 'background-color: #ffffff;' : '';
+              
+              return `
+              <tr style="height:28px; ${rowBg}">
                 <td>${idx+1}</td>
-                <td>${item.itemName || ''}</td>
+                <td style="text-align: left; padding-left: 8px;">${preReceivedBadge}${item.itemName || ''}</td>
                 <td>${item.spec || ''}</td>
                 <td>${item.stock || ''}</td>
                 <td>${item.qty || ''}</td>
                 <td>${item.receivedDate || ''}</td>
-                <td>${item.remarks || ''}</td>
-              </tr>`).join('')}
+                <td style="text-align: left; padding-left: 8px;">${finalRemarks}</td>
+              </tr>`;
+            }).join('')}
             </tbody>
           </table>
         </div>
@@ -545,6 +565,15 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
             ? sectionItems 
             : sectionItems.filter(it => it.itemName && it.itemName.trim() !== '');
 
+          // 선입고 항목이 항상 상단에 오도록 목록 상단 고정(Pinning) 정렬
+          const sortedDisplayItems = [...displayItems].sort((a, b) => {
+            const aPre = !!a.isPreReceived;
+            const bPre = !!b.isPreReceived;
+            if (aPre && !bPre) return -1;
+            if (!aPre && bPre) return 1;
+            return 0;
+          });
+
           // 조회 모드인데 표시할 항목이 없으면 섹션 자체를 숨김
           if (!isEditMode && displayItems.length === 0) return null;
 
@@ -570,7 +599,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                     </tr>
                   </thead>
                   <tbody>
-                    {displayItems.map((it, idx) => {
+                    {sortedDisplayItems.map((it, idx) => {
                       const isLinked = !!it.isLinked;
                       const hasText = it.itemName && it.itemName.trim() !== '';
                       
@@ -584,7 +613,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                       }
 
                       return (
-                        <tr key={it.id} className="hover:bg-blue-50/30 transition-colors text-center group h-[40px]">
+                        <tr key={it.id} className={`text-center group h-[40px] transition-colors ${it.isPreReceived ? 'bg-orange-50/40 hover:bg-orange-100/50' : 'hover:bg-blue-50/30'}`}>
                           <td className={`${tdClass} text-gray-400 relative`}>
                             <div className={cellDivClass}>
                               <span className={isEditMode ? "group-hover:opacity-0" : ""}>{idx + 1}</span>
@@ -600,7 +629,24 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                             </div>
                           </td>
                           <td className={tdClass}>
-                            <div className="flex items-center justify-center h-full">
+                            <div className="flex items-center justify-center h-full px-2 gap-1.5">
+                              {isEditMode && (
+                                <label className="flex items-center gap-1 cursor-pointer select-none shrink-0" title="선입고 여부">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={!!it.isPreReceived} 
+                                    onChange={e => {
+                                      const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, isPreReceived: e.target.checked } : i);
+                                      setActiveRequest({ ...activeRequest, items: ni });
+                                    }} 
+                                    className="w-3.5 h-3.5 rounded border-gray-300 text-orange-600 focus:ring-orange-500 cursor-pointer"
+                                  />
+                                  <span className="text-[11px] font-bold text-gray-500">선입고</span>
+                                </label>
+                              )}
+                              {!isEditMode && it.isPreReceived && (
+                                <span className="inline-block shrink-0 text-black text-[11px] font-normal mr-1">[선입고]</span>
+                              )}
                               <input 
                                 type="text" 
                                 value={it.itemName} 
@@ -608,7 +654,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                                   const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, itemName: e.target.value } : i);
                                   setActiveRequest({ ...activeRequest, items: ni });
                                 }} 
-                                className={`${isEditMode ? editableInputClass : inputClass} ${textColClass}`}
+                                className={`${isEditMode ? editableInputClass : inputClass} ${textColClass} flex-1`}
                                 readOnly={!isEditMode}
                               />
                             </div>
@@ -676,7 +722,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
                             <div className="flex items-center justify-center h-full">
                               <input 
                                 type="text" 
-                                value={it.remarks} 
+                                value={isEditMode ? (it.remarks || '') : (it.isPreReceived ? `${it.receivedDate && it.receivedDate.trim() !== '' ? `[${it.receivedDate.trim()}_ 선입고완료]` : ''} ${it.remarks || ''}`.trim() : (it.remarks || ''))} 
                                 onChange={e => {
                                   const ni = activeRequest.items.map(i => i.id === it.id ? { ...i, remarks: e.target.value } : i);
                                   setActiveRequest({ ...activeRequest, items: ni });

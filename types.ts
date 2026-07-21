@@ -203,6 +203,7 @@ export interface ConsumableRequestItem {
   receivedDate?: string; // 입고일
   remarks: string;   // 비고
   isLinked?: boolean; // 연동 여부 구분
+  isPreReceived?: boolean; // 선입고 여부
   
   // Legacy/Optional fields
   spec?: string; 
