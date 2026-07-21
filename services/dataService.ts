@@ -1921,11 +1921,109 @@ const getFloorWeight = (floor: string) => {
   return num;
 };
 
-export const fetchTenants = async (): Promise<Tenant[]> => {
+export const getMonthFromUuid = (uuid: string): string | null => {
+  if (!uuid || typeof uuid !== 'string') return null;
+  const match = uuid.match(/^(\d{6})00-/);
+  if (match) {
+    const yyyymm = match[1];
+    return `${yyyymm.slice(0, 4)}-${yyyymm.slice(4, 6)}`;
+  }
+  return null;
+};
+
+export const encodeUuidWithMonth = (uuid: string, month: string): string => {
+  let targetUuid = uuid;
+  if (uuid.includes('_')) {
+    targetUuid = uuid.split('_')[1];
+  }
+  if (!isValidUUID(targetUuid)) {
+    targetUuid = generateUUID();
+  }
+  const cleanMonth = month.replace(/-/g, '');
+  const parts = targetUuid.split('-');
+  parts[0] = `${cleanMonth}00`;
+  return parts.join('-');
+};
+
+export const fetchTenants = async (month?: string): Promise<Tenant[]> => {
   try {
     const { data } = await supabase.from('tenants').select('*');
     if (data && data.length > 0) {
-      const mapped = data.map(t => ({ id: t.id, floor: t.floor, name: t.name, area: t.area?.toString(), contact: t.contact, refPower: t.ref_power?.toString(), note: t.note }));
+      if (month) {
+        const monthPrefix = `${month.replace(/-/g, '')}00-`;
+        const monthSpecific = data.filter(t => String(t.id).startsWith(monthPrefix));
+        
+        if (monthSpecific.length > 0) {
+          const mapped = monthSpecific.map(t => ({
+            id: t.id,
+            floor: t.floor,
+            name: t.name,
+            area: t.area?.toString(),
+            contact: t.contact,
+            refPower: t.ref_power?.toString(),
+            note: t.note
+          }));
+          return mapped.sort((a, b) => {
+            const weightA = getFloorWeight(a.floor);
+            const weightB = getFloorWeight(b.floor);
+            if (weightA !== weightB) return weightA - weightB;
+            return a.name.localeCompare(b.name);
+          });
+        }
+
+        let currentYear = parseInt(month.split('-')[0]);
+        let currentMonthNum = parseInt(month.split('-')[1]);
+        
+        for (let i = 0; i < 12; i++) {
+          currentMonthNum--;
+          if (currentMonthNum === 0) {
+            currentMonthNum = 12;
+            currentYear--;
+          }
+          const prevMonthStr = `${currentYear}-${String(currentMonthNum).padStart(2, '0')}`;
+          const prevPrefix = `${prevMonthStr.replace(/-/g, '')}00-`;
+          const prevSpecific = data.filter(t => String(t.id).startsWith(prevPrefix));
+          
+          if (prevSpecific.length > 0) {
+            const mapped = prevSpecific.map(t => ({
+              id: t.id,
+              floor: t.floor,
+              name: t.name,
+              area: t.area?.toString(),
+              contact: t.contact,
+              refPower: t.ref_power?.toString(),
+              note: t.note
+            }));
+            return mapped.sort((a, b) => {
+              const weightA = getFloorWeight(a.floor);
+              const weightB = getFloorWeight(b.floor);
+              if (weightA !== weightB) return weightA - weightB;
+              return a.name.localeCompare(b.name);
+            });
+          }
+        }
+      }
+
+      const baseTenants = data.filter(t => !getMonthFromUuid(t.id));
+      if (baseTenants.length > 0) {
+        const mapped = baseTenants.map(t => ({ id: t.id, floor: t.floor, name: t.name, area: t.area?.toString(), contact: t.contact, refPower: t.ref_power?.toString(), note: t.note }));
+        return mapped.sort((a, b) => {
+          const weightA = getFloorWeight(a.floor);
+          const weightB = getFloorWeight(b.floor);
+          if (weightA !== weightB) return weightA - weightB;
+          return a.name.localeCompare(b.name);
+        });
+      }
+
+      const mapped = data.map(t => ({ 
+        id: t.id, 
+        floor: t.floor, 
+        name: t.name, 
+        area: t.area?.toString(), 
+        contact: t.contact, 
+        refPower: t.ref_power?.toString(), 
+        note: t.note 
+      }));
       return mapped.sort((a, b) => {
         const weightA = getFloorWeight(a.floor);
         const weightB = getFloorWeight(b.floor);
@@ -1939,21 +2037,28 @@ export const fetchTenants = async (): Promise<Tenant[]> => {
   return [];
 };
 
-export const saveTenants = async (list: Tenant[]): Promise<boolean> => {
+export const saveTenants = async (list: Tenant[], month?: string): Promise<boolean> => {
   const parseNum = (val: any) => {
     if (val === undefined || val === null || val === '') return 0;
     const n = parseFloat(String(val).replace(/,/g, ''));
     return isNaN(n) ? 0 : n;
   };
-  const dbData = list.map(t => ({ 
-    id: t.id ? String(t.id) : generateUUID(), 
-    floor: t.floor || '', 
-    name: t.name || '', 
-    area: parseNum(t.area), 
-    contact: t.contact || '', 
-    ref_power: parseNum(t.refPower), 
-    note: t.note || '' 
-  }));
+  const dbData = list.map(t => {
+    let rawId = t.id ? String(t.id) : generateUUID();
+    if (!isValidUUID(rawId) && !rawId.includes('-')) {
+      rawId = generateUUID();
+    }
+    const dbId = month ? encodeUuidWithMonth(rawId, month) : rawId;
+    return { 
+      id: dbId, 
+      floor: t.floor || '', 
+      name: t.name || '', 
+      area: parseNum(t.area), 
+      contact: t.contact || '', 
+      ref_power: parseNum(t.refPower), 
+      note: t.note || '' 
+    };
+  });
   const { error } = await supabase.from('tenants').upsert(dbData);
   if (error) {
     console.error('saveTenants error:', error);

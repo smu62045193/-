@@ -98,7 +98,7 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
       if (fetched) {
         // 이미 서버에 데이터가 있는 경우
         const normalize = (str: string) => (str || '').replace(/\s+/g, '');
-        const updatedItems = (fetched.items || []).map(item => {
+        let updatedItems = (fetched.items || []).map(item => {
           const matchedPhoto = photos.find(p => 
             normalize(p.tenant) === normalize(item.tenant) && 
             normalize(p.floor) === normalize(item.floor) && 
@@ -110,12 +110,29 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
           return item;
         });
 
-        // 마스터 DB(tenants)와 비교하여 새로 추가된 입주사가 있으면 병합
-        const masterTenants = await fetchTenants();
+        // 마스터 DB(tenants)와 비교하여 새로 추가/수정된 입주사가 있으면 병합
+        const masterTenants = await fetchTenants(monthStr);
         if (masterTenants && masterTenants.length > 0) {
           masterTenants.forEach(t => {
-            const existsNormal = updatedItems.find(it => normalize(it.tenant) === normalize(t.name) && normalize(it.floor) === normalize(t.floor) && normalize(it.note) === '일반');
+            let existsNormal = updatedItems.find(it => 
+              normalize(it.floor) === normalize(t.floor) && 
+              normalize(it.tenant) === normalize(t.name) && 
+              normalize(it.note) === '일반'
+            );
+            
             if (!existsNormal) {
+              existsNormal = updatedItems.find(it => 
+                normalize(it.floor) === normalize(t.floor) && 
+                normalize(it.note) === '일반' && 
+                !masterTenants.some(mt => normalize(mt.name) === normalize(it.tenant))
+              );
+            }
+
+            if (existsNormal) {
+              existsNormal.tenant = t.name;
+              existsNormal.area = t.area || '0';
+              if (t.refPower) existsNormal.refPower = t.refPower;
+            } else {
               updatedItems.push({
                 id: generateId(),
                 floor: t.floor,
@@ -128,8 +145,25 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
                 currentReading: ''
               });
             }
-            const existsSpecial = updatedItems.find(it => normalize(it.tenant) === normalize(t.name) && normalize(it.floor) === normalize(t.floor) && normalize(it.note) === '특수');
+
+            let existsSpecial = updatedItems.find(it => 
+              normalize(it.floor) === normalize(t.floor) && 
+              normalize(it.tenant) === normalize(t.name) && 
+              normalize(it.note) === '특수'
+            );
+
             if (!existsSpecial) {
+              existsSpecial = updatedItems.find(it => 
+                normalize(it.floor) === normalize(t.floor) && 
+                normalize(it.note) === '특수' && 
+                !masterTenants.some(mt => normalize(mt.name) === normalize(it.tenant))
+              );
+            }
+
+            if (existsSpecial) {
+              existsSpecial.tenant = t.name;
+              existsSpecial.area = t.area || '0';
+            } else {
               updatedItems.push({
                 id: generateId(),
                 floor: t.floor,
@@ -143,6 +177,11 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
               });
             }
           });
+
+          // 삭제/비활성화된 입주사는 목록에서 필터링
+          updatedItems = updatedItems.filter(it => 
+            masterTenants.some(mt => normalize(mt.floor) === normalize(it.floor) && normalize(mt.name) === normalize(it.tenant))
+          );
         }
 
         // 층별 정렬
@@ -182,12 +221,29 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
             currentReading: ''
           }));
 
-          // 마스터 DB(tenants)와 비교하여 새로 추가된 입주사가 있으면 병합
-          const masterTenants = await fetchTenants();
+          // 마스터 DB(tenants)와 비교하여 새로 추가/수정된 입주사가 있으면 병합
+          const masterTenants = await fetchTenants(monthStr);
           if (masterTenants && masterTenants.length > 0) {
             masterTenants.forEach(t => {
-              const existsNormal = initialItems.find(it => it.tenant === t.name && it.floor === t.floor && it.note === '일반');
+              let existsNormal = initialItems.find(it => 
+                normalize(it.floor) === normalize(t.floor) && 
+                normalize(it.tenant) === normalize(t.name) && 
+                normalize(it.note) === '일반'
+              );
+              
               if (!existsNormal) {
+                existsNormal = initialItems.find(it => 
+                  normalize(it.floor) === normalize(t.floor) && 
+                  normalize(it.note) === '일반' && 
+                  !masterTenants.some(mt => normalize(mt.name) === normalize(it.tenant))
+                );
+              }
+
+              if (existsNormal) {
+                existsNormal.tenant = t.name;
+                existsNormal.area = t.area || '0';
+                if (t.refPower) existsNormal.refPower = t.refPower;
+              } else {
                 initialItems.push({
                   id: generateId(),
                   floor: t.floor,
@@ -200,8 +256,25 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
                   currentReading: ''
                 });
               }
-              const existsSpecial = initialItems.find(it => it.tenant === t.name && it.floor === t.floor && it.note === '특수');
+
+              let existsSpecial = initialItems.find(it => 
+                normalize(it.floor) === normalize(t.floor) && 
+                normalize(it.tenant) === normalize(t.name) && 
+                normalize(it.note) === '특수'
+              );
+
               if (!existsSpecial) {
+                existsSpecial = initialItems.find(it => 
+                  normalize(it.floor) === normalize(t.floor) && 
+                  normalize(it.note) === '특수' && 
+                  !masterTenants.some(mt => normalize(mt.name) === normalize(it.tenant))
+                );
+              }
+
+              if (existsSpecial) {
+                existsSpecial.tenant = t.name;
+                existsSpecial.area = t.area || '0';
+              } else {
                 initialItems.push({
                   id: generateId(),
                   floor: t.floor,
@@ -215,10 +288,15 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
                 });
               }
             });
+
+            // 삭제/비활성화된 입주사는 목록에서 필터링
+            initialItems = initialItems.filter(it => 
+              masterTenants.some(mt => normalize(mt.floor) === normalize(it.floor) && normalize(mt.name) === normalize(it.tenant))
+            );
           }
         } else {
           // 마스터 DB에서 생성
-          const masterTenants = await fetchTenants();
+          const masterTenants = await fetchTenants(monthStr);
           if (masterTenants && masterTenants.length > 0) {
             initialItems = masterTenants.flatMap(t => [
               {

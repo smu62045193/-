@@ -128,7 +128,13 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
   }, [editingId, data.items, isPopupMode]);
 
   const loadTenants = async () => {
-    const fetched = await fetchTenants();
+    let monthToFetch = currentMonth;
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const urlMonth = params.get('month');
+      if (urlMonth) monthToFetch = urlMonth;
+    }
+    const fetched = await fetchTenants(monthToFetch);
     if (fetched) {
       fetched.sort((a, b) => {
         const weightA = getFloorWeight(a.floor);
@@ -245,10 +251,9 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
           if (monthlyReadingData && monthlyReadingData.items) {
             const normalize = (str: string) => (str || '').replace(/\s+/g, '');
             const updatedMonthlyItems = monthlyReadingData.items.map(mItem => {
-              if (normalize(mItem.tenant) === normalize(itemToSave.tenant) && 
-                  normalize(mItem.floor) === normalize(itemToSave.floor) && 
+              if (normalize(mItem.floor) === normalize(itemToSave.floor) && 
                   normalize(mItem.note) === normalize(itemToSave.type)) {
-                return { ...mItem, currentReading: itemToSave.reading };
+                return { ...mItem, tenant: itemToSave.tenant, currentReading: itemToSave.reading };
               }
               return mItem;
             });
@@ -300,8 +305,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
           if (monthlyReadingData && monthlyReadingData.items) {
             const normalize = (str: string) => (str || '').replace(/\s+/g, '');
             const updatedMonthlyItems = monthlyReadingData.items.map(mItem => {
-              if (normalize(mItem.tenant) === normalize(itemToDelete.tenant) && 
-                  normalize(mItem.floor) === normalize(itemToDelete.floor) && 
+              if (normalize(mItem.floor) === normalize(itemToDelete.floor) && 
                   normalize(mItem.note) === normalize(itemToDelete.type)) {
                 return { ...mItem, currentReading: '' };
               }

@@ -62,7 +62,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [isPopupMode]);
+  }, [isPopupMode, currentMonth]);
 
   useEffect(() => {
     if (isPopupMode && editingId && tenants.length > 0) {
@@ -73,7 +73,13 @@ const TenantStatus: React.FC<TenantStatusProps> = ({
 
   const loadData = async () => {
     setLoading(true);
-    const data = await fetchTenants();
+    let monthToFetch = currentMonth;
+    if (isPopupMode) {
+      const params = new URLSearchParams(window.location.search);
+      const urlMonth = params.get('month');
+      if (urlMonth) monthToFetch = urlMonth;
+    }
+    const data = await fetchTenants(monthToFetch);
     setTenants(data || []);
     setLoading(false);
     if (!isPopupMode) setEditingId(null);
@@ -88,6 +94,9 @@ const TenantStatus: React.FC<TenantStatusProps> = ({
     const url = new URL(window.location.href);
     url.searchParams.set('popup', 'tenant');
     url.searchParams.set('id', id);
+    if (currentMonth) {
+      url.searchParams.set('month', currentMonth);
+    }
 
     window.open(
       url.toString(),
@@ -100,7 +109,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({
     setSaveStatus('loading');
     try {
       const sortedTenants = [...tenants].sort((a, b) => getFloorWeight(a.floor) - getFloorWeight(b.floor));
-      const success = await saveTenants(sortedTenants);
+      const success = await saveTenants(sortedTenants, currentMonth);
       if (success) {
         setTenants(sortedTenants);
         setSaveStatus('success');
@@ -120,7 +129,9 @@ const TenantStatus: React.FC<TenantStatusProps> = ({
     if (!formItem.name.trim()) { alert('입주사명은 필수입니다.'); return; }
     setLoading(true);
     try {
-      const latestTenants = await fetchTenants();
+      const params = new URLSearchParams(window.location.search);
+      const urlMonth = params.get('month') || currentMonth;
+      const latestTenants = await fetchTenants(urlMonth);
       let newList = [...(latestTenants || [])];
       
       const targetId = editingId || generateUUID();
@@ -132,7 +143,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({
         newList = [itemToSave, ...newList];
       }
 
-      const success = await saveTenants(newList);
+      const success = await saveTenants(newList, urlMonth);
       if (success) {
         if (window.opener) {
           window.opener.postMessage({ type: 'TENANT_SAVED' }, '*');
@@ -158,7 +169,7 @@ const TenantStatus: React.FC<TenantStatusProps> = ({
     const newTenants = originalTenants.filter(t => String(t.id) !== idStr);
     
     try {
-      const success = await saveTenants(newTenants);
+      const success = await saveTenants(newTenants, currentMonth);
       if (success) {
         setTenants(newTenants);
         alert('삭제가 완료되었습니다.');

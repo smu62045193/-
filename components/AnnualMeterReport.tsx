@@ -44,7 +44,7 @@ const AnnualMeterReport: React.FC<AnnualMeterReportProps> = ({
     try {
       const [results, tenants] = await Promise.all([
         apiFetchRange("METER_", `${selectedYear}-01`, `${selectedYear}-12-31`),
-        fetchTenants()
+        fetchTenants(`${selectedYear}-12`)
       ]);
       const dataList = results.map((r: any) => r.data as MeterReadingData);
       setAllYearData(dataList);
