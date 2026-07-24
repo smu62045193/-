@@ -30,7 +30,8 @@ const ConsumablesRegister: React.FC = () => {
     stockQty: '',
     unit: 'EA',
     note: '',
-    isManual: false
+    isManual: false,
+    isDiscontinued: false
   });
 
   useEffect(() => {
@@ -105,7 +106,9 @@ const ConsumablesRegister: React.FC = () => {
         ...newItem, 
         id: generateId(),
         itemName: newItem.itemName.trim(),
-        modelName: (newItem.modelName || '').trim()
+        modelName: (newItem.modelName || '').trim(),
+        isManual: !!newItem.isManual,
+        isDiscontinued: !!newItem.isDiscontinued
       };
       const newList = [itemToAdd, ...currentList];
       
@@ -125,7 +128,8 @@ const ConsumablesRegister: React.FC = () => {
           stockQty: '',
           unit: 'EA',
           note: '',
-          isManual: false
+          isManual: false,
+          isDiscontinued: false
         });
         setBaseStock(0);
       } else {
@@ -228,15 +232,27 @@ const ConsumablesRegister: React.FC = () => {
           <label className="block text-sm font-bold text-gray-700 mb-2">비고</label>
           <input type="text" value={newItem.note} onChange={e => setNewItem({...newItem, note: e.target.value})} className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none text-sm bg-white text-black" />
         </div>
-        <div className="col-span-2 flex items-center gap-2 mt-2">
-          <input 
-            type="checkbox" 
-            id="isManualCheckReg" 
-            checked={newItem.isManual || false} 
-            onChange={e => setNewItem({...newItem, isManual: e.target.checked})} 
-            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <label htmlFor="isManualCheckReg" className="text-sm font-bold text-gray-700 cursor-pointer">수기작업</label>
+        <div className="col-span-2 flex items-center gap-4 mt-2">
+          <div className="flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              id="isManualCheckReg" 
+              checked={newItem.isManual || false} 
+              onChange={e => setNewItem({...newItem, isManual: e.target.checked})} 
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="isManualCheckReg" className="text-sm font-bold text-gray-700 cursor-pointer">수기작업</label>
+          </div>
+          <div className="flex items-center gap-2">
+            <input 
+              type="checkbox" 
+              id="isDiscontinuedCheckReg" 
+              checked={newItem.isDiscontinued || false} 
+              onChange={e => setNewItem({...newItem, isDiscontinued: e.target.checked})} 
+              className="w-4 h-4 text-rose-600 bg-gray-100 border-gray-300 rounded focus:ring-rose-500"
+            />
+            <label htmlFor="isDiscontinuedCheckReg" className="text-sm font-bold text-rose-700 cursor-pointer">사용안함 (자재신청 미연동)</label>
+          </div>
         </div>
       </div>
 

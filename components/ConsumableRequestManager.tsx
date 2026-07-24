@@ -118,6 +118,7 @@ const ConsumableRequestManager: React.FC<ConsumableRequestManagerProps> = ({ onB
       const lowStockItems = Object.values(groups)
         .map(g => ({ ...g.lastItem, currentStock: g.totalIn - g.totalOut }))
         .filter(item => {
+          if (item.isDiscontinued) return false;
           const minStockStr = String(item.minStock || '').trim();
           const threshold = (minStockStr !== '') ? parseFloat(minStockStr) : 5;
           return item.currentStock < threshold;

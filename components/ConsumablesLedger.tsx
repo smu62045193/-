@@ -46,7 +46,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     unit: 'EA',
     note: '',    
     minStock: '5',
-    isManual: false
+    isManual: false,
+    isDiscontinued: false
   });
 
   useEffect(() => {
@@ -73,6 +74,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           note: params.get('note') || '',
           date: params.get('date') || prev.date,
           isManual: params.get('isManual') === 'true',
+          isDiscontinued: params.get('isDiscontinued') === 'true',
           details: '' 
         }));
         // 여기서 바로 true를 설정하면 재고 계산 useEffect가 실행되지 않으므로 제거
@@ -352,6 +354,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       url.searchParams.set('note', initialData.note || '');
       url.searchParams.set('date', format(new Date(), 'yyyy-MM-dd'));
       url.searchParams.set('isManual', initialData.isManual ? 'true' : 'false');
+      url.searchParams.set('isDiscontinued', initialData.isDiscontinued ? 'true' : 'false');
       url.searchParams.set('details', '');
     }
 
@@ -439,7 +442,9 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         outQty: newItem.outQty || '0',
         itemName: newItem.itemName.trim(),
         modelName: (newItem.modelName || '').trim(),
-        minStock: newItem.minStock || '5'
+        minStock: newItem.minStock || '5',
+        isManual: !!newItem.isManual,
+        isDiscontinued: !!newItem.isDiscontinued
       };
       if (editId) {
         const targetIndex = newList.findIndex(i => String(i.id) === String(editId));
@@ -471,7 +476,8 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                 itemName: newItemName,
                 modelName: newModelName,
                 unit: newUnit,
-                minStock: newMinStock
+                minStock: newMinStock,
+                isDiscontinued: itemToSave.isDiscontinued
               };
             }
             return item;
@@ -690,15 +696,27 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                   <textarea value={newItem.details} onChange={e => setNewItem({...newItem, details: e.target.value})} placeholder="사용 장소, 작업 내용 등 구체적인 사유 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-12" />
                 </div>
               )}
-              <div className="flex items-center gap-2 mt-2">
-                <input 
-                  type="checkbox" 
-                  id="isManualCheck" 
-                  checked={newItem.isManual || false} 
-                  onChange={e => setNewItem({...newItem, isManual: e.target.checked})} 
-                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                />
-                <label htmlFor="isManualCheck" className="text-sm font-bold text-gray-700 cursor-pointer">수기작업</label>
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="isManualCheck" 
+                    checked={newItem.isManual || false} 
+                    onChange={e => setNewItem({...newItem, isManual: e.target.checked})} 
+                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="isManualCheck" className="text-sm font-bold text-gray-700 cursor-pointer">수기작업</label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox" 
+                    id="isDiscontinuedCheck" 
+                    checked={newItem.isDiscontinued || false} 
+                    onChange={e => setNewItem({...newItem, isDiscontinued: e.target.checked})} 
+                    className="w-4 h-4 text-rose-600 bg-gray-100 border-gray-300 rounded focus:ring-rose-500"
+                  />
+                  <label htmlFor="isDiscontinuedCheck" className="text-sm font-bold text-rose-700 cursor-pointer">사용안함 (자재신청 미연동)</label>
+                </div>
               </div>
             </div>
           </div>
@@ -855,7 +873,14 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                       <td className={tdClass}><div className={cellDivClass}>{globalIdx}</div></td>
                       <td className={tdClass}><div className={cellDivClass}>{categoryCode}</div></td>
                       <td className={`${tdClass} text-blue-600`}><div className={cellDivClass}>{item.category}</div></td>
-                      <td className={tdClass}><div className={cellDivClass}>{item.itemName}</div></td>
+                      <td className={tdClass}>
+                        <div className={cellDivClass}>
+                          <span>{item.itemName}</span>
+                          {item.isDiscontinued && (
+                            <span className="ml-1 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1 py-0.5 rounded">미연동</span>
+                          )}
+                        </div>
+                      </td>
                       <td className={tdClass}><div className={cellDivClass}>{item.modelName || '-'}</div></td>
                       <td className={tdClass}>
                         <div className={cellDivClass}>
@@ -885,7 +910,14 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                       <td className={tdClass}><div className={cellDivClass}>{globalIdx}</div></td>
                       <td className={tdClass}><div className={cellDivClass}>{item.date}</div></td>
                       <td className={`${tdClass} text-blue-600`}><div className={cellDivClass}>{item.category}</div></td>
-                      <td className={tdClass}><div className={cellDivClass}>{item.itemName}</div></td>
+                      <td className={tdClass}>
+                        <div className={cellDivClass}>
+                          <span>{item.itemName}</span>
+                          {item.isDiscontinued && (
+                            <span className="ml-1 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-1 py-0.5 rounded">미연동</span>
+                          )}
+                        </div>
+                      </td>
                       <td className={tdClass}><div className={cellDivClass}>{item.modelName}</div></td>
                       <td className={`${tdClass} text-blue-600`}><div className={cellDivClass}>{item.inQty !== '0' && item.inQty !== '' ? item.inQty : ''}</div></td>
                       <td className={`${tdClass} text-red-600`}><div className={cellDivClass}>{item.outQty !== '0' && item.outQty !== '' ? item.outQty : ''}</div></td>

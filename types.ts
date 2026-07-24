@@ -192,6 +192,7 @@ export interface ConsumableItem {
   note: string;      // 비고
   minStock?: string; // 적정재고 (부족자재 자동판단 기준)
   isManual?: boolean; // 수기작업 여부
+  isDiscontinued?: boolean; // 사용안함 (자재신청 미연동)
 }
 
 export interface ConsumableRequestItem {
