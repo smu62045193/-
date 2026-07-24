@@ -680,7 +680,7 @@ const ConstructionContractorManager: React.FC<ConstructionContractorManagerProps
               ) : (
                 paginatedList.map((item, index) => {
                   const isNoEnd = item.type && item.type.includes('~') && !item.type.split('~')[1]?.trim();
-                  const isExpanded = expandedIds[item.id] !== false;
+                  const isExpanded = !!expandedIds[item.id];
                   return (
                     <React.Fragment key={item.id}>
                       <tr className={`transition-colors group border-b border-black last:border-b-0 h-[40px] ${
