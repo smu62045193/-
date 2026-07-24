@@ -299,12 +299,12 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             if (matchingItem) {
               if (matchingItem.selected) {
                 updatedThisLines.push(line);
-                updatedResLines.push(currentResLines[idx] || '완료 / 이상없음');
+                updatedResLines.push(currentResLines[idx] || '완료/이상없음');
                 matchedSelectedThisIds.add(matchingItem.id);
               }
             } else {
               updatedThisLines.push(line);
-              updatedResLines.push(currentResLines[idx] || '완료 / 이상없음');
+              updatedResLines.push(currentResLines[idx] || '완료/이상없음');
             }
           });
 
@@ -315,7 +315,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               if (!updatedThisLines.includes(content)) {
                 updatedThisLines.push(content);
                 
-                let res = '완료 / 이상없음';
+                let res = '완료/이상없음';
                 const text = it.content;
                 if (text.includes('입고')) res = '입고완료';
                 else if (text.includes('신청')) res = '신청완료';
@@ -579,7 +579,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
 
       const resultsList: string[] = selThis.map(it => {
         const text = it.content;
-        let res = '완료 / 이상없음';
+        let res = '완료/이상없음';
         if (text.includes('입고')) res = '입고완료';
         else if (text.includes('신청')) res = '신청완료';
         else if (text.includes('재활용')) res = '배출완료';
@@ -590,7 +590,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
 
       newFields[field.id as keyof typeof newFields] = { 
         thisWeek: formatGroup(selThis, true) || '', 
-        results: resultsList.join('\n') || (selThis.length > 0 ? '완료 / 이상없음' : ''), 
+        results: resultsList.join('\n') || (selThis.length > 0 ? '완료/이상없음' : ''), 
         nextWeek: formatGroup(selNext, false) || '' 
       };
     });
@@ -631,7 +631,7 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
       const displayLabel = field.id === 'handover' ? '특이<br/>사항' : field.label;
       
       const thisWeekLines = (f.thisWeek || '').split('\n').filter(l => l.trim() !== '');
-      const resultLines = (f.results || '').split('\n').map(l => l.trim());
+      const resultLines = (f.results || '').split('\n').map(l => l.trim().replace(/완료\s*\/\s*이상없음/g, '완료/이상없음'));
       const nextWeekLines = (f.nextWeek || '').split('\n').filter(l => l.trim() !== '');
       
       const rowCount = Math.max(thisWeekLines.length, nextWeekLines.length, 1);
@@ -655,39 +655,26 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
     }).join('');
 
     const validPhotos = (report.photos || []).filter(p => p.dataUrl);
-    const photoChunks = [];
-    for (let i = 0; i < validPhotos.length; i += 12) {
-      photoChunks.push(validPhotos.slice(i, i + 12));
-    }
-
-    let photosPagesHtml = '';
-    if (photoChunks.length === 0) {
-      photosPagesHtml = `
-        <div class="print-page page-break">
-          <div class="section-header">2. 작업사진</div>
-          <div class="photo-grid">
-            <div style="width:100%; text-align:center; padding:50px; color:#999; font-weight:bold;">등록된 작업 사진이 없습니다.</div>
-          </div>
-        </div>
+    let photosSectionHtml = '';
+    if (validPhotos.length === 0) {
+      photosSectionHtml = `
+        <div class="section-header">2. 작업사진</div>
+        <div style="width:100%; text-align:center; padding:30px; color:#999; font-weight:bold;">등록된 작업 사진이 없습니다.</div>
       `;
     } else {
-      photosPagesHtml = photoChunks.map((chunk, index) => {
-        const chunkHtml = chunk.map(photo => `
-          <div class="photo-card">
-            <div class="photo-img-wrap"><img src="${photo.dataUrl}" /></div>
-            <div class="photo-title">${photo.title || '작업 사진'}</div>
-          </div>
-        `).join('');
-        
-        return `
-          <div class="print-page page-break">
-            <div class="section-header">2. 작업사진 ${photoChunks.length > 1 ? `(${index + 1}/${photoChunks.length})` : ''}</div>
-            <div class="photo-grid">
-              ${chunkHtml}
-            </div>
-          </div>
-        `;
-      }).join('');
+      const photosListHtml = validPhotos.map(photo => `
+        <div class="photo-card">
+          <div class="photo-img-wrap"><img src="${photo.dataUrl}" /></div>
+          <div class="photo-title">${photo.title || '작업 사진'}</div>
+        </div>
+      `).join('');
+
+      photosSectionHtml = `
+        <div class="section-header">2. 작업사진</div>
+        <div class="photo-grid">
+          ${photosListHtml}
+        </div>
+      `;
     }
 
     printWindow.document.write(`
@@ -696,28 +683,30 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
           <title>주간업무보고 - ${report.startDate}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-            @page { size: A4 portrait; margin: 0; }
-            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #000000; -webkit-print-color-adjust: exact; }
+            @page { size: A4 portrait; margin: 15mm 10mm 15mm 10mm; }
+            * { box-sizing: border-box; }
+            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #525659; -webkit-print-color-adjust: exact; }
             .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
             @media print { 
+              @page { size: A4 portrait; margin: 15mm 10mm 15mm 10mm; }
               .no-print { display: none !important; } 
-              body { background: white !important; } 
-              .print-page { box-shadow: none !important; margin: 0 !important; }
-              .page-break { page-break-before: always; }
+              body { background: white !important; margin: 0 !important; padding: 0 !important; } 
+              .print-page { box-shadow: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; min-height: auto !important; }
             }
-            .print-page { width: 210mm; min-height: 297mm; padding: 25mm 5mm 10mm 5mm; margin: 20px auto; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); box-sizing: border-box; }
-            .doc-title { margin: 0 auto 15px auto; text-align: center; font-size: 30pt; font-weight: 900; letter-spacing: 12px; text-decoration: underline; text-underline-offset: 8px; }
+            .print-page { width: 100%; max-width: 210mm; margin: 20px auto; padding: 15mm 10mm 15mm 10mm; box-sizing: border-box; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-height: 297mm; }
+            .doc-title { margin: 0 auto 15px auto; text-align: center; font-size: 28pt; font-weight: 900; letter-spacing: 12px; text-decoration: underline; text-underline-offset: 8px; }
             .info-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt; margin-bottom: 15px; border-bottom: 1.5px solid black; padding-bottom: 5px; }
-            .section-header { font-size: 13pt; font-weight: bold; margin-top: 10px; margin-bottom: 15px; border-left: 8px solid black; padding-left: 15px; text-align: left; }
-            table { width: 100%; border-collapse: collapse; border: 1.5px solid black; table-layout: fixed; margin-bottom: 15px; }
-            th, td { border: 1px solid black; padding: 6px; font-size: 9pt; vertical-align: top; text-align: center; word-break: break-all; }
-            th { background: white; font-weight: normal; }
+            .section-header { font-size: 13pt; font-weight: bold; margin-top: 20px; margin-bottom: 12px; border-left: 8px solid black; padding-left: 15px; text-align: left; break-after: avoid; page-break-after: avoid; }
+            table { width: 100%; border-collapse: collapse; border: 1.5px solid black; margin-bottom: 15px; table-layout: fixed; }
+            tr { break-inside: avoid; page-break-inside: avoid; }
+            th, td { border: 1px solid black; padding: 6px; font-size: 9pt; vertical-align: top; word-break: break-all; }
+            th { background: white; font-weight: normal; text-align: center; }
             .text-left { text-align: left; }
-            .photo-grid { display: flex; flex-wrap: wrap; gap: 1%; margin-top: 15px; }
-            .photo-card { width: 32%; border: 1px solid #000; padding: 5px; box-sizing: border-box; margin-bottom: 10px; background: white; }
+            .photo-grid { display: flex; flex-wrap: wrap; gap: 1.5%; margin-top: 10px; }
+            .photo-card { width: 32%; border: 1px solid #000; padding: 5px; box-sizing: border-box; margin-bottom: 12px; background: white; break-inside: avoid; page-break-inside: avoid; }
             .photo-img-wrap { width: 100%; aspect-ratio: 4/3; overflow: hidden; border: 1px solid #000; display: flex; align-items: center; justify-content: center; background: #f9f9f9; }
             .photo-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
-            .photo-title { font-weight: normal; font-size: 8.5pt; text-align: center; padding-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .photo-title { font-weight: normal; font-size: 8.5pt; text-align: center; padding-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid #000; }
           </style>
         </head>
         <body>
@@ -725,7 +714,6 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
             <button onclick="window.print()" style="padding: 10px 24px; background: #1e3a8a; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12pt;">인쇄하기</button>
           </div>
           
-          <!-- 1페이지: 업무 실적 및 계획 -->
           <div class="print-page">
             <h1 class="doc-title" style="margin-top: 0;">주간업무보고</h1>
             <div class="info-line">
@@ -734,16 +722,16 @@ const WeeklyWork: React.FC<WeeklyWorkProps> = ({ currentDate, onDateChange }) =>
               <span>작성자 : ${report.author}</span>
             </div>
             
-            <div class="section-header">1.금주업무/업무계획</div>
+            <div class="section-header">1. 금주업무 / 업무계획</div>
             <table>
               <thead>
                 <tr><th style="width:40px;">분야</th><th>금주 업무 실적</th><th style="width:90px;">점검결과</th><th>다음주 업무 계획</th></tr>
               </thead>
               <tbody>${fieldsHtml}</tbody>
             </table>
-          </div>
 
-          ${photosPagesHtml}
+            ${photosSectionHtml}
+          </div>
         </body>
       </html>
     `);
