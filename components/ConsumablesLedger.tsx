@@ -442,9 +442,43 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
         minStock: newItem.minStock || '5'
       };
       if (editId) {
-        const index = newList.findIndex(i => String(i.id) === String(editId));
-        if (index >= 0) newList[index] = itemToSave;
-        else newList = [itemToSave, ...newList];
+        const targetIndex = newList.findIndex(i => String(i.id) === String(editId));
+        if (targetIndex >= 0) {
+          const originalItem = newList[targetIndex];
+          const oldCategory = originalItem.category;
+          const oldItemName = (originalItem.itemName || '').trim();
+          const oldModelName = (originalItem.modelName || '').trim();
+
+          const newCategory = itemToSave.category;
+          const newItemName = itemToSave.itemName;
+          const newModelName = itemToSave.modelName;
+          const newUnit = itemToSave.unit;
+          const newMinStock = itemToSave.minStock;
+
+          // 동일한 (구분, 품명, 모델명)을 가진 이전 모든 입출고 내역을 신규 수정 정보로 일괄 변경
+          newList = newList.map(item => {
+            if (String(item.id) === String(editId)) {
+              return itemToSave;
+            }
+            if (
+              item.category === oldCategory &&
+              (item.itemName || '').trim() === oldItemName &&
+              (item.modelName || '').trim() === oldModelName
+            ) {
+              return {
+                ...item,
+                category: newCategory,
+                itemName: newItemName,
+                modelName: newModelName,
+                unit: newUnit,
+                minStock: newMinStock
+              };
+            }
+            return item;
+          });
+        } else {
+          newList = [itemToSave, ...newList];
+        }
       } else {
         newList = [itemToSave, ...newList];
       }
