@@ -281,7 +281,6 @@ const HvacLog: React.FC<HvacLogProps> = ({
         const success = await saveChemicalLog(chemicalData);
         if (success) {
           setSaveStatus('success');
-          alert('종균제/소독제가 저장이되었습니다.');
           setTimeout(() => setSaveStatus('idle'), 3000);
         } else {
           setSaveStatus('error');
@@ -302,7 +301,6 @@ const HvacLog: React.FC<HvacLogProps> = ({
       if (success) {
         setSaveStatus('success');
         setIsPrintEnabledHvac(true);
-        alert('냉온수기/보일러 일지가 저장되었습니다.');
         setTimeout(() => setSaveStatus('idle'), 3000);
       } else {
         setSaveStatus('error');
