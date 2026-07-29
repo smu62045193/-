@@ -753,19 +753,21 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                    <div style="height: 80px; border-bottom: 4px solid black; display: flex; align-items: center; justify-content: center;">
                       <span class="red-label" style="font-size: 20pt;">커피점테라스</span>
                    </div>
-                   <div style="position: absolute; top: 100px; right: 30px; display: flex; flex-direction: column; align-items: center;">
-                      <div class="label-text" style="position: static; margin-bottom: 5px; text-align: center;">${outdoorUnitGarden1FData.label1.replace(/\n/g, '<br/>')}</div>
+                   <!-- 1, 2번 (삼성 / B1F / 이가마루) -->
+                   <div style="position: absolute; top: 100px; left: 160px; display: flex; flex-direction: column; align-items: center;">
+                      <div class="label-text" style="position: static; margin-bottom: 5px; text-align: center;">${outdoorUnitGarden1FData.label234}</div>
                       <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">1</div>
+                      <div class="unit-box" style="position: static; width: 100px; height: 40px; border-top: 0; font-size: 20pt;">2</div>
                    </div>
-                   <div style="position: absolute; top: 280px; left: 30px; display: flex; flex-direction: column; align-items: center;">
-                      <div style="display: flex; align-items: flex-end; gap: 15px;">
-                         <div style="display: flex; flex-direction: column;">
-                            <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">2</div>
-                            <div class="unit-box" style="position: static; width: 100px; height: 40px; border-top: 0; font-size: 20pt;">3</div>
-                         </div>
-                         <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">4</div>
-                      </div>
-                      <div class="label-text" style="position: static; margin-top: 10px;">${outdoorUnitGarden1FData.label234}</div>
+                   <!-- 3번 (삼성 / 1F / 매머드커피) - 우측 이동 -->
+                   <div style="position: absolute; top: 100px; left: 280px; display: flex; flex-direction: column; align-items: center;">
+                      <div class="label-text" style="position: static; margin-bottom: 5px; text-align: center;">${outdoorUnitGarden1FData.label1.replace(/\n/g, '<br/>')}</div>
+                      <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">3</div>
+                   </div>
+                   <!-- 4번 - 3번 아래 -->
+                   <div style="position: absolute; top: 270px; left: 280px; display: flex; flex-direction: column; align-items: center;">
+                      <div class="label-text" style="position: static; margin-bottom: 5px; text-align: center;">${outdoorUnitGarden1FData.label4 !== undefined ? outdoorUnitGarden1FData.label4 : outdoorUnitGarden1FData.label234}</div>
+                      <div class="unit-box" style="position: static; width: 100px; height: 40px; font-size: 20pt;">4</div>
                    </div>
                    <div class="red-label" style="position: absolute; bottom: 30px; left: 0; right: 0; text-align: center; font-size: 40pt; letter-spacing: 0.5em;">화 단</div>
                 </div>
@@ -3293,23 +3295,35 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
         <div className="max-w-4xl mx-auto relative min-h-[700px]">
           {/* Left Column (1-9) */}
           <div className="flex flex-col space-y-6 w-[350px]">
-            {mainItems.map((item) => (
-              <div key={item.id} className="flex items-center space-x-6">
-                <div className="w-20 h-10 border-2 border-[#0066CC] flex items-center justify-center font-bold text-lg bg-white shrink-0">
-                  {item.id}
+            {mainItems.map((item) => {
+              const isEmpty = !item.label || item.label.trim() === '' || item.label.trim() === '빈자리';
+              return (
+                <div key={item.id} className="flex items-center space-x-6">
+                  <div className={`w-24 h-10 border-2 flex items-center justify-center font-bold text-lg shrink-0 ${
+                    isEmpty ? 'border-red-500 bg-red-100 text-red-600 shadow-sm' : 'border-[#0066CC] bg-white'
+                  }`}>
+                    {item.id}
+                  </div>
+                  {isOutdoorUnitEditMode ? (
+                    <input
+                      type="text"
+                      value={item.label}
+                      placeholder="빈자리"
+                      onChange={(e) => handleOutdoorUnitRooftopChange(item.id, e.target.value)}
+                      className={`flex-1 border p-1 text-[15px] font-medium rounded ${
+                        isEmpty ? 'border-red-300 bg-red-50 text-red-600 font-bold placeholder-red-400' : 'border-orange-300'
+                      }`}
+                    />
+                  ) : (
+                    <span className={`text-[15px] whitespace-nowrap ${
+                      isEmpty ? 'font-bold text-red-600 bg-red-100 border border-red-300 px-3 py-1 rounded shadow-xs' : 'font-medium'
+                    }`}>
+                      {isEmpty ? '빈자리' : item.label}
+                    </span>
+                  )}
                 </div>
-                {isOutdoorUnitEditMode ? (
-                  <input
-                    type="text"
-                    value={item.label}
-                    onChange={(e) => handleOutdoorUnitRooftopChange(item.id, e.target.value)}
-                    className="flex-1 border border-orange-300 p-1 text-[15px] font-medium rounded"
-                  />
-                ) : (
-                  <span className="text-[15px] font-medium whitespace-nowrap">{item.label}</span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Central Cooling Tower Box */}
@@ -3321,48 +3335,70 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
           {/* Bottom Row (10-15) */}
           <div className="mt-6 flex items-start justify-between">
             <div className="flex space-x-6">
-              {bottomItems.map((item) => (
-                <div key={item.id} className="flex flex-col items-center space-y-2 w-24">
-                  <div className="w-full h-10 border-2 border-[#0066CC] flex items-center justify-center font-bold text-lg bg-white">
-                    {item.id}
+              {bottomItems.map((item) => {
+                const isEmpty = !item.label || item.label.trim() === '' || item.label.trim() === '빈자리';
+                return (
+                  <div key={item.id} className="flex flex-col items-center space-y-2 w-24">
+                    <div className={`w-full h-10 border-2 flex items-center justify-center font-bold text-lg ${
+                      isEmpty ? 'border-red-500 bg-red-100 text-red-600 shadow-sm' : 'border-[#0066CC] bg-white'
+                    }`}>
+                      {item.id}
+                    </div>
+                    {isOutdoorUnitEditMode ? (
+                      <textarea
+                        value={item.label}
+                        placeholder="빈자리"
+                        onChange={(e) => handleOutdoorUnitRooftopChange(item.id, e.target.value)}
+                        rows={2}
+                        className={`w-full border p-1 text-[13px] font-medium text-center leading-tight rounded resize-none ${
+                          isEmpty ? 'border-red-300 bg-red-50 text-red-600 font-bold placeholder-red-400' : 'border-orange-300'
+                        }`}
+                      />
+                    ) : (
+                      <div className={`text-[13px] text-center leading-tight min-h-[32px] flex items-center justify-center w-full rounded ${
+                        isEmpty ? 'font-bold text-red-600 bg-red-100 border border-red-300 py-1' : 'font-medium'
+                      }`}>
+                        {isEmpty ? '빈자리' : item.label.split('\n').map((line, i) => (
+                          <div key={i}>{line}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {(() => {
+              const isEmpty = !lastItem.label || lastItem.label.trim() === '' || lastItem.label.trim() === '빈자리';
+              return (
+                <div className="flex flex-col items-center space-y-2 w-24">
+                  <div className={`w-full h-10 border-2 flex items-center justify-center font-bold text-lg ${
+                    isEmpty ? 'border-red-500 bg-red-100 text-red-600 shadow-sm' : 'border-[#0066CC] bg-white'
+                  }`}>
+                    {lastItem.id}
                   </div>
                   {isOutdoorUnitEditMode ? (
                     <textarea
-                      value={item.label}
-                      onChange={(e) => handleOutdoorUnitRooftopChange(item.id, e.target.value)}
+                      value={lastItem.label}
+                      placeholder="빈자리"
+                      onChange={(e) => handleOutdoorUnitRooftopChange(lastItem.id, e.target.value)}
                       rows={2}
-                      className="w-full border border-orange-300 p-1 text-[13px] font-medium text-center leading-tight rounded resize-none"
+                      className={`w-full border p-1 text-[13px] font-medium text-center leading-tight rounded resize-none ${
+                        isEmpty ? 'border-red-300 bg-red-50 text-red-600 font-bold placeholder-red-400' : 'border-orange-300'
+                      }`}
                     />
                   ) : (
-                    <div className="text-[13px] font-medium text-center leading-tight min-h-[32px] flex items-center justify-center">
-                      {item.label.split('\n').map((line, i) => (
+                    <div className={`text-[13px] text-center leading-tight min-h-[32px] flex items-center justify-center w-full rounded ${
+                      isEmpty ? 'font-bold text-red-600 bg-red-100 border border-red-300 py-1' : 'font-medium'
+                    }`}>
+                      {isEmpty ? '빈자리' : lastItem.label.split('\n').map((line, i) => (
                         <div key={i}>{line}</div>
                       ))}
                     </div>
                   )}
                 </div>
-              ))}
-            </div>
-
-            <div className="flex flex-col items-center space-y-2 w-24">
-              <div className="w-full h-10 border-2 border-[#0066CC] flex items-center justify-center font-bold text-lg bg-white">
-                {lastItem.id}
-              </div>
-              {isOutdoorUnitEditMode ? (
-                <textarea
-                  value={lastItem.label}
-                  onChange={(e) => handleOutdoorUnitRooftopChange(lastItem.id, e.target.value)}
-                  rows={2}
-                  className="w-full border border-orange-300 p-1 text-[13px] font-medium text-center leading-tight rounded resize-none"
-                />
-              ) : (
-                <div className="text-[13px] font-medium text-center leading-tight min-h-[32px] flex items-center justify-center">
-                  {lastItem.label.split('\n').map((line, i) => (
-                    <div key={i}>{line}</div>
-                  ))}
-                </div>
-              )}
-            </div>
+              );
+            })()}
           </div>
 
           {/* Bottom Labels */}
@@ -3395,23 +3431,35 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
           {/* Central Vertical Layout */}
           <div className="flex flex-col space-y-4 w-full max-w-lg px-12 items-center">
             <div className="w-full border-l-2 border-l-black border-r-2 border-r-black px-12 flex flex-col space-y-4 items-center h-fit pb-8">
-              {outdoorUnitOutside1FData.map((item) => (
-                <div key={item.id} className="flex items-center space-x-4 w-full">
-                  <div className="w-16 h-8 border-2 border-[#0066CC] flex items-center justify-center font-bold text-base bg-white shrink-0">
-                    {item.id}
+              {outdoorUnitOutside1FData.map((item) => {
+                const isEmpty = !item.label || item.label.trim() === '' || item.label.trim() === '빈자리';
+                return (
+                  <div key={item.id} className="flex items-center space-x-4 w-full">
+                    <div className={`w-16 h-8 border-2 flex items-center justify-center font-bold text-base shrink-0 ${
+                      isEmpty ? 'border-red-500 bg-red-100 text-red-600 shadow-sm' : 'border-[#0066CC] bg-white'
+                    }`}>
+                      {item.id}
+                    </div>
+                    {isOutdoorUnitEditMode ? (
+                      <input
+                        type="text"
+                        value={item.label}
+                        placeholder="빈자리"
+                        onChange={(e) => handleOutdoorUnitOutside1FChange(item.id, e.target.value)}
+                        className={`flex-1 border p-1 text-[14px] font-medium rounded ${
+                          isEmpty ? 'border-red-300 bg-red-50 text-red-600 font-bold placeholder-red-400' : 'border-orange-300'
+                        }`}
+                      />
+                    ) : (
+                      <span className={`text-[14px] whitespace-pre-wrap ${
+                        isEmpty ? 'font-bold text-red-600 bg-red-100 border border-red-300 px-3 py-0.5 rounded shadow-xs' : 'font-medium'
+                      }`}>
+                        {isEmpty ? '빈자리' : item.label}
+                      </span>
+                    )}
                   </div>
-                  {isOutdoorUnitEditMode ? (
-                    <input
-                      type="text"
-                      value={item.label}
-                      onChange={(e) => handleOutdoorUnitOutside1FChange(item.id, e.target.value)}
-                      className="flex-1 border border-orange-300 p-1 text-[14px] font-medium rounded"
-                    />
-                  ) : (
-                    <span className="text-[14px] font-medium whitespace-pre-wrap">{item.label}</span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -3425,6 +3473,12 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
   };
 
   const renderOutdoorUnitGarden1FContent = () => {
+    const is234Empty = !outdoorUnitGarden1FData.label234 || outdoorUnitGarden1FData.label234.trim() === '' || outdoorUnitGarden1FData.label234.trim() === '빈자리';
+    const is1Empty = !outdoorUnitGarden1FData.label1 || outdoorUnitGarden1FData.label1.trim() === '' || outdoorUnitGarden1FData.label1.trim() === '빈자리';
+    const label4Val = outdoorUnitGarden1FData.label4 !== undefined ? outdoorUnitGarden1FData.label4 : outdoorUnitGarden1FData.label234;
+    const is4Empty = !label4Val || label4Val.trim() === '' || label4Val.trim() === '빈자리';
+    const is5Empty = !outdoorUnitGarden1FData.label5 || outdoorUnitGarden1FData.label5.trim() === '' || outdoorUnitGarden1FData.label5.trim() === '빈자리';
+
     return (
       <div className="bg-white p-8 overflow-auto">
         <div className="max-w-6xl mx-auto flex justify-between space-x-12 min-h-[600px]">
@@ -3437,54 +3491,94 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
 
             {/* Content Area Inside Left Garden */}
             <div className="flex-1 relative p-8">
-              {/* Unit 1 Block */}
-              <div className="absolute top-8 right-16 flex flex-col items-center">
+              {/* Units 1, 2 Block (삼성 / B1F / 이가마루) */}
+              <div className="absolute top-8 left-[180px] flex flex-col items-center">
+                <div className="mb-2 text-center">
+                  {isOutdoorUnitEditMode ? (
+                    <input
+                      type="text"
+                      value={outdoorUnitGarden1FData.label234 || ''}
+                      placeholder="빈자리"
+                      onChange={(e) => handleOutdoorUnitGarden1FChange('label234', e.target.value)}
+                      className={`border p-1 text-[13px] font-medium text-center w-52 rounded ${
+                        is234Empty ? 'border-red-300 bg-red-50 text-red-600 font-bold placeholder-red-400' : 'border-orange-300'
+                      }`}
+                    />
+                  ) : (
+                    <div className={`text-[13px] text-center ${
+                      is234Empty ? 'font-bold text-red-600 bg-red-100 border border-red-300 px-3 py-0.5 rounded shadow-xs' : 'font-medium'
+                    }`}>
+                      {is234Empty ? '빈자리' : outdoorUnitGarden1FData.label234}
+                    </div>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <div className={`w-32 h-12 border-2 flex items-center justify-center font-bold text-2xl shadow-sm ${
+                    is234Empty ? 'border-red-500 bg-red-100 text-red-600' : 'border-[#0066CC] bg-white'
+                  }`}>
+                    1
+                  </div>
+                  <div className={`w-32 h-12 border-2 border-t-0 flex items-center justify-center font-bold text-2xl shadow-sm ${
+                    is234Empty ? 'border-red-500 bg-red-100 text-red-600' : 'border-[#0066CC] bg-white'
+                  }`}>
+                    2
+                  </div>
+                </div>
+              </div>
+
+              {/* Unit 3 Block (삼성 / 1F / 매머드커피 - 우측 이동) */}
+              <div className="absolute top-8 left-[330px] flex flex-col items-center">
                 <div className="mb-2 text-center">
                   {isOutdoorUnitEditMode ? (
                     <textarea
                       value={outdoorUnitGarden1FData.label1}
+                      placeholder="빈자리"
                       onChange={(e) => handleOutdoorUnitGarden1FChange('label1', e.target.value)}
-                      className="border border-orange-300 p-1 text-[13px] font-medium text-center w-64 leading-tight rounded resize-none"
+                      className={`border p-1 text-[13px] font-medium text-center w-52 leading-tight rounded resize-none ${
+                        is1Empty ? 'border-red-300 bg-red-50 text-red-600 font-bold placeholder-red-400' : 'border-orange-300'
+                      }`}
                       rows={2}
                     />
                   ) : (
-                    <div className="text-[13px] font-medium leading-tight whitespace-pre-wrap">
-                      {outdoorUnitGarden1FData.label1}
+                    <div className={`text-[13px] leading-tight whitespace-pre-wrap text-center ${
+                      is1Empty ? 'font-bold text-red-600 bg-red-100 border border-red-300 px-3 py-0.5 rounded shadow-xs' : 'font-medium'
+                    }`}>
+                      {is1Empty ? '빈자리' : outdoorUnitGarden1FData.label1}
                     </div>
                   )}
                 </div>
-                <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
-                  1
+                <div className={`w-32 h-12 border-2 flex items-center justify-center font-bold text-2xl shadow-sm ${
+                  is1Empty ? 'border-red-500 bg-red-100 text-red-600' : 'border-[#0066CC] bg-white'
+                }`}>
+                  3
                 </div>
               </div>
 
-              {/* Units 2, 3, 4 Cluster */}
-              <div className="absolute top-48 left-12 flex flex-col items-center">
-                <div className="flex items-end">
-                  <div className="flex flex-col">
-                    <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
-                      2
-                    </div>
-                    <div className="w-32 h-12 border-2 border-[#0066CC] border-t-0 flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
-                      3
-                    </div>
-                  </div>
-                  <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm mb-0 ml-4">
-                    4
-                  </div>
-                </div>
-                {/* Cluster Label */}
-                <div className="mt-4 text-center">
+              {/* Unit 4 Block (3번 아래) */}
+              <div className="absolute top-52 left-[330px] flex flex-col items-center">
+                <div className="mb-2 text-center">
                   {isOutdoorUnitEditMode ? (
                     <input
                       type="text"
-                      value={outdoorUnitGarden1FData.label234}
-                      onChange={(e) => handleOutdoorUnitGarden1FChange('label234', e.target.value)}
-                      className="border border-orange-300 p-1 text-[15px] font-medium text-center w-64 rounded"
+                      value={outdoorUnitGarden1FData.label4 !== undefined ? outdoorUnitGarden1FData.label4 : (outdoorUnitGarden1FData.label234 || '')}
+                      placeholder="빈자리"
+                      onChange={(e) => handleOutdoorUnitGarden1FChange('label4', e.target.value)}
+                      className={`border p-1 text-[13px] font-medium text-center w-52 rounded ${
+                        is4Empty ? 'border-red-300 bg-red-50 text-red-600 font-bold placeholder-red-400' : 'border-orange-300'
+                      }`}
                     />
                   ) : (
-                    <div className="text-[15px] font-medium">{outdoorUnitGarden1FData.label234}</div>
+                    <div className={`text-[13px] text-center ${
+                      is4Empty ? 'font-bold text-red-600 bg-red-100 border border-red-300 px-3 py-0.5 rounded shadow-xs' : 'font-medium'
+                    }`}>
+                      {is4Empty ? '빈자리' : label4Val}
+                    </div>
                   )}
+                </div>
+                <div className={`w-32 h-12 border-2 flex items-center justify-center font-bold text-2xl shadow-sm ${
+                  is4Empty ? 'border-red-500 bg-red-100 text-red-600' : 'border-[#0066CC] bg-white'
+                }`}>
+                  4
                 </div>
               </div>
 
@@ -3504,7 +3598,9 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
             <div className="flex-1 relative flex flex-col items-center justify-center p-8">
               {/* Unit 5 Block */}
               <div className="flex flex-col items-center mt-4">
-                <div className="w-32 h-12 border-2 border-[#0066CC] flex items-center justify-center font-bold text-2xl bg-white shadow-sm">
+                <div className={`w-32 h-12 border-2 flex items-center justify-center font-bold text-2xl shadow-sm ${
+                  is5Empty ? 'border-red-500 bg-red-100 text-red-600' : 'border-[#0066CC] bg-white'
+                }`}>
                   5
                 </div>
                 <div className="mt-4 text-center">
@@ -3512,11 +3608,18 @@ const AdminManager: React.FC<AdminManagerProps> = ({ isArchiveOnly = false }) =>
                     <input
                       type="text"
                       value={outdoorUnitGarden1FData.label5}
+                      placeholder="빈자리"
                       onChange={(e) => handleOutdoorUnitGarden1FChange('label5', e.target.value)}
-                      className="border border-orange-300 p-1 text-[15px] font-medium text-center w-72 rounded"
+                      className={`border p-1 text-[15px] font-medium text-center w-72 rounded ${
+                        is5Empty ? 'border-red-300 bg-red-50 text-red-600 font-bold placeholder-red-400' : 'border-orange-300'
+                      }`}
                     />
                   ) : (
-                    <div className="text-[15px] font-medium whitespace-nowrap">{outdoorUnitGarden1FData.label5}</div>
+                    <div className={`text-[15px] whitespace-nowrap ${
+                      is5Empty ? 'font-bold text-red-600 bg-red-100 border border-red-300 px-4 py-1 rounded shadow-xs' : 'font-medium'
+                    }`}>
+                      {is5Empty ? '빈자리' : outdoorUnitGarden1FData.label5}
+                    </div>
                   )}
                 </div>
               </div>
