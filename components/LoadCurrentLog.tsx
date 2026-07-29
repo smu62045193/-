@@ -275,7 +275,7 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
   }, [data.items]);
 
   const filteredItems = useMemo(() => {
-    const items = [...data.items];
+    const items = data.items.map((item, index) => ({ ...item, _originalIdx: index }));
     
     // 수정 모드가 아닐 때만 정렬 수행 (수정 중에는 행이 갑자기 이동하면 불편하므로)
     if (!isEditing) {
@@ -284,6 +284,14 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
         const floorA = getFloorSortScore(a.floor || '');
         const floorB = getFloorSortScore(b.floor || '');
         if (floorA !== floorB) return floorB - floorA; // 높은 층부터 (RF -> 7F -> B1)
+
+        const targetA = (a.targetL || '').trim();
+        const targetB = (b.targetL || '').trim();
+
+        // 점검대상이 하나라도 비어있는 경우(삭제된 경우) 원래 자리(_originalIdx) 유지
+        if (!targetA || !targetB) {
+          return a._originalIdx - b._originalIdx;
+        }
 
         // 2. 점검대상 정렬 (사용자 지정 순서: 일반 -> 특수 -> 일반 업체 -> 특수 업체)
         const getTargetWeight = (t: string) => {
@@ -294,8 +302,6 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
           return 10;
         };
 
-        const targetA = (a.targetL || '').trim();
-        const targetB = (b.targetL || '').trim();
         const weightA = getTargetWeight(targetA);
         const weightB = getTargetWeight(targetB);
 
@@ -305,7 +311,9 @@ const LoadCurrentLog: React.FC<LoadCurrentLogProps> = ({ currentDate }) => {
         // 3. 순서 정렬
         const orderA = parseInt((a.orderL || '0').replace(/[^0-9]/g, '')) || 0;
         const orderB = parseInt((b.orderL || '0').replace(/[^0-9]/g, '')) || 0;
-        return orderA - orderB;
+        if (orderA !== orderB) return orderA - orderB;
+
+        return a._originalIdx - b._originalIdx;
       });
     }
 
