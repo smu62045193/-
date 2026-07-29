@@ -337,6 +337,50 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
     return pages;
   }, [currentPage, totalPages]);
 
+  const handleLocationChange = (val: string) => {
+    const normLoc = val.trim().replace(/\s+/g, '').toUpperCase();
+    let updatedPrevPlate = newItem.prevPlate;
+    let updatedCompany = newItem.company;
+
+    if (newItem.type === '변경' && normLoc && items.length > 0) {
+      const matched = items.find(i => (i.location || '').toString().trim().replace(/\s+/g, '').toUpperCase() === normLoc);
+      if (matched) {
+        updatedPrevPlate = matched.plateNum || '';
+        updatedCompany = matched.company || '';
+      }
+    }
+
+    setNewItem(prev => ({
+      ...prev,
+      location: val,
+      prevPlate: updatedPrevPlate,
+      company: updatedCompany
+    }));
+  };
+
+  const handleTypeChange = (typeVal: string) => {
+    const normLoc = (newItem.location || '').trim().replace(/\s+/g, '').toUpperCase();
+    let updatedPrevPlate = newItem.prevPlate;
+    let updatedCompany = newItem.company;
+
+    if (typeVal === '변경' && normLoc && items.length > 0) {
+      const matched = items.find(i => (i.location || '').toString().trim().replace(/\s+/g, '').toUpperCase() === normLoc);
+      if (matched) {
+        updatedPrevPlate = matched.plateNum || '';
+        updatedCompany = matched.company || '';
+      }
+    } else if (typeVal === '추가') {
+      updatedPrevPlate = '';
+    }
+
+    setNewItem(prev => ({
+      ...prev,
+      type: typeVal,
+      prevPlate: updatedPrevPlate,
+      company: updatedCompany
+    }));
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       const inputs = document.querySelectorAll('.form-input');
@@ -390,7 +434,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
               </div>
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">구분</label>
-                <select className={`${formInputClass} form-input`} value={newItem.type || '변경'} onChange={(e) => setNewItem({...newItem, type: e.target.value})}>
+                <select className={`${formInputClass} form-input`} value={newItem.type || '변경'} onChange={(e) => handleTypeChange(e.target.value)}>
                   <option value="변경">변경</option>
                   <option value="추가">추가</option>
                 </select>
@@ -400,7 +444,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">주차 위치 *</label>
-                <input type="text" className={`${formInputClass} form-input text-blue-700`} value={newItem.location} onChange={(e) => setNewItem({...newItem, location: e.target.value})} onKeyDown={handleKeyDown} placeholder="예: B2-1" />
+                <input type="text" className={`${formInputClass} form-input text-blue-700`} value={newItem.location} onChange={(e) => handleLocationChange(e.target.value)} onKeyDown={handleKeyDown} placeholder="예: B2-1" />
               </div>
               <div>
                 <label className="block text-[11px] font-black text-slate-400 mb-2 uppercase tracking-widest">업체명</label>
@@ -476,7 +520,7 @@ const ParkingStatusList: React.FC<ParkingStatusListProps> = ({ isPopupMode = fal
               disabled={loading}
               className="shrink-0 py-3 px-4 flex items-center text-[14px] font-bold bg-transparent text-gray-500 hover:text-black transition-colors whitespace-nowrap relative disabled:opacity-50"
             >
-              <Plus size={18} className="mr-1.5" /> 등록
+              <Plus size={18} className="mr-1.5" /> 등록(추가/변경)
             </button>
             <button 
               onClick={handlePrint} 

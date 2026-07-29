@@ -1,5 +1,5 @@
 {
-  "name": "07.29_시설관리프로그램_전기점검 \u003e 부하전류 리스트 정렬 로직 변경",
+  "name": "07.29_시설관리프로그램_주차/실외기 \u003e 차량현황 등록(추가/변경) 업체 연동",
   "description": "A comprehensive facility management dashboard for the Saemaul Undong Junganghoe Daechi-dong Building, featuring digital logs, scheduling, and AI-assisted weather updates.",
   "requestFramePermissions": [],
   "C7": [],
