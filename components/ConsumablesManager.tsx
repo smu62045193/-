@@ -5,7 +5,6 @@ import ConsumableRequestManager from './ConsumableRequestManager';
 
 const TABS = [
   { id: 'ledger', label: '관리대장' },
-  { id: 'usage', label: '사용내역' },
   { id: 'request', label: '자재신청' },
 ];
 
@@ -35,8 +34,8 @@ const ConsumablesManager: React.FC = () => {
         </div>
       </div>
 
-      {activeTab === 'ledger' || activeTab === 'usage' ? (
-        <ConsumablesLedger viewMode={activeTab as 'ledger' | 'usage'} />
+      {activeTab === 'ledger' ? (
+        <ConsumablesLedger viewMode="ledger" />
       ) : (
         <ConsumableRequestManager />
       )}

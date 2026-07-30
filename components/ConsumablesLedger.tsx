@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ConsumableItem } from '../types';
 import { fetchConsumables, saveConsumables } from '../services/dataService';
-import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch, Lock, Plus, Printer } from 'lucide-react';
+import { Trash2, Search, X, History, Save, PackagePlus, RefreshCw, Edit2, RotateCcw, CheckCircle2, PlusCircle, LayoutGrid, List, Cloud, CheckCircle, ChevronLeft, ChevronRight, PackageSearch, Lock, Plus, Printer, Check } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ConsumablesLedgerProps {
@@ -334,16 +334,16 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     printWindow.document.close();
   };
 
-  const openIndependentWindow = (id: string = 'new', initialData?: ConsumableItem) => {
-    const width = 850;
-    const height = 800; 
+  const openIndependentWindow = (id: string = 'new', initialData?: ConsumableItem, targetViewMode?: 'ledger' | 'usage') => {
+    const width = 880;
+    const height = 850; 
     const left = (window.screen.width / 2) - (width / 2);
     const top = (window.screen.height / 2) - (height / 2);
 
     const url = new URL(window.location.href);
     url.searchParams.set('popup', 'consumable');
     url.searchParams.set('id', id);
-    url.searchParams.set('viewMode', viewMode); 
+    url.searchParams.set('viewMode', targetViewMode || viewMode); 
     
     if (initialData && id === 'new') {
       url.searchParams.set('itemName', initialData.itemName);
@@ -612,6 +612,359 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
   const cellDivClass = "flex items-center justify-center h-full px-2 text-[13px] font-normal";
   const cellDivLeftClass = "flex items-center justify-start h-full px-2 text-[13px] font-normal";
 
+  const itemHistoryList = useMemo(() => {
+    if (!newItem.itemName || !newItem.itemName.trim()) return [];
+    return items.filter(
+      i => i.category === newItem.category &&
+      (i.itemName || '').trim() === newItem.itemName.trim() &&
+      (i.modelName || '').trim() === (newItem.modelName || '').trim()
+    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [items, newItem.category, newItem.itemName, newItem.modelName]);
+
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyItemsPerPage = 10;
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [newItem.itemName, newItem.modelName, newItem.category]);
+
+  const totalHistoryPages = Math.ceil(itemHistoryList.length / historyItemsPerPage) || 1;
+  const paginatedHistoryList = useMemo(() => {
+    const start = (historyPage - 1) * historyItemsPerPage;
+    return itemHistoryList.slice(start, start + historyItemsPerPage);
+  }, [itemHistoryList, historyPage]);
+
+  const [inlineEditId, setInlineEditId] = useState<string | null>(null);
+  const [inlineEditData, setInlineEditData] = useState<{ inQty: string; outQty: string; details: string } | null>(null);
+
+  const handleStartInlineEdit = (hist: ConsumableItem) => {
+    setInlineEditId(hist.id);
+    setInlineEditData({
+      inQty: hist.inQty && hist.inQty !== '0' ? hist.inQty : '',
+      outQty: hist.outQty && hist.outQty !== '0' ? hist.outQty : '',
+      details: hist.details || hist.note || ''
+    });
+  };
+
+  const handleSaveInlineEdit = async (hist: ConsumableItem) => {
+    if (!inlineEditData) return;
+    setLoading(true);
+
+    const inVal = inlineEditData.inQty.replace(/[^0-9.]/g, '');
+    const outVal = inlineEditData.outQty.replace(/[^0-9.]/g, '');
+
+    const newList = items.map(item => {
+      if (String(item.id) === String(hist.id)) {
+        return {
+          ...item,
+          inQty: inVal,
+          outQty: outVal,
+          details: inlineEditData.details,
+          note: inlineEditData.details
+        };
+      }
+      return item;
+    });
+
+    const targetCategory = hist.category;
+    const targetItemName = (hist.itemName || '').trim();
+    const targetModelName = (hist.modelName || '').trim();
+
+    const groupItems = newList
+      .filter(
+        i =>
+          i.category === targetCategory &&
+          (i.itemName || '').trim() === targetItemName &&
+          (i.modelName || '').trim() === targetModelName
+      )
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    let runningStock = 0;
+    const updatedStockMap = new Map<string, string>();
+    groupItems.forEach(item => {
+      const itemIn = parseFloat(String(item.inQty || '0').replace(/,/g, '')) || 0;
+      const itemOut = parseFloat(String(item.outQty || '0').replace(/,/g, '')) || 0;
+      runningStock = runningStock + itemIn - itemOut;
+      updatedStockMap.set(String(item.id), runningStock.toString());
+    });
+
+    const finalUpdatedList = newList.map(item => {
+      if (updatedStockMap.has(String(item.id))) {
+        return {
+          ...item,
+          stockQty: updatedStockMap.get(String(item.id)) || item.stockQty
+        };
+      }
+      return item;
+    });
+
+    const success = await saveConsumables(finalUpdatedList);
+    if (success) {
+      setItems(finalUpdatedList);
+      if (window.opener) {
+        window.opener.postMessage({ type: 'CONSUMABLE_SAVED' }, '*');
+      }
+      setInlineEditId(null);
+      setInlineEditData(null);
+    } else {
+      alert('수정 저장에 실패했습니다.');
+    }
+    setLoading(false);
+  };
+
+  const handleEditHistoryItem = (hist: ConsumableItem) => {
+    setEditId(hist.id);
+    const currentIn = parseFloat(String(hist.inQty || '0').replace(/,/g, '')) || 0;
+    const currentOut = parseFloat(String(hist.outQty || '0').replace(/,/g, '')) || 0;
+
+    const summary = summaryItems.find(s => 
+      s.category === hist.category && 
+      s.itemName.trim() === hist.itemName.trim() && 
+      (s.modelName || '').trim() === (hist.modelName || '').trim()
+    );
+
+    const totalStock = parseFloat(summary?.stockQty || '0');
+    setBaseStock(totalStock - currentIn + currentOut);
+    setNewItem({ ...hist });
+    hasInitializedRef.current = true;
+  };
+
+  const handleHistoryPrint = () => {
+    if (!newItem.itemName) {
+      alert('품명을 먼저 입력해주세요.');
+      return;
+    }
+
+    const printWindow = window.open('', '_blank', 'width=950,height=900');
+    if (!printWindow) {
+      alert('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+      return;
+    }
+
+    const historyHtml = itemHistoryList.map((hist, index) => `
+      <tr style="height: 32px; text-align: center;">
+        <td style="border: 1px solid #cbd5e1; padding: 4px;">${itemHistoryList.length - index}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 4px; font-weight: bold;">${hist.date}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 4px; font-weight: bold; color: #2563eb;">${hist.inQty && hist.inQty !== '0' ? hist.inQty : '-'}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 4px; font-weight: bold; color: #e11d48;">${hist.outQty && hist.outQty !== '0' ? hist.outQty : '-'}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 4px; font-weight: bold; color: #047857;">${hist.stockQty || '0'}</td>
+        <td style="border: 1px solid #cbd5e1; padding: 4px 8px; text-align: left;">${hist.details || hist.note || '-'}</td>
+      </tr>
+    `).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>소모품 사용 및 입고 내역서 미리보기 - ${newItem.itemName}</title>
+        <style>
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+          * { box-sizing: border-box; }
+          body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            background-color: #000000;
+            color: #1e293b;
+            margin: 0;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            -webkit-print-color-adjust: exact;
+          }
+          .no-print-bar {
+            width: 210mm;
+            background-color: #1e293b;
+            color: #ffffff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+          }
+          .no-print-bar .title {
+            font-size: 15px;
+            font-weight: bold;
+            color: #f8fafc;
+          }
+          .no-print-bar .btn-group {
+            display: flex;
+            gap: 8px;
+          }
+          .btn-print {
+            padding: 8px 18px;
+            background-color: #2563eb;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+          }
+          .btn-print:hover { background-color: #1d4ed8; }
+          .btn-close {
+            padding: 8px 14px;
+            background-color: #475569;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+          }
+          .btn-close:hover { background-color: #334155; }
+          .a4-paper {
+            width: 210mm;
+            min-height: 297mm;
+            background-color: #ffffff;
+            padding: 20mm 15mm;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            border-radius: 2px;
+          }
+          .doc-title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: 900;
+            margin-bottom: 24px;
+            text-decoration: underline;
+            letter-spacing: 1px;
+            color: #0f172a;
+          }
+          .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+          }
+          .info-table th {
+            background-color: #f1f5f9;
+            border: 1px solid #94a3b8;
+            padding: 8px 10px;
+            font-size: 13px;
+            width: 15%;
+            text-align: center;
+            color: #334155;
+          }
+          .info-table td {
+            border: 1px solid #94a3b8;
+            padding: 8px 10px;
+            font-size: 13px;
+            font-weight: bold;
+            width: 35%;
+            color: #0f172a;
+          }
+          .list-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+          }
+          .list-table th {
+            background-color: #e2e8f0;
+            border: 1px solid #94a3b8;
+            padding: 8px 4px;
+            font-weight: bold;
+            text-align: center;
+            color: #1e293b;
+          }
+          .header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 8px;
+          }
+          .print-date {
+            font-size: 11px;
+            color: #64748b;
+          }
+          @media print {
+            body {
+              background-color: #ffffff !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .no-print-bar {
+              display: none !important;
+            }
+            .a4-paper {
+              width: 100% !important;
+              min-height: auto !important;
+              padding: 0 !important;
+              box-shadow: none !important;
+              border-radius: 0 !important;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print-bar">
+          <div class="title">📄 소모품 사용 및 입고 내역서 미리보기</div>
+          <div class="btn-group">
+            <button class="btn-print" onclick="window.print()">🖨️ 바로 인쇄하기</button>
+            <button class="btn-close" onclick="window.close()">창닫기</button>
+          </div>
+        </div>
+
+        <div class="a4-paper">
+          <div class="doc-title">소모품 사용 및 입고 내역서</div>
+          
+          <table class="info-table">
+            <tr>
+              <th>구 분</th>
+              <td>${newItem.category || '-'}</td>
+              <th>품 명</th>
+              <td>${newItem.itemName}</td>
+            </tr>
+            <tr>
+              <th>규격/모델명</th>
+              <td>${newItem.modelName || '-'}</td>
+              <th>단 위</th>
+              <td>${newItem.unit || 'EA'}</td>
+            </tr>
+            <tr>
+              <th>현재 재고</th>
+              <td style="color: #047857;">${newItem.stockQty || '0'}</td>
+              <th>총 내역 건수</th>
+              <td>${itemHistoryList.length}건</td>
+            </tr>
+          </table>
+
+          <div class="header-flex">
+            <span style="font-weight: bold; font-size: 14px; color: #0f172a;">■ 입고 및 사용 세부 이력 목록</span>
+            <span class="print-date">출력일자: ${format(new Date(), 'yyyy-MM-dd HH:mm')}</span>
+          </div>
+
+          <table class="list-table">
+            <thead>
+              <tr>
+                <th style="width: 40px;">No</th>
+                <th style="width: 90px;">일자</th>
+                <th style="width: 60px;">입고량</th>
+                <th style="width: 60px;">사용량</th>
+                <th style="width: 60px;">재고</th>
+                <th>상세내역 (사용 장소 및 사유)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemHistoryList.length === 0 ? '<tr><td colspan="6" style="text-align:center; padding: 20px; border:1px solid #94a3b8;">등록된 내역이 없습니다.</td></tr>' : historyHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <script>
+          window.focus();
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   if (isPopupMode) {
     const currentActiveMode = isPopupMode ? popupViewMode : viewMode;
     return (
@@ -719,6 +1072,192 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                 </div>
               </div>
             </div>
+
+            {newItem.itemName.trim() && (
+              <div className="mt-6 pt-6 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <History size={16} className="text-blue-600" />
+                    [{newItem.itemName}{newItem.modelName ? ` (${newItem.modelName})` : ''}] 이전 사용 / 입고 내역 ({itemHistoryList.length}건)
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleHistoryPrint}
+                      className="px-3 py-1 bg-slate-800 text-white rounded-lg text-xs font-bold hover:bg-slate-700 transition-colors flex items-center gap-1.5 shadow-2xs"
+                      title="사용 및 입고 내역 인쇄"
+                    >
+                      <Printer size={13} />
+                      사용내역 인쇄
+                    </button>
+                    <span className="text-[11px] font-bold text-slate-400">최근순 정렬</span>
+                  </div>
+                </div>
+
+                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-xs">
+                  <table className="w-full text-xs text-center border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold h-9">
+                        <th className="py-2 px-2 border-r border-slate-200 w-12">No</th>
+                        <th className="py-2 px-2 border-r border-slate-200 w-24">일자</th>
+                        <th className="py-2 px-2 border-r border-slate-200 w-16 text-blue-600">입고</th>
+                        <th className="py-2 px-2 border-r border-slate-200 w-16 text-rose-600">사용</th>
+                        <th className="py-2 px-2 border-r border-slate-200 w-16 text-emerald-700">재고</th>
+                        <th className="py-2 px-3 border-r border-slate-200 text-left">상세내역 (사용 장소/사유)</th>
+                        <th className="py-2 px-2 w-28 text-center">관리</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {itemHistoryList.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center text-slate-400 font-medium">
+                            등록된 이전 사용 및 입고 내역이 없습니다.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedHistoryList.map((hist, index) => {
+                          const itemIndex = itemHistoryList.length - ((historyPage - 1) * historyItemsPerPage + index);
+                          const isEditingInline = inlineEditId === hist.id;
+                          return (
+                            <tr key={hist.id} className={`border-b border-slate-100 transition-colors h-10 ${isEditingInline ? 'bg-amber-50/90 font-medium' : 'hover:bg-blue-50/40'}`}>
+                              <td className="py-1.5 px-2 border-r border-slate-100 text-slate-400">{itemIndex}</td>
+                              <td className="py-1.5 px-2 border-r border-slate-100 font-bold text-slate-700">{hist.date}</td>
+                              
+                              {/* 입고 수량 */}
+                              <td className="py-1.5 px-2 border-r border-slate-100 font-black text-blue-600">
+                                {isEditingInline ? (
+                                  <input
+                                    type="text"
+                                    value={inlineEditData?.inQty || ''}
+                                    onChange={e => setInlineEditData(prev => prev ? { ...prev, inQty: e.target.value } : null)}
+                                    placeholder="0"
+                                    className="w-14 px-1 py-0.5 border border-blue-400 rounded text-center text-xs font-black text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                  />
+                                ) : (
+                                  hist.inQty && hist.inQty !== '0' ? hist.inQty : '-'
+                                )}
+                              </td>
+
+                              {/* 사용 수량 */}
+                              <td className="py-1.5 px-2 border-r border-slate-100 font-black text-rose-600">
+                                {isEditingInline ? (
+                                  <input
+                                    type="text"
+                                    value={inlineEditData?.outQty || ''}
+                                    onChange={e => setInlineEditData(prev => prev ? { ...prev, outQty: e.target.value } : null)}
+                                    placeholder="0"
+                                    className="w-14 px-1 py-0.5 border border-rose-400 rounded text-center text-xs font-black text-rose-600 focus:outline-none focus:ring-1 focus:ring-rose-500 bg-white"
+                                  />
+                                ) : (
+                                  hist.outQty && hist.outQty !== '0' ? hist.outQty : '-'
+                                )}
+                              </td>
+
+                              {/* 재고 수량 */}
+                              <td className="py-1.5 px-2 border-r border-slate-100 font-bold text-emerald-700">
+                                {hist.stockQty}
+                              </td>
+
+                              {/* 상세내역 */}
+                              <td className="py-1.5 px-3 border-r border-slate-100 text-left text-slate-600 italic">
+                                {isEditingInline ? (
+                                  <input
+                                    type="text"
+                                    value={inlineEditData?.details || ''}
+                                    onChange={e => setInlineEditData(prev => prev ? { ...prev, details: e.target.value } : null)}
+                                    placeholder="상세내역 (사용 장소/사유)"
+                                    className="w-full px-2 py-0.5 border border-slate-300 rounded text-left text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                  />
+                                ) : (
+                                  <span className="truncate max-w-[180px] block">{hist.details || hist.note || '-'}</span>
+                                )}
+                              </td>
+
+                              {/* 관리 컬럼: 아이콘 전용 버튼 */}
+                              <td className="py-1.5 px-2 text-center">
+                                <div className="flex items-center justify-center gap-1.5">
+                                  {isEditingInline ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleSaveInlineEdit(hist)}
+                                        className="p-1.5 bg-emerald-600 text-white hover:bg-emerald-700 rounded transition-all shadow-xs"
+                                        title="수정 완료"
+                                      >
+                                        <Check size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => { setInlineEditId(null); setInlineEditData(null); }}
+                                        className="p-1.5 bg-slate-200 text-slate-600 hover:bg-slate-300 rounded transition-all"
+                                        title="취소"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartInlineEdit(hist)}
+                                        className="p-1.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white rounded transition-all shadow-xs"
+                                        title="수정"
+                                      >
+                                        <Edit2 size={13} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteItem(hist.id)}
+                                        className="p-1.5 bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-600 hover:text-white rounded transition-all shadow-xs"
+                                        title="삭제"
+                                      >
+                                        <Trash2 size={13} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* 10개 항목당 페이지네이션 */}
+                {totalHistoryPages > 1 && (
+                  <div className="flex items-center justify-between pt-2 px-1">
+                    <span className="text-[11px] font-medium text-slate-500">
+                      총 {itemHistoryList.length}개 중 {((historyPage - 1) * historyItemsPerPage) + 1}-{Math.min(historyPage * historyItemsPerPage, itemHistoryList.length)} 표시
+                    </span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                        disabled={historyPage === 1}
+                        className="px-2 py-1 rounded border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors flex items-center gap-0.5"
+                      >
+                        <ChevronLeft size={13} />
+                        이전
+                      </button>
+                      <span className="px-2.5 text-xs font-black text-slate-700">
+                        {historyPage} / {totalHistoryPages} 페이지
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setHistoryPage(p => Math.min(totalHistoryPages, p + 1))}
+                        disabled={historyPage === totalHistoryPages}
+                        className="px-2 py-1 rounded border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors flex items-center gap-0.5"
+                      >
+                        다음
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="p-5 bg-slate-50 border-t border-slate-100 flex gap-4">
@@ -831,7 +1370,7 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                   <th className={`${thClass} w-[76px]`}><div className={cellDivClass}>단위</div></th>
                   <th className={`${thClass} w-[180px]`}><div className={cellDivClass}>비고</div></th>
                   <th className={`${thClass} w-[56px]`}><div className={cellDivClass}>수기</div></th>
-                  <th className={`${thClass} w-[104px] print:hidden`}><div className={cellDivClass}>관리</div></th>
+                  <th className={`${thClass} w-[140px] print:hidden`}><div className={cellDivClass}>관리</div></th>
                 </tr>
               ) : (
                 <tr className="h-[40px]">
@@ -894,9 +1433,29 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                       <td className={`${tdClass} text-left`}><div className={`${cellDivLeftClass} italic text-gray-500`}>{item.note}</div></td>
                       <td className={tdClass}><div className={cellDivClass}>{item.isManual ? 'O' : ''}</div></td>
                       <td className={`${tdClass} print:hidden`}>
-                        <div className="flex items-center justify-center gap-1 h-full px-2">
-                          <button onClick={() => openIndependentWindow(item.id)} className="p-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-all" title="수정"><Edit2 size={14} /></button>
-                          <button onClick={() => handleDeleteItem(item.id)} className="p-1 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded transition-all" title="삭제"><Trash2 size={14} /></button>
+                        <div className="flex items-center justify-center gap-1.5 h-full px-1">
+                          <button 
+                            onClick={() => openIndependentWindow('new', item, 'usage')} 
+                            className="px-2 py-1 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-600 hover:text-white rounded text-[11px] font-bold transition-all flex items-center gap-0.5 shadow-2xs" 
+                            title="사용 및 입고 등록"
+                          >
+                            <Plus size={12} />
+                            사용
+                          </button>
+                          <button 
+                            onClick={() => openIndependentWindow(item.id, undefined, 'ledger')} 
+                            className="p-1 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded transition-all" 
+                            title="품목 정보 수정"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteItem(item.id)} 
+                            className="p-1 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded transition-all" 
+                            title="삭제"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                         </div>
                       </td>
                     </tr>
