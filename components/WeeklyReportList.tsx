@@ -85,26 +85,34 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
     }).join('');
 
     const validPhotos = (report.photos || []).filter(p => p.dataUrl);
-    let photosSectionHtml = '';
-    if (validPhotos.length === 0) {
-      photosSectionHtml = `
-        <div class="section-header">2. 작업사진</div>
-        <div style="width:100%; text-align:center; padding:30px; color:#999; font-weight:bold;">등록된 작업 사진이 없습니다.</div>
-      `;
-    } else {
-      const photosListHtml = validPhotos.map(photo => `
-        <div class="photo-card">
-          <div class="photo-img-wrap"><img src="${photo.dataUrl}" /></div>
-          <div class="photo-title">${photo.title || '작업 사진'}</div>
-        </div>
-      `).join('');
+    let photosPagesHtml = '';
 
-      photosSectionHtml = `
-        <div class="section-header">2. 작업사진</div>
-        <div class="photo-grid">
-          ${photosListHtml}
-        </div>
-      `;
+    if (validPhotos.length > 0) {
+      const PHOTOS_PER_PAGE = 15;
+      const totalPages = Math.ceil(validPhotos.length / PHOTOS_PER_PAGE);
+
+      for (let pageIdx = 0; pageIdx < totalPages; pageIdx++) {
+        const pagePhotos = validPhotos.slice(pageIdx * PHOTOS_PER_PAGE, (pageIdx + 1) * PHOTOS_PER_PAGE);
+        const photosListHtml = pagePhotos.map(photo => `
+          <div class="photo-card">
+            <div class="photo-img-wrap"><img src="${photo.dataUrl}" /></div>
+            <div class="photo-title">${photo.title || '작업 사진'}</div>
+          </div>
+        `).join('');
+
+        const headerHtml = pageIdx === 0 
+          ? `<div class="section-header" style="margin-top:0;">2. 작업사진</div>` 
+          : `<div style="height:15px;"></div>`;
+
+        photosPagesHtml += `
+          <div class="print-page">
+            ${headerHtml}
+            <div class="photo-grid">
+              ${photosListHtml}
+            </div>
+          </div>
+        `;
+      }
     }
 
     printWindow.document.write(`
@@ -113,29 +121,69 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
           <title>주간업무보고 - ${report.startDate}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
-            @page { size: A4 portrait; margin: 15mm 10mm 15mm 10mm; }
+            @page { size: A4 portrait; margin: 0; }
             * { box-sizing: border-box; }
-            body { font-family: 'Noto Sans KR', sans-serif; font-size: 9pt; line-height: 1.2; color: black; margin: 0; padding: 0; background: #525659; -webkit-print-color-adjust: exact; }
-            .no-print { margin: 20px; display: flex; gap: 10px; justify-content: center; }
-            @media print { 
-              @page { size: A4 portrait; margin: 15mm 10mm 15mm 10mm; }
-              .no-print { display: none !important; } 
-              body { background: white !important; margin: 0 !important; padding: 0 !important; } 
-              .print-page { box-shadow: none !important; margin: 0 !important; padding: 0 !important; width: 100% !important; min-height: auto !important; }
+            body { 
+              font-family: 'Noto Sans KR', sans-serif; 
+              font-size: 9pt; 
+              line-height: 1.2; 
+              color: black; 
+              margin: 0; 
+              padding: 20px 0; 
+              background: #525659; 
+              -webkit-print-color-adjust: exact; 
+              display: flex;
+              flex-direction: column;
+              align-items: center;
             }
-            .print-page { width: 100%; max-width: 210mm; margin: 20px auto; padding: 15mm 10mm 15mm 10mm; box-sizing: border-box; background: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); min-height: 297mm; }
-            .doc-title { margin: 0 auto 15px auto; text-align: center; font-size: 28pt; font-weight: 900; letter-spacing: 12px; text-decoration: underline; text-underline-offset: 8px; }
-            .info-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 11pt; margin-bottom: 15px; border-bottom: 1.5px solid black; padding-bottom: 5px; }
-            .section-header { font-size: 13pt; font-weight: bold; margin-top: 20px; margin-bottom: 12px; border-left: 8px solid black; padding-left: 15px; text-align: left; break-after: avoid; page-break-after: avoid; }
-            table { width: 100%; border-collapse: collapse; border: 1.5px solid black; margin-bottom: 15px; table-layout: fixed; }
+            .no-print { margin-bottom: 20px; display: flex; gap: 10px; justify-content: center; width: 100%; }
+            @media print { 
+              @page { size: A4 portrait; margin: 0; }
+              .no-print { display: none !important; } 
+              body { background: white !important; margin: 0 !important; padding: 0 !important; display: block !important; } 
+              .print-page { 
+                box-shadow: none !important; 
+                margin: 0 !important; 
+                padding: 12mm 10mm !important; 
+                width: 100% !important; 
+                min-height: 297mm !important;
+                max-height: 297mm !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                overflow: hidden !important;
+              }
+              .print-page:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+              }
+            }
+            .print-page { 
+              width: 210mm; 
+              min-height: 297mm; 
+              margin: 0 auto 20px auto; 
+              padding: 12mm 10mm; 
+              box-sizing: border-box; 
+              background: white; 
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25); 
+              position: relative;
+              page-break-after: always;
+              break-after: page;
+            }
+            .print-page:last-child {
+              margin-bottom: 0;
+            }
+            .doc-title { margin: 0 auto 12px auto; text-align: center; font-size: 26pt; font-weight: 900; letter-spacing: 12px; text-decoration: underline; text-underline-offset: 6px; }
+            .info-line { display: flex; justify-content: space-between; font-weight: bold; font-size: 10.5pt; margin-bottom: 12px; border-bottom: 1.5px solid black; padding-bottom: 4px; }
+            .section-header { font-size: 12.5pt; font-weight: bold; margin-top: 10px; margin-bottom: 10px; border-left: 8px solid black; padding-left: 12px; text-align: left; break-after: avoid; page-break-after: avoid; }
+            table { width: 100%; border-collapse: collapse; border: 1.5px solid black; margin-bottom: 0; table-layout: fixed; }
             tr { break-inside: avoid; page-break-inside: avoid; }
-            th, td { border: 1px solid black; padding: 6px; font-size: 9pt; vertical-align: top; word-break: break-all; }
+            th, td { border: 1px solid black; padding: 4px 5px; font-size: 8.5pt; vertical-align: top; word-break: break-all; }
             th { background: #f3f4f6; font-weight: normal; text-align: center; }
-            .photo-grid { display: flex; flex-wrap: wrap; gap: 1.5%; margin-top: 10px; }
-            .photo-card { width: 32%; border: 1px solid #000; padding: 5px; box-sizing: border-box; margin-bottom: 12px; background: white; break-inside: avoid; page-break-inside: avoid; }
-            .photo-img-wrap { width: 100%; aspect-ratio: 4/3; overflow: hidden; border: 1px solid #000; display: flex; align-items: center; justify-content: center; background: #f9f9f9; }
+            .photo-grid { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 1.5%; row-gap: 12px; margin-top: 10px; }
+            .photo-card { width: 32.3%; border: 1px solid #000; padding: 5px; box-sizing: border-box; background: white; break-inside: avoid; page-break-inside: avoid; }
+            .photo-img-wrap { width: 100%; height: 135px; overflow: hidden; border: 1px solid #000; display: flex; align-items: center; justify-content: center; background: #f9f9f9; }
             .photo-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
-            .photo-title { font-weight: normal; font-size: 8.5pt; text-align: center; padding-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-bottom: 1px solid #000; }
+            .photo-title { font-weight: bold; font-size: 8.5pt; text-align: center; padding-top: 4px; padding-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
           </style>
         </head>
         <body>
@@ -158,9 +206,9 @@ const WeeklyReportList: React.FC<WeeklyReportListProps> = ({ onSelectReport }) =
               </thead>
               <tbody>${fieldsTableHtml}</tbody>
             </table>
-
-            ${photosSectionHtml}
           </div>
+
+          ${photosPagesHtml}
         </body>
       </html>
     `);
