@@ -426,79 +426,150 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
     }));
   };
 
-  const handleRegister = async () => {
+  const handleAddToList = () => {
     if (!newItem.itemName.trim()) {
       alert('품명은 필수 입력 항목입니다.');
       return;
     }
+
+    const inVal = parseFloat(String(newItem.inQty || '0').replace(/,/g, '')) || 0;
+    const outVal = parseFloat(String(newItem.outQty || '0').replace(/,/g, '')) || 0;
+
+    if (inVal === 0 && outVal === 0 && !newItem.details?.trim() && !newItem.note?.trim()) {
+      alert('입고량, 사용량 또는 상세내역을 입력해주세요.');
+      return;
+    }
+
+    const newItemToAdd: ConsumableItem = {
+      ...newItem,
+      id: editId || generateId(),
+      inQty: newItem.inQty || '0',
+      outQty: newItem.outQty || '0',
+      itemName: newItem.itemName.trim(),
+      modelName: (newItem.modelName || '').trim(),
+      minStock: newItem.minStock || '5',
+      isManual: !!newItem.isManual,
+      isDiscontinued: !!newItem.isDiscontinued,
+      details: newItem.details || '',
+      note: newItem.note || ''
+    };
+
+    let updatedList = [...items];
+    if (editId) {
+      const idx = updatedList.findIndex(i => String(i.id) === String(editId));
+      if (idx >= 0) {
+        updatedList[idx] = newItemToAdd;
+      } else {
+        updatedList = [newItemToAdd, ...updatedList];
+      }
+    } else {
+      updatedList = [newItemToAdd, ...updatedList];
+    }
+
+    // 동일 품목 입출고에 따른 재고 자동 계산
+    const targetCategory = newItemToAdd.category;
+    const targetItemName = newItemToAdd.itemName;
+    const targetModelName = newItemToAdd.modelName;
+
+    const groupItems = updatedList
+      .filter(
+        i =>
+          i.category === targetCategory &&
+          (i.itemName || '').trim() === targetItemName &&
+          (i.modelName || '').trim() === targetModelName
+      )
+      .sort((a, b) => {
+        const timeA = new Date(a.date).getTime();
+        const timeB = new Date(b.date).getTime();
+        if (timeA !== timeB) return timeA - timeB;
+        return updatedList.indexOf(b) - updatedList.indexOf(a);
+      });
+
+    let runningStock = 0;
+    const updatedStockMap = new Map<string, string>();
+    groupItems.forEach(item => {
+      const itemIn = parseFloat(String(item.inQty || '0').replace(/,/g, '')) || 0;
+      const itemOut = parseFloat(String(item.outQty || '0').replace(/,/g, '')) || 0;
+      runningStock = runningStock + itemIn - itemOut;
+      updatedStockMap.set(String(item.id), runningStock.toString());
+    });
+
+    const finalUpdatedList = updatedList.map(item => {
+      if (updatedStockMap.has(String(item.id))) {
+        return {
+          ...item,
+          stockQty: updatedStockMap.get(String(item.id)) || item.stockQty
+        };
+      }
+      return item;
+    });
+
+    setItems(finalUpdatedList);
+
+    setBaseStock(runningStock);
+    setEditId(null);
+    setNewItem(prev => ({
+      ...prev,
+      inQty: '',
+      outQty: '',
+      details: '',
+      stockQty: runningStock.toString()
+    }));
+
+    alert('이전 사용/입고 내역 리스트에 등록되었습니다.\n(※ 최종 저장하려면 하단의 [서버에 데이터 저장] 버튼을 누르세요)');
+  };
+
+  const handleRegister = async () => {
     setLoading(true);
     try {
-      const latestItems = await fetchConsumables();
-      let newList = Array.isArray(latestItems) ? [...latestItems] : [];
-      const itemToSave = { 
-        ...newItem, 
-        id: editId || generateId(),
-        inQty: newItem.inQty || '0',
-        outQty: newItem.outQty || '0',
-        itemName: newItem.itemName.trim(),
-        modelName: (newItem.modelName || '').trim(),
-        minStock: newItem.minStock || '5',
-        isManual: !!newItem.isManual,
-        isDiscontinued: !!newItem.isDiscontinued
-      };
-      if (editId) {
-        const targetIndex = newList.findIndex(i => String(i.id) === String(editId));
-        if (targetIndex >= 0) {
-          const originalItem = newList[targetIndex];
-          const oldCategory = originalItem.category;
-          const oldItemName = (originalItem.itemName || '').trim();
-          const oldModelName = (originalItem.modelName || '').trim();
+      let listToSave = [...items];
 
-          const newCategory = itemToSave.category;
-          const newItemName = itemToSave.itemName;
-          const newModelName = itemToSave.modelName;
-          const newUnit = itemToSave.unit;
-          const newMinStock = itemToSave.minStock;
+      // 현재 입력 폼에 등록되지 않은 입고/사용/상세내역 데이터가 남아있다면 자동으로 포함
+      const currentIn = parseFloat(String(newItem.inQty || '0').replace(/,/g, '')) || 0;
+      const currentOut = parseFloat(String(newItem.outQty || '0').replace(/,/g, '')) || 0;
 
-          // 동일한 (구분, 품명, 모델명)을 가진 이전 모든 입출고 내역을 신규 수정 정보로 일괄 변경
-          newList = newList.map(item => {
-            if (String(item.id) === String(editId)) {
-              return itemToSave;
-            }
-            if (
-              item.category === oldCategory &&
-              (item.itemName || '').trim() === oldItemName &&
-              (item.modelName || '').trim() === oldModelName
-            ) {
-              return {
-                ...item,
-                category: newCategory,
-                itemName: newItemName,
-                modelName: newModelName,
-                unit: newUnit,
-                minStock: newMinStock,
-                isDiscontinued: itemToSave.isDiscontinued
-              };
-            }
-            return item;
-          });
+      if (newItem.itemName.trim() && (currentIn > 0 || currentOut > 0 || (newItem.details && newItem.details.trim()))) {
+        const itemToSave: ConsumableItem = {
+          ...newItem,
+          id: editId || generateId(),
+          inQty: newItem.inQty || '0',
+          outQty: newItem.outQty || '0',
+          itemName: newItem.itemName.trim(),
+          modelName: (newItem.modelName || '').trim(),
+          minStock: newItem.minStock || '5',
+          isManual: !!newItem.isManual,
+          isDiscontinued: !!newItem.isDiscontinued
+        };
+
+        if (editId) {
+          const targetIndex = listToSave.findIndex(i => String(i.id) === String(editId));
+          if (targetIndex >= 0) {
+            listToSave[targetIndex] = itemToSave;
+          } else {
+            listToSave = [itemToSave, ...listToSave];
+          }
         } else {
-          newList = [itemToSave, ...newList];
+          listToSave = [itemToSave, ...listToSave];
         }
-      } else {
-        newList = [itemToSave, ...newList];
       }
-      const success = await saveConsumables(newList);
+
+      if (listToSave.length === 0) {
+        alert('저장할 내역이 없습니다.');
+        setLoading(false);
+        return;
+      }
+
+      const success = await saveConsumables(listToSave);
       if (success) {
         if (window.opener) {
           window.opener.postMessage({ type: 'CONSUMABLE_SAVED' }, '*');
         }
         setSaveStatus(true);
-        alert('성공적으로 저장되었습니다.');
+        alert('성공적으로 서버에 저장되었습니다.');
         if (isPopupMode) {
           window.close();
         } else {
-          setItems(newList);
+          setItems(listToSave);
           setTimeout(() => setSaveStatus(false), 2000);
         }
       } else {
@@ -618,7 +689,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
       i => i.category === newItem.category &&
       (i.itemName || '').trim() === newItem.itemName.trim() &&
       (i.modelName || '').trim() === (newItem.modelName || '').trim()
-    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    ).sort((a, b) => {
+      const timeA = new Date(a.date).getTime();
+      const timeB = new Date(b.date).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return items.indexOf(a) - items.indexOf(b);
+    });
   }, [items, newItem.category, newItem.itemName, newItem.modelName]);
 
   const [historyPage, setHistoryPage] = useState(1);
@@ -677,7 +753,12 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
           (i.itemName || '').trim() === targetItemName &&
           (i.modelName || '').trim() === targetModelName
       )
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      .sort((a, b) => {
+        const timeA = new Date(a.date).getTime();
+        const timeB = new Date(b.date).getTime();
+        if (timeA !== timeB) return timeA - timeB;
+        return newList.indexOf(b) - newList.indexOf(a);
+      });
 
     let runningStock = 0;
     const updatedStockMap = new Map<string, string>();
@@ -1049,27 +1130,39 @@ const ConsumablesLedger: React.FC<ConsumablesLedgerProps> = ({ onBack, viewMode 
                   <textarea value={newItem.details} onChange={e => setNewItem({...newItem, details: e.target.value})} placeholder="사용 장소, 작업 내용 등 구체적인 사유 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 font-medium outline-none focus:ring-2 focus:ring-blue-500 resize-none h-12" />
                 </div>
               )}
-              <div className="flex items-center gap-4 mt-2">
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    id="isManualCheck" 
-                    checked={newItem.isManual || false} 
-                    onChange={e => setNewItem({...newItem, isManual: e.target.checked})} 
-                    className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                  <label htmlFor="isManualCheck" className="text-sm font-bold text-gray-700 cursor-pointer">수기작업</label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id="isManualCheck" 
+                      checked={newItem.isManual || false} 
+                      onChange={e => setNewItem({...newItem, isManual: e.target.checked})} 
+                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <label htmlFor="isManualCheck" className="text-sm font-bold text-gray-700 cursor-pointer">수기작업</label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="checkbox" 
+                      id="isDiscontinuedCheck" 
+                      checked={newItem.isDiscontinued || false} 
+                      onChange={e => setNewItem({...newItem, isDiscontinued: e.target.checked})} 
+                      className="w-4 h-4 text-rose-600 bg-gray-100 border-gray-300 rounded focus:ring-rose-500"
+                    />
+                    <label htmlFor="isDiscontinuedCheck" className="text-sm font-bold text-rose-700 cursor-pointer">사용안함 (자재신청 미연동)</label>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    id="isDiscontinuedCheck" 
-                    checked={newItem.isDiscontinued || false} 
-                    onChange={e => setNewItem({...newItem, isDiscontinued: e.target.checked})} 
-                    className="w-4 h-4 text-rose-600 bg-gray-100 border-gray-300 rounded focus:ring-rose-500"
-                  />
-                  <label htmlFor="isDiscontinuedCheck" className="text-sm font-bold text-rose-700 cursor-pointer">사용안함 (자재신청 미연동)</label>
-                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddToList}
+                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm shadow-md transition-all flex items-center gap-1.5 active:scale-95 shrink-0"
+                  title="이전 사용/입고 내역 목록에 등록 (서버 저장은 하단의 [서버에 데이터 저장] 버튼 클릭)"
+                >
+                  <PlusCircle size={18} />
+                  리스트등록 (이전사용/입고내역에 등록)
+                </button>
               </div>
             </div>
 
