@@ -119,24 +119,58 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
 } | null> => {
   try {
     return await withRetry(async () => {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+      if (!apiKey) {
+        console.warn("Gemini API key is missing");
+        return null;
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const tenantContext = tenants.map(t => `${t.floor}: ${t.name}`).join(', ');
 
+      const base64Data = base64Image.includes(',') ? base64Image.split(',')[1] : base64Image;
       const imagePart = {
-        inlineData: { mimeType: 'image/jpeg', data: base64Image.split(',')[1] }
+        inlineData: { mimeType: 'image/jpeg', data: base64Data }
       };
 
-      const prompt = `사진의 계량기 수치를 읽으세요. 입주사 명단 [${tenantContext}] 중 매칭되는 곳과 지침값(정수)을 JSON으로 반환하세요.`;
+      const prompt = `계량기 사진입니다. 사진을 분석하여 아래 항목을 추출 후 JSON으로 출력하세요.
+1. tenantName: 계량기 명표/위치에 표시된 입주사 명칭 (입주사 명단 중 매칭되는 이름)
+2. floor: 입주사 층수 (예: 3F, B1)
+3. type: '일반' 또는 '특수'
+4. reading: 계량기 계기판의 정수 수치 지침값 (단위나 쉼표 제외한 숫자)
+
+입주사 명단: [${tenantContext}]`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: { parts: [imagePart, { text: prompt }] },
-        config: { responseMimeType: "application/json" }
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              tenantName: { type: Type.STRING, description: "입주사 명칭" },
+              floor: { type: Type.STRING, description: "층수" },
+              type: { type: Type.STRING, enum: ["일반", "특수"], description: "검침 구분" },
+              reading: { type: Type.STRING, description: "계량기 수치 숫자" }
+            },
+            required: ["tenantName", "floor", "type", "reading"]
+          }
+        }
       });
 
-      return JSON.parse(response.text || '{}');
+      const text = response.text || '{}';
+      const parsed = JSON.parse(text);
+
+      const tenantName = parsed.tenantName || parsed.tenant || parsed.tenant_name || '';
+      const floor = parsed.floor || parsed.floorName || '';
+      const type = parsed.type === '특수' ? '특수' : '일반';
+      const rawReading = parsed.reading ?? parsed.currentReading ?? parsed.value ?? '';
+      const reading = String(rawReading).replace(/[^0-9]/g, '');
+
+      return { tenantName, floor, type, reading };
     });
   } catch (error: any) {
+    console.error("analyzeMeterPhoto error:", error);
     if (error?.message?.includes("429")) {
       alert("현재 AI 분석 서버가 혼잡합니다. 잠시 후 다시 시도하거나 지침값을 직접 입력해 주세요.");
     }

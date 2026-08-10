@@ -199,19 +199,62 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
     }
   };
 
+  const runAiAnalysis = async (photoBase64: string) => {
+    if (!photoBase64) return;
+    setAnalyzing(true);
+    try {
+      const result = await analyzeMeterPhoto(photoBase64, tenants);
+      if (result) {
+        const resTenant = (result.tenantName || '').trim();
+        const resFloor = (result.floor || '').trim();
+
+        let matchedTenant = tenants.find(t =>
+          (resTenant && t.name.trim().toLowerCase() === resTenant.toLowerCase()) &&
+          (!resFloor || t.floor.trim().toLowerCase() === resFloor.toLowerCase())
+        );
+
+        if (!matchedTenant && resTenant) {
+          const normRes = resTenant.replace(/\s+/g, '').toLowerCase();
+          matchedTenant = tenants.find(t => {
+            const normName = t.name.replace(/\s+/g, '').toLowerCase();
+            return normName.includes(normRes) || normRes.includes(normName);
+          });
+        }
+
+        const tenantToSet = matchedTenant ? matchedTenant.name : resTenant;
+        const floorToSet = matchedTenant ? matchedTenant.floor : resFloor;
+
+        setNewItem(prev => ({
+          ...prev,
+          tenant: tenantToSet || prev.tenant,
+          floor: floorToSet || prev.floor,
+          type: result.type || prev.type || '일반',
+          reading: result.reading || prev.reading
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to analyze meter photo:", err);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const resized = await resizeImage(file);
       setNewItem(prev => ({ ...prev, photo: resized }));
-      if (!isAiEnabled) return;
-      setAnalyzing(true);
-      try {
-        const result = await analyzeMeterPhoto(resized, tenants);
-        if (result) setNewItem(prev => ({ ...prev, tenant: result.tenantName, floor: result.floor, type: result.type, reading: result.reading ? Math.floor(parseFloat(result.reading.toString().replace(/,/g, ''))).toString() : '' }));
-      } catch (err) {
-        console.error("Failed to analyze meter photo:", err);
-      } finally { setAnalyzing(false); }
+      if (isAiEnabled) {
+        await runAiAnalysis(resized);
+      }
+    }
+  };
+
+  const handleToggleAi = async () => {
+    const nextState = !isAiEnabled;
+    setIsAiEnabled(nextState);
+    if (nextState && newItem.photo) {
+      await runAiAnalysis(newItem.photo);
     }
   };
 
@@ -353,7 +396,7 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => setIsAiEnabled(!isAiEnabled)} className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black transition-all border shadow-sm active:scale-95 ${isAiEnabled ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-slate-400 border-slate-200'}`}><Bot size={16} /> {isAiEnabled ? 'AI 분석 사용중' : 'AI 분석 꺼짐'}</button>
+              <button onClick={handleToggleAi} className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black transition-all border shadow-sm active:scale-95 ${isAiEnabled ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-slate-400 border-slate-200'}`}><Bot size={16} /> {isAiEnabled ? 'AI 분석 사용중' : 'AI 분석 꺼짐'}</button>
               <button onClick={() => window.close()} className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"><X size={28} /></button>
             </div>
           </div>

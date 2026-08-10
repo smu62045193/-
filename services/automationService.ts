@@ -52,6 +52,118 @@ export const isNonWorkingDay = (date: Date): boolean => {
 };
 
 /**
+ * 공휴일/휴무일 이월 처리 헬퍼 함수
+ * prevDay와 nextDay 옵션에 따라 이월일을 계산하며,
+ * 둘 다 체크된 경우 연휴 일수(짝수/홀수) 및 지정일 위치에 따라 전일/익일을 스마트하게 분할 처리합니다.
+ */
+export const resolveHolidayShift = (S: Date, prevDay: boolean, nextDay: boolean): Date => {
+  if (!isNonWorkingDay(S)) return S;
+
+  let usePrev = false;
+  let useNext = false;
+
+  if (prevDay && !nextDay) {
+    usePrev = true;
+  } else if (!prevDay && nextDay) {
+    useNext = true;
+  } else if (prevDay && nextDay) {
+    // 둘 다 체크된 경우: 연속 휴무 블록 계산 (동일 월 내)
+    let blockStart = S;
+    while (blockStart.getMonth() === S.getMonth()) {
+      const prev = addDays(blockStart, -1);
+      if (prev.getMonth() === S.getMonth() && isNonWorkingDay(prev)) {
+        blockStart = prev;
+      } else {
+        break;
+      }
+    }
+
+    let blockEnd = S;
+    while (blockEnd.getMonth() === S.getMonth()) {
+      const next = addDays(blockEnd, 1);
+      if (next.getMonth() === S.getMonth() && isNonWorkingDay(next)) {
+        blockEnd = next;
+      } else {
+        break;
+      }
+    }
+
+    // 연속 휴무 일수 N 및 현재 지정일 위치 k (1-based)
+    const N = differenceInDays(blockEnd, blockStart) + 1;
+    const k = differenceInDays(S, blockStart) + 1;
+
+    if (N % 2 === 0) {
+      // 짝수 연휴 (2일, 4일 등): 앞 절반은 전일, 뒤 절반은 익일
+      if (k <= N / 2) {
+        usePrev = true;
+      } else {
+        useNext = true;
+      }
+    } else {
+      // 홀수 연휴 (1일, 3일, 5일 등): 1일차는 전일, 2일차 이상(가운데/뒷부분)은 익일
+      if (k === 1) {
+        usePrev = true;
+      } else {
+        useNext = true;
+      }
+    }
+  } else {
+    // 둘 다 체크되지 않은 경우 이월 안 함
+    return S;
+  }
+
+  let runDate = S;
+
+  if (usePrev) {
+    let temp = addDays(S, -1);
+    let found = false;
+    while (temp.getMonth() === S.getMonth()) {
+      if (!isNonWorkingDay(temp)) {
+        runDate = temp;
+        found = true;
+        break;
+      }
+      temp = addDays(temp, -1);
+    }
+    // 월을 벗어날 경우 익일로 대체
+    if (!found) {
+      let tempForward = addDays(S, 1);
+      while (tempForward.getMonth() === S.getMonth()) {
+        if (!isNonWorkingDay(tempForward)) {
+          runDate = tempForward;
+          break;
+        }
+        tempForward = addDays(tempForward, 1);
+      }
+    }
+  } else if (useNext) {
+    let temp = addDays(S, 1);
+    let found = false;
+    while (temp.getMonth() === S.getMonth()) {
+      if (!isNonWorkingDay(temp)) {
+        runDate = temp;
+        found = true;
+        break;
+      }
+      temp = addDays(temp, 1);
+    }
+    // 월을 벗어날 경우 전일로 대체
+    if (!found) {
+      let tempBackward = addDays(S, -1);
+      while (tempBackward.getMonth() === S.getMonth()) {
+        if (!isNonWorkingDay(tempBackward)) {
+          runDate = tempBackward;
+          break;
+        }
+        tempBackward = addDays(tempBackward, -1);
+      }
+    }
+  }
+
+  return runDate;
+};
+
+/**
  * 매월 첫 번째 월요일을 기준(1주차의 첫 날인 월요일)으로 날짜의 마일리안 주차를 계산합니다.
  * 첫 번째 월요일 이전의 일은 주차가 없는 것으로 판단해 0을 반환합니다.
  */
@@ -131,51 +243,7 @@ export const isWeeklySettingMatched = (setting: any, date: Date): boolean => {
       let runDate: Date = S;
 
       if (isNonWorkingDay(S)) {
-        if (prevDay) {
-          let temp = addDays(S, -1);
-          let found = false;
-          while (temp.getMonth() === S.getMonth()) {
-            if (!isNonWorkingDay(temp)) {
-              runDate = temp;
-              found = true;
-              break;
-            }
-            temp = addDays(temp, -1);
-          }
-          if (!found) {
-            let tempForward = addDays(S, 1);
-            while (tempForward.getMonth() === S.getMonth()) {
-              if (!isNonWorkingDay(tempForward)) {
-                runDate = tempForward;
-                break;
-              }
-              tempForward = addDays(tempForward, 1);
-            }
-          }
-        } else if (nextDay) {
-          let temp = addDays(S, 1);
-          let found = false;
-          while (temp.getMonth() === S.getMonth()) {
-            if (!isNonWorkingDay(temp)) {
-              runDate = temp;
-              found = true;
-              break;
-            }
-            temp = addDays(temp, 1);
-          }
-          if (!found) {
-            let tempBackward = addDays(S, -1);
-            while (tempBackward.getMonth() === S.getMonth()) {
-              if (!isNonWorkingDay(tempBackward)) {
-                runDate = tempBackward;
-                break;
-              }
-              tempBackward = addDays(tempBackward, -1);
-            }
-          }
-        } else {
-          continue; // No shifting. Ignored
-        }
+        runDate = resolveHolidayShift(S, prevDay, nextDay);
       }
 
       if (!isNonWorkingDay(runDate) && runDate.getDate() === date.getDate()) {
@@ -302,51 +370,7 @@ export const isMonthlySettingMatched = (setting: any, date: Date): boolean => {
 
         // B. 만약 여전히 휴무일이라면, 동일한 월 내에서 전일/익일 로직 수행 (월 이탈 방지)
         if (isNonWorkingDay(runDate)) {
-          if (prevDay) {
-            let temp = addDays(S, -1);
-            let found = false;
-            while (temp.getMonth() === S.getMonth()) {
-              if (!isNonWorkingDay(temp)) {
-                runDate = temp;
-                found = true;
-                break;
-              }
-              temp = addDays(temp, -1);
-            }
-            // 월을 이탈할 시, 익일(이후 근무일)로 자동 대체하여 같은 달 내에서 처리
-            if (!found) {
-              let tempForward = addDays(S, 1);
-              while (tempForward.getMonth() === S.getMonth()) {
-                if (!isNonWorkingDay(tempForward)) {
-                  runDate = tempForward;
-                  break;
-                }
-                tempForward = addDays(tempForward, 1);
-              }
-            }
-          } else if (nextDay) {
-            let temp = addDays(S, 1);
-            let found = false;
-            while (temp.getMonth() === S.getMonth()) {
-              if (!isNonWorkingDay(temp)) {
-                runDate = temp;
-                found = true;
-                break;
-              }
-              temp = addDays(temp, 1);
-            }
-            // 월을 이탈할 시, 전일(이전 근무일)로 자동 대체하여 같은 달 내에서 처리
-            if (!found) {
-              let tempBackward = addDays(S, -1);
-              while (tempBackward.getMonth() === S.getMonth()) {
-                if (!isNonWorkingDay(tempBackward)) {
-                  runDate = tempBackward;
-                  break;
-                }
-                tempBackward = addDays(tempBackward, -1);
-              }
-            }
-          }
+          runDate = resolveHolidayShift(runDate, prevDay, nextDay);
         }
       }
 
@@ -508,49 +532,7 @@ export const isYearlySettingMatched = (setting: any, date: Date): boolean => {
 
         // B. 만약 여전히 휴무일이라면, 동일한 월 내에서 전일/익일 로직 수행 (월 이탈 방지)
         if (isNonWorkingDay(runDate)) {
-          if (prevDay) {
-            let temp = addDays(S, -1);
-            let found = false;
-            while (temp.getMonth() === S.getMonth()) {
-              if (!isNonWorkingDay(temp)) {
-                runDate = temp;
-                found = true;
-                break;
-              }
-              temp = addDays(temp, -1);
-            }
-            if (!found) {
-              let tempForward = addDays(S, 1);
-              while (tempForward.getMonth() === S.getMonth()) {
-                if (!isNonWorkingDay(tempForward)) {
-                  runDate = tempForward;
-                  break;
-                }
-                tempForward = addDays(tempForward, 1);
-              }
-            }
-          } else if (nextDay) {
-            let temp = addDays(S, 1);
-            let found = false;
-            while (temp.getMonth() === S.getMonth()) {
-              if (!isNonWorkingDay(temp)) {
-                runDate = temp;
-                found = true;
-                break;
-              }
-              temp = addDays(temp, 1);
-            }
-            if (!found) {
-              let tempBackward = addDays(S, -1);
-              while (tempBackward.getMonth() === S.getMonth()) {
-                if (!isNonWorkingDay(tempBackward)) {
-                  runDate = tempBackward;
-                  break;
-                }
-                tempBackward = addDays(tempBackward, -1);
-              }
-            }
-          }
+          runDate = resolveHolidayShift(runDate, prevDay, nextDay);
         }
       }
 

@@ -46,6 +46,8 @@ const getFloorWeight = (floor: string) => {
   return num;
 };
 
+const normalize = (str: string) => (str || '').replace(/\s+/g, '');
+
 const MeterReadingLog: React.FC<MeterReadingLogProps> = ({ 
   currentDate, 
   activeTab, 
@@ -97,7 +99,6 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
 
       if (fetched) {
         // 이미 서버에 데이터가 있는 경우
-        const normalize = (str: string) => (str || '').replace(/\s+/g, '');
         let updatedItems = (fetched.items || []).map(item => {
           const matchedPhoto = photos.find(p => 
             normalize(p.tenant) === normalize(item.tenant) && 
@@ -326,7 +327,6 @@ const MeterReadingLog: React.FC<MeterReadingLogProps> = ({
         }
 
         // 초기 생성된 리스트에 사진첩 데이터가 있다면 즉시 반영
-        const normalize = (str: string) => (str || '').replace(/\s+/g, '');
         const syncedItems = initialItems.map(item => {
           const matchedPhoto = photos.find(p => 
             normalize(p.tenant) === normalize(item.tenant) && 
