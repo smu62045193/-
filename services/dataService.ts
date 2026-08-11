@@ -1512,13 +1512,37 @@ const decodeConstructionLogs = (row: any): ConstructionWorkItem => {
     date = rangeMatch[1].trim();
     content = content.replace(/\n\[DateRange:\s*([^\]]+)\]$/, '');
   }
+
+  let contactPerson = row.contact_person || '';
+  let phoneMain = row.phone_main || '';
+  let phoneMobile = row.phone_mobile || '';
+  let subcontractors = row.subcontractors || [];
+
+  const metaMatch = content.match(/\n\[EXT_META:\s*([\s\S]+?)\]$/);
+  if (metaMatch) {
+    try {
+      const parsed = JSON.parse(metaMatch[1]);
+      if (parsed.contactPerson) contactPerson = parsed.contactPerson;
+      if (parsed.phoneMain) phoneMain = parsed.phoneMain;
+      if (parsed.phoneMobile) phoneMobile = parsed.phoneMobile;
+      if (Array.isArray(parsed.subcontractors)) subcontractors = parsed.subcontractors;
+    } catch (e) {
+      console.error('Error parsing EXT_META:', e);
+    }
+    content = content.replace(/\n\[EXT_META:\s*([\s\S]+?)\]$/, '');
+  }
+
   return {
     id: row.id,
     date: date,
     category: row.category,
     company: row.company,
+    contactPerson: contactPerson,
+    phoneMain: phoneMain,
+    phoneMobile: phoneMobile,
     content: content,
-    photos: row.photos || []
+    photos: row.photos || [],
+    subcontractors: subcontractors
   };
 };
 
@@ -1538,12 +1562,22 @@ export const fetchExternalWorkList = async (): Promise<ConstructionWorkItem[]> =
 export const saveConstructionWorkItem = async (item: ConstructionWorkItem, source: 'external' | 'internal'): Promise<boolean> => {
   let dbDate = item.date;
   let dbContent = item.content;
+
+  const extMeta = {
+    contactPerson: item.contactPerson || '',
+    phoneMain: item.phoneMain || '',
+    phoneMobile: item.phoneMobile || '',
+    subcontractors: item.subcontractors || []
+  };
+
+  dbContent = `${dbContent}\n[EXT_META: ${JSON.stringify(extMeta)}]`;
+
   if (item.date && item.date.includes('~')) {
     dbDate = item.date.split('~')[0].trim();
     if (!dbDate) {
       dbDate = new Date().toISOString().split('T')[0];
     }
-    dbContent = `${item.content}\n[DateRange: ${item.date}]`;
+    dbContent = `${dbContent}\n[DateRange: ${item.date}]`;
   }
 
   const dbData = { 

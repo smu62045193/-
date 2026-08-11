@@ -902,8 +902,13 @@ export interface ConstructionWorkItem {
   date: string;        // YYYY-MM-DD
   category: string;    // 구분 (전기, 설비, 영선 등)
   company?: string;    // 업체명 (Optional, mainly for external)
+  contactPerson?: string; // 담당자
+  phoneMain?: string;   // 대표번호
+  phoneMobile?: string; // 휴대폰
+  note?: string;        // 비고
   content: string;     // 내용
-  photos: WorkPhoto[]; // Max 10 photos
+  photos: WorkPhoto[]; // Photos
+  subcontractors?: SubcontractorLog[]; // 협력(하청)업체 및 작업자 이력
 }
 
 // Appointment Status Types

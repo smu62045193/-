@@ -9,11 +9,10 @@ const TABS = [
   { id: 'history', label: '전체이력' },
   { id: 'external', label: '외부업체' },
   { id: 'internal', label: '시설직' },
-  { id: 'contractors', label: '공사업체' },
 ];
 
 const ConstructionManager: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'history' | 'external' | 'internal' | 'contractors'>('history');
+  const [activeTab, setActiveTab] = useState<'history' | 'external' | 'internal'>('history');
 
   return (
     <div className="p-4 max-w-7xl mx-auto animate-fade-in space-y-2 pb-32">
@@ -45,7 +44,6 @@ const ConstructionManager: React.FC = () => {
         {(activeTab === 'external' || activeTab === 'internal') && (
           <ConstructionLog mode={activeTab} />
         )}
-        {activeTab === 'contractors' && <ConstructionContractorManager />}
       </div>
     </div>
   );
