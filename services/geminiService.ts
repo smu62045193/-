@@ -132,13 +132,20 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
         inlineData: { mimeType: 'image/jpeg', data: base64Data }
       };
 
-      const prompt = `계량기 사진입니다. 사진을 분석하여 아래 항목을 추출 후 JSON으로 출력하세요.
-1. tenantName: 계량기 명표/위치에 표시된 입주사 명칭 (입주사 명단 중 매칭되는 이름)
-2. floor: 입주사 층수 (예: 3F, B1)
-3. type: '일반' 또는 '특수'
-4. reading: 계량기 계기판의 정수 수치 지침값 (단위나 쉼표 제외한 숫자)
+      const prompt = `이 사진은 계량기(전력량계) 사진입니다. 사진을 정밀 분석하여 아래 4가지 항목을 정확하게 추출한 후 JSON으로 출력하세요.
 
-입주사 명단: [${tenantContext}]`;
+1. 노란색 스티커/라벨 표지판 분석 (가장 중요):
+   - 계량기 전면이나 상단에 부착된 노란색 라벨/테이프를 유심히 찾으세요. (예: [B2F] [특수] 식당, [2F] [일반] 이가종합, [3F] [특수] 이가ACM, [5F] [일반] 이스턴)
+   - [층수]: B2F, 2F, 3F, 4F, 5F, B1 등 층수를 floor 항목으로 추출하세요.
+   - [구분]: '일반' 또는 '특수'를 type 항목으로 추출하세요.
+   - [입주사명]: 스티커에 표기된 입주사명(예: 식당, 이가종합, 이가ACM, 이스턴 등)을 tenantName 항목으로 추출하세요.
+   - 노란색 스티커가 없다면 주변의 인쇄된 라벨이나 명표를 참조하세요.
+
+2. 계량기 수치 (지침값):
+   - 계량기 중앙의 LCD 디지털 화면에 표시된 계량 수치 숫자를 읽으세요. (예: 33663.0, 37722.1, 09391.8, 16276.2 등)
+   - 소수점을 제외한 정수 부분(예: 33663)을 reading 항목으로 추출하세요.
+
+등록된 입주사 명단 목록: [${tenantContext}]`;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -148,10 +155,10 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
           responseSchema: {
             type: Type.OBJECT,
             properties: {
-              tenantName: { type: Type.STRING, description: "입주사 명칭" },
-              floor: { type: Type.STRING, description: "층수" },
-              type: { type: Type.STRING, enum: ["일반", "특수"], description: "검침 구분" },
-              reading: { type: Type.STRING, description: "계량기 수치 숫자" }
+              tenantName: { type: Type.STRING, description: "노란색 라벨/명표의 입주사 명칭" },
+              floor: { type: Type.STRING, description: "층수 (예: B2F, 2F, 3F)" },
+              type: { type: Type.STRING, enum: ["일반", "특수"], description: "검침 구분 (일반 또는 특수)" },
+              reading: { type: Type.STRING, description: "계량기 검침 수치 정수 (예: 33663)" }
             },
             required: ["tenantName", "floor", "type", "reading"]
           }
@@ -161,11 +168,23 @@ export const analyzeMeterPhoto = async (base64Image: string, tenants: Tenant[]):
       const text = response.text || '{}';
       const parsed = JSON.parse(text);
 
-      const tenantName = parsed.tenantName || parsed.tenant || parsed.tenant_name || '';
-      const floor = parsed.floor || parsed.floorName || '';
+      const tenantName = (parsed.tenantName || parsed.tenant || parsed.tenant_name || '').trim();
+      const floor = (parsed.floor || parsed.floorName || '').trim();
       const type = parsed.type === '특수' ? '특수' : '일반';
-      const rawReading = parsed.reading ?? parsed.currentReading ?? parsed.value ?? '';
-      const reading = String(rawReading).replace(/[^0-9]/g, '');
+
+      let rawReading = parsed.reading ?? parsed.currentReading ?? parsed.value ?? '';
+      if (typeof rawReading === 'number') {
+        rawReading = String(Math.floor(rawReading));
+      } else {
+        const strVal = String(rawReading).trim();
+        const match = strVal.match(/\d+(\.\d+)?/);
+        if (match) {
+          rawReading = String(Math.floor(parseFloat(match[0])));
+        } else {
+          rawReading = strVal.replace(/[^0-9]/g, '');
+        }
+      }
+      const reading = rawReading;
 
       return { tenantName, floor, type, reading };
     });

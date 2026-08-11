@@ -27,12 +27,12 @@ const resizeImage = (file: File): Promise<string> => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_SIZE = 800; 
+        const MAX_SIZE = 1200; 
         if (width > height) { if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; } } 
         else { if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; } }
         canvas.width = width; canvas.height = height;
         const ctx = canvas.getContext('2d');
-        if (ctx) { ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', 0.6)); } 
+        if (ctx) { ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', 0.85)); } 
         else { reject(new Error("Canvas context not available")); }
       };
       img.onerror = reject; img.src = e.target?.result as string;
@@ -67,7 +67,6 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [isAiEnabled, setIsAiEnabled] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [data, setData] = useState<MeterPhotoData>({ month: currentMonth, items: [] });
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -199,6 +198,8 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
     }
   };
 
+  const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
+
   const runAiAnalysis = async (photoBase64: string) => {
     if (!photoBase64) return;
     setAnalyzing(true);
@@ -239,22 +240,123 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const resized = await resizeImage(file);
-      setNewItem(prev => ({ ...prev, photo: resized }));
-      if (isAiEnabled) {
-        await runAiAnalysis(resized);
+  const handleBatchFiles = async (files: File[]) => {
+    if (files.length === 0) return;
+    setAnalyzing(true);
+    setBatchProgress({ current: 0, total: files.length });
+
+    const targetMonth = newItem.date ? newItem.date.substring(0, 7) : currentMonth;
+    const latestData = await fetchMeterPhotos(targetMonth);
+    let updatedItems = Array.isArray(latestData?.items) ? [...latestData.items] : [];
+    const newCreatedItems: MeterPhotoItem[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      setBatchProgress({ current: i + 1, total: files.length });
+      const file = files[i];
+      try {
+        const resized = await resizeImage(file);
+        let tenantName = '';
+        let floorName = '';
+        let meterType: '일반' | '특수' = '일반';
+        let readingVal = '';
+
+        const result = await analyzeMeterPhoto(resized, tenants);
+        if (result) {
+          const resTenant = (result.tenantName || '').trim();
+          const resFloor = (result.floor || '').trim();
+
+          let matchedTenant = tenants.find(t =>
+            (resTenant && t.name.trim().toLowerCase() === resTenant.toLowerCase()) &&
+            (!resFloor || t.floor.trim().toLowerCase() === resFloor.toLowerCase())
+          );
+
+          if (!matchedTenant && resTenant) {
+            const normRes = resTenant.replace(/\s+/g, '').toLowerCase();
+            matchedTenant = tenants.find(t => {
+              const normName = t.name.replace(/\s+/g, '').toLowerCase();
+              return normName.includes(normRes) || normRes.includes(normName);
+            });
+          }
+
+          tenantName = matchedTenant ? matchedTenant.name : resTenant;
+          floorName = matchedTenant ? matchedTenant.floor : resFloor;
+          meterType = (result.type as '일반' | '특수') || '일반';
+          readingVal = result.reading || '';
+        }
+
+        const itemId = generateUUID();
+        const fileName = `meter_${itemId}_${Date.now()}_${i}.jpg`;
+        const publicUrl = await uploadFile('facility', 'meters', fileName, resized);
+
+        const finalTenantName = tenantName || (floorName ? `${floorName} 입주사` : `미지정_${i + 1}`);
+
+        const itemToSave: MeterPhotoItem = {
+          id: itemId,
+          floor: floorName,
+          tenant: finalTenantName,
+          reading: readingVal,
+          date: newItem.date || format(new Date(), 'yyyy-MM-dd'),
+          type: meterType,
+          photo: publicUrl || resized
+        };
+
+        newCreatedItems.push(itemToSave);
+      } catch (fileErr) {
+        console.error(`Error processing file ${i + 1}:`, fileErr);
       }
     }
+
+    if (newCreatedItems.length > 0) {
+      updatedItems = [...newCreatedItems, ...updatedItems];
+      const success = await saveMeterPhotos({ month: targetMonth, items: updatedItems });
+      if (success) {
+        try {
+          const monthlyReadingData = await fetchMeterReading(targetMonth);
+          if (monthlyReadingData && monthlyReadingData.items) {
+            const normalize = (str: string) => (str || '').replace(/\s+/g, '');
+            let updatedMonthlyItems = [...monthlyReadingData.items];
+            for (const itemToSave of newCreatedItems) {
+              updatedMonthlyItems = updatedMonthlyItems.map(mItem => {
+                if (normalize(mItem.floor) === normalize(itemToSave.floor) && 
+                    normalize(mItem.note) === normalize(itemToSave.type)) {
+                  return { ...mItem, tenant: itemToSave.tenant, currentReading: itemToSave.reading };
+                }
+                return mItem;
+              });
+            }
+            await saveMeterReading({ ...monthlyReadingData, items: updatedMonthlyItems });
+          }
+        } catch (syncError) {
+          console.error('Batch sync error:', syncError);
+        }
+
+        if (window.opener) window.opener.postMessage({ type: 'METER_PHOTO_SAVED' }, '*');
+        window.alert(`${newCreatedItems.length}장의 계량기 사진이 성공적으로 등록 및 분석되었습니다.`);
+        if (isPopupMode) {
+          window.close();
+        } else {
+          await loadData();
+        }
+      } else {
+        window.alert('일괄 저장에 실패했습니다.');
+      }
+    }
+
+    setAnalyzing(false);
+    setBatchProgress(null);
   };
 
-  const handleToggleAi = async () => {
-    const nextState = !isAiEnabled;
-    setIsAiEnabled(nextState);
-    if (nextState && newItem.photo) {
-      await runAiAnalysis(newItem.photo);
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (files.length === 1) {
+      const file = files[0];
+      const resized = await resizeImage(file);
+      setNewItem(prev => ({ ...prev, photo: resized }));
+      await runAiAnalysis(resized);
+    } else {
+      await handleBatchFiles(Array.from(files));
     }
   };
 
@@ -396,7 +498,6 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={handleToggleAi} className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black transition-all border shadow-sm active:scale-95 ${isAiEnabled ? 'bg-blue-600 text-white border-blue-700' : 'bg-white text-slate-400 border-slate-200'}`}><Bot size={16} /> {isAiEnabled ? 'AI 분석 사용중' : 'AI 분석 꺼짐'}</button>
               <button onClick={() => window.close()} className="p-2 hover:bg-white/20 rounded-full transition-colors text-white"><X size={28} /></button>
             </div>
           </div>
@@ -405,10 +506,30 @@ const MeterReadingPhotos: React.FC<MeterReadingPhotosProps> = ({
               <div className="lg:w-1/2 flex flex-col">
                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Photo Preview</label>
                 <label className="w-full aspect-[4/3] border-4 border-dashed border-slate-100 rounded-[32px] flex flex-col items-center justify-center cursor-pointer bg-slate-50/30 hover:bg-amber-50/50 hover:border-amber-300 transition-all overflow-hidden relative group shadow-inner">
-                  {newItem.photo ? <img src={newItem.photo} className="w-full h-full object-contain" alt="Meter" /> : <div className="flex flex-col items-center gap-3"><div className="p-5 bg-white rounded-3xl shadow-md text-slate-400 group-hover:text-amber-500 group-hover:scale-110 transition-all"><Upload size={40} /></div><span className="text-slate-400 font-black text-sm">이미지 선택 또는 직접 촬영</span></div>}
-                  <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                  {newItem.photo ? <img src={newItem.photo} className="w-full h-full object-contain" alt="Meter" /> : <div className="flex flex-col items-center gap-3 p-4 text-center"><div className="p-5 bg-white rounded-3xl shadow-md text-slate-400 group-hover:text-amber-500 group-hover:scale-110 transition-all"><Upload size={40} /></div><span className="text-slate-600 font-black text-sm">이미지 선택 (여러 장 선택 가능: 최대 40장 이상)</span><span className="text-xs text-slate-400 font-medium">여러 장 선택 시 AI가 자동 분석하여 일괄 등록합니다</span></div>}
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
                 </label>
-                {analyzing && <div className="mt-4 flex items-center justify-center gap-3 bg-blue-50 text-blue-700 p-4 rounded-2xl font-black border border-blue-100 animate-pulse"><Sparkles size={20} className="animate-spin" /><span className="text-sm">AI가 계량기 수치를 정밀 분석 중입니다...</span></div>}
+                {analyzing && (
+                  <div className="mt-4 flex flex-col items-center justify-center gap-2 bg-blue-50 text-blue-700 p-4 rounded-2xl font-black border border-blue-100 animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <Sparkles size={20} className="animate-spin" />
+                      <span className="text-sm">
+                        {batchProgress 
+                          ? `[${batchProgress.current} / ${batchProgress.total}] 사진 AI 분석 및 등록 중...`
+                          : 'AI가 계량기 수치를 정밀 분석 중입니다...'
+                        }
+                      </span>
+                    </div>
+                    {batchProgress && (
+                      <div className="w-full bg-blue-200 rounded-full h-2 mt-1 overflow-hidden">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                          style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="lg:w-1/2 flex flex-col gap-6">
                 <div><label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">입주사 선택 *</label><select className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 outline-none font-black text-slate-800 focus:bg-white focus:ring-4 focus:ring-blue-50 transition-all text-base h-[60px]" value={`${newItem.tenant}|${newItem.floor}`} onChange={e => { const [name, floor] = e.target.value.split('|'); setNewItem({ ...newItem, tenant: name, floor }); }}><option value="">입주사 및 층수 선택</option>{tenants.map(t => <option key={t.id} value={`${t.name}|${t.floor}`}>{t.name} ( {t.floor} )</option>)}</select></div>
