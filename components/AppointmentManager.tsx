@@ -14,7 +14,7 @@ const TABS = [
   { id: 'status', label: '선임현황' },
 ];
 
-const CATEGORIES = ['전기', '기계', '소방', '승강기'];
+const CATEGORIES = ['전기', '기계', '소방', '승강기', '기타'];
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = false, isEmbedded = false }) => {
@@ -125,7 +125,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
   };
 
   const sortedItems = React.useMemo(() => {
-    const orderMap: Record<string, number> = { '전기': 1, '소방': 2, '기계': 3, '승강기': 4 };
+    const orderMap: Record<string, number> = { '전기': 1, '소방': 2, '기계': 3, '승강기': 4, '기타': 5 };
     return [...items].sort((a, b) => {
       return (orderMap[a.category] || 99) - (orderMap[b.category] || 99) || a.name.localeCompare(b.name);
     });
@@ -459,6 +459,7 @@ const AppointmentManager: React.FC<AppointmentManagerProps> = ({ isPopupMode = f
                           it.category === '전기' ? 'bg-blue-100 text-blue-700' :
                           it.category === '소방' ? 'bg-red-100 text-red-700' :
                           it.category === '기계' ? 'bg-orange-100 text-orange-700' :
+                          it.category === '승강기' ? 'bg-purple-100 text-purple-700' :
                           'bg-slate-100 text-slate-700'
                         }`}>
                           {it.category}
